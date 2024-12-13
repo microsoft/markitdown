@@ -23,6 +23,19 @@ result = markitdown.convert("test.xlsx")
 print(result.text_content)
 ```
 
+## Example with OpenAI Integration
+
+```python
+from markitdown import MarkItDown
+from openai import OpenAI
+
+client = OpenAI()
+md = MarkItDown(mlm_client=client, mlm_model="gpt-4o")
+image_file = 'https://gagb.github.io/imgs/bansal-chi21.png'
+result = md.convert(source=image_file)
+print(result.text_content)
+```
+
 ## Contributing
 
 This project welcomes contributions and suggestions.  Most contributions require you to agree to a
