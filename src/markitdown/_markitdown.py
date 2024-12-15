@@ -44,6 +44,14 @@ try:
 except ModuleNotFoundError:
     pass
 
+# Optional GitHub issue support
+try:
+    from github import Github
+
+    IS_GITHUB_ISSUE_CAPABLE = True
+except ModuleNotFoundError:
+    IS_GITHUB_ISSUE_CAPABLE = False
+
 
 class _CustomMarkdownify(markdownify.MarkdownConverter):
     """
@@ -837,6 +845,128 @@ class ImageConverter(MediaConverter):
         return response.choices[0].message.content
 
 
+class GitHubIssueConverter(DocumentConverter):
+    """Converts GitHub issues and pull requests to Markdown."""
+
+    def convert(self, github_url, github_token) -> Union[None, DocumentConverterResult]:
+        # Bail if not a valid GitHub issue or pull request URL
+        if github_url:
+            parsed_url = urlparse(github_url)
+            path_parts = parsed_url.path.strip("/").split("/")
+            if len(path_parts) < 4 or path_parts[2] not in ["issues", "pull"]:
+                return None
+
+            if not github_token:
+                raise ValueError(
+                    "GitHub token is not set. Cannot convert GitHub issue or pull request."
+                )
+
+            if path_parts[2] == "issues":
+                return self._convert_github_issue(github_url, github_token)
+            elif path_parts[2] == "pull":
+                return self._convert_github_pr(github_url, github_token)
+
+        return None
+
+    def _convert_github_issue(
+        self, issue_url: str, github_token: str
+    ) -> DocumentConverterResult:
+        """
+        Convert a GitHub issue to a markdown document.
+        Args:
+            issue_url (str): The URL of the GitHub issue to convert.
+            github_token (str): A GitHub token with access to the repository.
+        Returns:
+            DocumentConverterResult: The result containing the issue title and markdown content.
+        Raises:
+            ImportError: If the PyGithub library is not installed.
+            ValueError: If the provided URL is not a valid GitHub issue URL.
+        """
+        if not IS_GITHUB_ISSUE_CAPABLE:
+            raise ImportError(
+                "PyGithub is not installed. Please install it to use this feature."
+            )
+
+        # Parse the issue URL
+        parsed_url = urlparse(issue_url)
+        path_parts = parsed_url.path.strip("/").split("/")
+        if len(path_parts) < 4 or path_parts[2] != "issues":
+            raise ValueError("Invalid GitHub issue URL")
+
+        owner, repo, _, issue_number = path_parts[:4]
+
+        # Authenticate with GitHub
+        g = Github(github_token)
+        repo = g.get_repo(f"{owner}/{repo}")
+        issue = repo.get_issue(int(issue_number))
+
+        # Convert issue details to markdown
+        markdown_content = f"# {issue.title}\n\n{issue.body}\n\n"
+        markdown_content += f"**State:** {issue.state}\n"
+        markdown_content += f"**Created at:** {issue.created_at}\n"
+        markdown_content += f"**Updated at:** {issue.updated_at}\n"
+        markdown_content += f"**Comments:**\n"
+
+        for comment in issue.get_comments():
+            markdown_content += (
+                f"- {comment.user.login} ({comment.created_at}): {comment.body}\n"
+            )
+
+        return DocumentConverterResult(
+            title=issue.title,
+            text_content=markdown_content,
+        )
+
+    def _convert_github_pr(
+        self, pr_url: str, github_token: str
+    ) -> DocumentConverterResult:
+        """
+        Convert a GitHub pull request to a markdown document.
+        Args:
+            pr_url (str): The URL of the GitHub pull request to convert.
+            github_token (str): A GitHub token with access to the repository.
+        Returns:
+            DocumentConverterResult: The result containing the pull request title and markdown content.
+        Raises:
+            ImportError: If the PyGithub library is not installed.
+            ValueError: If the provided URL is not a valid GitHub pull request URL.
+        """
+        if not IS_GITHUB_ISSUE_CAPABLE:
+            raise ImportError(
+                "PyGithub is not installed. Please install it to use this feature."
+            )
+
+        # Parse the pull request URL
+        parsed_url = urlparse(pr_url)
+        path_parts = parsed_url.path.strip("/").split("/")
+        if len(path_parts) < 4 or path_parts[2] != "pull":
+            raise ValueError("Invalid GitHub pull request URL")
+
+        owner, repo, _, pr_number = path_parts[:4]
+
+        # Authenticate with GitHub
+        g = Github(github_token)
+        repo = g.get_repo(f"{owner}/{repo}")
+        pr = repo.get_pull(int(pr_number))
+
+        # Convert pull request details to markdown
+        markdown_content = f"# {pr.title}\n\n{pr.body}\n\n"
+        markdown_content += f"**State:** {pr.state}\n"
+        markdown_content += f"**Created at:** {pr.created_at}\n"
+        markdown_content += f"**Updated at:** {pr.updated_at}\n"
+        markdown_content += f"**Comments:**\n"
+
+        for comment in pr.get_issue_comments():
+            markdown_content += (
+                f"- {comment.user.login} ({comment.created_at}): {comment.body}\n"
+            )
+
+        return DocumentConverterResult(
+            title=pr.title,
+            text_content=markdown_content,
+        )
+
+
 class FileConversionException(BaseException):
     pass
 
@@ -889,7 +1019,6 @@ class MarkItDown:
             - source: can be a string representing a path or url, or a requests.response object
             - extension: specifies the file extension to use when interpreting the file. If None, infer from source (path, uri, content-type, etc.)
         """
-
         # Local path or url
         if isinstance(source, str):
             if (
@@ -903,6 +1032,28 @@ class MarkItDown:
         # Request response
         elif isinstance(source, requests.Response):
             return self.convert_response(source, **kwargs)
+
+    def convert_url(
+        self, url: str, **kwargs: Any
+    ) -> DocumentConverterResult:  # TODO: fix kwargs type
+        # Handle GitHub issue and pull request URLs directly
+        parsed_url = urlparse(url)
+        if parsed_url.hostname == "github.com" and any(
+            x in parsed_url.path for x in ["/issues/", "/pull/"]
+        ):
+            github_token = kwargs.get("github_token", os.getenv("GITHUB_TOKEN"))
+            if not github_token:
+                raise ValueError(
+                    "GitHub token is required for GitHub issue or pull request conversion."
+                )
+            return GitHubIssueConverter().convert(
+                github_url=url, github_token=github_token
+            )
+
+        # Send a HTTP request to the URL
+        response = self._requests_session.get(url, stream=True)
+        response.raise_for_status()
+        return self.convert_response(response, **kwargs)
 
     def convert_local(
         self, path: str, **kwargs: Any
@@ -957,14 +1108,6 @@ class MarkItDown:
             os.unlink(temp_path)
 
         return result
-
-    def convert_url(
-        self, url: str, **kwargs: Any
-    ) -> DocumentConverterResult:  # TODO: fix kwargs type
-        # Send a HTTP request to the URL
-        response = self._requests_session.get(url, stream=True)
-        response.raise_for_status()
-        return self.convert_response(response, **kwargs)
 
     def convert_response(
         self, response: requests.Response, **kwargs: Any

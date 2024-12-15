@@ -87,6 +87,10 @@ SERP_TEST_EXCLUDES = [
     "data:image/svg+xml,%3Csvg%20width%3D",
 ]
 
+GITHUB_ISSUE_URL = "https://github.com/microsoft/autogen/issues/1421"
+GITHUB_PR_URL = "https://github.com/microsoft/autogen/pull/194"
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
+
 
 @pytest.mark.skipif(
     skip_remote,
@@ -179,8 +183,34 @@ def test_markitdown_exiftool() -> None:
         assert target in result.text_content
 
 
+@pytest.mark.skipif(
+    not GITHUB_TOKEN,
+    reason="GitHub token not provided",
+)
+def test_markitdown_github_issue() -> None:
+    markitdown = MarkItDown()
+    result = markitdown.convert(GITHUB_ISSUE_URL, github_token=GITHUB_TOKEN)
+    print(result.text_content)
+    assert "User-Defined Functions" in result.text_content
+    assert "closed" in result.text_content
+    assert "Comments:" in result.text_content
+
+
+@pytest.mark.skipif(
+    not GITHUB_TOKEN,
+    reason="GitHub token not provided",
+)
+def test_markitdown_github_pr() -> None:
+    markitdown = MarkItDown()
+    result = markitdown.convert(GITHUB_PR_URL, github_token=GITHUB_TOKEN)
+    print(result.text_content)
+    assert "faq" in result.text_content
+
+
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     test_markitdown_remote()
     test_markitdown_local()
     test_markitdown_exiftool()
+    test_markitdown_github_issue()
+    test_markitdown_github_pr()

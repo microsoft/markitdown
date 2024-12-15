@@ -38,6 +38,7 @@ dependencies = [
   "youtube-transcript-api",
   "SpeechRecognition",
   "pathvalidate",
+  "pygithub"
 ]
 
 [project.urls]
