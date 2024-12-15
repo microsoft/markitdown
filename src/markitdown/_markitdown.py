@@ -498,6 +498,30 @@ class DocxConverter(HtmlConverter):
 
         return result
 
+class DocConverter(HtmlConverter):
+    """
+    Converts DOC files to Markdown.
+    """
+
+    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
+        """
+               Args:
+                   local_path (str): The path to the DOC file.
+                   **kwargs: Additional arguments that may include 'file_extension'.
+               Returns:
+                   Union[None, DocumentConverterResult]: The conversion result or None if the file is not a DOC.
+               """
+        extension = kwargs.get("file_extension", "")
+        if extension.lower() != ".doc":
+            return None
+
+        result = None
+        with open(local_path, "rb") as doc_file:
+            result = mammoth.convert_to_html(doc_file)
+            html_content = result.value
+            result = self._convert(html_content)
+
+        return result
 
 class XlsxConverter(HtmlConverter):
     """
@@ -874,6 +898,7 @@ class MarkItDown:
         self.register_page_converter(YouTubeConverter())
         self.register_page_converter(BingSerpConverter())
         self.register_page_converter(DocxConverter())
+        self.register_page_converter(DocConverter())
         self.register_page_converter(XlsxConverter())
         self.register_page_converter(PptxConverter())
         self.register_page_converter(WavConverter())
