@@ -51,6 +51,15 @@ DOCX_TEST_STRINGS = [
     "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation",
 ]
 
+DOC_TEST_STRINGS = [
+    "314b0a30-5b04-470b-b9f7-eed2c2bec74a",
+    "49e168b7-d2ae-407f-a055-2167576f39a1",
+    "## d666f1f7-46cb-42bd-9a39-9a39cf2a509f",
+    "# Abstract",
+    "# Introduction",
+    "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation",
+]
+
 PPTX_TEST_STRINGS = [
     "2cdda5c8-e50e-4db4-b5f0-9722a649f455",
     "04191ea8-5c73-4215-a1d3-1cfb43aaaf12",
