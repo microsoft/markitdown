@@ -40,6 +40,12 @@ dependencies = [
   "pathvalidate",
 ]
 
+[tool.uv]
+dev-dependencies = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.23.0",
+]
+
 [project.urls]
 Documentation = "https://github.com/microsoft/markitdown#readme"
 Issues = "https://github.com/microsoft/markitdown/issues"
