@@ -845,6 +845,10 @@ class UnsupportedFormatException(BaseException):
     pass
 
 
+class FileDoesNotExistException(BaseException):
+    pass
+
+
 class MarkItDown:
     """(In preview) An extremely simple text-based document reader, suitable for LLM use.
     This reader will convert common file-types or webpages to Markdown."""
@@ -910,6 +914,9 @@ class MarkItDown:
         # Prepare a list of extensions to try (in order of priority)
         ext = kwargs.get("file_extension")
         extensions = [ext] if ext is not None else []
+
+        if not os.path.exists(path):
+            raise FileDoesNotExistException(f"File {path} does not exist")
 
         # Get extension alternatives from the path and puremagic
         base, ext = os.path.splitext(path)
