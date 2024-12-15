@@ -88,10 +88,10 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
 
         # For the replacement see #29: text nodes underscores are escaped
         if (
-                self.options["autolinks"]
-                and text.replace(r"\_", "_") == href
-                and not title
-                and not self.options["default_title"]
+            self.options["autolinks"]
+            and text.replace(r"\_", "_") == href
+            and not title
+            and not self.options["default_title"]
         ):
             # Shortcut syntax
             return "<%s>" % href
@@ -112,8 +112,8 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         title = el.attrs.get("title", None) or ""
         title_part = ' "%s"' % title.replace('"', r"\"") if title else ""
         if (
-                convert_as_inline
-                and el.parent.name not in self.options["keep_inline_images_in"]
+            convert_as_inline
+            and el.parent.name not in self.options["keep_inline_images_in"]
         ):
             return alt
 
@@ -139,7 +139,7 @@ class DocumentConverter:
     """Abstract superclass of all DocumentConverters."""
 
     def convert(
-            self, local_path: str, **kwargs: Any
+        self, local_path: str, **kwargs: Any
     ) -> Union[None, DocumentConverterResult]:
         raise NotImplementedError()
 
@@ -148,7 +148,7 @@ class PlainTextConverter(DocumentConverter):
     """Anything with content type text/plain"""
 
     def convert(
-            self, local_path: str, **kwargs: Any
+        self, local_path: str, **kwargs: Any
     ) -> Union[None, DocumentConverterResult]:
         # Guess the content type from any file extension that might be around
         content_type, _ = mimetypes.guess_type(
@@ -174,7 +174,7 @@ class HtmlConverter(DocumentConverter):
     """Anything with content type text/html"""
 
     def convert(
-            self, local_path: str, **kwargs: Any
+        self, local_path: str, **kwargs: Any
     ) -> Union[None, DocumentConverterResult]:
         # Bail if not html
         extension = kwargs.get("file_extension", "")
@@ -217,7 +217,7 @@ class WikipediaConverter(DocumentConverter):
     """Handle Wikipedia pages separately, focusing only on the main document content."""
 
     def convert(
-            self, local_path: str, **kwargs: Any
+        self, local_path: str, **kwargs: Any
     ) -> Union[None, DocumentConverterResult]:
         # Bail if not Wikipedia
         extension = kwargs.get("file_extension", "")
@@ -266,7 +266,7 @@ class YouTubeConverter(DocumentConverter):
     """Handle YouTube specially, focusing on the video title, description, and transcript."""
 
     def convert(
-            self, local_path: str, **kwargs: Any
+        self, local_path: str, **kwargs: Any
     ) -> Union[None, DocumentConverterResult]:
         # Bail if not YouTube
         extension = kwargs.get("file_extension", "")
@@ -299,7 +299,7 @@ class YouTubeConverter(DocumentConverter):
                     obj_start = lines[0].find("{")
                     obj_end = lines[0].rfind("}")
                     if obj_start >= 0 and obj_end >= 0:
-                        data = json.loads(lines[0][obj_start: obj_end + 1])
+                        data = json.loads(lines[0][obj_start : obj_end + 1])
                         attrdesc = self._findKey(data, "attributedDescriptionBodyText")  # type: ignore
                         if attrdesc:
                             metadata["description"] = str(attrdesc["content"])
@@ -364,10 +364,10 @@ class YouTubeConverter(DocumentConverter):
         )
 
     def _get(
-            self,
-            metadata: Dict[str, str],
-            keys: List[str],
-            default: Union[str, None] = None,
+        self,
+        metadata: Dict[str, str],
+        keys: List[str],
+        default: Union[str, None] = None,
     ) -> Union[str, None]:
         for k in keys:
             if k in metadata:
@@ -435,7 +435,7 @@ class BingSerpConverter(DocumentConverter):
                 # but appears to be base64 encoded, with some prefix
                 if "u" in qs:
                     u = (
-                            qs["u"][0][2:].strip() + "=="
+                        qs["u"][0][2:].strip() + "=="
                     )  # Python 3 doesn't care about extra padding
 
                     try:
@@ -452,8 +452,8 @@ class BingSerpConverter(DocumentConverter):
             results.append("\n".join([line for line in lines if len(line) > 0]))
 
         webpage_text = (
-                f"## A Bing search for '{query}' found the following results:\n\n"
-                + "\n\n".join(results)
+            f"## A Bing search for '{query}' found the following results:\n\n"
+            + "\n\n".join(results)
         )
 
         return DocumentConverterResult(
@@ -586,11 +586,11 @@ class PptxConverter(HtmlConverter):
                     # A placeholder name
                     filename = re.sub(r"\W", "", shape.name) + ".jpg"
                     md_content += (
-                            "\n!["
-                            + (alt_text if alt_text else shape.name)
-                            + "]("
-                            + filename
-                            + ")\n"
+                        "\n!["
+                        + (alt_text if alt_text else shape.name)
+                        + "]("
+                        + filename
+                        + ")\n"
                     )
 
                 # Tables
@@ -608,7 +608,7 @@ class PptxConverter(HtmlConverter):
                         first_row = False
                     html_table += "</table></body></html>"
                     md_content += (
-                            "\n" + self._convert(html_table).text_content.strip() + "\n"
+                        "\n" + self._convert(html_table).text_content.strip() + "\n"
                     )
 
                 # Text areas
@@ -817,15 +817,15 @@ class ImageConverter(MediaConverter):
         mlm_model = kwargs.get("mlm_model")
         if mlm_client is not None and mlm_model is not None:
             md_content += (
-                    "\n# Description:\n"
-                    + self._get_mlm_description(
+                "\n# Description:\n"
+                + self._get_mlm_description(
                 local_path,
                 extension,
                 mlm_client,
                 mlm_model,
                 prompt=kwargs.get("mlm_prompt"),
             ).strip()
-                    + "\n"
+                + "\n"
             )
 
         return DocumentConverterResult(
@@ -879,10 +879,10 @@ class MarkItDown:
     This reader will convert common file-types or webpages to Markdown."""
 
     def __init__(
-            self,
-            requests_session: Optional[requests.Session] = None,
-            mlm_client: Optional[Any] = None,
-            mlm_model: Optional[Any] = None,
+        self,
+        requests_session: Optional[requests.Session] = None,
+        mlm_client: Optional[Any] = None,
+        mlm_model: Optional[Any] = None,
     ):
         if requests_session is None:
             self._requests_session = requests.Session()
@@ -912,7 +912,7 @@ class MarkItDown:
         self.register_page_converter(PdfConverter())
 
     def convert(
-            self, source: Union[str, requests.Response], **kwargs: Any
+        self, source: Union[str, requests.Response], **kwargs: Any
     ) -> DocumentConverterResult:  # TODO: deal with kwargs
         """
         Args:
@@ -923,9 +923,9 @@ class MarkItDown:
         # Local path or url
         if isinstance(source, str):
             if (
-                    source.startswith("http://")
-                    or source.startswith("https://")
-                    or source.startswith("file://")
+                source.startswith("http://")
+                or source.startswith("https://")
+                or source.startswith("file://")
             ):
                 return self.convert_url(source, **kwargs)
             else:
@@ -935,7 +935,7 @@ class MarkItDown:
             return self.convert_response(source, **kwargs)
 
     def convert_local(
-            self, path: str, **kwargs: Any
+        self, path: str, **kwargs: Any
     ) -> DocumentConverterResult:  # TODO: deal with kwargs
         # Prepare a list of extensions to try (in order of priority)
         ext = kwargs.get("file_extension")
@@ -953,7 +953,7 @@ class MarkItDown:
 
     # TODO what should stream's type be?
     def convert_stream(
-            self, stream: Any, **kwargs: Any
+        self, stream: Any, **kwargs: Any
     ) -> DocumentConverterResult:  # TODO: deal with kwargs
         # Prepare a list of extensions to try (in order of priority)
         ext = kwargs.get("file_extension")
@@ -997,7 +997,7 @@ class MarkItDown:
         return self.convert_response(response, **kwargs)
 
     def convert_response(
-            self, response: requests.Response, **kwargs: Any
+        self, response: requests.Response, **kwargs: Any
     ) -> DocumentConverterResult:  # TODO fix kwargs type
         # Prepare a list of extensions to try (in order of priority)
         ext = kwargs.get("file_extension")
@@ -1045,7 +1045,7 @@ class MarkItDown:
         return result
 
     def _convert(
-            self, local_path: str, extensions: List[Union[str, None]], **kwargs
+        self, local_path: str, extensions: List[Union[str, None]], **kwargs
     ) -> DocumentConverterResult:
         error_trace = ""
         for ext in extensions + [None]:  # Try last with no extension
