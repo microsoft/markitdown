@@ -6,7 +6,7 @@ import shutil
 import pytest
 import requests
 
-from markitdown import MarkItDown
+from markitdown import MarkItDown, FileDoesNotExistException
 
 skip_remote = (
     True if os.environ.get("GITHUB_ACTIONS") else False
@@ -143,6 +143,9 @@ def test_markitdown_local() -> None:
     for test_string in BLOG_TEST_STRINGS:
         text_content = result.text_content.replace("\\", "")
         assert test_string in text_content
+
+    with pytest.raises(FileDoesNotExistException):
+        markitdown.convert(os.path.join(TEST_FILES_DIR, "missing_file.pdf"))
 
     # Test Wikipedia processing
     result = markitdown.convert(
