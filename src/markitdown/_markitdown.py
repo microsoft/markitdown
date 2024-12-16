@@ -608,7 +608,7 @@ class BingSerpConverter(DocumentConverter):
     NOTE: It is better to use the Bing API
     """
 
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
+    def convert(self, local_path: str, **kwargs) -> Union[None, DocumentConverterResult]:
         # Bail if not a Bing SERP
         extension = kwargs.get("file_extension", "")
         if extension.lower() not in [".html", ".htm"]:
@@ -678,7 +678,7 @@ class PdfConverter(DocumentConverter):
     Converts PDFs to Markdown. Most style information is ignored, so the results are essentially plain-text.
     """
 
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
+    def convert(self, local_path: str, **kwargs) -> Union[None, DocumentConverterResult]:
         # Bail if not a PDF
         extension = kwargs.get("file_extension", "")
         if extension.lower() != ".pdf":
@@ -695,7 +695,7 @@ class DocxConverter(HtmlConverter):
     Converts DOCX files to Markdown. Style information (e.g.m headings) and tables are preserved where possible.
     """
 
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
+    def convert(self, local_path: str, **kwargs) -> Union[None, DocumentConverterResult]:
         # Bail if not a DOCX
         extension = kwargs.get("file_extension", "")
         if extension.lower() != ".docx":
@@ -717,7 +717,7 @@ class XlsxConverter(HtmlConverter):
     Converts XLSX files to Markdown, with each sheet presented as a separate Markdown table.
     """
 
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
+    def convert(self, local_path: str, **kwargs) -> Union[None, DocumentConverterResult]:
         # Bail if not a XLSX
         extension = kwargs.get("file_extension", "")
         if extension.lower() != ".xlsx":
@@ -741,7 +741,7 @@ class PptxConverter(HtmlConverter):
     Converts PPTX files to Markdown. Supports heading, tables and images with alt text.
     """
 
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
+    def convert(self, local_path: str, **kwargs) -> Union[None, DocumentConverterResult]:
         # Bail if not a PPTX
         extension = kwargs.get("file_extension", "")
         if extension.lower() != ".pptx":
@@ -881,7 +881,7 @@ class WavConverter(MediaConverter):
     Converts WAV files to markdown via extraction of metadata (if `exiftool` is installed), and speech transcription (if `speech_recognition` is installed).
     """
 
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
+    def convert(self, local_path: str, **kwargs) -> Union[None, DocumentConverterResult]:
         # Bail if not a WAV
         extension = kwargs.get("file_extension", "")
         if extension.lower() != ".wav":
@@ -936,7 +936,7 @@ class Mp3Converter(WavConverter):
     Converts MP3 files to markdown via extraction of metadata (if `exiftool` is installed), and speech transcription (if `speech_recognition` AND `pydub` are installed).
     """
 
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
+    def convert(self, local_path: str, **kwargs) -> Union[None, DocumentConverterResult]:
         # Bail if not a MP3
         extension = kwargs.get("file_extension", "")
         if extension.lower() != ".mp3":
@@ -997,7 +997,7 @@ class ImageConverter(MediaConverter):
     Converts images to markdown via extraction of metadata (if `exiftool` is installed), OCR (if `easyocr` is installed), and description via a multimodal LLM (if an llm_client is configured).
     """
 
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
+    def convert(self, local_path: str, **kwargs) -> Union[None, DocumentConverterResult]:
         # Bail if not an image
         extension = kwargs.get("file_extension", "")
         if extension.lower() not in [".jpg", ".jpeg", ".png"]:
