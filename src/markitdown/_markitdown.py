@@ -21,6 +21,7 @@ import pandas as pd
 import pdfminer
 import pdfminer.high_level
 import pptx
+import one_extract as onenote
 
 # File-format detection
 import puremagic
@@ -617,6 +618,32 @@ class PptxConverter(HtmlConverter):
         return False
 
 
+class OneNoteConverter(HtmlConverter):
+    """
+    Converts OneNote files to Markdown. Supports heading, tables and images with alt text.
+    """
+
+    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
+        # Bail if not a OneNote file
+        extension = kwargs.get("file_extension", "")
+        if extension.lower() != ".one":
+            return None
+
+        md_content = ""
+
+        notebook = onenote.Notebook(local_path)
+        for section in notebook.sections:
+            md_content += f"\n\n# {section.name}\n"
+            for page in section.pages:
+                md_content += f"\n\n## {page.name}\n"
+                md_content += self._convert(page.content).text_content.strip() + "\n\n"
+
+        return DocumentConverterResult(
+            title=None,
+            text_content=md_content.strip(),
+        )
+
+
 class MediaConverter(DocumentConverter):
     """
     Abstract class for multi-modal media (e.g., images and audio)
@@ -880,6 +907,7 @@ class MarkItDown:
         self.register_page_converter(Mp3Converter())
         self.register_page_converter(ImageConverter())
         self.register_page_converter(PdfConverter())
+        self.register_page_converter(OneNoteConverter())
 
     def convert(
         self, source: Union[str, requests.Response], **kwargs: Any

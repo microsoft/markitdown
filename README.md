@@ -12,6 +12,9 @@ It presently supports:
 - Audio (EXIF metadata, and speech transcription)
 - HTML (special handling of Wikipedia, etc.)
 - Various other text-based formats (csv, json, xml, etc.)
+- OneNote (.one)
+
+Note: OneNote is not supported.
 
 # Installation
 
@@ -50,6 +53,18 @@ md = MarkItDown(mlm_client=client, mlm_model="gpt-4o")
 result = md.convert("example.jpg")
 print(result.text_content)
 ```
+
+To convert OneNote files, you can use the following example:
+
+```python
+from markitdown import MarkItDown
+
+markitdown = MarkItDown()
+result = markitdown.convert("example.one")
+print(result.text_content)
+```
+
+Note: For OneNote support, the `one-extract` package is used.
 
 ## Contributing
 
