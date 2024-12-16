@@ -33,7 +33,7 @@ If you're on macOS, you can install markitdown via Homebrew:
 brew install markitdown
 ```
 
-This provides a convenient method to install and run markitdown directly from the terminal, with no need to install Python or other dependencies.
+This provides a convenient method to install and run markitdown directly from the terminal.
 
 # Usage
 The API is simple:
