@@ -194,7 +194,7 @@ def test_markitdown_exiftool() -> None:
         assert target in result.text_content
 
 
-if __name__main__":
+if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     test_markitdown_remote()
     test_markitdown_local()
