@@ -27,6 +27,11 @@ or from the source
 pip install -e .
 ```
 
+Alternatively, using conda
+
+```sh
+conda install markitdown
+```
 
 # Usage
 The API is simple:
