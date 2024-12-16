@@ -120,9 +120,12 @@ def test_markitdown_local() -> None:
 
     # Test XLSX processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.xlsx"))
+    # Check assertions
     for test_string in XLSX_TEST_STRINGS:
         text_content = result.text_content.replace("\\", "")
         assert test_string in text_content
+    # Check negations
+    assert "Unnamed:" not in text_content
 
     # Test DOCX processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.docx"))
