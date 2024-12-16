@@ -505,11 +505,11 @@ class DocConverter(HtmlConverter):
 
     def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
         """
-               Args:
-                   local_path (str): The path to the DOC file.
-                   **kwargs: Additional arguments that may include 'file_extension'.
-               Returns:
-                   Union[None, DocumentConverterResult]: The conversion result or None if the file is not a DOC.
+        Args:
+            local_path (str): The path to the DOC file.
+            **kwargs: Additional arguments that may include 'file_extension'.
+            Returns:Union[None, DocumentConverterResult]: The conversion result
+                    or None if the file is not a DOC.
                """
         extension = kwargs.get("file_extension", "")
         if extension.lower() != ".doc":
