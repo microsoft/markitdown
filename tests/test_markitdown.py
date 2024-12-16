@@ -126,6 +126,7 @@ def test_markitdown_local() -> None:
         assert test_string in text_content
     # Check negations
     assert "Unnamed:" not in text_content
+    assert "NaN" not in text_content
 
     # Test DOCX processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.docx"))
