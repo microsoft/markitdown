@@ -510,7 +510,7 @@ class XlsxConverter(HtmlConverter):
     Converts XLSX files to Markdown, with each sheet presented as a separate Markdown table.
     """
 
-    def _clean_colname(self, colname: str | Any) -> str | Any:
+    def _clean_colname(self, colname: Any) -> Any:
         if isinstance(colname, str) and colname.startswith("Unnamed:"):
             return ""
         return colname
