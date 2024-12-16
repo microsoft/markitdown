@@ -87,6 +87,15 @@ SERP_TEST_EXCLUDES = [
     "data:image/svg+xml,%3Csvg%20width%3D",
 ]
 
+ONENOTE_TEST_STRINGS = [
+    "# Section 1",
+    "## Page 1",
+    "This is a test OneNote page.",
+    "# Section 2",
+    "## Page 2",
+    "Another test OneNote page.",
+]
+
 
 @pytest.mark.skipif(
     skip_remote,
@@ -164,6 +173,12 @@ def test_markitdown_local() -> None:
     for test_string in SERP_TEST_STRINGS:
         assert test_string in text_content
 
+    # Test OneNote processing
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.one"))
+    text_content = result.text_content.replace("\\", "")
+    for test_string in ONENOTE_TEST_STRINGS:
+        assert test_string in text_content
+
 
 @pytest.mark.skipif(
     skip_exiftool,
@@ -179,7 +194,7 @@ def test_markitdown_exiftool() -> None:
         assert target in result.text_content
 
 
-if __name__ == "__main__":
+if __name__main__":
     """Runs this file's tests from the command line."""
     test_markitdown_remote()
     test_markitdown_local()
