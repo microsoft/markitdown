@@ -24,9 +24,17 @@ def main():
     parser.add_argument(
         "filename", nargs="?", help="if unspecified, defaults to stdin"
     ).complete = shtab.FILE
+    parser.add_argument("--llm-client", choices={"OpenAI"}, help="default None")
+    parser.add_argument("--llm-client-url", help="base URL for --llm-client")
+    parser.add_argument("--llm-model", help="required for --llm-client")
     shtab.add_argument_to(parser)
     args = parser.parse_args()
-    markitdown = MarkItDown()
+    if args.llm_client == "OpenAI":
+        from openai import OpenAI
+        llm_client = OpenAI(base_url=args.llm_client_url)
+    else:
+        llm_client = None
+    markitdown = MarkItDown(llm_client=llm_client, llm_model=args.llm_model)
     result = markitdown.convert(args.filename or sys.stdin.buffer)
     print(result.text_content)
 
