@@ -24,13 +24,13 @@ def main():
     parser.add_argument(
         "filename", nargs="?", help="if unspecified, defaults to stdin"
     ).complete = shtab.FILE
-    parser.add_argument("--llm-client", choices={"OpenAI"}, help="default None")
-    parser.add_argument("--llm-client-url", help="base URL for --llm-client")
-    parser.add_argument("--llm-model", help="required for --llm-client")
+    parser.add_argument("--llm-model", help="e.g. gpt-4o")
+    parser.add_argument("--llm-client-url", help="base URL for OpenAI LLM client")
     shtab.add_argument_to(parser)
     args = parser.parse_args()
-    if args.llm_client == "OpenAI":
+    if args.llm_model:
         from openai import OpenAI
+
         llm_client = OpenAI(base_url=args.llm_client_url)
     else:
         llm_client = None
