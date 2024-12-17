@@ -13,7 +13,7 @@ import sys
 import tempfile
 import traceback
 import zipfile
-from typing import Any, Dict, List, Optional, Union, overload
+from typing import Any, Dict, List, Optional, Union
 from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse, urlunparse
 from warnings import catch_warnings
@@ -1047,7 +1047,7 @@ class MarkItDown:
     ) -> DocumentConverterResult:  # TODO: deal with kwargs
         """
         Args:
-            - source: can be a string representing a path or url, or a requests.response object
+            - source: can be a string representing a path either as string pathlib path object or url, or a requests.response object
             - extension: specifies the file extension to use when interpreting the file. If None, infer from source (path, uri, content-type, etc.)
         """
 
