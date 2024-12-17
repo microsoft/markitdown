@@ -27,7 +27,7 @@ or from the source
 pip install -e .
 ```
 
-Alternatively, using conda
+Alternatively, using conda (for pre-release versions):
 
 ```sh
 conda install conda-forge/label/markitdown_dev::markitdown
