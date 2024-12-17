@@ -130,6 +130,16 @@ LLM_TEST_STRINGS = [
     "5bda1dd6",
 ]
 
+# --- Helper Functions ---
+def validate_strings(result, expected_strings, exclude_strings=None):
+    """Validate presence or absence of specific strings."""
+    text_content = result.text_content.replace("\\", "")
+    for string in expected_strings:
+        assert string in text_content
+    if exclude_strings:
+        for string in exclude_strings:
+            assert string not in text_content
+
 
 @pytest.mark.skipif(
     skip_remote,
@@ -163,73 +173,53 @@ def test_markitdown_local() -> None:
 
     # Test XLSX processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.xlsx"))
-    for test_string in XLSX_TEST_STRINGS:
-        text_content = result.text_content.replace("\\", "")
-        assert test_string in text_content
+    validate_strings(result, XLSX_TEST_STRINGS)
 
     # Test DOCX processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.docx"))
-    for test_string in DOCX_TEST_STRINGS:
-        text_content = result.text_content.replace("\\", "")
-        assert test_string in text_content
+    validate_strings(result, DOCX_TEST_STRINGS)
 
     # Test DOCX processing, with comments
     result = markitdown.convert(
         os.path.join(TEST_FILES_DIR, "test_with_comment.docx"),
         style_map="comment-reference => ",
     )
-    for test_string in DOCX_COMMENT_TEST_STRINGS:
-        text_content = result.text_content.replace("\\", "")
-        assert test_string in text_content
+    validate_strings(result, DOCX_COMMENT_TEST_STRINGS)
 
     # Test DOCX processing, with comments and setting style_map on init
     markitdown_with_style_map = MarkItDown(style_map="comment-reference => ")
     result = markitdown_with_style_map.convert(
         os.path.join(TEST_FILES_DIR, "test_with_comment.docx")
     )
-    for test_string in DOCX_COMMENT_TEST_STRINGS:
-        text_content = result.text_content.replace("\\", "")
-        assert test_string in text_content
+    validate_strings(result, DOCX_COMMENT_TEST_STRINGS)
 
     # Test PPTX processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.pptx"))
-    for test_string in PPTX_TEST_STRINGS:
-        text_content = result.text_content.replace("\\", "")
-        assert test_string in text_content
+    validate_strings(result, PPTX_TEST_STRINGS)
 
     # Test HTML processing
     result = markitdown.convert(
         os.path.join(TEST_FILES_DIR, "test_blog.html"), url=BLOG_TEST_URL
     )
-    for test_string in BLOG_TEST_STRINGS:
-        text_content = result.text_content.replace("\\", "")
-        assert test_string in text_content
+    validate_strings(result, BLOG_TEST_STRINGS)
 
     # Test ZIP file processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test_files.zip"))
-    for test_string in DOCX_TEST_STRINGS:
-        text_content = result.text_content.replace("\\", "")
-        assert test_string in text_content
+    validate_strings(result, XLSX_TEST_STRINGS)
 
     # Test Wikipedia processing
     result = markitdown.convert(
         os.path.join(TEST_FILES_DIR, "test_wikipedia.html"), url=WIKIPEDIA_TEST_URL
     )
     text_content = result.text_content.replace("\\", "")
-    for test_string in WIKIPEDIA_TEST_EXCLUDES:
-        assert test_string not in text_content
-    for test_string in WIKIPEDIA_TEST_STRINGS:
-        assert test_string in text_content
+    validate_strings(result, WIKIPEDIA_TEST_STRINGS, WIKIPEDIA_TEST_EXCLUDES)
 
     # Test Bing processing
     result = markitdown.convert(
         os.path.join(TEST_FILES_DIR, "test_serp.html"), url=SERP_TEST_URL
     )
     text_content = result.text_content.replace("\\", "")
-    for test_string in SERP_TEST_EXCLUDES:
-        assert test_string not in text_content
-    for test_string in SERP_TEST_STRINGS:
-        assert test_string in text_content
+    validate_strings(result, SERP_TEST_STRINGS, SERP_TEST_EXCLUDES)
 
     # Test RSS processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test_rss.xml"))
@@ -239,9 +229,7 @@ def test_markitdown_local() -> None:
 
     ## Test non-UTF-8 encoding
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test_mskanji.csv"))
-    text_content = result.text_content.replace("\\", "")
-    for test_string in CSV_CP932_TEST_STRINGS:
-        assert test_string in text_content
+    validate_strings(result, CSV_CP932_TEST_STRINGS)
 
 
 @pytest.mark.skipif(
