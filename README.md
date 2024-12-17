@@ -1,5 +1,7 @@
 # MarkItDown
 
+[![PyPI](https://img.shields.io/pypi/v/markitdown.svg)](https://pypi.org/project/markitdown/)
+
 The MarkItDown library is a utility tool for converting various files to Markdown (e.g., for indexing, text analysis, etc.)
 
 It presently supports:
@@ -12,6 +14,7 @@ It presently supports:
 - Audio (EXIF metadata, and speech transcription)
 - HTML (special handling of Wikipedia, etc.)
 - Various other text-based formats (csv, json, xml, etc.)
+- ZIP (Iterates over contents and converts each file)
 
 # Installation
 
@@ -29,11 +32,13 @@ pip install -e .
 # Homebrew Installation (for macOS users)
 If you're on macOS, you can install markitdown via Homebrew:
 
+
 ```sh
 brew install markitdown
 ```
 
 This provides a convenient method to install and run markitdown directly from the terminal.
+
 
 # Usage
 The API is simple:
@@ -46,16 +51,42 @@ result = markitdown.convert("test.xlsx")
 print(result.text_content)
 ```
 
-You can also configure markitdown to use Large Language Models to describe images. To do so you must provide mlm_client and mlm_model parameters to MarkItDown object, according to your specific client.
+To use this as a command-line utility, install it and then run it like this:
+
+```bash
+markitdown path-to-file.pdf
+```
+
+This will output Markdown to standard output. You can save it like this:
+
+```bash
+markitdown path-to-file.pdf > document.md
+```
+
+You can pipe content to standard input by omitting the argument:
+
+```bash
+cat path-to-file.pdf | markitdown
+```
+
+You can also configure markitdown to use Large Language Models to describe images. To do so you must provide `llm_client` and `llm_model` parameters to MarkItDown object, according to your specific client.
+
 
 ```python
 from markitdown import MarkItDown
 from openai import OpenAI
 
 client = OpenAI()
-md = MarkItDown(mlm_client=client, mlm_model="gpt-4o")
+md = MarkItDown(llm_client=client, llm_model="gpt-4o")
 result = md.convert("example.jpg")
 print(result.text_content)
+```
+
+You can also use the project as Docker Image:
+
+```sh
+docker build -t markitdown:latest .
+docker run --rm -i markitdown:latest < ~/your-file.pdf > output.md
 ```
 
 ## Contributing
@@ -74,14 +105,17 @@ contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additio
 
 ### Running Tests
 
-To run the tests for this project, use the following command:
+To run tests, install `hatch` using `pip` or other methods as described [here](https://hatch.pypa.io/dev/install).
 
 ```sh
+pip install hatch
 hatch shell
 hatch test
 ```
 
 ### Running Pre-commit Checks
+
+Please run the pre-commit checks before submitting a PR.
 
 ```sh
 pre-commit run --all-files
