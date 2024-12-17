@@ -230,7 +230,6 @@ def test_markitdown_exiftool() -> None:
         assert target in result.text_content
 
 
-
 def test_markitdown_local_pathlib() -> None:
     markitdown = MarkItDown()
 
