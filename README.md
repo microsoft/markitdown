@@ -150,7 +150,7 @@ Or from the CLI:
 
 ```bash
 pip install markitdown
-markitdown --llm-client OpenAI --llm-model gpt-4o example.jpg
+markitdown --llm-model gpt-4o example.jpg
 ```
 
 ### Docker
