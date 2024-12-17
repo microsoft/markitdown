@@ -140,18 +140,16 @@ def test_markitdown_local() -> None:
     markitdown = MarkItDown()
 
     # Test XLSX processing
-    # XlsxConverter has an additional kwarg `beautify`, which defaults to True
-    result = markitdown.convert(
-        os.path.join(TEST_FILES_DIR, "test.xlsx"), beautify=False
-    )
-    result_cleaned = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.xlsx"))
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.xlsx"))
+    text_content = result.text_content.replace("\\", "")
+
     # Check assertions
     for test_string in XLSX_TEST_STRINGS:
-        text_content = result.text_content.replace("\\", "")
         assert test_string in text_content
+
     # Check negations
-    assert "Unnamed:" not in result_cleaned.text_content
-    assert "NaN" not in result_cleaned.text_content
+    assert "Unnamed:" not in result.text_content
+    assert "NaN" not in result.text_content
 
     # Test DOCX processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.docx"))

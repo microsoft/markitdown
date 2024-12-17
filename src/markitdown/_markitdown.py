@@ -523,19 +523,18 @@ class XlsxConverter(HtmlConverter):
     """
 
     def _clean_colname(self, colname: Any) -> Any:
+        # Remove Pandas header placeholders
         if isinstance(colname, str) and colname.startswith("Unnamed:"):
             return ""
         return colname
 
-    def _clean_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
-        return (
-            df.rename(columns=lambda col: self._clean_colname(col))
-            .dropna(how="all", axis=1)
-            .dropna(how="all", axis=0)
-        )
-
     def convert(
-        self, local_path, beautify: bool = True, **kwargs
+        self,
+        local_path,
+        na_rep: Any = "",
+        drop_empty_cols: bool = False,
+        drop_empty_rows: bool = False,
+        **kwargs,
     ) -> Union[None, DocumentConverterResult]:
         # Bail if not a XLSX
         extension = kwargs.get("file_extension", "")
@@ -546,12 +545,15 @@ class XlsxConverter(HtmlConverter):
         md_content = ""
         for name, sheet in sheets.items():
             md_content += f"## {name}\n"
-            df = self._clean_dataframe(sheet) if beautify else sheet
-            html_content = (
-                df.to_html(index=False, na_rep="")
-                if beautify
-                else df.to_html(index=False)
-            )
+            sheet = sheet.rename(columns=lambda col: self._clean_colname(col))
+
+            if drop_empty_cols:
+                sheet = sheet.dropna(axis=1, how="all")
+
+            if drop_empty_rows:
+                sheet = sheet.dropna(axis=0, how="all")
+
+            html_content = sheet.to_html(index=False, na_rep=na_rep)
             md_content += self._convert(html_content).text_content.strip() + "\n\n"
 
         return DocumentConverterResult(
