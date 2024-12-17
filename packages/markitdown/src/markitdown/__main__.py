@@ -14,36 +14,14 @@ def main():
         description="Convert various file formats to markdown.",
         prog="markitdown",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        usage=dedent(
-            """
-            SYNTAX:
-
-                markitdown <OPTIONAL: FILENAME>
-                If FILENAME is empty, markitdown reads from stdin.
-
-            EXAMPLE:
-
-                markitdown example.pdf
-
-                OR
-
-                cat example.pdf | markitdown
-
-                OR
-
-                markitdown < example.pdf
-                
-                OR to save to a file use
-    
-                markitdown example.pdf -o example.md
-                
-                OR
-                
-                markitdown example.pdf > example.md
-            """
-        ).strip(),
+        epilog=dedent(
+            """\
+            examples:
+              markitdown example.pdf
+              markitdown -o example.md example.pdf
+              cat example.pdf | markitdown > example.md"""
+        ),
     )
-
     parser.add_argument(
         "-v",
         "--version",
@@ -51,41 +29,39 @@ def main():
         version=f"%(prog)s {__version__}",
         help="show the version number and exit",
     )
-
     parser.add_argument(
         "-o",
         "--output",
-        help="Output file name. If not provided, output is written to stdout.",
+        dest="filename",
+        help="if unspecified, defaults to stdout",
     )
-
     parser.add_argument(
         "-d",
         "--use-docintel",
         action="store_true",
         help="Use Document Intelligence to extract text instead of offline conversion. Requires a valid Document Intelligence Endpoint.",
     )
-
     parser.add_argument(
         "-e",
         "--endpoint",
         type=str,
         help="Document Intelligence Endpoint. Required if using Document Intelligence.",
     )
-
     parser.add_argument(
         "-p",
         "--use-plugins",
         action="store_true",
         help="Use 3rd-party plugins to convert files. Use --list-plugins to see installed plugins.",
     )
-
     parser.add_argument(
         "--list-plugins",
         action="store_true",
         help="List installed 3rd-party plugins. Plugins are loaded when using the -p or --use-plugin option.",
     )
+    parser.add_argument(
+        "filename", nargs="?", help="if unspecified, defaults to stdin"
+    )
 
-    parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
 
     if args.list_plugins:
@@ -123,14 +99,9 @@ def main():
     else:
         result = markitdown.convert(args.filename)
 
-    _handle_output(args, result)
-
-
-def _handle_output(args, result: DocumentConverterResult):
-    """Handle output to stdout or file"""
     if args.output:
         with open(args.output, "w", encoding="utf-8") as f:
-            f.write(result.text_content)
+            print(result.text_content, file=f)
     else:
         print(result.text_content)
 
