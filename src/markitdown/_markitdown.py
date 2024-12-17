@@ -847,8 +847,6 @@ class ImageConverter(MediaConverter):
         if prompt is None or prompt.strip() == "":
             prompt = "Write a detailed caption for this image."
 
-        sys.stderr.write(f"llm Prompt:\n{prompt}\n")
-
         data_uri = ""
         with open(local_path, "rb") as image_file:
             content_type, encoding = mimetypes.guess_type("_dummy" + extension)

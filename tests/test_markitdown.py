@@ -11,6 +11,16 @@ from markitdown import MarkItDown
 skip_remote = (
     True if os.environ.get("GITHUB_ACTIONS") else False
 )  # Don't run these tests in CI
+
+
+# Don't run the llm tests without a key and the client library
+skip_llm = False if os.environ.get("OPENAI_API_KEY") else True
+try:
+    import openai
+except ModuleNotFoundError:
+    skip_llm = True
+
+# Skip exiftool tests if not installed
 skip_exiftool = shutil.which("exiftool") is None
 
 TEST_FILES_DIR = os.path.join(os.path.dirname(__file__), "test_files")
@@ -105,6 +115,10 @@ CSV_CP932_TEST_STRINGS = [
     "佐藤太郎,30,東京",
     "三木英子,25,大阪",
     "髙橋淳,35,名古屋",
+]
+
+LLM_TEST_STRINGS = [
+    "5bda1dd6",
 ]
 
 
@@ -229,8 +243,28 @@ def test_markitdown_exiftool() -> None:
         assert target in result.text_content
 
 
+@pytest.mark.skipif(
+    skip_llm,
+    reason="do not run llm tests without a key",
+)
+def test_markitdown_llm() -> None:
+    client = openai.OpenAI()
+    markitdown = MarkItDown(llm_client=client, llm_model="gpt-4o")
+
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test_llm.jpg"))
+
+    for test_string in LLM_TEST_STRINGS:
+        assert test_string in result.text_content
+
+    # This is not super precise. It would also accept "red square", "blue circle",
+    # "the square is not blue", etc. But it's sufficient for this test.
+    for test_string in ["red", "circle", "blue", "square"]:
+        assert test_string in result.text_content.lower()
+
+
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     test_markitdown_remote()
     test_markitdown_local()
     test_markitdown_exiftool()
+    test_markitdown_llm()
