@@ -527,7 +527,16 @@ class XlsxConverter(HtmlConverter):
             return ""
         return colname
 
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
+    def _clean_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
+        return (
+            df.rename(columns=lambda col: self._clean_colname(col))
+            .dropna(how="all", axis=1)
+            .dropna(how="all", axis=0)
+        )
+
+    def convert(
+        self, local_path, beautify: bool = True, **kwargs
+    ) -> Union[None, DocumentConverterResult]:
         # Bail if not a XLSX
         extension = kwargs.get("file_extension", "")
         if extension.lower() != ".xlsx":
@@ -535,14 +544,13 @@ class XlsxConverter(HtmlConverter):
 
         sheets = pd.read_excel(local_path, sheet_name=None)
         md_content = ""
-        for s in sheets:
-            md_content += f"## {s}\n"
-            sheet = sheets[s]
-            sheet.columns = list(map(self._clean_colname, sheet.columns))
+        for name, sheet in sheets.items():
+            md_content += f"## {name}\n"
+            df = self._clean_dataframe(sheet) if beautify else sheet
             html_content = (
-                sheet.dropna(how="all", axis=1)
-                .dropna(how="all", axis=0)
-                .to_html(index=False, na_rep="")
+                df.to_html(index=False, na_rep="")
+                if beautify
+                else df.to_html(index=False)
             )
             md_content += self._convert(html_content).text_content.strip() + "\n\n"
 

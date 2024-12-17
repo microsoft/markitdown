@@ -42,6 +42,7 @@ XLSX_TEST_STRINGS = [
     "affc7dad-52dc-4b98-9b5d-51e65d8a8ad0",
 ]
 
+
 DOCX_TEST_STRINGS = [
     "314b0a30-5b04-470b-b9f7-eed2c2bec74a",
     "49e168b7-d2ae-407f-a055-2167576f39a1",
@@ -139,14 +140,18 @@ def test_markitdown_local() -> None:
     markitdown = MarkItDown()
 
     # Test XLSX processing
-    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.xlsx"))
+    # XlsxConverter has an additional kwarg `beautify`, which defaults to True
+    result = markitdown.convert(
+        os.path.join(TEST_FILES_DIR, "test.xlsx"), beautify=False
+    )
+    result_cleaned = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.xlsx"))
     # Check assertions
     for test_string in XLSX_TEST_STRINGS:
         text_content = result.text_content.replace("\\", "")
         assert test_string in text_content
     # Check negations
-    assert "Unnamed:" not in text_content
-    assert "NaN" not in text_content
+    assert "Unnamed:" not in result_cleaned.text_content
+    assert "NaN" not in result_cleaned.text_content
 
     # Test DOCX processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.docx"))
