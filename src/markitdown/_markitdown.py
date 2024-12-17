@@ -13,7 +13,8 @@ import sys
 import tempfile
 import traceback
 import zipfile
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, overload
+from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse, urlunparse
 from warnings import catch_warnings
 
@@ -1042,7 +1043,7 @@ class MarkItDown:
         self.register_page_converter(ZipConverter())
 
     def convert(
-        self, source: Union[str, requests.Response], **kwargs: Any
+        self, source: Union[str, requests.Response, Path], **kwargs: Any
     ) -> DocumentConverterResult:  # TODO: deal with kwargs
         """
         Args:
@@ -1063,10 +1064,14 @@ class MarkItDown:
         # Request response
         elif isinstance(source, requests.Response):
             return self.convert_response(source, **kwargs)
+        elif isinstance(source, Path):
+            return self.convert_local(source, **kwargs)
 
     def convert_local(
-        self, path: str, **kwargs: Any
+        self, path: Union[str, Path], **kwargs: Any
     ) -> DocumentConverterResult:  # TODO: deal with kwargs
+        if isinstance(path, Path):
+            path = str(path)
         # Prepare a list of extensions to try (in order of priority)
         ext = kwargs.get("file_extension")
         extensions = [ext] if ext is not None else []

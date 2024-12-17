@@ -7,6 +7,7 @@ import pytest
 import requests
 
 from markitdown import MarkItDown
+from pathlib import Path
 
 skip_remote = (
     True if os.environ.get("GITHUB_ACTIONS") else False
@@ -229,8 +230,105 @@ def test_markitdown_exiftool() -> None:
         assert target in result.text_content
 
 
+
+def test_markitdown_local_pathlib() -> None:
+    markitdown = MarkItDown()
+
+    # Test XLSX processing
+    result = markitdown.convert(Path(TEST_FILES_DIR) / "test.xlsx")
+    for test_string in XLSX_TEST_STRINGS:
+        text_content = result.text_content.replace("\\", "")
+        assert test_string in text_content
+
+    # Test DOCX processing
+    result = markitdown.convert(Path(TEST_FILES_DIR) / "test.docx")
+    for test_string in DOCX_TEST_STRINGS:
+        text_content = result.text_content.replace("\\", "")
+        assert test_string in text_content
+
+    # Test DOCX processing, with comments
+    result = markitdown.convert(
+        Path(TEST_FILES_DIR) / "test_with_comment.docx",
+        style_map="comment-reference => ",
+    )
+    for test_string in DOCX_COMMENT_TEST_STRINGS:
+        text_content = result.text_content.replace("\\", "")
+        assert test_string in text_content
+
+    # Test DOCX processing, with comments and setting style_map on init
+    markitdown_with_style_map = MarkItDown(style_map="comment-reference => ")
+    result = markitdown_with_style_map.convert(
+        Path(TEST_FILES_DIR) / "test_with_comment.docx"
+    )
+    for test_string in DOCX_COMMENT_TEST_STRINGS:
+        text_content = result.text_content.replace("\\", "")
+        assert test_string in text_content
+
+    # Test PPTX processing
+    result = markitdown.convert(Path(TEST_FILES_DIR) / "test.pptx")
+    for test_string in PPTX_TEST_STRINGS:
+        text_content = result.text_content.replace("\\", "")
+        assert test_string in text_content
+
+    # Test HTML processing
+    result = markitdown.convert(
+        Path(TEST_FILES_DIR) / "test_blog.html", url=BLOG_TEST_URL
+    )
+    for test_string in BLOG_TEST_STRINGS:
+        text_content = result.text_content.replace("\\", "")
+        assert test_string in text_content
+
+    # Test ZIP file processing
+    result = markitdown.convert(Path(TEST_FILES_DIR) / "test_files.zip")
+    for test_string in DOCX_TEST_STRINGS:
+        text_content = result.text_content.replace("\\", "")
+        assert test_string in text_content
+
+    # Test Wikipedia processing
+    result = markitdown.convert(
+        Path(TEST_FILES_DIR) / "test_wikipedia.html", url=WIKIPEDIA_TEST_URL
+    )
+    text_content = result.text_content.replace("\\", "")
+    for test_string in WIKIPEDIA_TEST_EXCLUDES:
+        assert test_string not in text_content
+    for test_string in WIKIPEDIA_TEST_STRINGS:
+        assert test_string in text_content
+
+    # Test Bing processing
+    result = markitdown.convert(
+        Path(TEST_FILES_DIR) / "test_serp.html", url=SERP_TEST_URL
+    )
+    text_content = result.text_content.replace("\\", "")
+    for test_string in SERP_TEST_EXCLUDES:
+        assert test_string not in text_content
+    for test_string in SERP_TEST_STRINGS:
+        assert test_string in text_content
+
+    # Test non-UTF-8 encoding
+    result = markitdown.convert(Path(TEST_FILES_DIR) / "test_mskanji.csv")
+    text_content = result.text_content.replace("\\", "")
+    for test_string in CSV_CP932_TEST_STRINGS:
+        assert test_string in text_content
+
+
+@pytest.mark.skipif(
+    skip_exiftool,
+    reason="do not run if exiftool is not installed",
+)
+def test_markitdown_exiftool_pathlib() -> None:
+    markitdown = MarkItDown()
+
+    # Test JPG metadata processing
+    result = markitdown.convert(Path(TEST_FILES_DIR) / "test.jpg")
+    for key in JPG_TEST_EXIFTOOL:
+        target = f"{key}: {JPG_TEST_EXIFTOOL[key]}"
+        assert target in result.text_content
+
+
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     test_markitdown_remote()
     test_markitdown_local()
     test_markitdown_exiftool()
+    test_markitdown_local_pathlib()
+    test_markitdown_exiftool_pathlib()
