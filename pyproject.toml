@@ -38,6 +38,7 @@ dependencies = [
   "youtube-transcript-api",
   "SpeechRecognition",
   "pathvalidate",
+  "charset-normalizer",
 ]
 
 [project.urls]
