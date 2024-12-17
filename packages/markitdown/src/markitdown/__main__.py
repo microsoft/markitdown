@@ -56,6 +56,9 @@ parser.add_argument(
     action="store_true",
     help="list installed 3rd-party plugins (loaded with `--use-plugin`)",
 )
+parser.add_argument("--llm-client", choices={"OpenAI"}, help="default None")
+parser.add_argument("--llm-client-url", help="base URL for --llm-client")
+parser.add_argument("--llm-model", help="required for --llm-client")
 parser.add_argument(
     "filename", metavar="FILENAME", nargs="?", help="if unspecified, defaults to stdin"
 )
@@ -89,9 +92,17 @@ def main(args=None):
         elif args.filename is None:
             raise ValueError("Filename is required when using Document Intelligence.")
 
+    if args.llm_client == "OpenAI":
+        from openai import OpenAI
+        llm_client = OpenAI(base_url=args.llm_client_url)
+    else:
+        llm_client = None
+
     markitdown = MarkItDown(
         enable_plugins=args.use_plugins,
         docintel_endpoint=args.endpoint if args.use_docintel else None,
+        llm_client=llm_client,
+        llm_model=args.llm_model,
     )
 
     if args.filename:
