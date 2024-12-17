@@ -11,39 +11,22 @@ def main():
     parser = argparse.ArgumentParser(
         description="Convert various file formats to markdown.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        usage=dedent(
-            """
-            SYNTAX: 
-                
-                markitdown <OPTIONAL: FILENAME>
-                If FILENAME is empty, markitdown reads from stdin.
-            
-            EXAMPLE:
-                
-                markitdown example.pdf
-                
-                OR
-            
-                cat example.pdf | markitdown
-            
-                OR 
-            
-                markitdown < example.pdf
-            """
-        ).strip(),
+        epilog=dedent(
+            """\
+            examples:
+              markitdown example.pdf
+              cat example.pdf | markitdown
+              markitdown < example.pdf"""
+        ),
     )
 
-    parser.add_argument("filename", nargs="?")
+    parser.add_argument(
+        "filename", nargs="?", help="if unspecified, defaults to stdin"
+    )
     args = parser.parse_args()
-
-    if args.filename is None:
-        markitdown = MarkItDown()
-        result = markitdown.convert_stream(sys.stdin.buffer)
-        print(result.text_content)
-    else:
-        markitdown = MarkItDown()
-        result = markitdown.convert(args.filename)
-        print(result.text_content)
+    markitdown = MarkItDown()
+    result = markitdown.convert(args.filename or sys.stdin.buffer)
+    print(result.text_content)
 
 
 if __name__ == "__main__":
