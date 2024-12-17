@@ -30,7 +30,7 @@ pip install -e .
 Alternatively, using conda
 
 ```sh
-conda install markitdown
+conda install conda-forge/label/markitdown_dev::markitdown
 ```
 
 # Usage
