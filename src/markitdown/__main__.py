@@ -4,6 +4,7 @@
 import sys
 import argparse
 from textwrap import dedent
+import shtab
 from ._markitdown import MarkItDown
 
 
@@ -22,7 +23,8 @@ def main():
 
     parser.add_argument(
         "filename", nargs="?", help="if unspecified, defaults to stdin"
-    )
+    ).complete = shtab.FILE
+    shtab.add_argument_to(parser)
     args = parser.parse_args()
     markitdown = MarkItDown()
     result = markitdown.convert(args.filename or sys.stdin.buffer)
