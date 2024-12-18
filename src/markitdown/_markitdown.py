@@ -12,8 +12,11 @@ import subprocess
 import sys
 import tempfile
 import traceback
+import zipfile
+from xml.dom import minidom
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import parse_qs, quote, unquote, urlparse, urlunparse
+from warnings import warn, resetwarnings, catch_warnings
 
 import mammoth
 import markdownify
@@ -26,15 +29,24 @@ import pptx
 import puremagic
 import requests
 from bs4 import BeautifulSoup
+from charset_normalizer import from_path
 
 # Optional Transcription support
 try:
-    import pydub
+    # Using warnings' catch_warnings to catch
+    # pydub's warning of ffmpeg or avconv missing
+    with catch_warnings(record=True) as w:
+        import pydub
+
+        if w:
+            raise ModuleNotFoundError
     import speech_recognition as sr
 
     IS_AUDIO_TRANSCRIPTION_CAPABLE = True
 except ModuleNotFoundError:
     pass
+finally:
+    resetwarnings()
 
 # Optional YouTube transcription support
 try:
@@ -161,9 +173,7 @@ class PlainTextConverter(DocumentConverter):
         elif "text/" not in content_type.lower():
             return None
 
-        text_content = ""
-        with open(local_path, "rt", encoding="utf-8") as fh:
-            text_content = fh.read()
+        text_content = str(from_path(local_path).best())
         return DocumentConverterResult(
             title=None,
             text_content=text_content,
@@ -211,6 +221,143 @@ class HtmlConverter(DocumentConverter):
             title=None if soup.title is None else soup.title.string,
             text_content=webpage_text,
         )
+
+
+class RSSConverter(DocumentConverter):
+    """Convert RSS / Atom type to markdown"""
+
+    def convert(
+        self, local_path: str, **kwargs
+    ) -> Union[None, DocumentConverterResult]:
+        # Bail if not RSS type
+        extension = kwargs.get("file_extension", "")
+        if extension.lower() not in [".xml", ".rss", ".atom"]:
+            return None
+        try:
+            doc = minidom.parse(local_path)
+        except BaseException as _:
+            return None
+        result = None
+        if doc.getElementsByTagName("rss"):
+            # A RSS feed must have a root element of <rss>
+            result = self._parse_rss_type(doc)
+        elif doc.getElementsByTagName("feed"):
+            root = doc.getElementsByTagName("feed")[0]
+            if root.getElementsByTagName("entry"):
+                # An Atom feed must have a root element of <feed> and at least one <entry>
+                result = self._parse_atom_type(doc)
+            else:
+                return None
+        else:
+            # not rss or atom
+            return None
+
+        return result
+
+    def _parse_atom_type(
+        self, doc: minidom.Document
+    ) -> Union[None, DocumentConverterResult]:
+        """Parse the type of an Atom feed.
+
+        Returns None if the feed type is not recognized or something goes wrong.
+        """
+        try:
+            root = doc.getElementsByTagName("feed")[0]
+            title = self._get_data_by_tag_name(root, "title")
+            subtitle = self._get_data_by_tag_name(root, "subtitle")
+            entries = root.getElementsByTagName("entry")
+            md_text = f"# {title}\n"
+            if subtitle:
+                md_text += f"{subtitle}\n"
+            for entry in entries:
+                entry_title = self._get_data_by_tag_name(entry, "title")
+                entry_summary = self._get_data_by_tag_name(entry, "summary")
+                entry_updated = self._get_data_by_tag_name(entry, "updated")
+                entry_content = self._get_data_by_tag_name(entry, "content")
+
+                if entry_title:
+                    md_text += f"\n## {entry_title}\n"
+                if entry_updated:
+                    md_text += f"Updated on: {entry_updated}\n"
+                if entry_summary:
+                    md_text += self._parse_content(entry_summary)
+                if entry_content:
+                    md_text += self._parse_content(entry_content)
+
+            return DocumentConverterResult(
+                title=title,
+                text_content=md_text,
+            )
+        except BaseException as _:
+            return None
+
+    def _parse_rss_type(
+        self, doc: minidom.Document
+    ) -> Union[None, DocumentConverterResult]:
+        """Parse the type of an RSS feed.
+
+        Returns None if the feed type is not recognized or something goes wrong.
+        """
+        try:
+            root = doc.getElementsByTagName("rss")[0]
+            channel = root.getElementsByTagName("channel")
+            if not channel:
+                return None
+            channel = channel[0]
+            channel_title = self._get_data_by_tag_name(channel, "title")
+            channel_description = self._get_data_by_tag_name(channel, "description")
+            items = channel.getElementsByTagName("item")
+            if channel_title:
+                md_text = f"# {channel_title}\n"
+            if channel_description:
+                md_text += f"{channel_description}\n"
+            if not items:
+                items = []
+            for item in items:
+                title = self._get_data_by_tag_name(item, "title")
+                description = self._get_data_by_tag_name(item, "description")
+                pubDate = self._get_data_by_tag_name(item, "pubDate")
+                content = self._get_data_by_tag_name(item, "content:encoded")
+
+                if title:
+                    md_text += f"\n## {title}\n"
+                if pubDate:
+                    md_text += f"Published on: {pubDate}\n"
+                if description:
+                    md_text += self._parse_content(description)
+                if content:
+                    md_text += self._parse_content(content)
+
+            return DocumentConverterResult(
+                title=channel_title,
+                text_content=md_text,
+            )
+        except BaseException as _:
+            print(traceback.format_exc())
+            return None
+
+    def _parse_content(self, content: str) -> str:
+        """Parse the content of an RSS feed item"""
+        try:
+            # using bs4 because many RSS feeds have HTML-styled content
+            soup = BeautifulSoup(content, "html.parser")
+            return _CustomMarkdownify().convert_soup(soup)
+        except BaseException as _:
+            return content
+
+    def _get_data_by_tag_name(
+        self, element: minidom.Element, tag_name: str
+    ) -> Union[str, None]:
+        """Get data from first child element with the given tag name.
+        Returns None when no such element is found.
+        """
+        nodes = element.getElementsByTagName(tag_name)
+        if not nodes:
+            return None
+        fc = nodes[0].firstChild
+        if fc:
+            return fc.data
+        return None
 
 
 class WikipediaConverter(DocumentConverter):
@@ -344,8 +491,11 @@ class YouTubeConverter(DocumentConverter):
                 assert isinstance(params["v"][0], str)
                 video_id = str(params["v"][0])
                 try:
+                    youtube_transcript_languages = kwargs.get(
+                        "youtube_transcript_languages", ("en",)
+                    )
                     # Must be a single transcript.
-                    transcript = YouTubeTranscriptApi.get_transcript(video_id)  # type: ignore
+                    transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=youtube_transcript_languages)  # type: ignore
                     transcript_text = " ".join([part["text"] for part in transcript])  # type: ignore
                     # Alternative formatting:
                     # formatter = TextFormatter()
@@ -389,6 +539,67 @@ class YouTubeConverter(DocumentConverter):
                     if ret is not None:
                         return ret
         return None
+
+
+class IpynbConverter(DocumentConverter):
+    """Converts Jupyter Notebook (.ipynb) files to Markdown."""
+
+    def convert(
+        self, local_path: str, **kwargs: Any
+    ) -> Union[None, DocumentConverterResult]:
+        # Bail if not ipynb
+        extension = kwargs.get("file_extension", "")
+        if extension.lower() != ".ipynb":
+            return None
+
+        # Parse and convert the notebook
+        result = None
+        with open(local_path, "rt", encoding="utf-8") as fh:
+            notebook_content = json.load(fh)
+            result = self._convert(notebook_content)
+
+        return result
+
+    def _convert(self, notebook_content: dict) -> Union[None, DocumentConverterResult]:
+        """Helper function that converts notebook JSON content to Markdown."""
+        try:
+            md_output = []
+            title = None
+
+            for cell in notebook_content.get("cells", []):
+                cell_type = cell.get("cell_type", "")
+                source_lines = cell.get("source", [])
+
+                if cell_type == "markdown":
+                    md_output.append("".join(source_lines))
+
+                    # Extract the first # heading as title if not already found
+                    if title is None:
+                        for line in source_lines:
+                            if line.startswith("# "):
+                                title = line.lstrip("# ").strip()
+                                break
+
+                elif cell_type == "code":
+                    # Code cells are wrapped in Markdown code blocks
+                    md_output.append(f"```python\n{''.join(source_lines)}\n```")
+                elif cell_type == "raw":
+                    md_output.append(f"```\n{''.join(source_lines)}\n```")
+
+            md_text = "\n\n".join(md_output)
+
+            # Check for title in notebook metadata
+            title = notebook_content.get("metadata", {}).get("title", title)
+
+            return DocumentConverterResult(
+                title=title,
+                text_content=md_text,
+            )
+
+        except Exception as e:
+            raise FileConversionException(
+                f"Error converting .ipynb file: {str(e)}"
+            ) from e
 
 
 class BingSerpConverter(DocumentConverter):
@@ -492,7 +703,9 @@ class DocxConverter(HtmlConverter):
 
         result = None
         with open(local_path, "rb") as docx_file:
-            result = mammoth.convert_to_html(docx_file)
+            style_map = kwargs.get("style_map", None)
+
+            result = mammoth.convert_to_html(docx_file, style_map=style_map)
             html_content = result.value
             result = self._convert(html_content)
 
@@ -582,6 +795,10 @@ class PptxConverter(HtmlConverter):
                         "\n" + self._convert(html_table).text_content.strip() + "\n"
                     )
 
+                # Charts
+                if shape.has_chart:
+                    md_content += self._convert_chart_to_markdown(shape.chart)
+
                 # Text areas
                 elif shape.has_text_frame:
                     if shape == title:
@@ -616,6 +833,29 @@ class PptxConverter(HtmlConverter):
             return True
         return False
 
+    def _convert_chart_to_markdown(self, chart):
+        md = "\n\n### Chart"
+        if chart.has_title:
+            md += f": {chart.chart_title.text_frame.text}"
+        md += "\n\n"
+        data = []
+        category_names = [c.label for c in chart.plots[0].categories]
+        series_names = [s.name for s in chart.series]
+        data.append(["Category"] + series_names)
+
+        for idx, category in enumerate(category_names):
+            row = [category]
+            for series in chart.series:
+                row.append(series.values[idx])
+            data.append(row)
+
+        markdown_table = []
+        for row in data:
+            markdown_table.append("| " + " | ".join(map(str, row)) + " |")
+        header = markdown_table[0]
+        separator = "|" + "|".join(["---"] * len(data[0])) + "|"
+        return md + "\n".join([header, separator] + markdown_table[1:])
+
 
 class MediaConverter(DocumentConverter):
     """
@@ -642,7 +882,7 @@ class WavConverter(MediaConverter):
     """
 
     def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
-        # Bail if not a XLSX
+        # Bail if not a WAV
         extension = kwargs.get("file_extension", "")
         if extension.lower() != ".wav":
             return None
@@ -754,11 +994,11 @@ class Mp3Converter(WavConverter):
 
 class ImageConverter(MediaConverter):
     """
-    Converts images to markdown via extraction of metadata (if `exiftool` is installed), OCR (if `easyocr` is installed), and description via a multimodal LLM (if an mlm_client is configured).
+    Converts images to markdown via extraction of metadata (if `exiftool` is installed), OCR (if `easyocr` is installed), and description via a multimodal LLM (if an llm_client is configured).
     """
 
     def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
-        # Bail if not a XLSX
+        # Bail if not an image
         extension = kwargs.get("file_extension", "")
         if extension.lower() not in [".jpg", ".jpeg", ".png"]:
             return None
@@ -784,17 +1024,17 @@ class ImageConverter(MediaConverter):
                     md_content += f"{f}: {metadata[f]}\n"
 
         # Try describing the image with GPTV
-        mlm_client = kwargs.get("mlm_client")
-        mlm_model = kwargs.get("mlm_model")
-        if mlm_client is not None and mlm_model is not None:
+        llm_client = kwargs.get("llm_client")
+        llm_model = kwargs.get("llm_model")
+        if llm_client is not None and llm_model is not None:
             md_content += (
                 "\n# Description:\n"
-                + self._get_mlm_description(
+                + self._get_llm_description(
                     local_path,
                     extension,
-                    mlm_client,
-                    mlm_model,
-                    prompt=kwargs.get("mlm_prompt"),
+                    llm_client,
+                    llm_model,
+                    prompt=kwargs.get("llm_prompt"),
                 ).strip()
                 + "\n"
             )
@@ -804,11 +1044,9 @@ class ImageConverter(MediaConverter):
             text_content=md_content,
         )
 
-    def _get_mlm_description(self, local_path, extension, client, model, prompt=None):
+    def _get_llm_description(self, local_path, extension, client, model, prompt=None):
         if prompt is None or prompt.strip() == "":
             prompt = "Write a detailed caption for this image."
-
-        sys.stderr.write(f"MLM Prompt:\n{prompt}\n")
 
         data_uri = ""
         with open(local_path, "rb") as image_file:
@@ -837,6 +1075,124 @@ class ImageConverter(MediaConverter):
         return response.choices[0].message.content
 
 
+class ZipConverter(DocumentConverter):
+    """Converts ZIP files to markdown by extracting and converting all contained files.
+
+    The converter extracts the ZIP contents to a temporary directory, processes each file
+    using appropriate converters based on file extensions, and then combines the results
+    into a single markdown document. The temporary directory is cleaned up after processing.
+
+    Example output format:
+    ```markdown
+    Content from the zip file `example.zip`:
+
+    ## File: docs/readme.txt
+
+    This is the content of readme.txt
+    Multiple lines are preserved
+
+    ## File: images/example.jpg
+
+    ImageSize: 1920x1080
+    DateTimeOriginal: 2024-02-15 14:30:00
+    Description: A beautiful landscape photo
+
+    ## File: data/report.xlsx
+
+    ## Sheet1
+    | Column1 | Column2 | Column3 |
+    |---------|---------|---------|
+    | data1   | data2   | data3   |
+    | data4   | data5   | data6   |
+    ```
+
+    Key features:
+    - Maintains original file structure in headings
+    - Processes nested files recursively
+    - Uses appropriate converters for each file type
+    - Preserves formatting of converted content
+    - Cleans up temporary files after processing
+    """
+
+    def convert(
+        self, local_path: str, **kwargs: Any
+    ) -> Union[None, DocumentConverterResult]:
+        # Bail if not a ZIP
+        extension = kwargs.get("file_extension", "")
+        if extension.lower() != ".zip":
+            return None
+
+        # Get parent converters list if available
+        parent_converters = kwargs.get("_parent_converters", [])
+        if not parent_converters:
+            return DocumentConverterResult(
+                title=None,
+                text_content=f"[ERROR] No converters available to process zip contents from: {local_path}",
+            )
+
+        extracted_zip_folder_name = (
+            f"extracted_{os.path.basename(local_path).replace('.zip', '_zip')}"
+        )
+        new_folder = os.path.normpath(
+            os.path.join(os.path.dirname(local_path), extracted_zip_folder_name)
+        )
+        md_content = f"Content from the zip file `{os.path.basename(local_path)}`:\n\n"
+
+        # Safety check for path traversal
+        if not new_folder.startswith(os.path.dirname(local_path)):
+            return DocumentConverterResult(
+                title=None, text_content=f"[ERROR] Invalid zip file path: {local_path}"
+            )
+
+        try:
+            # Extract the zip file
+            with zipfile.ZipFile(local_path, "r") as zipObj:
+                zipObj.extractall(path=new_folder)
+
+            # Process each extracted file
+            for root, dirs, files in os.walk(new_folder):
+                for name in files:
+                    file_path = os.path.join(root, name)
+                    relative_path = os.path.relpath(file_path, new_folder)
+
+                    # Get file extension
+                    _, file_extension = os.path.splitext(name)
+
+                    # Update kwargs for the file
+                    file_kwargs = kwargs.copy()
+                    file_kwargs["file_extension"] = file_extension
+                    file_kwargs["_parent_converters"] = parent_converters
+
+                    # Try converting the file using available converters
+                    for converter in parent_converters:
+                        # Skip the zip converter to avoid infinite recursion
+                        if isinstance(converter, ZipConverter):
+                            continue
+
+                        result = converter.convert(file_path, **file_kwargs)
+                        if result is not None:
+                            md_content += f"\n## File: {relative_path}\n\n"
+                            md_content += result.text_content + "\n\n"
+                            break
+
+            # Clean up extracted files if specified
+            if kwargs.get("cleanup_extracted", True):
+                shutil.rmtree(new_folder)
+
+            return DocumentConverterResult(title=None, text_content=md_content.strip())
+
+        except zipfile.BadZipFile:
+            return DocumentConverterResult(
+                title=None,
+                text_content=f"[ERROR] Invalid or corrupted zip file: {local_path}",
+            )
+        except Exception as e:
+            return DocumentConverterResult(
+                title=None,
+                text_content=f"[ERROR] Failed to process zip file {local_path}: {str(e)}",
+            )
+
+
 class FileConversionException(BaseException):
     pass
 
@@ -852,16 +1208,50 @@ class MarkItDown:
     def __init__(
         self,
         requests_session: Optional[requests.Session] = None,
+        llm_client: Optional[Any] = None,
+        llm_model: Optional[str] = None,
+        style_map: Optional[str] = None,
+        # Deprecated
         mlm_client: Optional[Any] = None,
-        mlm_model: Optional[Any] = None,
+        mlm_model: Optional[str] = None,
     ):
         if requests_session is None:
             self._requests_session = requests.Session()
         else:
             self._requests_session = requests_session
 
-        self._mlm_client = mlm_client
-        self._mlm_model = mlm_model
+        # Handle deprecation notices
+        #############################
+        if mlm_client is not None:
+            if llm_client is None:
+                warn(
+                    "'mlm_client' is deprecated, and was renamed 'llm_client'.",
+                    DeprecationWarning,
+                )
+                llm_client = mlm_client
+                mlm_client = None
+            else:
+                raise ValueError(
+                    "'mlm_client' is deprecated, and was renamed 'llm_client'. Do not use both at the same time. Just use 'llm_client' instead."
+                )
+
+        if mlm_model is not None:
+            if llm_model is None:
+                warn(
+                    "'mlm_model' is deprecated, and was renamed 'llm_model'.",
+                    DeprecationWarning,
+                )
+                llm_model = mlm_model
+                mlm_model = None
+            else:
+                raise ValueError(
+                    "'mlm_model' is deprecated, and was renamed 'llm_model'. Do not use both at the same time. Just use 'llm_model' instead."
+                )
+        #############################
+
+        self._llm_client = llm_client
+        self._llm_model = llm_model
+        self._style_map = style_map
 
         self._page_converters: List[DocumentConverter] = []
 
@@ -870,6 +1260,7 @@ class MarkItDown:
         # To this end, the most specific converters should appear below the most generic converters
         self.register_page_converter(PlainTextConverter())
         self.register_page_converter(HtmlConverter())
+        self.register_page_converter(RSSConverter())
         self.register_page_converter(WikipediaConverter())
         self.register_page_converter(YouTubeConverter())
         self.register_page_converter(BingSerpConverter())
@@ -879,7 +1270,9 @@ class MarkItDown:
         self.register_page_converter(WavConverter())
         self.register_page_converter(Mp3Converter())
         self.register_page_converter(ImageConverter())
+        self.register_page_converter(IpynbConverter())
         self.register_page_converter(PdfConverter())
+        self.register_page_converter(ZipConverter())
 
     def convert(
         self, source: Union[str, requests.Response], **kwargs: Any
@@ -1003,7 +1396,7 @@ class MarkItDown:
                 self._append_ext(extensions, g)
 
             # Convert
-            result = self._convert(temp_path, extensions, url=response.url)
+            result = self._convert(temp_path, extensions, url=response.url, **kwargs)
         # Clean up
         finally:
             try:
@@ -1030,11 +1423,17 @@ class MarkItDown:
                     _kwargs.update({"file_extension": ext})
 
                 # Copy any additional global options
-                if "mlm_client" not in _kwargs and self._mlm_client is not None:
-                    _kwargs["mlm_client"] = self._mlm_client
+                if "llm_client" not in _kwargs and self._llm_client is not None:
+                    _kwargs["llm_client"] = self._llm_client
 
-                if "mlm_model" not in _kwargs and self._mlm_model is not None:
-                    _kwargs["mlm_model"] = self._mlm_model
+                if "llm_model" not in _kwargs and self._llm_model is not None:
+                    _kwargs["llm_model"] = self._llm_model
+
+                # Add the list of converters for nested processing
+                _kwargs["_parent_converters"] = self._page_converters
+
+                if "style_map" not in _kwargs and self._style_map is not None:
+                    _kwargs["style_map"] = self._style_map
 
                 # If we hit an error log it and keep trying
                 try:
@@ -1071,8 +1470,7 @@ class MarkItDown:
         if ext == "":
             return
         # if ext not in extensions:
-        if True:
-            extensions.append(ext)
+        extensions.append(ext)
 
     def _guess_ext_magic(self, path):
         """Use puremagic (a Python implementation of libmagic) to guess a file's extension based on the first few bytes."""

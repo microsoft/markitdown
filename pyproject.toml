@@ -38,6 +38,8 @@ dependencies = [
   "youtube-transcript-api",
   "SpeechRecognition",
   "pathvalidate",
+  "charset-normalizer",
+  "openai",
 ]
 
 [tool.uv]
@@ -82,3 +84,6 @@ exclude_lines = [
   "if __name__ == .__main__.:",
   "if TYPE_CHECKING:",
 ]
+
+[tool.hatch.build.targets.sdist]
+only-include = ["src/markitdown"]
