@@ -29,6 +29,16 @@ or from the source
 ```sh
 pip install -e .
 ```
+# Homebrew Installation (for macOS users)
+If you're on macOS, you can install markitdown via Homebrew:
+
+
+```sh
+brew install markitdown
+```
+
+This provides a convenient method to install and run markitdown directly from the terminal.
+
 
 # Usage
 The API is simple:

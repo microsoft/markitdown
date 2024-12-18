@@ -2,8 +2,12 @@
 #
 # SPDX-License-Identifier: MIT
 import sys
+
+from markitdown._markitdown import MarkItDown
+=======
 import argparse
 from ._markitdown import MarkItDown
+
 
 
 def main():
@@ -45,3 +49,4 @@ EXAMPLE:
 
 if __name__ == "__main__":
     main()
+
