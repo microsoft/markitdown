@@ -9,7 +9,6 @@ import requests
 from warnings import catch_warnings, resetwarnings
 
 from markitdown import MarkItDown
-from pathlib import Path
 
 skip_remote = (
     True if os.environ.get("GITHUB_ACTIONS") else False
