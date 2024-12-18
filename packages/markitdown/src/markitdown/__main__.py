@@ -61,6 +61,14 @@ parser.add_argument(
     "--llm-client-url", metavar="URL", help="base URL for OpenAI LLM client"
 )
 parser.add_argument(
+    "-H",
+    "--llm-client-header",
+    metavar="HEADER",
+    nargs="*",
+    default=[],
+    help="may be specified multiple times",
+)
+parser.add_argument(
     "filename", metavar="FILENAME", nargs="?", help="if unspecified, defaults to stdin"
 )
 
@@ -96,7 +104,11 @@ def main(args=None):
     if args.llm_model:
         from openai import OpenAI
 
-        llm_client = OpenAI(base_url=args.llm_client_url)
+        headers = {}
+        for header in args.llm_client_header:
+            key, value = header.split(":", 1)
+            headers[key] = value.lstrip()
+        llm_client = OpenAI(base_url=args.llm_client_url, default_headers=headers)
     else:
         llm_client = None
 
