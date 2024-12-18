@@ -1,5 +1,4 @@
-# type: ignore
-import base64
+# type: ignoreimport base64
 import binascii
 import copy
 import html
@@ -18,23 +17,49 @@ from typing import Any, Dict, List, Optional, Union
 from urllib.parse import parse_qs, quote, unquote, urlparse, urlunparse
 from warnings import warn, resetwarnings, catch_warnings
 
-import mammoth
-import markdownify
-import pandas as pd
-import pdfminer
-import pdfminer.high_level
-import pptx
+# Function to install a package dynamically
+def install_package(package_name):
+    try:
+        subprocess.check_call([sys.executable, '-m', 'pip', 'install', package_name])
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to install {package_name}: {e}")
+
+# Attempt to import each module and install it if necessary
+modules = [
+    ('mammoth', 'mammoth'),
+    ('markdownify', 'markdownify'),
+    ('pandas', 'pandas'),
+    ('pdfminer', 'pdfminer.six'),
+    ('pptx', 'python-pptx'),
+    ('puremagic', 'puremagic'),
+    ('requests', 'requests'),
+    ('bs4', 'beautifulsoup4'),
+    ('charset_normalizer', 'charset-normalizer'),
+    ('pydub', 'pydub'),
+    ('speech_recognition', 'SpeechRecognition'),
+]
+
+for module_name, package_name in modules:
+    try:
+        globals()[module_name] = __import__(module_name)
+    except ModuleNotFoundError:
+        print(f"{module_name} not found. Installing {package_name}...")
+        install_package(package_name)
+        try:
+            globals()[module_name] = __import__(module_name)
+        except ModuleNotFoundError:
+            print(f"Failed to import {module_name} after installation.")
 
 # File-format detection
-import puremagic
-import requests
-from bs4 import BeautifulSoup
-from charset_normalizer import from_path
+try:
+    import puremagic
+except ModuleNotFoundError:
+    print("puremagic not found. Installing...")
+    install_package("puremagic")
+    import puremagic
 
 # Optional Transcription support
 try:
-    # Using warnings' catch_warnings to catch
-    # pydub's warning of ffmpeg or avconv missing
     with catch_warnings(record=True) as w:
         import pydub
 
@@ -44,7 +69,16 @@ try:
 
     IS_AUDIO_TRANSCRIPTION_CAPABLE = True
 except ModuleNotFoundError:
-    pass
+    print("pydub or speech_recognition not found. Installing...")
+    install_package("pydub")
+    install_package("SpeechRecognition")
+    try:
+        import pydub
+        import speech_recognition as sr
+
+        IS_AUDIO_TRANSCRIPTION_CAPABLE = True
+    except ModuleNotFoundError:
+        IS_AUDIO_TRANSCRIPTION_CAPABLE = False
 finally:
     resetwarnings()
 
@@ -54,7 +88,7 @@ try:
 
     IS_YOUTUBE_TRANSCRIPT_CAPABLE = True
 except ModuleNotFoundError:
-    pass
+    os.system("pip install youtube-transcript-api")
 
 
 class _CustomMarkdownify(markdownify.MarkdownConverter):
@@ -1463,7 +1497,7 @@ class MarkItDown:
         )
 
     def _append_ext(self, extensions, ext):
-        """Append a unique non-None, non-empty extension to a list of extensions."""
+        """Append a unique non-null, non-empty extension to a list of extensions."""
         if ext is None:
             return
         ext = ext.strip()
