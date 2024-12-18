@@ -46,6 +46,7 @@ dependencies = [
 dev-dependencies = [
     "pytest>=7.0",
     "pytest-asyncio>=0.23.0",
+    "black>=23.7.0",
 ]
 
 [project.urls]

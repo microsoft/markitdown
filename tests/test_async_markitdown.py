@@ -207,15 +207,9 @@ async def test_async_markitdown_concurrent():
         # Create a list of tasks
         tasks = []
         for _ in range(5):
-            tasks.append(
-                markitdown.convert(os.path.join(TEST_FILES_DIR, "test.docx"))
-            )
-            tasks.append(
-                markitdown.convert(os.path.join(TEST_FILES_DIR, "test.xlsx"))
-            )
-            tasks.append(
-                markitdown.convert(os.path.join(TEST_FILES_DIR, "test.pptx"))
-            )
+            tasks.append(markitdown.convert(os.path.join(TEST_FILES_DIR, "test.docx")))
+            tasks.append(markitdown.convert(os.path.join(TEST_FILES_DIR, "test.xlsx")))
+            tasks.append(markitdown.convert(os.path.join(TEST_FILES_DIR, "test.pptx")))
 
         # Run all tasks concurrently
         results = await asyncio.gather(*tasks)
