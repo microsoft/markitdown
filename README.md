@@ -24,6 +24,12 @@ To install MarkItDown, use pip: `pip install markitdown`. Alternatively, you can
 markitdown path-to-file.pdf > document.md
 ```
 
+Or use `-o` to specify the output file:
+
+```bash
+markitdown path-to-file.pdf -o document.md
+```
+
 You can also pipe content:
 
 ```bash
