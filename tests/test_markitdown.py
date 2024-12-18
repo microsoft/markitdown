@@ -101,6 +101,13 @@ BLOG_TEST_STRINGS = [
     "an example where high cost can easily prevent a generic complex",
 ]
 
+
+RSS_TEST_STRINGS = [
+    "The Official Microsoft Blog",
+    "In the case of AI, it is absolutely true that the industry is moving incredibly fast",
+]
+
+
 WIKIPEDIA_TEST_URL = "https://en.wikipedia.org/wiki/Microsoft"
 WIKIPEDIA_TEST_STRINGS = [
     "Microsoft entered the operating system (OS) business in 1980 with its own version of [Unix]",
@@ -256,6 +263,12 @@ def test_markitdown_local() -> None:
     for test_string in SERP_TEST_EXCLUDES:
         assert test_string not in text_content
     for test_string in SERP_TEST_STRINGS:
+        assert test_string in text_content
+
+    # Test RSS processing
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test_rss.xml"))
+    text_content = result.text_content.replace("\\", "")
+    for test_string in RSS_TEST_STRINGS:
         assert test_string in text_content
 
     ## Test non-UTF-8 encoding
