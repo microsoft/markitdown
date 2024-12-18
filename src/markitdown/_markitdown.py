@@ -512,6 +512,7 @@ class DocxConverter(HtmlConverter):
 
         return result
 
+
 class DocConverter(HtmlConverter):
     """
     Converts DOC files to Markdown.
@@ -529,6 +530,7 @@ class DocConverter(HtmlConverter):
             result = self._convert(html_content)
 
         return result
+
 
 class XlsxConverter(HtmlConverter):
     """
