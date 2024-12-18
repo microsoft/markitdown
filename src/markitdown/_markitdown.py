@@ -1133,27 +1133,33 @@ class ZipConverter(DocumentConverter):
         extracted_zip_folder_name = (
             f"extracted_{os.path.basename(local_path).replace('.zip', '_zip')}"
         )
-        new_folder = os.path.normpath(
+        extraction_dir = os.path.normpath(
             os.path.join(os.path.dirname(local_path), extracted_zip_folder_name)
         )
         md_content = f"Content from the zip file `{os.path.basename(local_path)}`:\n\n"
 
-        # Safety check for path traversal
-        if not new_folder.startswith(os.path.dirname(local_path)):
-            return DocumentConverterResult(
-                title=None, text_content=f"[ERROR] Invalid zip file path: {local_path}"
-            )
-
         try:
-            # Extract the zip file
+            # Extract the zip file safely
             with zipfile.ZipFile(local_path, "r") as zipObj:
-                zipObj.extractall(path=new_folder)
+                # Safeguard against path traversal
+                for member in zipObj.namelist():
+                    member_path = os.path.normpath(os.path.join(extraction_dir, member))
+                    if (
+                        not os.path.commonprefix([extraction_dir, member_path])
+                        == extraction_dir
+                    ):
+                        raise ValueError(
+                            f"Path traversal detected in zip file: {member}"
+                        )
+
+                # Extract all files safely
+                zipObj.extractall(path=extraction_dir)
 
             # Process each extracted file
-            for root, dirs, files in os.walk(new_folder):
+            for root, dirs, files in os.walk(extraction_dir):
                 for name in files:
                     file_path = os.path.join(root, name)
-                    relative_path = os.path.relpath(file_path, new_folder)
+                    relative_path = os.path.relpath(file_path, extraction_dir)
 
                     # Get file extension
                     _, file_extension = os.path.splitext(name)
@@ -1177,7 +1183,7 @@ class ZipConverter(DocumentConverter):
 
             # Clean up extracted files if specified
             if kwargs.get("cleanup_extracted", True):
-                shutil.rmtree(new_folder)
+                shutil.rmtree(extraction_dir)
 
             return DocumentConverterResult(title=None, text_content=md_content.strip())
 
@@ -1185,6 +1191,11 @@ class ZipConverter(DocumentConverter):
             return DocumentConverterResult(
                 title=None,
                 text_content=f"[ERROR] Invalid or corrupted zip file: {local_path}",
+            )
+        except ValueError as ve:
+            return DocumentConverterResult(
+                title=None,
+                text_content=f"[ERROR] Security error in zip file {local_path}: {str(ve)}",
             )
         except Exception as e:
             return DocumentConverterResult(
