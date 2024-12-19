@@ -23,6 +23,7 @@ import markdownify
 import pandas as pd
 import pdfminer
 import pdfminer.high_level
+import pymupdf4llm
 import pptx
 
 # File-format detection
@@ -684,10 +685,12 @@ class PdfConverter(DocumentConverter):
         if extension.lower() != ".pdf":
             return None
 
-        return DocumentConverterResult(
-            title=None,
-            text_content=pdfminer.high_level.extract_text(local_path),
-        )
+        # return DocumentConverterResult(
+        #     title=None,
+        #     text_content=pdfminer.high_level.extract_text(local_path),
+        # )
+        text_content = pymupdf4llm.to_markdown(local_path, show_progress=False)
+        return DocumentConverterResult(title=None, text_content=text_content)
 
 
 class DocxConverter(HtmlConverter):
