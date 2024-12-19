@@ -43,6 +43,7 @@ from markitdown import MarkItDown
 md = MarkItDown()
 result = md.convert("test.xlsx")
 print(result.text_content)
+result.save("test.md")
 ```
 
 To use Large Language Models for image descriptions, provide `llm_client` and `llm_model`:
