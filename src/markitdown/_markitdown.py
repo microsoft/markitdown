@@ -157,6 +157,7 @@ class DocumentConverterResult:
         with open(file_path, "w", encoding=encoding) as f:
             f.write(self.text_content)
 
+
 class DocumentConverter:
     """Abstract superclass of all DocumentConverters."""
 
