@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: MIT
 import sys
 import argparse
+from textwrap import dedent
 from ._markitdown import MarkItDown
 
 
@@ -10,24 +11,26 @@ def main():
     parser = argparse.ArgumentParser(
         description="Convert various file formats to markdown.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        usage="""
-SYNTAX: 
-    
-    markitdown <OPTIONAL: FILENAME>
-    If FILENAME is empty, markitdown reads from stdin.
-
-EXAMPLE:
-    
-    markitdown example.pdf
-    
-    OR
-
-    cat example.pdf | markitdown
-
-    OR 
-
-    markitdown < example.pdf
-""".strip(),
+        usage=dedent(
+            """
+            SYNTAX: 
+                
+                markitdown <OPTIONAL: FILENAME>
+                If FILENAME is empty, markitdown reads from stdin.
+            
+            EXAMPLE:
+                
+                markitdown example.pdf
+                
+                OR
+            
+                cat example.pdf | markitdown
+            
+                OR 
+            
+                markitdown < example.pdf
+            """
+        ).strip(),
     )
 
     parser.add_argument("filename", nargs="?")
