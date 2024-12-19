@@ -138,8 +138,7 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         if src.startswith("data:image/"):
             if self.mlm_client is not None and self.mlm_model is not None:
                 md = ImageConverter()
-                ext = f".{src.split(",")[0].split(";")[0].split("/")[1]}"
-                result = md._convert(src, file_extension=ext, mlm_client=self.mlm_client, mlm_model=self.mlm_model)
+                result = md._convert(src, mlm_client=self.mlm_client, mlm_model=self.mlm_model)
                 src = result.text_content if result is not None else src.split(",")[0] + "..."              
             else:
                 src = src.split(",")[0] + "..."
