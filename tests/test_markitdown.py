@@ -20,7 +20,7 @@ skip_llm = False if os.environ.get("OPENAI_API_KEY") else True
 try:
     import openai
 except ModuleNotFoundError:
-    skip_llm = True
+    raise ModuleNotFoundError
 
 # Skip exiftool tests if not installed
 skip_exiftool = shutil.which("exiftool") is None
