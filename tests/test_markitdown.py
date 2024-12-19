@@ -74,6 +74,17 @@ DOCX_COMMENT_TEST_STRINGS = [
     "Yet another comment in the doc. 55yiyi-asd09",
 ]
 
+
+DOC_TEST_STRINGS = [
+    "314b0a30-5b04-470b-b9f7-eed2c2bec74a",
+    "49e168b7-d2ae-407f-a055-2167576f39a1",
+    "## d666f1f7-46cb-42bd-9a39-9a39cf2a509f",
+    "# Abstract",
+    "# Introduction",
+    "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation",
+]
+
+
 PPTX_TEST_STRINGS = [
     "2cdda5c8-e50e-4db4-b5f0-9722a649f455",
     "04191ea8-5c73-4215-a1d3-1cfb43aaaf12",
@@ -170,6 +181,29 @@ def test_markitdown_local() -> None:
     # Test DOCX processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.docx"))
     for test_string in DOCX_TEST_STRINGS:
+        text_content = result.text_content.replace("\\", "")
+        assert test_string in text_content
+    # Test DOCX processing, with comments
+    result = markitdown.convert(
+        os.path.join(TEST_FILES_DIR, "test_with_comment.docx"),
+        style_map="comment-reference => ",
+    )
+    for test_string in DOCX_COMMENT_TEST_STRINGS:
+        text_content = result.text_content.replace("\\", "")
+        assert test_string in text_content
+
+    # Test DOCX processing, with comments and setting style_map on init
+    markitdown_with_style_map = MarkItDown(style_map="comment-reference => ")
+    result = markitdown_with_style_map.convert(
+        os.path.join(TEST_FILES_DIR, "test_with_comment.docx")
+    )
+    for test_string in DOCX_COMMENT_TEST_STRINGS:
+        text_content = result.text_content.replace("\\", "")
+        assert test_string in text_content
+
+    # Test DOC processing
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.doc"))
+    for test_string in DOC_TEST_STRINGS:
         text_content = result.text_content.replace("\\", "")
         assert test_string in text_content
 
