@@ -81,3 +81,6 @@ exclude_lines = [
 
 [tool.hatch.build.targets.sdist]
 only-include = ["src/markitdown"]
+
+[[tool.hatch.envs.hatch-test.matrix]]
+python = ["3.13", "3.12", "3.11", "3.10"]
