@@ -749,8 +749,11 @@ class DocConverter(HtmlConverter):
             result = self._convert(output_content)
             return result
 
-        except Exception as _:
-            return None
+        except Exception as e:
+            return DocumentConverterResult(
+                title=None,
+                text_content=f"[ERROR] Failed to process DOC file {local_path}: {str(e)}",
+            )
 
 
 class XlsxConverter(HtmlConverter):
