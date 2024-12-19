@@ -17,6 +17,7 @@ from xml.dom import minidom
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import parse_qs, quote, unquote, urlparse, urlunparse
 from warnings import warn, resetwarnings, catch_warnings
+from pathlib import Path
 
 import mammoth
 import markdownify
@@ -712,6 +713,46 @@ class DocxConverter(HtmlConverter):
         return result
 
 
+class DocConverter(HtmlConverter):
+    """
+    Converts DOC files to Markdown.
+    """
+
+    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
+        # Bail if not a DOC
+        extension = kwargs.get("file_extension", "")
+        if extension.lower() != ".doc":
+            return None
+
+        if not (soffice := shutil.which("soffice")):
+            return None
+
+        local_path = Path(local_path)
+        outdir = local_path.parent
+        result = None
+
+        libreoffice_command = [
+            soffice,
+            "--headless",
+            "--convert-to",
+            "txt:Text",
+            "--outdir",
+            outdir,
+            local_path,
+        ]
+        try:
+            result = subprocess.run(libreoffice_command, capture_output=True, text=True)
+            output_file = outdir / (local_path.stem + ".txt")
+            with open(output_file, "r", encoding="utf-8") as f:
+                output_content = f.read()
+            output_file.unlink(missing_ok=True)
+            result = self._convert(output_content)
+            return result
+
+        except Exception as _:
+            return None
+
+
 class XlsxConverter(HtmlConverter):
     """
     Converts XLSX files to Markdown, with each sheet presented as a separate Markdown table.
@@ -1276,6 +1317,7 @@ class MarkItDown:
         self.register_page_converter(YouTubeConverter())
         self.register_page_converter(BingSerpConverter())
         self.register_page_converter(DocxConverter())
+        self.register_page_converter(DocConverter())
         self.register_page_converter(XlsxConverter())
         self.register_page_converter(PptxConverter())
         self.register_page_converter(WavConverter())
