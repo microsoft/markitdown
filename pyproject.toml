@@ -40,6 +40,8 @@ dependencies = [
   "pathvalidate",
   "charset-normalizer",
   "openai",
+  "ebooklib",
+  "html2text>=2020.1.16",
 ]
 
 [project.urls]
