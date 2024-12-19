@@ -6,6 +6,8 @@ import shutil
 import pytest
 import requests
 
+import openai
+
 from warnings import catch_warnings, resetwarnings
 
 from markitdown import MarkItDown
@@ -17,10 +19,6 @@ skip_remote = (
 
 # Don't run the llm tests without a key and the client library
 skip_llm = False if os.environ.get("OPENAI_API_KEY") else True
-try:
-    import openai
-except ModuleNotFoundError:
-    skip_llm = True
 
 # Skip exiftool tests if not installed
 skip_exiftool = shutil.which("exiftool") is None
