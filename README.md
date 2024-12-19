@@ -1,6 +1,9 @@
 # MarkItDown
 
 [![PyPI](https://img.shields.io/pypi/v/markitdown.svg)](https://pypi.org/project/markitdown/)
+![PyPI - Downloads](https://img.shields.io/pypi/dd/markitdown)
+
+
 
 MarkItDown is a utility for converting various files to Markdown (e.g., for indexing, text analysis, etc).
 It supports:
