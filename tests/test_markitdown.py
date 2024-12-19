@@ -1,8 +1,9 @@
 #!/usr/bin/env python3 -m pytest
 import io
 import os
+from dotenv import load_dotenv
 import shutil
-
+from openai import OpenAI, AzureOpenAI
 import pytest
 import requests
 
@@ -115,8 +116,20 @@ def test_markitdown_remote() -> None:
     #     assert test_string in result.text_content
 
 
-def test_markitdown_local() -> None:
-    markitdown = MarkItDown()
+def test_markitdown_local(use_mlm = False) -> None:
+    if (use_mlm):
+        load_dotenv()   
+        client = AzureOpenAI(
+            api_key=os.getenv("AZURE_OPENAI_API_KEY"),  
+            api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
+            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
+        )
+        mlm_model="gpt-4oModel"
+          
+        markitdown = MarkItDown(mlm_client=client, mlm_model=mlm_model)
+    else:
+        markitdown = MarkItDown()
+
 
     # Test XLSX processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.xlsx"))
@@ -178,9 +191,8 @@ def test_markitdown_exiftool() -> None:
         target = f"{key}: {JPG_TEST_EXIFTOOL[key]}"
         assert target in result.text_content
 
-
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     test_markitdown_remote()
-    test_markitdown_local()
+    test_markitdown_local(True)
     test_markitdown_exiftool()

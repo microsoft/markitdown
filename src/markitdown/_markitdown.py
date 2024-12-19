@@ -1,4 +1,5 @@
 # type: ignore
+from io import BytesIO
 import base64
 import binascii
 import copy
@@ -51,12 +52,15 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
 
     - Altering the default heading style to use '#', '##', etc.
     - Removing javascript hyperlinks.
-    - Truncating images with large data:uri sources.
+    - Using mlm for transcription the images, otherwise, truncation images with large data:uri sources.
     - Ensuring URIs are properly escaped, and do not conflict with Markdown syntax
     """
 
     def __init__(self, **options: Any):
         options["heading_style"] = options.get("heading_style", markdownify.ATX)
+        
+        self.mlm_client = options.get("mlm_client")
+        self.mlm_model = options.get("mlm_model")
         # Explicitly cast options to the expected type if necessary
         super().__init__(**options)
 
@@ -109,7 +113,8 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
 
         alt = el.attrs.get("alt", None) or ""
         src = el.attrs.get("src", None) or ""
-        title = el.attrs.get("title", None) or ""
+        title = el.attrs.get("title", None) or ""      
+        
         title_part = ' "%s"' % title.replace('"', r"\"") if title else ""
         if (
             convert_as_inline
@@ -119,7 +124,13 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
 
         # Remove dataURIs
         if src.startswith("data:"):
-            src = src.split(",")[0] + "..."
+            if self.mlm_client is not None and self.mlm_model is not None:
+                md = ImageConverter()
+                ext = f".{src.split(",")[0].split(";")[0].split("/")[1]}"
+                result = md._convert(src, file_extension=ext, mlm_client=self.mlm_client, mlm_model=self.mlm_model)
+                src = result.text_content
+            else:
+                src = src.split(",")[0] + "..."
 
         return "![%s](%s%s)" % (alt, src, title_part)
 
@@ -183,11 +194,11 @@ class HtmlConverter(DocumentConverter):
 
         result = None
         with open(local_path, "rt", encoding="utf-8") as fh:
-            result = self._convert(fh.read())
+            result = self._convert(fh.read(), **kwargs)
 
         return result
 
-    def _convert(self, html_content: str) -> Union[None, DocumentConverterResult]:
+    def _convert(self, html_content: str, **kwargs) -> Union[None, DocumentConverterResult]:
         """Helper function that converts and HTML string."""
 
         # Parse the string
@@ -200,10 +211,14 @@ class HtmlConverter(DocumentConverter):
         # Print only the main content
         body_elm = soup.find("body")
         webpage_text = ""
+        
+        # add mlm_client and mlm_model to the options
+        #options = copy.deepcopy(kwargs)
+        
         if body_elm:
-            webpage_text = _CustomMarkdownify().convert_soup(body_elm)
+            webpage_text = _CustomMarkdownify(**kwargs).convert_soup(body_elm)
         else:
-            webpage_text = _CustomMarkdownify().convert_soup(soup)
+            webpage_text = _CustomMarkdownify(**kwargs).convert_soup(soup)
 
         assert isinstance(webpage_text, str)
 
@@ -494,7 +509,7 @@ class DocxConverter(HtmlConverter):
         with open(local_path, "rb") as docx_file:
             result = mammoth.convert_to_html(docx_file)
             html_content = result.value
-            result = self._convert(html_content)
+            result = self._convert(html_content, **kwargs)
 
         return result
 
@@ -535,7 +550,9 @@ class PptxConverter(HtmlConverter):
             return None
 
         md_content = ""
-
+        self._mlm_client = kwargs.get("mlm_client")
+        self._mlm_model = kwargs.get("mlm_model")     
+        
         presentation = pptx.Presentation(local_path)
         slide_num = 0
         for slide in presentation.slides:
@@ -552,8 +569,8 @@ class PptxConverter(HtmlConverter):
                     try:
                         alt_text = shape._element._nvXxPr.cNvPr.attrib.get("descr", "")
                     except Exception:
-                        pass
-
+                        pass                  
+                                            
                     # A placeholder name
                     filename = re.sub(r"\W", "", shape.name) + ".jpg"
                     md_content += (
@@ -563,6 +580,7 @@ class PptxConverter(HtmlConverter):
                         + filename
                         + ")\n"
                     )
+                    md_content += self._convert_image_to_markdown(shape)
 
                 # Tables
                 if self._is_table(shape):
@@ -602,6 +620,29 @@ class PptxConverter(HtmlConverter):
             title=None,
             text_content=md_content.strip(),
         )
+
+    def _convert_image_to_markdown(self, shape) -> str:   
+        if not self._is_picture(shape):
+            return ""
+             
+        image_converter = ImageConverter() if (self._mlm_client is not None) and (self._mlm_model is not None) else None
+        
+        if image_converter is not None:            
+            image = shape.image
+            content_type = image.content_type  
+            blob = image.blob
+            
+            try:
+                ext = f"data:{content_type};base64"
+                image_base64_uri = f"{ext},{base64.b64encode(blob).decode('utf-8')}"
+                image_description = image_converter._convert(image_base64_uri, mlm_client=self._mlm_client, mlm_model=self._mlm_model)
+                
+                return ("\n" + image_description.text_content.strip() + "\n")
+            except Exception as e:
+                print("Error converting image to markdown")
+                sys.stderr.write(f"Error converting image to markdown: {e}")                
+                
+        return ""
 
     def _is_picture(self, shape):
         if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.PICTURE:
@@ -756,7 +797,29 @@ class ImageConverter(MediaConverter):
     """
     Converts images to markdown via extraction of metadata (if `exiftool` is installed), OCR (if `easyocr` is installed), and description via a multimodal LLM (if an mlm_client is configured).
     """
+    def _convert(self, data_base64_uri, **kwargs) -> Union[None, DocumentConverterResult]:
+        # Try describing the image with GPTV
+        mlm_client = kwargs.get("mlm_client")
+        mlm_model = kwargs.get("mlm_model")
+        md_content = ""
+        
+        if mlm_client is not None and mlm_model is not None:            
+            md_content = (
+                "\n# Image Description:\n"
+                + self._get_mlm_description(
+                    data_base64_uri,
+                    mlm_client,
+                    mlm_model,
+                    prompt=kwargs.get("mlm_prompt"),
+                ).strip()
+                + "\n"
+            )
 
+        return DocumentConverterResult(
+            title=None,
+            text_content=md_content,
+        )
+    
     def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
         # Bail if not a XLSX
         extension = kwargs.get("file_extension", "")
@@ -783,41 +846,29 @@ class ImageConverter(MediaConverter):
                 if f in metadata:
                     md_content += f"{f}: {metadata[f]}\n"
 
-        # Try describing the image with GPTV
-        mlm_client = kwargs.get("mlm_client")
-        mlm_model = kwargs.get("mlm_model")
-        if mlm_client is not None and mlm_model is not None:
-            md_content += (
-                "\n# Description:\n"
-                + self._get_mlm_description(
-                    local_path,
-                    extension,
-                    mlm_client,
-                    mlm_model,
-                    prompt=kwargs.get("mlm_prompt"),
-                ).strip()
-                + "\n"
-            )
+        image_base64_uri = self._get_image_base64(local_path, extension)
+        md_content += self._convert(image_base64_uri, **kwargs).text_content        
 
         return DocumentConverterResult(
             title=None,
             text_content=md_content,
         )
-
-    def _get_mlm_description(self, local_path, extension, client, model, prompt=None):
-        if prompt is None or prompt.strip() == "":
-            prompt = "Write a detailed caption for this image."
-
-        sys.stderr.write(f"MLM Prompt:\n{prompt}\n")
-
-        data_uri = ""
+        
+    def _get_image_base64(self, local_path, extension):
         with open(local_path, "rb") as image_file:
             content_type, encoding = mimetypes.guess_type("_dummy" + extension)
             if content_type is None:
                 content_type = "image/jpeg"
             image_base64 = base64.b64encode(image_file.read()).decode("utf-8")
-            data_uri = f"data:{content_type};base64,{image_base64}"
+            
+            return f"data:{content_type};base64,{image_base64}"  
+        
+    def _get_mlm_description(self, data_base64_uri, client, model, prompt=None):
+        if prompt is None or prompt.strip() == "":
+            prompt = "Write a detailed caption for this image."
 
+        sys.stderr.write(f"MLM Prompt:\n{prompt}\n")
+        
         messages = [
             {
                 "role": "user",
@@ -826,7 +877,7 @@ class ImageConverter(MediaConverter):
                     {
                         "type": "image_url",
                         "image_url": {
-                            "url": data_uri,
+                            "url": data_base64_uri,
                         },
                     },
                 ],
@@ -835,7 +886,6 @@ class ImageConverter(MediaConverter):
 
         response = client.chat.completions.create(model=model, messages=messages)
         return response.choices[0].message.content
-
 
 class FileConversionException(BaseException):
     pass
@@ -948,6 +998,9 @@ class MarkItDown:
 
             # Convert
             result = self._convert(temp_path, extensions, **kwargs)
+        except Exception as e:
+            sys.stderr.write(f"Error converting stream to markdown: {e}")
+            pass
         # Clean up
         finally:
             try:
@@ -1019,23 +1072,22 @@ class MarkItDown:
     ) -> DocumentConverterResult:
         error_trace = ""
         for ext in extensions + [None]:  # Try last with no extension
+            _kwargs = copy.deepcopy(kwargs)
+            # Overwrite file_extension appropriately
+            if ext is None:
+                if "file_extension" in _kwargs:
+                    del _kwargs["file_extension"]
+            else:
+                _kwargs.update({"file_extension": ext})
+
+            # Copy any additional global options
+            if "mlm_client" not in _kwargs and self._mlm_client is not None:
+                _kwargs["mlm_client"] = self._mlm_client
+
+            if "mlm_model" not in _kwargs and self._mlm_model is not None:
+                _kwargs["mlm_model"] = self._mlm_model      
+                    
             for converter in self._page_converters:
-                _kwargs = copy.deepcopy(kwargs)
-
-                # Overwrite file_extension appropriately
-                if ext is None:
-                    if "file_extension" in _kwargs:
-                        del _kwargs["file_extension"]
-                else:
-                    _kwargs.update({"file_extension": ext})
-
-                # Copy any additional global options
-                if "mlm_client" not in _kwargs and self._mlm_client is not None:
-                    _kwargs["mlm_client"] = self._mlm_client
-
-                if "mlm_model" not in _kwargs and self._mlm_model is not None:
-                    _kwargs["mlm_model"] = self._mlm_model
-
                 # If we hit an error log it and keep trying
                 try:
                     res = converter.convert(local_path, **_kwargs)
