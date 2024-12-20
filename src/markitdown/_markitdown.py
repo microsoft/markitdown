@@ -725,7 +725,10 @@ class DocConverter(HtmlConverter):
             return None
 
         if not (soffice := shutil.which("soffice")):
-            return None
+            return DocumentConverterResult(
+                title=None,
+                text_content="[ERROR] LibreOffice not found. Please install LibreOffice and try again.",
+            )
 
         local_path = Path(local_path)
         outdir = local_path.parent

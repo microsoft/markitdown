@@ -282,6 +282,14 @@ def test_markitdown_soffice() -> None:
         text_content = result.text_content.replace("\\", "")
         assert test_string in text_content
 
+def test_markitdown_soffice_mocked(mocker) -> None:
+    mocker.patch("shutil.which", return_value=None)
+    markitdown = MarkItDown()
+
+    # Test DOC processing
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.doc"))
+    text_content = result.text_content.replace("\\", "")
+    assert text_content == "[ERROR] LibreOffice not found. Please install LibreOffice and try again."
 
 
 def test_markitdown_deprecation() -> None:
