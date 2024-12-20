@@ -54,6 +54,12 @@ XLSX_TEST_STRINGS = [
     "affc7dad-52dc-4b98-9b5d-51e65d8a8ad0",
 ]
 
+XLS_TEST_STRINGS = [
+    "## 09060124-b5e7-4717-9d07-3c046eb",
+    "6ff4173b-42a5-4784-9b19-f49caff4d93d",
+    "affc7dad-52dc-4b98-9b5d-51e65d8a8ad0",
+]
+
 DOCX_TEST_STRINGS = [
     "314b0a30-5b04-470b-b9f7-eed2c2bec74a",
     "49e168b7-d2ae-407f-a055-2167576f39a1",
@@ -164,6 +170,12 @@ def test_markitdown_local() -> None:
     # Test XLSX processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.xlsx"))
     for test_string in XLSX_TEST_STRINGS:
+        text_content = result.text_content.replace("\\", "")
+        assert test_string in text_content
+
+    # Test XLS processing
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.xls"))
+    for test_string in XLS_TEST_STRINGS:
         text_content = result.text_content.replace("\\", "")
         assert test_string in text_content
 
