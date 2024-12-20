@@ -495,7 +495,9 @@ class YouTubeConverter(DocumentConverter):
                         "youtube_transcript_languages", ("en",)
                     )
                     # Must be a single transcript.
-                    transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=youtube_transcript_languages)  # type: ignore
+                    transcript = YouTubeTranscriptApi.get_transcript(
+                        video_id, languages=youtube_transcript_languages
+                    )  # type: ignore
                     transcript_text = " ".join([part["text"] for part in transcript])  # type: ignore
                     # Alternative formatting:
                     # formatter = TextFormatter()
@@ -1075,6 +1077,146 @@ class ImageConverter(MediaConverter):
         return response.choices[0].message.content
 
 
+class VideoConverter(WavConverter):
+    """
+    Converts videos to markdown via:
+        * extraction of metadata (if `exiftool` is installed)
+        * speech transcription (if `speech_recognition` AND `pydub` are installed).
+        * summary via a multimodal LLM if a transcription is available and a llm_client is configured
+    """
+
+    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
+        """
+        Convert a video to markdown
+
+        Args:
+            local_path (str): The path to the video file
+            metadata_exclude: A list of metadata fields to exclude from the extracted exif metadata
+            metadata_title: The title of the metadata section
+            transcribe: Whether to transcribe the video
+            transcript_title: The title of the transcript section
+            llm_summary: Whether to generate a summary via the provided multimodal LLM client
+            llm_summary_title: The title of the summary section
+        """
+
+        mime_type = mimetypes.guess_type(local_path)[0]
+        if mime_type is None or not mime_type.startswith("video/"):
+            return None
+
+        md_content = ""
+
+        # Add metadata, let the user exclude metadata they don't want
+        metadata = self._get_metadata(local_path)
+        # Exclude these metadat by default (but allow the user to override)
+        # Maybe this should be moved to somewhere else
+        DEFAULTS_METADATA_EXCLUDE = [
+            "SourceFile",
+            "ExifToolVersion",
+            "Directory",
+            "FileModifyDate",
+            "FileAccessDate",
+            "FileInodeChangeDate",
+            "FilePermissions",
+        ]
+        metadata_exclude = kwargs.get("metadata_exclude", DEFAULTS_METADATA_EXCLUDE)
+        metadata_title = kwargs.get("metadata_title", "### Metadata:\n")
+        if metadata_title is not None:
+            md_content += metadata_title
+        for f in metadata:
+            if not f in metadata_exclude:
+                md_content += f"{f}: {metadata[f]}\n"
+
+        # Transcribe
+        transcribe = kwargs.get("transcribe", True)
+        transcript = ""
+        if transcribe and IS_AUDIO_TRANSCRIPTION_CAPABLE:
+            handle, temp_path = tempfile.mkstemp(suffix=".wav")
+            os.close(handle)
+            try:
+                sound = pydub.AudioSegment.from_file(local_path)
+                with open(temp_path, "wb") as f:
+                    sound.export(f, format="wav")
+                _args = dict()
+                _args.update(kwargs)
+                _args["file_extension"] = ".wav"
+
+                transcript_title = kwargs.get(
+                    "transcript_title", "\n\n### Transcript:\n"
+                )
+                try:
+                    transcript = super()._transcribe_audio(temp_path).strip()
+                    md_content += transcript_title + (
+                        "[No speech detected]" if transcript == "" else transcript
+                    )
+                except Exception:
+                    transcript_error = kwargs.get(
+                        "transcript_error", "Error. Could not transcribe."
+                    )
+                    md_content += f"{transcript_title}{transcript_error}"
+
+            finally:
+                os.unlink(temp_path)
+
+        # LLM analysis (Optional) / not all LLMs are fully capable of analyzing video files yet,
+        # But for now we can use the transcript to get a summary of its content
+        llm_summary = kwargs.get("llm_summary", True)
+        llm_client = kwargs.get("llm_client")
+        llm_model = kwargs.get("llm_model")
+        if llm_summary and llm_client is not None and llm_model is not None:
+            if not transcribe:
+                print("Error: LLM summary requires transcription to be enabled.")
+            elif transcript == "":
+                print("Warning: No transcript found. Skipping LLM summary.")
+            else:
+                llm_summary_title = kwargs.get(
+                    "llm_summary_title", "\n\n### Video Summary:\n"
+                )
+                md_content += (
+                    llm_summary_title
+                    + self._get_llm_video_summary_from_transcript(
+                        transcript,
+                        llm_client,
+                        llm_model,
+                        prompt=kwargs.get("llm_prompt"),
+                    )
+                )
+
+        # Return the result
+        return DocumentConverterResult(
+            title=None,
+            text_content=md_content.strip(),
+        )
+
+    def _get_llm_video_summary_from_transcript(
+        self, transcript, client, model, prompt=None
+    ) -> str:
+        """
+        helper function to get a summary of the video content from the transcript
+
+        Args:
+            transcript: the transcript of the video
+            client: the llm client
+            model: the llm model
+            prompt: the prompt to use
+        Returns: the summary
+        """
+        if prompt is None or prompt.strip() == "":
+            prompt = "The following is video transcript, based on it, write a summary of the video content:\n"
+
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "text", "text": transcript},
+                ],
+            }
+        ]
+
+        response = client.chat.completions.create(model=model, messages=messages)
+        return response.choices[0].message.content
+
+
 class ZipConverter(DocumentConverter):
     """Converts ZIP files to markdown by extracting and converting all contained files.
 
@@ -1281,6 +1423,7 @@ class MarkItDown:
         self.register_page_converter(WavConverter())
         self.register_page_converter(Mp3Converter())
         self.register_page_converter(ImageConverter())
+        self.register_page_converter(VideoConverter())
         self.register_page_converter(IpynbConverter())
         self.register_page_converter(PdfConverter())
         self.register_page_converter(ZipConverter())
