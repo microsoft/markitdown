@@ -1385,38 +1385,26 @@ class MarkItDown:
         content_disposition = response.headers.get("content-disposition", "")
         m = re.search(r"filename=([^;]+)", content_disposition)
         if m:
-            base, ext = os.path.splitext(m.group(1).strip("\"'"))
+            _, ext = os.path.splitext(m.group(1).strip("\"'"))
             self._append_ext(extensions, ext)
 
         # Read from the extension from the path
-        base, ext = os.path.splitext(urlparse(response.url).path)
+        _, ext = os.path.splitext(urlparse(response.url).path)
         self._append_ext(extensions, ext)
 
         # Save the file locally to a temporary file. It will be deleted before this method exits
-        handle, temp_path = tempfile.mkstemp()
-        fh = os.fdopen(handle, "wb")
-        result = None
-        try:
+        with tempfile.NamedTemporaryFile("wb") as temp_file:
             # Download the file
             for chunk in response.iter_content(chunk_size=512):
-                fh.write(chunk)
-            fh.close()
+                temp_file.write(chunk)
+            temp_file.flush()
 
             # Use puremagic to check for more extension options
-            for g in self._guess_ext_magic(temp_path):
+            for g in self._guess_ext_magic(temp_file.name):
                 self._append_ext(extensions, g)
 
-            # Convert
-            result = self._convert(temp_path, extensions, url=response.url, **kwargs)
-        # Clean up
-        finally:
-            try:
-                fh.close()
-            except Exception:
-                pass
-            os.unlink(temp_path)
-
-        return result
+            # Convert and return
+            return self._convert(temp_file.name, extensions, url=response.url, **kwargs)
 
     def _convert(
         self, local_path: str, extensions: List[Union[str, None]], **kwargs
