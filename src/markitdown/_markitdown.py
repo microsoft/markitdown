@@ -92,9 +92,15 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         if href:
             try:
                 parsed_url = urlparse(href)  # type: ignore
-                if parsed_url.scheme and parsed_url.scheme.lower() not in ["http", "https", "file"]:  # type: ignore
+                if parsed_url.scheme and parsed_url.scheme.lower() not in [
+                    "http",
+                    "https",
+                    "file",
+                ]:  # type: ignore
                     return "%s%s%s" % (prefix, text, suffix)
-                href = urlunparse(parsed_url._replace(path=quote(unquote(parsed_url.path))))  # type: ignore
+                href = urlunparse(
+                    parsed_url._replace(path=quote(unquote(parsed_url.path)))
+                )  # type: ignore
             except ValueError:  # It's not clear if this ever gets thrown
                 return "%s%s%s" % (prefix, text, suffix)
 
@@ -717,7 +723,20 @@ class XlsxConverter(HtmlConverter):
     Converts XLSX files to Markdown, with each sheet presented as a separate Markdown table.
     """
 
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
+    def _clean_colname(self, colname: Any) -> Any:
+        # Remove Pandas header placeholders
+        if isinstance(colname, str) and colname.startswith("Unnamed:"):
+            return ""
+        return colname
+
+    def convert(
+        self,
+        local_path,
+        na_rep: Any = "",
+        drop_empty_cols: bool = False,
+        drop_empty_rows: bool = False,
+        **kwargs,
+    ) -> Union[None, DocumentConverterResult]:
         # Bail if not a XLSX
         extension = kwargs.get("file_extension", "")
         if extension.lower() != ".xlsx":
@@ -725,9 +744,17 @@ class XlsxConverter(HtmlConverter):
 
         sheets = pd.read_excel(local_path, sheet_name=None)
         md_content = ""
-        for s in sheets:
-            md_content += f"## {s}\n"
-            html_content = sheets[s].to_html(index=False)
+        for name, sheet in sheets.items():
+            md_content += f"## {name}\n"
+            sheet = sheet.rename(columns=lambda col: self._clean_colname(col))
+
+            if drop_empty_cols:
+                sheet = sheet.dropna(axis=1, how="all")
+
+            if drop_empty_rows:
+                sheet = sheet.dropna(axis=0, how="all")
+
+            html_content = sheet.to_html(index=False, na_rep=na_rep)
             md_content += self._convert(html_content).text_content.strip() + "\n\n"
 
         return DocumentConverterResult(
@@ -869,7 +896,9 @@ class MediaConverter(DocumentConverter):
         else:
             try:
                 result = subprocess.run(
-                    [exiftool, "-json", local_path], capture_output=True, text=True
+                    [exiftool, "-json", local_path],
+                    capture_output=True,
+                    text=True,
                 ).stdout
                 return json.loads(result)[0]
             except Exception:
