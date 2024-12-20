@@ -4,6 +4,7 @@
 import sys
 import argparse
 from textwrap import dedent
+import shtab
 from ._markitdown import MarkItDown
 
 
@@ -11,39 +12,42 @@ def main():
     parser = argparse.ArgumentParser(
         description="Convert various file formats to markdown.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        usage=dedent(
-            """
-            SYNTAX: 
-                
-                markitdown <OPTIONAL: FILENAME>
-                If FILENAME is empty, markitdown reads from stdin.
-            
-            EXAMPLE:
-                
-                markitdown example.pdf
-                
-                OR
-            
-                cat example.pdf | markitdown
-            
-                OR 
-            
-                markitdown < example.pdf
-            """
-        ).strip(),
+        epilog=dedent(
+            """\
+            examples:
+              markitdown example.pdf
+              cat example.pdf | markitdown
+              markitdown < example.pdf"""
+        ),
     )
 
-    parser.add_argument("filename", nargs="?")
+    parser.add_argument(
+        "filename", nargs="?", help="if unspecified, defaults to stdin"
+    ).complete = shtab.FILE
+    parser.add_argument("--llm-model", help="e.g. gpt-4o")
+    parser.add_argument("--llm-client-url", help="base URL for OpenAI LLM client")
+    parser.add_argument(
+        "-H",
+        "--llm-client-header",
+        nargs="*",
+        default=[],
+        help="may be specified multiple times",
+    )
+    shtab.add_argument_to(parser)
     args = parser.parse_args()
+    if args.llm_model:
+        from openai import OpenAI
 
-    if args.filename is None:
-        markitdown = MarkItDown()
-        result = markitdown.convert_stream(sys.stdin.buffer)
-        print(result.text_content)
+        headers = {}
+        for header in args.llm_client_header:
+            key, value = header.split(":", 1)
+            headers[key] = value.lstrip()
+        llm_client = OpenAI(base_url=args.llm_client_url, default_headers=headers)
     else:
-        markitdown = MarkItDown()
-        result = markitdown.convert(args.filename)
-        print(result.text_content)
+        llm_client = None
+    markitdown = MarkItDown(llm_client=llm_client, llm_model=args.llm_model)
+    result = markitdown.convert(args.filename or sys.stdin.buffer)
+    print(result.text_content)
 
 
 if __name__ == "__main__":
