@@ -116,6 +116,20 @@ This project has adopted the [Microsoft Open Source Code of Conduct](https://ope
 For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
 contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
 
+### How to Contribute
+
+You can help by looking at issues or helping review PRs. Any issue or PR is welcome, but we have also marked some as 'open for contribution' and 'open for reviewing' to help faciliate community contributions. These are ofcourse just suggestions and you are welcome to contribute in any way you like.
+
+
+<div align="center">
+
+|                       | All                                      | Especially Needs Help from Community                                                                 |
+|-----------------------|------------------------------------------|------------------------------------------------------------------------------------------|
+| **Issues**            | [All Issues](https://github.com/microsoft/markitdown/issues) | [Issues open for contribution](https://github.com/microsoft/markitdown/issues?q=is%3Aissue+is%3Aopen+label%3A%22open+for+contribution%22) |
+| **PRs**               | [All PRs](https://github.com/microsoft/markitdown/pulls)     | [PRs open for reviewing](https://github.com/microsoft/markitdown/pulls?q=is%3Apr+is%3Aopen+label%3A%22open+for+reviewing%22)               |
+
+</div>
+
 ### Running Tests and Checks
 
 - Install `hatch` in your environment and run tests:
