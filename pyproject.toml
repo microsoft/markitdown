@@ -32,6 +32,7 @@ dependencies = [
   "python-pptx",
   "pandas",
   "openpyxl",
+  "xlrd",
   "pdfminer.six",
   "puremagic",
   "pydub",
