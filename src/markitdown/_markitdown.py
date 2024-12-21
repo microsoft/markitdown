@@ -14,7 +14,7 @@ import tempfile
 import traceback
 import zipfile
 from xml.dom import minidom
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, IO
 from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse, urlunparse
 from warnings import warn, resetwarnings, catch_warnings
@@ -525,7 +525,7 @@ class YouTubeConverter(DocumentConverter):
                 return metadata[k]
         return default
 
-    def _findKey(self, json: Any, key: str) -> Union[str, None]:  # TODO: Fix json type
+    def _findKey(self, json: Union[dict, list, Any], key: str) -> Union[str, None]:
         if isinstance(json, list):
             for elm in json:
                 ret = self._findKey(elm, key)
@@ -1330,9 +1330,8 @@ class MarkItDown:
         # Convert
         return self._convert(path, extensions, **kwargs)
 
-    # TODO what should stream's type be?
     def convert_stream(
-        self, stream: Any, **kwargs: Any
+        self, stream: IO[Any], **kwargs: Any
     ) -> DocumentConverterResult:  # TODO: deal with kwargs
         # Prepare a list of extensions to try (in order of priority)
         ext = kwargs.get("file_extension")
