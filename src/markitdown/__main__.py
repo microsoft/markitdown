@@ -1,33 +1,35 @@
 # SPDX-FileCopyrightText: 2024-present Adam Fourney <adamfo@microsoft.com>
 #
 # SPDX-License-Identifier: MIT
-import sys
 import argparse
+import sys
 from textwrap import dedent
+from .__about__ import __version__
 from ._markitdown import MarkItDown, DocumentConverterResult
 
 
 def main():
     parser = argparse.ArgumentParser(
         description="Convert various file formats to markdown.",
+        prog="markitdown",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         usage=dedent(
             """
-            SYNTAX: 
-                
+            SYNTAX:
+
                 markitdown <OPTIONAL: FILENAME>
                 If FILENAME is empty, markitdown reads from stdin.
-            
+
             EXAMPLE:
-                
+
                 markitdown example.pdf
-                
+
                 OR
-            
+
                 cat example.pdf | markitdown
-            
-                OR 
-            
+
+                OR
+
                 markitdown < example.pdf
                 
                 OR to save to a file use
@@ -39,6 +41,14 @@ def main():
                 markitdown example.pdf > example.md
             """
         ).strip(),
+    )
+
+    parser.add_argument(
+        "-v",
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+        help="show the version number and exit",
     )
 
     parser.add_argument("filename", nargs="?")
