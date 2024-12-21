@@ -736,6 +736,7 @@ class XlsxConverter(HtmlConverter):
             text_content=md_content.strip(),
         )
 
+
 class XlsConverter(HtmlConverter):
     """
     Converts XLS files to Markdown, with each sheet presented as a separate Markdown table.
