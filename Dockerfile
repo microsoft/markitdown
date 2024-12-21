@@ -1,23 +1,38 @@
-FROM python:3.13-slim-bullseye
+# ffmpeg
+FROM jrottenberg/ffmpeg:4.1-scratch AS ffmpeg
 
-USER root
+# Developoment stage
+FROM python:3.13-bullseye AS development
+# Copy ffmpeg binaries
+COPY --from=ffmpeg / /
 
-ARG INSTALL_GIT=false
-RUN if [ "$INSTALL_GIT" = "true" ]; then \
-    apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*; \
-    fi
+# Install build dependencies
+RUN apt update \
+  && apt install -y --no-install-recommends \
+  build-essential \
+  && apt clean \
+  && rm -rf /var/lib/apt/lists/*
 
-# Runtime dependency
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
+# Install Python package
+RUN pip install --no-cache-dir markitdown
 
-RUN pip install markitdown
+# Production stage
+FROM python:3.13-slim-bullseye AS production
+# Copy ffmpeg binaries
+COPY --from=ffmpeg / /
 
 # Default USERID and GROUPID
 ARG USERID=10000
 ARG GROUPID=10000
 
+# Set up user
+RUN groupadd -g $GROUPID appgroup && \
+    useradd -m -u $USERID -g appgroup appuser
+
 USER $USERID:$GROUPID
 
-ENTRYPOINT [ "markitdown" ]
+# Copy installed dependencies from development stage
+COPY --from=development /usr/local /usr/local
+
+# Entrypoint
+ENTRYPOINT ["markitdown"]
