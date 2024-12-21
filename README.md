@@ -5,6 +5,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/markitdown.svg)](https://pypi.org/project/markitdown/)
 ![PyPI - Downloads](https://img.shields.io/pypi/dd/markitdown)
+[![Built by AutoGen Team](https://img.shields.io/badge/Built%20by-AutoGen%20Team-blue)](https://github.com/microsoft/autogen)
 
 
 MarkItDown is a utility for converting various files to Markdown (e.g., for indexing, text analysis, etc).
@@ -27,6 +28,12 @@ To install MarkItDown, use pip: `pip install markitdown`. Alternatively, you can
 
 ```bash
 markitdown path-to-file.pdf > document.md
+```
+
+Or use `-o` to specify the output file:
+
+```bash
+markitdown path-to-file.pdf -o document.md
 ```
 
 You can also pipe content:
