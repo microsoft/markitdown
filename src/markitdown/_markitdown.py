@@ -33,6 +33,7 @@ from bs4 import BeautifulSoup
 from charset_normalizer import from_path
 
 # Optional Transcription support
+IS_AUDIO_TRANSCRIPTION_CAPABLE = False
 try:
     # Using warnings' catch_warnings to catch
     # pydub's warning of ffmpeg or avconv missing
