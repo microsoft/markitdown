@@ -72,6 +72,42 @@ print(result.text_content)
 docker build -t markitdown:latest .
 docker run --rm -i markitdown:latest < ~/your-file.pdf > output.md
 ```
+
+### Web API
+
+You can also use MarkItDown via a REST endpoint. The Web API is built using FastAPI and can be run using Docker.
+
+#### Running the Web API
+
+1. Build the Docker image:
+
+```sh
+docker build -t markitdown-api:latest .
+```
+
+2. Run the Docker container:
+
+```sh
+docker run --rm -p 8000:8000 markitdown-api:latest
+```
+
+The Web API will be available at `http://localhost:8000`.
+
+#### Using the Web API
+
+The Web API provides a single endpoint `/convert` that accepts a file and returns the converted markdown.
+
+- **Endpoint:** `/convert`
+- **Method:** `POST`
+- **Request Body:** Multipart form data with a file field named `file`
+- **Response:** JSON object with a `markdown` field containing the converted markdown
+
+Example using `curl`:
+
+```sh
+curl -X POST "http://localhost:8000/convert" -F "file=@path-to-file.pdf"
+```
+
 <details>
     
 <summary>Batch Processing Multiple Files</summary>
