@@ -6,6 +6,7 @@ import sys
 from textwrap import dedent
 from .__about__ import __version__
 from ._markitdown import MarkItDown, DocumentConverterResult
+import uvicorn
 
 
 def main():
@@ -57,9 +58,16 @@ def main():
         "--output",
         help="Output file name. If not provided, output is written to stdout.",
     )
+    parser.add_argument(
+        "--api",
+        action="store_true",
+        help="Start the FastAPI server",
+    )
     args = parser.parse_args()
 
-    if args.filename is None:
+    if args.api:
+        uvicorn.run("src.markitdown.api:app", host="0.0.0.0", port=8000)
+    elif args.filename is None:
         markitdown = MarkItDown()
         result = markitdown.convert_stream(sys.stdin.buffer)
         _handle_output(args, result)
