@@ -5,6 +5,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/markitdown.svg)](https://pypi.org/project/markitdown/)
 ![PyPI - Downloads](https://img.shields.io/pypi/dd/markitdown)
+[![Built by AutoGen Team](https://img.shields.io/badge/Built%20by-AutoGen%20Team-blue)](https://github.com/microsoft/autogen)
 
 
 MarkItDown is a utility for converting various files to Markdown (e.g., for indexing, text analysis, etc).
@@ -27,6 +28,12 @@ To install MarkItDown, use pip: `pip install markitdown`. Alternatively, you can
 
 ```bash
 markitdown path-to-file.pdf > document.md
+```
+
+Or use `-o` to specify the output file:
+
+```bash
+markitdown path-to-file.pdf -o document.md
 ```
 
 You can also pipe content:
@@ -115,6 +122,20 @@ provided by the bot. You will only need to do this once across all repos using o
 This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
 For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
 contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
+
+### How to Contribute
+
+You can help by looking at issues or helping review PRs. Any issue or PR is welcome, but we have also marked some as 'open for contribution' and 'open for reviewing' to help facilitate community contributions. These are ofcourse just suggestions and you are welcome to contribute in any way you like.
+
+
+<div align="center">
+
+|                       | All                                      | Especially Needs Help from Community                                                                 |
+|-----------------------|------------------------------------------|------------------------------------------------------------------------------------------|
+| **Issues**            | [All Issues](https://github.com/microsoft/markitdown/issues) | [Issues open for contribution](https://github.com/microsoft/markitdown/issues?q=is%3Aissue+is%3Aopen+label%3A%22open+for+contribution%22) |
+| **PRs**               | [All PRs](https://github.com/microsoft/markitdown/pulls)     | [PRs open for reviewing](https://github.com/microsoft/markitdown/pulls?q=is%3Apr+is%3Aopen+label%3A%22open+for+reviewing%22)               |
+
+</div>
 
 ### Running Tests and Checks
 
