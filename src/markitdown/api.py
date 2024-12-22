@@ -19,9 +19,9 @@ async def convert(file: UploadFile = File(...)):
         markitdown = MarkItDown()
         result = markitdown.convert(temp_file_path)
 
-        output_file_path = f"/tmp/{os.path.splitext(file.filename)[0]}.md"
-        with open(output_file_path, "w") as output_file:
-            output_file.write(result.text_content)
+        # output_file_path = f"/tmp/{os.path.splitext(file.filename)[0]}.md"
+        # with open(output_file_path, "w") as output_file:
+        #     output_file.write(result.text_content)
 
         os.remove(temp_file_path)
 
