@@ -40,6 +40,8 @@ dependencies = [
   "pathvalidate",
   "charset-normalizer",
   "openai",
+  "fastapi",
+  "uvicorn",
 ]
 
 [project.urls]
