@@ -60,8 +60,8 @@ def main():
     )
     parser.add_argument(
         "--api",
-        action="store_true",
-        help="Start the FastAPI server",
+        action="api",
+        help="Start the API server",
     )
     args = parser.parse_args()
 
