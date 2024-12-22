@@ -54,6 +54,8 @@ XLSX_TEST_STRINGS = [
     "affc7dad-52dc-4b98-9b5d-51e65d8a8ad0",
 ]
 
+XLSX_TEST_EXCLUDES = ["Unnamed:", "NaN"]
+
 
 DOCX_TEST_STRINGS = [
     "314b0a30-5b04-470b-b9f7-eed2c2bec74a",
@@ -175,11 +177,7 @@ def test_markitdown_local() -> None:
 
     # Test XLSX processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.xlsx"))
-    validate_strings(result, XLSX_TEST_STRINGS)
-
-    # Check negations
-    assert "Unnamed:" not in text_content
-    assert "NaN" not in text_content
+    validate_strings(result, XLSX_TEST_STRINGS, XLSX_TEST_EXCLUDES)
 
     # Test DOCX processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.docx"))
