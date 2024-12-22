@@ -8,76 +8,76 @@ from importlib.metadata import entry_points
 from .__about__ import __version__
 from ._markitdown import MarkItDown, DocumentConverterResult
 
+parser = argparse.ArgumentParser(
+    description="Convert various file formats to markdown.",
+    prog="markitdown",
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    epilog=dedent(
+        """\
+        examples:
+          markitdown example.pdf
+          markitdown -o example.md example.pdf
+          cat example.pdf | markitdown > example.md"""
+    ),
+)
+parser.add_argument(
+    "-v",
+    "--version",
+    action="version",
+    version=f"%(prog)s {__version__}",
+    help="show the version number and exit",
+)
+parser.add_argument(
+    "-o",
+    "--output",
+    metavar="outfilename",
+    help="if unspecified, defaults to stdout",
+)
+parser.add_argument(
+    "-d",
+    "--use-docintel",
+    action="store_true",
+    help="Use Document Intelligence to extract text instead of offline conversion. Requires a valid Document Intelligence Endpoint.",
+)
+parser.add_argument(
+    "-e",
+    "--endpoint",
+    type=str,
+    help="Document Intelligence Endpoint. Required if using Document Intelligence.",
+)
+parser.add_argument(
+    "-p",
+    "--use-plugins",
+    action="store_true",
+    help="Use 3rd-party plugins to convert files. Use --list-plugins to see installed plugins.",
+)
+parser.add_argument(
+    "--list-plugins",
+    action="store_true",
+    help="List installed 3rd-party plugins. Plugins are loaded when using the -p or --use-plugin option.",
+)
+parser.add_argument(
+    "filename", nargs="?", help="if unspecified, defaults to stdin"
+)
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Convert various file formats to markdown.",
-        prog="markitdown",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=dedent(
-            """\
-            examples:
-              markitdown example.pdf
-              markitdown -o example.md example.pdf
-              cat example.pdf | markitdown > example.md"""
-        ),
-    )
-    parser.add_argument(
-        "-v",
-        "--version",
-        action="version",
-        version=f"%(prog)s {__version__}",
-        help="show the version number and exit",
-    )
-    parser.add_argument(
-        "-o",
-        "--output",
-        dest="filename",
-        help="if unspecified, defaults to stdout",
-    )
-    parser.add_argument(
-        "-d",
-        "--use-docintel",
-        action="store_true",
-        help="Use Document Intelligence to extract text instead of offline conversion. Requires a valid Document Intelligence Endpoint.",
-    )
-    parser.add_argument(
-        "-e",
-        "--endpoint",
-        type=str,
-        help="Document Intelligence Endpoint. Required if using Document Intelligence.",
-    )
-    parser.add_argument(
-        "-p",
-        "--use-plugins",
-        action="store_true",
-        help="Use 3rd-party plugins to convert files. Use --list-plugins to see installed plugins.",
-    )
-    parser.add_argument(
-        "--list-plugins",
-        action="store_true",
-        help="List installed 3rd-party plugins. Plugins are loaded when using the -p or --use-plugin option.",
-    )
-    parser.add_argument(
-        "filename", nargs="?", help="if unspecified, defaults to stdin"
-    )
 
-    args = parser.parse_args()
+def main(args=None):
+    args = parser.parse_args(args)
 
     if args.list_plugins:
         # List installed plugins, then exit
         print("Installed MarkItDown 3rd-party Plugins:\n")
         plugin_entry_points = list(entry_points(group="markitdown.plugin"))
-        if len(plugin_entry_points) == 0:
-            print("  * No 3rd-party plugins installed.")
-            print(
-                "\nFind plugins by searching for the hashtag #markitdown-plugin on GitHub.\n"
-            )
-        else:
+        if plugin_entry_points:
             for entry_point in plugin_entry_points:
                 print(f"  * {entry_point.name:<16}\t(package: {entry_point.value})")
             print(
                 "\nUse the -p (or --use-plugins) option to enable 3rd-party plugins.\n"
+            )
+        else:
+            print("No 3rd-party plugins installed.")
+            print(
+                "\nFind plugins by searching for the hashtag #markitdown-plugin on GitHub.\n"
             )
         sys.exit(0)
 
@@ -94,10 +94,10 @@ def main():
     else:
         markitdown = MarkItDown(enable_plugins=args.use_plugins)
 
-    if args.filename is None:
-        result = markitdown.convert_stream(sys.stdin.buffer)
-    else:
+    if args.filename:
         result = markitdown.convert(args.filename)
+    else:
+        result = markitdown.convert_stream(sys.stdin.buffer)
 
     if args.output:
         with open(args.output, "w", encoding="utf-8") as f:
