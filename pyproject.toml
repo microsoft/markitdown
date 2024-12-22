@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "markitdown"
 dynamic = ["version"]
-description = ''
+description = 'Utility tool for converting various files to Markdown'
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
@@ -39,6 +39,7 @@ dependencies = [
   "SpeechRecognition",
   "pathvalidate",
   "charset-normalizer",
+  "openai",
 ]
 
 [project.urls]
@@ -77,3 +78,6 @@ exclude_lines = [
   "if __name__ == .__main__.:",
   "if TYPE_CHECKING:",
 ]
+
+[tool.hatch.build.targets.sdist]
+only-include = ["src/markitdown"]
