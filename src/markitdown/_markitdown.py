@@ -1047,7 +1047,21 @@ class ImageConverter(MediaConverter):
 
     def _get_llm_description(self, local_path, extension, client, model, prompt=None):
         if prompt is None or prompt.strip() == "":
-            prompt = "Write a detailed caption for this image."
+            prompt = '''
+                Analyze the image and extract all visible text in the original language.
+                Reproduce the extracted text in a structured Markdown format, preserving
+                any formatting such as headings, bullet points, and highlights. Ensure
+                the output accurately reflects the structure and style of the original
+                document. 
+
+                Additionally, if the image includes any visual elements (e.g., diagrams,
+                logos, or specific layouts) that cannot be represented directly in Markdown,
+                describe them in plain text as part of the Markdown document under a section
+                titled "Visual Notes."
+
+                Output only the converted Markdown text without any additional commentary
+                or explanations.
+            '''
 
         data_uri = ""
         with open(local_path, "rb") as image_file:
