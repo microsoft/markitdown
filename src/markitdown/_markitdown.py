@@ -525,7 +525,7 @@ class XlsxConverter(HtmlConverter):
     def _clean_colname(self, colname: Any) -> Any:
         # Remove Pandas header placeholders
         if isinstance(colname, str) and colname.startswith("Unnamed:"):
-            return ""
+            return None
         return colname
 
     def convert(
@@ -548,10 +548,15 @@ class XlsxConverter(HtmlConverter):
             sheet = sheet.rename(columns=lambda col: self._clean_colname(col))
 
             if drop_empty_cols:
-                sheet = sheet.dropna(axis=1, how="all")
+                # also consider headers to be part of the column
+                sheet = sheet.loc[:, sheet.notna().any() | sheet.columns.notna()]
 
             if drop_empty_rows:
                 sheet = sheet.dropna(axis=0, how="all")
+
+            # convert remaining NaN's to empty string
+            # because .to_html(na_rep="") does not apply to headers
+            sheet.columns = sheet.columns.fillna(na_rep)
 
             html_content = sheet.to_html(index=False, na_rep=na_rep)
             md_content += self._convert(html_content).text_content.strip() + "\n\n"
