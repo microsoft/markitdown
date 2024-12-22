@@ -63,6 +63,15 @@ DOCX_TEST_STRINGS = [
     "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation",
 ]
 
+MSG_TEST_STRINGS = [
+    "# Email Message",
+    "**From:** test.sender@example.com",
+    "**To:** test.recipient@example.com",
+    "**Subject:** Test Email Message",
+    "## Content",
+    "This is the body of the test email message",
+]
+
 DOCX_COMMENT_TEST_STRINGS = [
     "314b0a30-5b04-470b-b9f7-eed2c2bec74a",
     "49e168b7-d2ae-407f-a055-2167576f39a1",
@@ -231,6 +240,10 @@ def test_markitdown_local() -> None:
     ## Test non-UTF-8 encoding
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test_mskanji.csv"))
     validate_strings(result, CSV_CP932_TEST_STRINGS)
+
+    # Test MSG (Outlook email) processing
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test_outlook_msg.msg"))
+    validate_strings(result, MSG_TEST_STRINGS)
 
 
 @pytest.mark.skipif(

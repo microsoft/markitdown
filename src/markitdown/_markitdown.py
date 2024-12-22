@@ -1083,7 +1083,6 @@ class OutlookMsgConverter(DocumentConverter):
     Uses the olefile package to parse the .msg file structure and extract:
     - Email headers (From, To, Subject, Date)
     - Email body content
-    - Attachments (listed but not converted)
     """
 
     def convert(
@@ -1101,7 +1100,7 @@ class OutlookMsgConverter(DocumentConverter):
 
             # Get headers
             headers = {
-                "From": self._get_stream_data(msg, "__substg1.0_0C1A001F"),
+                "From": self._get_stream_data(msg, "__substg1.0_0C1F001F"),
                 "To": self._get_stream_data(msg, "__substg1.0_0E04001F"),
                 "Subject": self._get_stream_data(msg, "__substg1.0_0037001F"),
             }
