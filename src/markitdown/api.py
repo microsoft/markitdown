@@ -25,7 +25,8 @@ async def convert(file: UploadFile = File(...)):
 
         os.remove(temp_file_path)
 
-        return FileResponse(output_file_path, filename=f"{os.path.splitext(file.filename)[0]}.md")
+        # return FileResponse(output_file_path, filename=f"{os.path.splitext(file.filename)[0]}.md")
+        return {"markdown": result.text_content}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
