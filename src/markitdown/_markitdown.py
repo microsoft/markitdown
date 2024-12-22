@@ -1081,7 +1081,7 @@ class OutlookMsgConverter(DocumentConverter):
     """Converts Outlook .msg files to markdown by extracting email metadata and content.
 
     Uses the olefile package to parse the .msg file structure and extract:
-    - Email headers (From, To, Subject, Date)
+    - Email headers (From, To, Subject)
     - Email body content
     """
 
