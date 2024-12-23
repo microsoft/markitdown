@@ -685,12 +685,13 @@ class PdfConverter(DocumentConverter):
         extension = kwargs.get("file_extension", "")
         if extension.lower() != ".pdf":
             return None
-
-        # return DocumentConverterResult(
-        #     title=None,
-        #     text_content=pdfminer.high_level.extract_text(local_path),
-        # )
-        text_content = pymupdf4llm.to_markdown(local_path, show_progress=False)
+        method = kwargs.get("method", "pdfminer")
+        if method == "pdfminer":
+            text_content = pdfminer.high_level.extract_text(local_path)
+        elif method == "pymupdf4llm":
+            text_content = pymupdf4llm.to_markdown(local_path, show_progress=False)
+        else:
+            return None     # unknown method
         return DocumentConverterResult(title=None, text_content=text_content)
 
 
