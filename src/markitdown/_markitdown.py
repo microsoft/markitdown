@@ -733,10 +733,10 @@ class DocxConverter(HtmlConverter):
                 style_map = kwargs.get("style_map")
                 image_output_dir = kwargs.get("image_output_dir", "images")
 
-                mammoth_result = convert_to_html(
+                mammoth_result = mammoth.convert_to_html(
                     docx_file,
                     style_map=style_map,
-                    convert_image=images.inline(
+                    convert_image=mammoth.images.inline(
                         lambda img: self.convert_image(img, image_output_dir)
                     ),
                 )
