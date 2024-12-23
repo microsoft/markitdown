@@ -699,7 +699,7 @@ class DocxConverter(HtmlConverter):
     def sanitize_filename(self, name: str) -> str:
         """Sanitizes a string to make it a valid file name."""
         # Normalize whitespace
-        name = re.sub(r'\s+', " ", name.strip())
+        name = re.sub(r"\s+", " ", name.strip())
         # Replace invalid characters with underscores
         return re.sub(r'[\\/*?:"<>|]', "_", name)
 
@@ -720,7 +720,9 @@ class DocxConverter(HtmlConverter):
             # Return an empty src if saving fails
             return {"src": ""}
 
-    def convert(self, local_path: str, **kwargs) -> Union[None, DocumentConverterResult]:
+    def convert(
+        self, local_path: str, **kwargs
+    ) -> Union[None, DocumentConverterResult]:
         # Bail if not a DOCX
         extension = kwargs.get("file_extension", "")
         if extension.lower() != ".docx":
@@ -734,7 +736,9 @@ class DocxConverter(HtmlConverter):
                 mammoth_result = convert_to_html(
                     docx_file,
                     style_map=style_map,
-                    convert_image=images.inline(lambda img: self.convert_image(img, image_output_dir)),
+                    convert_image=images.inline(
+                        lambda img: self.convert_image(img, image_output_dir)
+                    ),
                 )
 
                 html_content = mammoth_result.value
