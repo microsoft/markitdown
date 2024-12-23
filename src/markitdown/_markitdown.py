@@ -693,24 +693,54 @@ class PdfConverter(DocumentConverter):
 
 class DocxConverter(HtmlConverter):
     """
-    Converts DOCX files to Markdown. Style information (e.g.m headings) and tables are preserved where possible.
+    Converts DOCX files to Markdown. Style information (e.g., headings) and tables are preserved where possible.
     """
 
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
+    def sanitize_filename(self, name: str) -> str:
+        """Sanitizes a string to make it a valid file name."""
+        # Normalize whitespace
+        name = re.sub(r'\s+', " ", name.strip())
+        # Replace invalid characters with underscores
+        return re.sub(r'[\\/*?:"<>|]', "_", name)
+
+    def convert_image(self, image, output_dir: str) -> dict:
+        """Handles image extraction and saving."""
+        os.makedirs(output_dir, exist_ok=True)
+
+        raw_name = image.alt_text or f"image_{hash(image)}"
+        image_name = self.sanitize_filename(raw_name) + ".png"
+        image_path = os.path.join(output_dir, image_name)
+
+        try:
+            with image.open() as image_bytes:
+                with open(image_path, "wb") as img_file:
+                    img_file.write(image_bytes.read())
+            return {"src": image_path}
+        except Exception:
+            # Return an empty src if saving fails
+            return {"src": ""}
+
+    def convert(self, local_path: str, **kwargs) -> Union[None, DocumentConverterResult]:
         # Bail if not a DOCX
         extension = kwargs.get("file_extension", "")
         if extension.lower() != ".docx":
             return None
 
-        result = None
-        with open(local_path, "rb") as docx_file:
-            style_map = kwargs.get("style_map", None)
+        try:
+            with open(local_path, "rb") as docx_file:
+                style_map = kwargs.get("style_map")
+                image_output_dir = kwargs.get("image_output_dir", "images")
 
-            result = mammoth.convert_to_html(docx_file, style_map=style_map)
-            html_content = result.value
-            result = self._convert(html_content)
+                mammoth_result = convert_to_html(
+                    docx_file,
+                    style_map=style_map,
+                    convert_image=images.inline(lambda img: self.convert_image(img, image_output_dir)),
+                )
 
-        return result
+                html_content = mammoth_result.value
+                return self._convert(html_content)
+        except Exception:
+            return None
 
 
 class XlsxConverter(HtmlConverter):
