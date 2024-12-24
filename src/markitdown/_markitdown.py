@@ -677,18 +677,23 @@ class BingSerpConverter(DocumentConverter):
 
 class PdfConverter(DocumentConverter):
     """
-    Converts PDFs to Markdown. Most style information is ignored, so the results are essentially plain-text.
+    Converts PDFs to Markdown. Most style information is ignored, so the results are essentially plain-text.    
     """
 
     def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
+        """
+        Example:
+        >>> source = "https://arxiv.org/pdf/2308.08155v2.pdf"
+        >>> markitdown.convert(source, pdf_engine="pymupdf4llm")
+        """
         # Bail if not a PDF
         extension = kwargs.get("file_extension", "")
         if extension.lower() != ".pdf":
             return None
-        method = kwargs.get("method", "pdfminer")
-        if method == "pdfminer":
+        pdf_engine = kwargs.get("pdf_engine", "pdfminer")
+        if pdf_engine == "pdfminer":
             text_content = pdfminer.high_level.extract_text(local_path)
-        elif method == "pymupdf4llm":
+        elif pdf_engine == "pymupdf4llm":
             text_content = pymupdf4llm.to_markdown(local_path, show_progress=False)
         else:
             return None     # unknown method
