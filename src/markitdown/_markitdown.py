@@ -1206,13 +1206,20 @@ class ZipConverter(DocumentConverter):
 
 
 class JsonConverter(DocumentConverter):
+    """Converts generic json files to markdown :
+    - keys are prefixed with the whole dictionnary tree starting with the file name
+    - values are kept untouched
+    - key/values are between backtips
+    - (ordered) lists are converted into markdown ordered lists starting at 0."""
+
     def convert(
         self, local_path: str, **kwargs: Any
     ) -> Union[None, DocumentConverterResult]:
-        # Bail if not an image
         extension = kwargs.get("file_extension", "")
         if extension.lower() not in [".json"]:
             return None
+
+        # TODO : check similar extensions and/or mime type
 
         with open(local_path) as test_json:
             try:
