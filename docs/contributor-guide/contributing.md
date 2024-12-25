@@ -1,7 +1,15 @@
-## Contributing
+# How to Contribute
 
-This project welcomes contributions and suggestions.  Most contributions require you to agree to a
-Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
+This project welcomes contributions and suggestions. 
+
+## Steps to Contribute
+1. Fork the repository.
+2. Create a branch for your feature or bug fix.
+3. Write your code and tests.
+4. Submit a pull request.
+
+## Contributor License Agreement (CLA)
+Most contributions require you to agree to a Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
 the rights to use your contribution. For details, visit https://cla.opensource.microsoft.com.
 
 When you submit a pull request, a CLA bot will automatically determine whether you need to provide
@@ -12,10 +20,11 @@ This project has adopted the [Microsoft Open Source Code of Conduct](https://ope
 For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
 contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
 
-### How to Contribute
+## Getting Started
+To start contributing, refer to the [Running Tests and Checks](#running-tests-and-checks) section.
 
-You can help by looking at issues or helping review PRs. Any issue or PR is welcome, but we have also marked some as 'open for contribution' and 'open for reviewing' to help facilitate community contributions. These are ofcourse just suggestions and you are welcome to contribute in any way you like.
-
+## Issues and PRs
+You can help by looking at issues or helping review PRs. Any issue or PR is welcome, but we have also marked some as 'open for contribution' and 'open for reviewing' to help facilitate community contributions. These are of course just suggestions and you are welcome to contribute in any way you like.
 
 <div align="center">
 
@@ -42,6 +51,13 @@ You can help by looking at issues or helping review PRs. Any issue or PR is welc
     ```
 
 - Run pre-commit checks before submitting a PR: `pre-commit run --all-files`
+
+- Run pre-commit checks before submitting a PR: `pre-commit run --all-files`
+
+
+### How to Contribute
+
+You can help by looking at issues or helping review PRs. Any issue or PR is welcome, but we have also marked some as 'open for contribution' and 'open for reviewing' to help facilitate community contributions. These are ofcourse just suggestions and you are welcome to contribute in any way you like.
 
 ## Trademarks
 
