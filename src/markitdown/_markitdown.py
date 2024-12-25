@@ -14,7 +14,7 @@ import tempfile
 import traceback
 import zipfile
 from xml.dom import minidom
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Literal
 from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse, urlunparse
 from warnings import warn, resetwarnings, catch_warnings
@@ -680,7 +680,7 @@ class PdfConverter(DocumentConverter):
     Converts PDFs to Markdown. Most style information is ignored, so the results are essentially plain-text.    
     """
 
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
+    def convert(self, local_path, pdf_engine: Literal['pdfminer', 'pymupdf4llm']='pdfminer', **kwargs) -> Union[None, DocumentConverterResult]:
         """
         Example:
         >>> source = "https://arxiv.org/pdf/2308.08155v2.pdf"
@@ -690,13 +690,13 @@ class PdfConverter(DocumentConverter):
         extension = kwargs.get("file_extension", "")
         if extension.lower() != ".pdf":
             return None
-        pdf_engine = kwargs.get("pdf_engine", "pdfminer")
         if pdf_engine == "pdfminer":
             text_content = pdfminer.high_level.extract_text(local_path)
         elif pdf_engine == "pymupdf4llm":
             text_content = pymupdf4llm.to_markdown(local_path, show_progress=False)
         else:
-            return None     # unknown method
+            # return None     # unknown method
+            raise FileConversionException("'pdf_engine' not valid. Please choose between ['pdfminer', 'pymupdf4llm'].")
         return DocumentConverterResult(title=None, text_content=text_content)
 
 

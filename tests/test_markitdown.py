@@ -7,7 +7,8 @@ import pytest
 import requests
 
 from warnings import catch_warnings, resetwarnings
-
+import sys
+sys.path.insert(0, "/home/yxl/Projects/markitdown/src")
 from markitdown import MarkItDown
 
 skip_remote = (
@@ -299,6 +300,20 @@ def test_markitdown_llm() -> None:
     for test_string in ["red", "circle", "blue", "square"]:
         assert test_string in result.text_content.lower()
 
+def test_markitdown_pdf() -> None:
+    markitdown = MarkItDown()
+    
+    # I test by local pdf, using PDF_TEST_URL may also be fine.
+    
+    # By pymupdf4llm
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "2308.08155v2.pdf"), pdf_engine="pymupdf4llm")
+    for test_string in PDF_TEST_STRINGS:
+        assert test_string in result.text_content
+
+    # By pdfminer
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "2308.08155v2.pdf"), pdf_engine="pdfminer")
+    for test_string in PDF_TEST_STRINGS:
+        assert test_string in result.text_content
 
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
@@ -307,3 +322,4 @@ if __name__ == "__main__":
     test_markitdown_exiftool()
     test_markitdown_deprecation()
     test_markitdown_llm()
+    test_markitdown_pdf()
