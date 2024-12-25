@@ -1,29 +1,45 @@
-# How to Contribute
+# Contributing to MarkItDown
 
-This project welcomes contributions and suggestions. 
+Welcome! We're pleased that you're considering contributing to this project. Whether you're fixing a typo, reporting a bug, suggesting a feature, or writing code, your contributions are highly valued and appreciated.
 
 ## Steps to Contribute
-1. Fork the repository.
-2. Create a branch for your feature or bug fix.
-3. Write your code and tests.
-4. Submit a pull request.
+
+Follow these steps to get started:
+
+1. **Fork the Repository**
+   Create a copy of the repository by forking it on GitHub.
+
+2. **Create a Branch**
+   Make a branch for your feature or bug fix. Use a meaningful name like `feature/add-login` or `fix/typo-readme`.
+
+3. **Write Your Code**
+   Add your changes, write tests if necessary, and ensure your code is clean and well-documented.
+
+4. **Run Tests and Pre-Commit Checks**
+   Before submitting, please make sure your code passes all tests and follows the code formatting guidelines (see the [Running Tests and Checks](#running-tests-and-checks) section).
+
+5. **Submit a Pull Request (PR)**
+   Open a pull request to share your changes with us. Reviewers will help you improve it.
 
 ## Contributor License Agreement (CLA)
-Most contributions require you to agree to a Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
-the rights to use your contribution. For details, visit https://cla.opensource.microsoft.com.
+Most contributions require you to agree to a Contributor License Agreement (CLA) declaring that you have the right to and actually do, grant us the rights to use your contribution. For details, visit https://cla.opensource.microsoft.com.
 
-When you submit a pull request, a CLA bot will automatically determine whether you need to provide
-a CLA and decorate the PR appropriately (e.g., status check, comment). Simply follow the instructions
-provided by the bot. You will only need to do this once across all repos using our CLA.
+- When you submit a pull request, a CLA bot will automatically determine whether you need to provide a CLA and decorate the PR appropriately (e.g., status check, comment).
+- Follow the instructions provided by the bot.
+- You will only need to do this once across all repos using our CLA.
 
-This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
-For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
-contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
+## Code of Conduct
+
+We have adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/). By participating in this project, you agree to uphold these standards.
+
+- **For FAQs or more information:** Visit the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq).
+- **For questions or concerns:** Contact [opencode@microsoft.com](mailto:opencode@microsoft.com).
 
 ## Getting Started
-To start contributing, refer to the [Running Tests and Checks](#running-tests-and-checks) section.
 
-## Issues and PRs
+Ready to contribute? Start here:
+
+### Issues and PRs
 You can help by looking at issues or helping review PRs. Any issue or PR is welcome, but we have also marked some as 'open for contribution' and 'open for reviewing' to help facilitate community contributions. These are of course just suggestions and you are welcome to contribute in any way you like.
 
 <div align="center">
@@ -35,7 +51,7 @@ You can help by looking at issues or helping review PRs. Any issue or PR is welc
 
 </div>
 
-### Running Tests and Checks
+## Running Tests and Checks
 
 - Install `hatch` in your environment and run tests:
     ```sh
@@ -52,12 +68,12 @@ You can help by looking at issues or helping review PRs. Any issue or PR is welc
 
 - Run pre-commit checks before submitting a PR: `pre-commit run --all-files`
 
-- Run pre-commit checks before submitting a PR: `pre-commit run --all-files`
+##### Pre-Commit Checks
 
-
-### How to Contribute
-
-You can help by looking at issues or helping review PRs. Any issue or PR is welcome, but we have also marked some as 'open for contribution' and 'open for reviewing' to help facilitate community contributions. These are ofcourse just suggestions and you are welcome to contribute in any way you like.
+Before submitting your pull request, run these checks to ensure code quality:
+```sh
+pre-commit run --all-files
+```
 
 ## Trademarks
 
@@ -66,3 +82,5 @@ trademarks or logos is subject to and must follow
 [Microsoft's Trademark & Brand Guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks/usage/general).
 Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship.
 Any use of third-party trademarks or logos are subject to those third-party's policies.
+
+Thank you for helping make this project better!
