@@ -7,8 +7,6 @@ import pytest
 import requests
 
 from warnings import catch_warnings, resetwarnings
-import sys
-sys.path.insert(0, "/home/yxl/Projects/markitdown/src")
 from markitdown import MarkItDown
 
 skip_remote = (
@@ -302,16 +300,35 @@ def test_markitdown_llm() -> None:
 
 def test_markitdown_pdf() -> None:
     markitdown = MarkItDown()
-    
+
     # I test by local pdf, using PDF_TEST_URL may also be fine.
-    
+
     # By pymupdf4llm
-    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "2308.08155v2.pdf"), pdf_engine="pymupdf4llm")
+    result = markitdown.convert(
+        os.path.join(TEST_FILES_DIR, "2308.08155v2.pdf"),
+        engine="pymupdf4llm",
+        engine_kwargs={"show_progress": False},  # additional kwargs
+    )
+    for test_string in PDF_TEST_STRINGS:
+        assert test_string in result.text_content
+
+    # By pymupdf4llm and extract images
+    result = markitdown.convert(
+        os.path.join(TEST_FILES_DIR, "2308.08155v2.pdf"),
+        engine="pymupdf4llm",
+        engine_kwargs={
+            "show_progress": False,
+            "write_images": True,
+            "image_path": "tests/pics",
+        },  # `write_images` must be True, setting `image_path` for images saving dir.
+    )
     for test_string in PDF_TEST_STRINGS:
         assert test_string in result.text_content
 
     # By pdfminer
-    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "2308.08155v2.pdf"), pdf_engine="pdfminer")
+    result = markitdown.convert(
+        os.path.join(TEST_FILES_DIR, "2308.08155v2.pdf"), engine="pdfminer"
+    )
     for test_string in PDF_TEST_STRINGS:
         assert test_string in result.text_content
 

@@ -14,7 +14,7 @@ import tempfile
 import traceback
 import zipfile
 from xml.dom import minidom
-from typing import Any, Dict, List, Optional, Union, Literal
+from typing import Any, Dict, List, Optional, Union, Literal, Mapping
 from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse, urlunparse
 from warnings import warn, resetwarnings, catch_warnings
@@ -679,24 +679,35 @@ class PdfConverter(DocumentConverter):
     """
     Converts PDFs to Markdown. Most style information is ignored, so the results are essentially plain-text.    
     """
+    _engines: Mapping[str, Any] = {
+        "pdfminer": pdfminer.high_level.extract_text,
+        "pymupdf4llm": pymupdf4llm.to_markdown,
+    }
 
-    def convert(self, local_path, pdf_engine: Literal['pdfminer', 'pymupdf4llm']='pdfminer', **kwargs) -> Union[None, DocumentConverterResult]:
+    def convert(
+        self,
+        local_path,
+        engine: Literal["pdfminer", "pymupdf4llm"] = "pdfminer",
+        engine_kwargs={},
+        **kwargs,
+    ) -> Union[None, DocumentConverterResult]:
         """
         Example:
         >>> source = "https://arxiv.org/pdf/2308.08155v2.pdf"
-        >>> markitdown.convert(source, pdf_engine="pymupdf4llm")
+        >>> markitdown.convert(source, engine="pymupdf4llm")
         """
         # Bail if not a PDF
         extension = kwargs.get("file_extension", "")
         if extension.lower() != ".pdf":
             return None
-        if pdf_engine == "pdfminer":
-            text_content = pdfminer.high_level.extract_text(local_path)
-        elif pdf_engine == "pymupdf4llm":
-            text_content = pymupdf4llm.to_markdown(local_path, show_progress=False)
+        if engine is not None and engine not in self._engines:
+            raise FileConversionException(
+                "'pdf_engine' not valid. Please choose between {}.".format(
+                    list(self._engines.keys())
+                )
+            )
         else:
-            # return None     # unknown method
-            raise FileConversionException("'pdf_engine' not valid. Please choose between ['pdfminer', 'pymupdf4llm'].")
+            text_content = self._engines[engine](local_path, **engine_kwargs)
         return DocumentConverterResult(title=None, text_content=text_content)
 
 
