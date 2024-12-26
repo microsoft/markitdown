@@ -768,6 +768,17 @@ class PptxConverter(HtmlConverter):
                     except Exception:
                         pass
 
+                    # Try describing the image using GPTV
+                    llm_client = kwargs.get("llm_client")
+                    llm_model = kwargs.get("llm_model")
+                    if llm_client is not None and llm_model is not None:
+                        alt_text += self._get_llm_description(
+                            shape.image.blob,
+                            llm_client,
+                            llm_model,
+                            prompt=kwargs.get("llm_prompt"),
+                        ).strip()
+
                     # A placeholder name
                     filename = re.sub(r"\W", "", shape.name) + ".jpg"
                     md_content += (
@@ -856,6 +867,31 @@ class PptxConverter(HtmlConverter):
         header = markdown_table[0]
         separator = "|" + "|".join(["---"] * len(data[0])) + "|"
         return md + "\n".join([header, separator] + markdown_table[1:])
+
+    def _get_llm_description(self, image_blob, client, model, prompt=None):
+        if prompt is None or prompt.strip() == "":
+            prompt = "Write a caption for this image."
+        content_type = "image/jpeg"
+        image_base64 = base64.b64encode(image_blob).decode("utf-8")
+        data_uri = f"data:{content_type};base64,{image_base64}"
+
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": data_uri,
+                        },
+                    },
+                ],
+            }
+        ]
+
+        response = client.chat.completions.create(model=model, messages=messages)
+        return response.choices[0].message.content
 
 
 class MediaConverter(DocumentConverter):
