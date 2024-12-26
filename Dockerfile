@@ -1,5 +1,7 @@
 FROM python:3.13-slim-bullseye
 
+ENV DEBIAN_FRONTEND=noninteractive
+
 ARG INSTALL_GIT=false
 RUN if [ "$INSTALL_GIT" = "true" ]; then \
     apt-get update && apt-get install -y --no-install-recommends \
