@@ -13,8 +13,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN pip install markitdown
 
 # Default USERID and GROUPID
-ARG USERID=10000
-ARG GROUPID=10000
+ARG USERID=nobody
+ARG GROUPID=nogroup
 
 USER $USERID:$GROUPID
 
