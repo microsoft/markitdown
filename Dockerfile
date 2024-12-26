@@ -10,7 +10,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install markitdown
+WORKDIR /app
+COPY . /app
+RUN pip --no-cache-dir install .
 
 # Default USERID and GROUPID
 ARG USERID=nobody
