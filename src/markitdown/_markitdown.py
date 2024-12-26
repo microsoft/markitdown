@@ -1205,6 +1205,63 @@ class ZipConverter(DocumentConverter):
             )
 
 
+class JsonConverter(DocumentConverter):
+    """Converts generic json files to markdown :
+    - keys are prefixed with the whole dictionnary tree starting with the file name
+    - values are kept untouched
+    - key/values are between backtips
+    - (ordered) lists are converted into markdown ordered lists starting at 0."""
+
+    def convert(
+        self, local_path: str, **kwargs: Any
+    ) -> Union[None, DocumentConverterResult]:
+        extension = kwargs.get("file_extension", "")
+        if extension.lower() not in [".json"]:
+            return None
+
+        # TODO : check similar extensions and/or mime type
+
+        with open(local_path) as test_json:
+            try:
+                json_data = json.load(test_json)
+            except json.JSONDecodeError:
+                return None
+
+        _prefix, _ = os.path.splitext(os.path.basename(local_path))
+        md_content = self._json_traversal(json_data, level=1, prefix=_prefix)
+
+        return DocumentConverterResult(
+            title=None,
+            text_content=md_content,
+        )
+
+    def _json_traversal(self, d: Union[dict, list], level: int, prefix: str) -> str:
+        _md = ""
+
+        if type(d) is dict:
+            for key in d.keys():
+                if type(d[key]) is dict or type(d[key]) is list:
+                    _md += "%s %s.%s\n" % ("#" * level, prefix, str(key))
+
+                _md += self._json_traversal(d[key], level + 1, prefix + "." + key)
+
+        elif type(d) is list:
+            _md += "---\n"
+            for index, item in enumerate(d):
+                _md += (
+                    str(index)
+                    + ". "
+                    + self._json_traversal(
+                        item, level=0, prefix=prefix + "[" + str(index) + "]"
+                    )
+                )
+            _md += "---\n"
+
+        else:
+            _md += "`null`  \n" if d is None else "`%s:%s`  \n" % (prefix, repr(d))
+        return _md
+
+
 class FileConversionException(BaseException):
     pass
 
@@ -1285,6 +1342,7 @@ class MarkItDown:
         self.register_page_converter(IpynbConverter())
         self.register_page_converter(PdfConverter())
         self.register_page_converter(ZipConverter())
+        self.register_page_converter(JsonConverter())
 
     def convert(
         self, source: Union[str, requests.Response, Path], **kwargs: Any
