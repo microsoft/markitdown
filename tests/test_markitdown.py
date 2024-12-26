@@ -319,7 +319,7 @@ def test_markitdown_pdf() -> None:
         engine_kwargs={
             "show_progress": False,
             "write_images": True,
-            "image_path": "tests/pics",
+            "image_path": "tests/out",
         },  # `write_images` must be True, setting `image_path` for images saving dir.
     )
     for test_string in PDF_TEST_STRINGS:
