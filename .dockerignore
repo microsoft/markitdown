@@ -1,1 +1,9 @@
-*
+**/coverage
+**/.env
+**/.aws
+**/.ssh
+Dockerfile
+docker-compose.yml
+**/.DS_Store
+**/venv
+**/env
