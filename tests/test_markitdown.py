@@ -308,7 +308,7 @@ def test_markitdown_pdf() -> None:
         os.path.join(TEST_FILES_DIR, "2308.08155v2.pdf"),
         engine="pymupdf4llm",
         
-        engine_kwargs={"show_progress": False, "pages": [i for i in range(10)],},  # additional kwargs
+        engine_kwargs={"show_progress": False, "pages": range(10),},  # additional kwargs
     )
     for test_string in PDF_TEST_STRINGS:
         assert test_string in result.text_content
@@ -321,7 +321,7 @@ def test_markitdown_pdf() -> None:
             "show_progress": False,
             "write_images": True,
             "image_path": "tests/out",
-            "pages": [i for i in range(10)],
+            "pages": range(10),
         },  # `write_images` must be True, setting `image_path` for images saving dir.
     )
     for test_string in PDF_TEST_STRINGS:
@@ -330,16 +330,16 @@ def test_markitdown_pdf() -> None:
     # By pdfminer
     result = markitdown.convert(
         os.path.join(TEST_FILES_DIR, "2308.08155v2.pdf"), engine="pdfminer",
-        enging_kwargs={"page_numbers": [i for i in range(10)],}
+        enging_kwargs={"page_numbers": range(10),}
     )
     for test_string in PDF_TEST_STRINGS:
         assert test_string in result.text_content
 
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
-    # test_markitdown_remote()
-    # test_markitdown_local()
-    # test_markitdown_exiftool()
-    # test_markitdown_deprecation()
-    # test_markitdown_llm()
+    test_markitdown_remote()
+    test_markitdown_local()
+    test_markitdown_exiftool()
+    test_markitdown_deprecation()
+    test_markitdown_llm()
     test_markitdown_pdf()

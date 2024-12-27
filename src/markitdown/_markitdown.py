@@ -702,8 +702,8 @@ class PdfConverter(DocumentConverter):
             return None
         if engine is not None and engine not in self._engines:
             raise FileConversionException(
-                "'pdf_engine' not valid. Please choose between {}.".format(
-                    list(self._engines.keys())
+                "'engine' not valid for {} files. Please choose between {}.".format(
+                    extension, list(self._engines.keys())
                 )
             )
         else:
