@@ -300,6 +300,21 @@ def test_markitdown_llm() -> None:
         assert test_string in result.text_content.lower()
 
 
+@pytest.mark.skipif(
+    skip_llm,
+    reason="do not run llm tests without a key",
+)
+def test_markitdown_pptx_llm() -> None:
+    client = openai.OpenAI()
+    markitdown = MarkItDown(llm_client=client, llm_model="gpt-4o-mini")
+
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.pptx"))
+
+    # like test_markitdown_llm, this should be improved
+    for test_string in ["red", "blue"]:
+        assert test_string in result.text_content.lower()
+
+
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     test_markitdown_remote()
@@ -307,3 +322,4 @@ if __name__ == "__main__":
     test_markitdown_exiftool()
     test_markitdown_deprecation()
     test_markitdown_llm()
+    test_markitdown_pptx_llm()
