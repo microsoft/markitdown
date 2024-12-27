@@ -1344,7 +1344,7 @@ class MarkItDown:
         result = None
         try:
             # Write to the temporary file
-            content = stream.read()
+            content = self._strip_leading_blanks(stream.read())
             if isinstance(content, str):
                 fh.write(content.encode("utf-8"))
             else:
@@ -1366,6 +1366,10 @@ class MarkItDown:
             os.unlink(temp_path)
 
         return result
+
+    def _strip_leading_blanks(self, content: bytes) -> bytes:
+        """Helper function to strip leading blank characters or line breaks from content."""
+        return content.lstrip()
 
     def convert_url(
         self, url: str, **kwargs: Any

@@ -300,6 +300,15 @@ def test_markitdown_llm() -> None:
         assert test_string in result.text_content.lower()
 
 
+def test_markitdown_strip_leading_blanks() -> None:
+    markitdown = MarkItDown()
+
+    # Test input with leading blank characters
+    input_data = b"   \n\n\n<html><body><h1>Test</h1></body></html>"
+    result = markitdown.convert_stream(io.BytesIO(input_data), file_extension=".html")
+    assert "<h1>Test</h1>" in result.text_content
+
+
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     test_markitdown_remote()
@@ -307,3 +316,4 @@ if __name__ == "__main__":
     test_markitdown_exiftool()
     test_markitdown_deprecation()
     test_markitdown_llm()
+    test_markitdown_strip_leading_blanks()
