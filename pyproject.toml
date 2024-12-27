@@ -33,6 +33,7 @@ dependencies = [
   "pandas",
   "openpyxl",
   "pdfminer.six",
+  "pymupdf4llm",
   "puremagic",
   "pydub",
   "youtube-transcript-api",
