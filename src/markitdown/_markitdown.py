@@ -773,7 +773,7 @@ class PptxConverter(HtmlConverter):
                     llm_model = kwargs.get("llm_model")
                     if llm_client is not None and llm_model is not None:
                         alt_text += self._get_llm_description(
-                            shape.image.blob,
+                            shape.image,
                             llm_client,
                             llm_model,
                             prompt=kwargs.get("llm_prompt"),
@@ -868,12 +868,18 @@ class PptxConverter(HtmlConverter):
         separator = "|" + "|".join(["---"] * len(data[0])) + "|"
         return md + "\n".join([header, separator] + markdown_table[1:])
 
-    def _get_llm_description(self, image_blob, client, model, prompt=None):
+    def _get_llm_description(self, image, client, model, prompt=None):
+        if image.content_type not in [
+            "image/jpeg",
+            "image/png",
+            "image/webp",
+            "image/gif",
+        ]:
+            return ""  # https://platform.openai.com/docs/guides/vision#what-type-of-files-can-i-upload
         if prompt is None or prompt.strip() == "":
             prompt = "Write a caption for this image."
-        content_type = "image/jpeg"
-        image_base64 = base64.b64encode(image_blob).decode("utf-8")
-        data_uri = f"data:{content_type};base64,{image_base64}"
+        image_base64 = base64.b64encode(image.blob).decode("utf-8")
+        data_uri = f"data:{image.content_type};base64,{image_base64}"
 
         messages = [
             {
