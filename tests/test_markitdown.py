@@ -48,7 +48,7 @@ YOUTUBE_TEST_STRINGS = [
     "the model we're going to be using today is GPT 3.5 turbo",  # From the transcript
 ]
 
-XLSX_TEST_STRINGS = [
+EXCEL_TEST_STRINGS = [
     "## 09060124-b5e7-4717-9d07-3c046eb",
     "6ff4173b-42a5-4784-9b19-f49caff4d93d",
     "affc7dad-52dc-4b98-9b5d-51e65d8a8ad0",
@@ -174,7 +174,19 @@ def test_markitdown_local() -> None:
 
     # Test XLSX processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.xlsx"))
-    validate_strings(result, XLSX_TEST_STRINGS)
+    validate_strings(result, EXCEL_TEST_STRINGS)
+
+    # Test XLS processing
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.xls"))
+    validate_strings(result, EXCEL_TEST_STRINGS)
+
+    # Test XLSM processing
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.xlsm"))
+    validate_strings(result, EXCEL_TEST_STRINGS)
+
+    # Test XLSB processing
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.xlsb"))
+    validate_strings(result, EXCEL_TEST_STRINGS)
 
     # Test DOCX processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.docx"))
@@ -206,7 +218,7 @@ def test_markitdown_local() -> None:
 
     # Test ZIP file processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test_files.zip"))
-    validate_strings(result, XLSX_TEST_STRINGS)
+    validate_strings(result, EXCEL_TEST_STRINGS)
 
     # Test Wikipedia processing
     result = markitdown.convert(

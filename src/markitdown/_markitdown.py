@@ -713,18 +713,18 @@ class DocxConverter(HtmlConverter):
         return result
 
 
-class XlsxConverter(HtmlConverter):
+class ExcelConverter(HtmlConverter):
     """
-    Converts XLSX files to Markdown, with each sheet presented as a separate Markdown table.
+    Converts excel files to Markdown, with each sheet presented as a separate Markdown table.
     """
 
     def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
         # Bail if not a XLSX
         extension = kwargs.get("file_extension", "")
-        if extension.lower() != ".xlsx":
+        if extension.lower() not in [".xlsx", ".xls", ".xlsm", ".xlsb"]:
             return None
 
-        sheets = pd.read_excel(local_path, sheet_name=None)
+        sheets = pd.read_excel(local_path, sheet_name=None, engine="calamine")
         md_content = ""
         for s in sheets:
             md_content += f"## {s}\n"
@@ -1277,7 +1277,7 @@ class MarkItDown:
         self.register_page_converter(YouTubeConverter())
         self.register_page_converter(BingSerpConverter())
         self.register_page_converter(DocxConverter())
-        self.register_page_converter(XlsxConverter())
+        self.register_page_converter(ExcelConverter())
         self.register_page_converter(PptxConverter())
         self.register_page_converter(WavConverter())
         self.register_page_converter(Mp3Converter())
