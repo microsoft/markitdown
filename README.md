@@ -72,6 +72,23 @@ print(result.text_content)
 docker build -t markitdown:latest .
 docker run --rm -i markitdown:latest < ~/your-file.pdf > output.md
 ```
+
+### Serve Command
+
+You can start a CORS-enabled Flask server to convert files to markdown using the `serve` command:
+
+```sh
+markitdown serve
+```
+
+The server will be available at `http://localhost:5000`. You can send a POST request to the `/convert` endpoint with a file to convert it to markdown.
+
+Example using `curl`:
+
+```sh
+curl -X POST -F 'file=@path-to-file.pdf' http://localhost:5000/convert
+```
+
 <details>
     
 <summary>Batch Processing Multiple Files</summary>
