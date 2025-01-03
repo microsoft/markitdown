@@ -1076,6 +1076,54 @@ class ImageConverter(MediaConverter):
         return response.choices[0].message.content
 
 
+class OllamaConverter(DocumentConverter):
+    """
+    Converts images to markdown via description using Ollama API.
+    """
+
+    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
+        # Bail if not an image
+        extension = kwargs.get("file_extension", "")
+        if extension.lower() not in [".jpg", ".jpeg", ".png"]:
+            return None
+
+        md_content = ""
+
+        # Try describing the image with Ollama
+        ollama_client = kwargs.get("ollama_client")
+        if ollama_client is not None:
+            md_content += (
+                "\n# Description:\n"
+                + self._get_ollama_description(
+                    local_path,
+                    extension,
+                    ollama_client,
+                    prompt=kwargs.get("ollama_prompt"),
+                ).strip()
+                + "\n"
+            )
+
+        return DocumentConverterResult(
+            title=None,
+            text_content=md_content,
+        )
+
+    def _get_ollama_description(self, local_path, extension, client, prompt=None):
+        if prompt is None or prompt.strip() == "":
+            prompt = "Write a detailed caption for this image."
+
+        data_uri = ""
+        with open(local_path, "rb") as image_file:
+            content_type, encoding = mimetypes.guess_type("_dummy" + extension)
+            if content_type is None:
+                content_type = "image/jpeg"
+            image_base64 = base64.b64encode(image_file.read()).decode("utf-8")
+            data_uri = f"data:{content_type};base64,{image_base64}"
+
+        response = client.describe_image(data_uri, prompt)
+        return response["description"]
+
+
 class ZipConverter(DocumentConverter):
     """Converts ZIP files to markdown by extracting and converting all contained files.
 
@@ -1223,6 +1271,7 @@ class MarkItDown:
         llm_client: Optional[Any] = None,
         llm_model: Optional[str] = None,
         style_map: Optional[str] = None,
+        ollama_client: Optional[Any] = None,
         # Deprecated
         mlm_client: Optional[Any] = None,
         mlm_model: Optional[str] = None,
@@ -1264,6 +1313,7 @@ class MarkItDown:
         self._llm_client = llm_client
         self._llm_model = llm_model
         self._style_map = style_map
+        self._ollama_client = ollama_client
 
         self._page_converters: List[DocumentConverter] = []
 
@@ -1285,6 +1335,7 @@ class MarkItDown:
         self.register_page_converter(IpynbConverter())
         self.register_page_converter(PdfConverter())
         self.register_page_converter(ZipConverter())
+        self.register_page_converter(OllamaConverter())
 
     def convert(
         self, source: Union[str, requests.Response, Path], **kwargs: Any
@@ -1444,6 +1495,9 @@ class MarkItDown:
 
                 if "llm_model" not in _kwargs and self._llm_model is not None:
                     _kwargs["llm_model"] = self._llm_model
+
+                if "ollama_client" not in _kwargs and self._ollama_client is not None:
+                    _kwargs["ollama_client"] = self._ollama_client
 
                 # Add the list of converters for nested processing
                 _kwargs["_parent_converters"] = self._page_converters
