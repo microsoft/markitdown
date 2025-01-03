@@ -257,6 +257,11 @@ def test_markitdown_local() -> None:
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test_outlook_msg.msg"))
     validate_strings(result, MSG_TEST_STRINGS)
 
+    # Test input with leading blank characters
+    input_data = b"   \n\n\n<html><body><h1>Test</h1></body></html>"
+    result = markitdown.convert_stream(io.BytesIO(input_data), file_extension=".html")
+    assert "# Test" in result.text_content
+
 
 @pytest.mark.skipif(
     skip_exiftool,
