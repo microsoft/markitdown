@@ -1594,6 +1594,25 @@ class MarkItDown:
         # Use puremagic to guess
         try:
             guesses = puremagic.magic_file(path)
+
+            # Fix for: https://github.com/microsoft/markitdown/issues/222
+            # If there are no guesses, then try again after trimming leading ASCII whitespaces.
+            # ASCII whitespace characters are those byte values in the sequence b' \t\n\r\x0b\f'
+            # (space, tab, newline, carriage return, vertical tab, form feed).
+            if len(guesses) == 0:
+                with open(path, "rb") as file:
+                    while True:
+                        char = file.read(1)
+                        if not char:  # End of file
+                            break
+                        if not char.isspace():
+                            file.seek(file.tell() - 1)
+                            break
+                    try:
+                        guesses = puremagic.magic_stream(file)
+                    except puremagic.main.PureError:
+                        pass
+
             extensions = list()
             for g in guesses:
                 ext = g.extension.strip()

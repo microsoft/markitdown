@@ -259,7 +259,7 @@ def test_markitdown_local() -> None:
 
     # Test input with leading blank characters
     input_data = b"   \n\n\n<html><body><h1>Test</h1></body></html>"
-    result = markitdown.convert_stream(io.BytesIO(input_data), file_extension=".html")
+    result = markitdown.convert_stream(io.BytesIO(input_data))
     assert "# Test" in result.text_content
 
 
