@@ -145,6 +145,11 @@ LLM_TEST_STRINGS = [
     "5bda1dd6",
 ]
 
+# New test strings for the serve command
+SERVE_TEST_STRINGS = [
+    "While there is contemporaneous exploration of multi-agent approaches"
+]
+
 
 # --- Helper Functions ---
 def validate_strings(result, expected_strings, exclude_strings=None):
@@ -330,6 +335,32 @@ def test_markitdown_llm() -> None:
         assert test_string in result.text_content.lower()
 
 
+# New test for the serve command
+def test_markitdown_serve() -> None:
+    from src.markitdown.server import app
+
+    client = app.test_client()
+
+    # Test with file
+    response = client.post(
+        "/convert",
+        data={"file": (io.BytesIO(b"test content"), "test.pdf")},
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 200
+    for test_string in SERVE_TEST_STRINGS:
+        assert test_string in response.json["content"]
+
+    # Test with URL
+    response = client.post(
+        "/convert",
+        data={"url": PDF_TEST_URL},
+    )
+    assert response.status_code == 200
+    for test_string in SERVE_TEST_STRINGS:
+        assert test_string in response.json["content"]
+
+
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     test_markitdown_remote()
@@ -337,3 +368,4 @@ if __name__ == "__main__":
     test_markitdown_exiftool()
     test_markitdown_deprecation()
     test_markitdown_llm()
+    test_markitdown_serve()

@@ -42,6 +42,8 @@ dependencies = [
   "pathvalidate",
   "charset-normalizer",
   "openai",
+  "flask",
+  "flask-cors",
 ]
 
 [project.urls]
@@ -54,6 +56,7 @@ path = "src/markitdown/__about__.py"
 
 [project.scripts]
 markitdown = "markitdown.__main__:main"
+serve = "markitdown.server:app.run"
 
 [tool.hatch.envs.types]
 extra-dependencies = [
