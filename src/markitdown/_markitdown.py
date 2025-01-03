@@ -715,42 +715,18 @@ class DocxConverter(HtmlConverter):
         return result
 
 
-class XlsxConverter(HtmlConverter):
+class ExcelConverter(HtmlConverter):
     """
-    Converts XLSX files to Markdown, with each sheet presented as a separate Markdown table.
-    """
-
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
-        # Bail if not a XLSX
-        extension = kwargs.get("file_extension", "")
-        if extension.lower() != ".xlsx":
-            return None
-
-        sheets = pd.read_excel(local_path, sheet_name=None, engine="openpyxl")
-        md_content = ""
-        for s in sheets:
-            md_content += f"## {s}\n"
-            html_content = sheets[s].to_html(index=False)
-            md_content += self._convert(html_content).text_content.strip() + "\n\n"
-
-        return DocumentConverterResult(
-            title=None,
-            text_content=md_content.strip(),
-        )
-
-
-class XlsConverter(HtmlConverter):
-    """
-    Converts XLS files to Markdown, with each sheet presented as a separate Markdown table.
+    Converts Excel (XLSX, XLS, XLSM or XLSB) files to Markdown, with each sheet presented as a separate Markdown table.
     """
 
     def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
-        # Bail if not a XLS
+        # Bail if not a XLSX, XLS, XLSM or XLSB
         extension = kwargs.get("file_extension", "")
-        if extension.lower() != ".xls":
+        if extension.lower() not in [".xlsx", ".xls", ".xlsb", ".xlsm"]:
             return None
 
-        sheets = pd.read_excel(local_path, sheet_name=None, engine="xlrd")
+        sheets = pd.read_excel(local_path, sheet_name=None, engine="calamine")
         md_content = ""
         for s in sheets:
             md_content += f"## {s}\n"
@@ -1376,8 +1352,7 @@ class MarkItDown:
         self.register_page_converter(YouTubeConverter())
         self.register_page_converter(BingSerpConverter())
         self.register_page_converter(DocxConverter())
-        self.register_page_converter(XlsxConverter())
-        self.register_page_converter(XlsConverter())
+        self.register_page_converter(ExcelConverter())
         self.register_page_converter(PptxConverter())
         self.register_page_converter(WavConverter())
         self.register_page_converter(Mp3Converter())

@@ -191,11 +191,17 @@ def test_markitdown_local() -> None:
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.xlsx"))
     validate_strings(result, XLSX_TEST_STRINGS)
 
+    # Test XLSB processing
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.xlsb"))
+    validate_strings(result, XLSX_TEST_STRINGS)
+
+    # Test XLSM processing
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.xlsm"))
+    validate_strings(result, XLSX_TEST_STRINGS)
+
     # Test XLS processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.xls"))
-    for test_string in XLS_TEST_STRINGS:
-        text_content = result.text_content.replace("\\", "")
-        assert test_string in text_content
+    validate_strings(result, XLSX_TEST_STRINGS)
 
     # Test DOCX processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.docx"))
