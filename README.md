@@ -66,6 +66,18 @@ result = md.convert("example.jpg")
 print(result.text_content)
 ```
 
+To use Ollama for image descriptions, provide `ollama_client`:
+
+```python
+from markitdown import MarkItDown
+from ollama import Ollama
+
+client = Ollama(api_key="your-api-key")
+md = MarkItDown(ollama_client=client)
+result = md.convert("example.jpg")
+print(result.text_content)
+```
+
 ### Docker
 
 ```sh

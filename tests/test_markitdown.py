@@ -25,6 +25,13 @@ except ModuleNotFoundError:
 # Skip exiftool tests if not installed
 skip_exiftool = shutil.which("exiftool") is None
 
+# Skip Ollama tests if not installed
+skip_ollama = False if os.environ.get("OLLAMA_API_KEY") else True
+try:
+    import ollama
+except ModuleNotFoundError:
+    skip_ollama = True
+
 TEST_FILES_DIR = os.path.join(os.path.dirname(__file__), "test_files")
 
 JPG_TEST_EXIFTOOL = {
@@ -128,6 +135,11 @@ CSV_CP932_TEST_STRINGS = [
 
 LLM_TEST_STRINGS = [
     "5bda1dd6",
+]
+
+OLLAMA_TEST_STRINGS = [
+    "detailed caption",
+    "image",
 ]
 
 
@@ -300,6 +312,20 @@ def test_markitdown_llm() -> None:
         assert test_string in result.text_content.lower()
 
 
+@pytest.mark.skipif(
+    skip_ollama,
+    reason="do not run ollama tests without a key",
+)
+def test_markitdown_ollama() -> None:
+    client = ollama.Ollama(api_key=os.environ.get("OLLAMA_API_KEY"))
+    markitdown = MarkItDown(ollama_client=client)
+
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test_ollama.jpg"))
+
+    for test_string in OLLAMA_TEST_STRINGS:
+        assert test_string in result.text_content
+
+
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     test_markitdown_remote()
@@ -307,3 +333,4 @@ if __name__ == "__main__":
     test_markitdown_exiftool()
     test_markitdown_deprecation()
     test_markitdown_llm()
+    test_markitdown_ollama()

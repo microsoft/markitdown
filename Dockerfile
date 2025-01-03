@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install markitdown
+RUN pip install markitdown ollama
 
 # Default USERID and GROUPID
 ARG USERID=10000
