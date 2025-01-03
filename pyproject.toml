@@ -35,6 +35,7 @@ dependencies = [
   "pdfminer.six",
   "puremagic",
   "pydub",
+  "olefile",
   "youtube-transcript-api",
   "SpeechRecognition",
   "pathvalidate",
