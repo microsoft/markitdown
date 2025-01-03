@@ -4,8 +4,9 @@
 import argparse
 import sys
 from textwrap import dedent
+
 from .__about__ import __version__
-from ._markitdown import MarkItDown, DocumentConverterResult
+from .core import DocumentConverterResult, MarkItDown
 
 
 def main():
