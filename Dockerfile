@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install markitdown
+RUN pip install markitdown fastapi uvicorn
 
 # Default USERID and GROUPID
 ARG USERID=10000
@@ -20,4 +20,4 @@ ARG GROUPID=10000
 
 USER $USERID:$GROUPID
 
-ENTRYPOINT [ "markitdown" ]
+ENTRYPOINT ["uvicorn", "src.markitdown.api:app", "--host", "0.0.0.0", "--port", "8000"]
