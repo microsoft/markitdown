@@ -748,6 +748,7 @@ class DocxConverter(HtmlConverter):
         """Handles image extraction and saving with collision avoidance and length limits."""
         os.makedirs(output_dir, exist_ok=True)
 
+        image.alt_text = image.alt_text.replace("\n", " ")
         raw_name = image.alt_text or f"image_{hash(image)}"
         sanitized_name = self.sanitize_filename(raw_name)
         truncated_name = self.truncate_filename(sanitized_name, 251, ".png")
@@ -760,7 +761,7 @@ class DocxConverter(HtmlConverter):
             with image.open() as image_bytes:
                 with open(image_path, "wb") as img_file:
                     img_file.write(image_bytes.read())
-            return {"src": image_path}
+            return {"src": image_path, "alt": image.alt_text}
         except Exception:
             # Return an empty src if saving fails
             return {"src": ""}
