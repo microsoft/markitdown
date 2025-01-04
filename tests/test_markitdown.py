@@ -54,6 +54,12 @@ XLSX_TEST_STRINGS = [
     "affc7dad-52dc-4b98-9b5d-51e65d8a8ad0",
 ]
 
+XLS_TEST_STRINGS = [
+    "## 09060124-b5e7-4717-9d07-3c046eb",
+    "6ff4173b-42a5-4784-9b19-f49caff4d93d",
+    "affc7dad-52dc-4b98-9b5d-51e65d8a8ad0",
+]
+
 DOCX_TEST_STRINGS = [
     "314b0a30-5b04-470b-b9f7-eed2c2bec74a",
     "49e168b7-d2ae-407f-a055-2167576f39a1",
@@ -139,6 +145,11 @@ LLM_TEST_STRINGS = [
     "5bda1dd6",
 ]
 
+JSON_TEST_STRINGS = [
+    "5b64c88c-b3c3-4510-bcb8-da0b200602d8",
+    "9700dc99-6685-40b4-9a3a-5e406dcb37f3",
+]
+
 
 # --- Helper Functions ---
 def validate_strings(result, expected_strings, exclude_strings=None):
@@ -184,6 +195,12 @@ def test_markitdown_local() -> None:
     # Test XLSX processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.xlsx"))
     validate_strings(result, XLSX_TEST_STRINGS)
+
+    # Test XLS processing
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.xls"))
+    for test_string in XLS_TEST_STRINGS:
+        text_content = result.text_content.replace("\\", "")
+        assert test_string in text_content
 
     # Test DOCX processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.docx"))
@@ -244,6 +261,15 @@ def test_markitdown_local() -> None:
     # Test MSG (Outlook email) processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test_outlook_msg.msg"))
     validate_strings(result, MSG_TEST_STRINGS)
+
+    # Test JSON processing
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.json"))
+    validate_strings(result, JSON_TEST_STRINGS)
+
+    # Test input with leading blank characters
+    input_data = b"   \n\n\n<html><body><h1>Test</h1></body></html>"
+    result = markitdown.convert_stream(io.BytesIO(input_data))
+    assert "# Test" in result.text_content
 
 
 @pytest.mark.skipif(

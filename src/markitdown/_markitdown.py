@@ -173,7 +173,10 @@ class PlainTextConverter(DocumentConverter):
         # Only accept text files
         if content_type is None:
             return None
-        elif "text/" not in content_type.lower():
+        elif all(
+            not content_type.lower().startswith(type_prefix)
+            for type_prefix in ["text/", "application/json"]
+        ):
             return None
 
         text_content = str(from_path(local_path).best())
@@ -760,7 +763,31 @@ class XlsxConverter(HtmlConverter):
         if extension.lower() != ".xlsx":
             return None
 
-        sheets = pd.read_excel(local_path, sheet_name=None)
+        sheets = pd.read_excel(local_path, sheet_name=None, engine="openpyxl")
+        md_content = ""
+        for s in sheets:
+            md_content += f"## {s}\n"
+            html_content = sheets[s].to_html(index=False)
+            md_content += self._convert(html_content).text_content.strip() + "\n\n"
+
+        return DocumentConverterResult(
+            title=None,
+            text_content=md_content.strip(),
+        )
+
+
+class XlsConverter(HtmlConverter):
+    """
+    Converts XLS files to Markdown, with each sheet presented as a separate Markdown table.
+    """
+
+    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
+        # Bail if not a XLS
+        extension = kwargs.get("file_extension", "")
+        if extension.lower() != ".xls":
+            return None
+
+        sheets = pd.read_excel(local_path, sheet_name=None, engine="xlrd")
         md_content = ""
         for s in sheets:
             md_content += f"## {s}\n"
@@ -1387,6 +1414,7 @@ class MarkItDown:
         self.register_page_converter(BingSerpConverter())
         self.register_page_converter(DocxConverter())
         self.register_page_converter(XlsxConverter())
+        self.register_page_converter(XlsConverter())
         self.register_page_converter(PptxConverter())
         self.register_page_converter(WavConverter())
         self.register_page_converter(Mp3Converter())
@@ -1603,6 +1631,25 @@ class MarkItDown:
         # Use puremagic to guess
         try:
             guesses = puremagic.magic_file(path)
+
+            # Fix for: https://github.com/microsoft/markitdown/issues/222
+            # If there are no guesses, then try again after trimming leading ASCII whitespaces.
+            # ASCII whitespace characters are those byte values in the sequence b' \t\n\r\x0b\f'
+            # (space, tab, newline, carriage return, vertical tab, form feed).
+            if len(guesses) == 0:
+                with open(path, "rb") as file:
+                    while True:
+                        char = file.read(1)
+                        if not char:  # End of file
+                            break
+                        if not char.isspace():
+                            file.seek(file.tell() - 1)
+                            break
+                    try:
+                        guesses = puremagic.magic_stream(file)
+                    except puremagic.main.PureError:
+                        pass
+
             extensions = list()
             for g in guesses:
                 ext = g.extension.strip()
