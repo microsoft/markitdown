@@ -7,73 +7,70 @@ from textwrap import dedent
 from .__about__ import __version__
 from ._markitdown import MarkItDown, DocumentConverterResult
 
+parser = argparse.ArgumentParser(
+    description="Convert various file formats to markdown.",
+    prog="markitdown",
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    epilog=dedent(
+        """\
+        examples:
+          markitdown example.pdf
+          markitdown -o example.md example.pdf
+          cat example.pdf | markitdown > example.md"""
+    ),
+)
+parser.add_argument(
+    "-v",
+    "--version",
+    action="version",
+    version=f"%(prog)s {__version__}",
+    help="show the version number and exit",
+)
+parser.add_argument(
+    "filename", metavar="FILENAME", nargs="?", help="if unspecified, defaults to stdin"
+)
+parser.add_argument(
+    "-o",
+    "--output",
+    metavar="OUTFILENAME",
+    help="if unspecified, defaults to stdout",
+)
+parser.add_argument("--llm-model", metavar="MODEL", help="e.g. gpt-4o")
+parser.add_argument(
+    "--llm-client-url", metavar="URL", help="base URL for OpenAI LLM client"
+)
+parser.add_argument(
+    "-H",
+    "--llm-client-header",
+    metavar="HEADER",
+    nargs="*",
+    default=[],
+    help="may be specified multiple times",
+)
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Convert various file formats to markdown.",
-        prog="markitdown",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        usage=dedent(
-            """
-            SYNTAX:
 
-                markitdown <OPTIONAL: FILENAME>
-                If FILENAME is empty, markitdown reads from stdin.
+def main(args=None):
+    args = parser.parse_args(args)
+    if args.llm_model:
+        from openai import OpenAI
 
-            EXAMPLE:
-
-                markitdown example.pdf
-
-                OR
-
-                cat example.pdf | markitdown
-
-                OR
-
-                markitdown < example.pdf
-                
-                OR to save to a file use
-    
-                markitdown example.pdf -o example.md
-                
-                OR
-                
-                markitdown example.pdf > example.md
-            """
-        ).strip(),
-    )
-
-    parser.add_argument(
-        "-v",
-        "--version",
-        action="version",
-        version=f"%(prog)s {__version__}",
-        help="show the version number and exit",
-    )
-
-    parser.add_argument("filename", nargs="?")
-    parser.add_argument(
-        "-o",
-        "--output",
-        help="Output file name. If not provided, output is written to stdout.",
-    )
-    args = parser.parse_args()
-
-    if args.filename is None:
-        markitdown = MarkItDown()
-        result = markitdown.convert_stream(sys.stdin.buffer)
-        _handle_output(args, result)
+        headers = {}
+        for header in args.llm_client_header:
+            key, value = header.split(":", 1)
+            headers[key] = value.lstrip()
+        llm_client = OpenAI(base_url=args.llm_client_url, default_headers=headers)
     else:
-        markitdown = MarkItDown()
+        llm_client = None
+    markitdown = MarkItDown(llm_client=llm_client, llm_model=args.llm_model)
+
+    if args.filename:
         result = markitdown.convert(args.filename)
-        _handle_output(args, result)
+    else:
+        result = markitdown.convert_stream(sys.stdin.buffer)
 
-
-def _handle_output(args, result: DocumentConverterResult):
-    """Handle output to stdout or file"""
     if args.output:
         with open(args.output, "w", encoding="utf-8") as f:
-            f.write(result.text_content)
+            print(result.text_content, file=f)
     else:
         print(result.text_content)
 
