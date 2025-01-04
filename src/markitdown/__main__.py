@@ -57,6 +57,12 @@ def main():
         "--output",
         help="Output file name. If not provided, output is written to stdout.",
     )
+    parser.add_argument(
+        "-e",
+        "--encoding",
+        help="Encoding of the output file. Defaults to utf-8.",
+        default="utf-8",
+    )
     args = parser.parse_args()
 
     if args.filename is None:
@@ -72,8 +78,7 @@ def main():
 def _handle_output(args, result: DocumentConverterResult):
     """Handle output to stdout or file"""
     if args.output:
-        with open(args.output, "w", encoding="utf-8") as f:
-            f.write(result.text_content)
+        result.save(args.output, encoding=args.encoding)
     else:
         print(result.text_content)
 

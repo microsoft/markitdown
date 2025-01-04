@@ -149,6 +149,17 @@ class DocumentConverterResult:
         self.title: Union[str, None] = title
         self.text_content: str = text_content
 
+    def save(self, file_path: str, encoding: str = "utf-8") -> None:
+        """
+        Save the converted document result `text_content` to a file.
+
+        params:
+            file_path: The path to save the document result to.
+            encoding: The encoding to use when writing the document.
+        """
+        with open(file_path, "w", encoding=encoding) as f:
+            f.write(self.text_content)
+
 
 class DocumentConverter:
     """Abstract superclass of all DocumentConverters."""
