@@ -22,10 +22,11 @@ from warnings import warn, resetwarnings, catch_warnings
 import mammoth
 import markdownify
 import olefile
-import pandas as pd
 import pdfminer
 import pdfminer.high_level
 import pptx
+from python_calamine import load_workbook
+from tabulate import tabulate
 
 # File-format detection
 import puremagic
@@ -726,11 +727,14 @@ class ExcelConverter(HtmlConverter):
         if extension.lower() not in [".xlsx", ".xls", ".xlsb", ".xlsm"]:
             return None
 
-        sheets = pd.read_excel(local_path, sheet_name=None, engine="calamine")
+        workbook = load_workbook(local_path)
         md_content = ""
-        for s in sheets:
+        for s in workbook.sheet_names:
+            sheet = workbook.get_sheet_by_name(s)
+            # TODO: Add argument to allow filtering empty row / columns
+            tabular_data = sheet.to_python(skip_empty_area=False)
             md_content += f"## {s}\n"
-            html_content = sheets[s].to_html(index=False)
+            html_content = tabulate(tabular_data, tablefmt="html")
             md_content += self._convert(html_content).text_content.strip() + "\n\n"
 
         return DocumentConverterResult(
