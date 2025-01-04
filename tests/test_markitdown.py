@@ -145,6 +145,11 @@ LLM_TEST_STRINGS = [
     "5bda1dd6",
 ]
 
+JSON_TEST_STRINGS = [
+    "5b64c88c-b3c3-4510-bcb8-da0b200602d8",
+    "9700dc99-6685-40b4-9a3a-5e406dcb37f3",
+]
+
 
 # --- Helper Functions ---
 def validate_strings(result, expected_strings, exclude_strings=None):
@@ -256,6 +261,10 @@ def test_markitdown_local() -> None:
     # Test MSG (Outlook email) processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test_outlook_msg.msg"))
     validate_strings(result, MSG_TEST_STRINGS)
+
+    # Test JSON processing
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.json"))
+    validate_strings(result, JSON_TEST_STRINGS)
 
     # Test input with leading blank characters
     input_data = b"   \n\n\n<html><body><h1>Test</h1></body></html>"

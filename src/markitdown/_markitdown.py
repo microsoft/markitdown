@@ -173,7 +173,10 @@ class PlainTextConverter(DocumentConverter):
         # Only accept text files
         if content_type is None:
             return None
-        elif "text/" not in content_type.lower():
+        elif all(
+            not content_type.lower().startswith(type_prefix)
+            for type_prefix in ["text/", "application/json"]
+        ):
             return None
 
         text_content = str(from_path(local_path).best())
