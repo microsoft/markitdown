@@ -96,7 +96,7 @@ DOCX_IMAGES_TEST_STRINGS = [
     "# Abstract",
     "# Introduction",
     "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation",
-    "GitHub_-_microsoft_markitdown__Python_tool_for_converting_files_and_office_documents_to_Markdown.png"
+    "GitHub_-_microsoft_markitdown__Python_tool_for_converting_files_and_office_documents_to_Markdown.png",
 ]
 
 PPTX_TEST_STRINGS = [

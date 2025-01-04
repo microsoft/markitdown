@@ -705,18 +705,18 @@ class DocxConverter(HtmlConverter):
         """Sanitizes a string to make it a valid file name across different operating systems."""
         # Normalize underscore
         name = re.sub(r"\s+", "_", name.strip())
-        
+
         # Replace invalid characters with underscores
         name = re.sub(r'[\\/*?:"<>|]', "_", name)
-        
+
         # Remove leading and trailing dots and spaces
         name = name.strip(" .")
-        
+
         # Limit the length of the filename to a reasonable length (e.g., 251 characters)
         max_length = 251
         if len(name) > max_length:
             name = name[:max_length]
-        
+
         return name
 
     def truncate_filename(self, name: str, max_length: int, extension: str = "") -> str:
@@ -736,7 +736,9 @@ class DocxConverter(HtmlConverter):
         while os.path.exists(unique_path):
             suffix = f"_{counter}"
             # Ensure base is short enough to add the suffix
-            truncated_base = self.truncate_filename(base, max_length - len(suffix) - len(ext))
+            truncated_base = self.truncate_filename(
+                base, max_length - len(suffix) - len(ext)
+            )
             unique_path = f"{truncated_base}{suffix}{ext}"
             counter += 1
 
