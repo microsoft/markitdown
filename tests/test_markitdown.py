@@ -89,6 +89,16 @@ DOCX_COMMENT_TEST_STRINGS = [
     "Yet another comment in the doc. 55yiyi-asd09",
 ]
 
+DOCX_IMAGES_TEST_STRINGS = [
+    "314b0a30-5b04-470b-b9f7-eed2c2bec74a",
+    "49e168b7-d2ae-407f-a055-2167576f39a1",
+    "## d666f1f7-46cb-42bd-9a39-9a39cf2a509f",
+    "# Abstract",
+    "# Introduction",
+    "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation",
+    "GitHub_-_microsoft_markitdown__Python_tool_for_converting_files_and_office_documents_to_Markdown.png"
+]
+
 PPTX_TEST_STRINGS = [
     "2cdda5c8-e50e-4db4-b5f0-9722a649f455",
     "04191ea8-5c73-4215-a1d3-1cfb43aaaf12",
@@ -205,6 +215,10 @@ def test_markitdown_local() -> None:
     # Test DOCX processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.docx"))
     validate_strings(result, DOCX_TEST_STRINGS)
+
+    # Test DOCX processing, with images
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test_with_images.docx"))
+    validate_strings(result, DOCX_IMAGES_TEST_STRINGS)
 
     # Test DOCX processing, with comments
     result = markitdown.convert(

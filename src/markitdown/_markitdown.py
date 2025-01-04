@@ -702,19 +702,57 @@ class DocxConverter(HtmlConverter):
     """
 
     def sanitize_filename(self, name: str) -> str:
-        """Sanitizes a string to make it a valid file name."""
-        # Normalize whitespace
-        name = re.sub(r"\s+", " ", name.strip())
+        """Sanitizes a string to make it a valid file name across different operating systems."""
+        # Normalize underscore
+        name = re.sub(r"\s+", "_", name.strip())
+        
         # Replace invalid characters with underscores
-        return re.sub(r'[\\/*?:"<>|]', "_", name)
+        name = re.sub(r'[\\/*?:"<>|]', "_", name)
+        
+        # Remove leading and trailing dots and spaces
+        name = name.strip(" .")
+        
+        # Limit the length of the filename to a reasonable length (e.g., 251 characters)
+        max_length = 251
+        if len(name) > max_length:
+            name = name[:max_length]
+        
+        return name
+
+    def truncate_filename(self, name: str, max_length: int, extension: str = "") -> str:
+        """Truncates the filename to ensure the final length is within the limit."""
+        max_base_length = max_length - len(extension)
+        if len(name) > max_base_length:
+            return name[:max_base_length]
+        return name
+
+    def unique_filename(self, base_path: str, max_length: int = 251) -> str:
+        """Generates a unique filename while ensuring it stays within the length limit."""
+        base, ext = os.path.splitext(base_path)
+        truncated_base = self.truncate_filename(base, max_length, ext)
+
+        counter = 1
+        unique_path = f"{truncated_base}{ext}"
+        while os.path.exists(unique_path):
+            suffix = f"_{counter}"
+            # Ensure base is short enough to add the suffix
+            truncated_base = self.truncate_filename(base, max_length - len(suffix) - len(ext))
+            unique_path = f"{truncated_base}{suffix}{ext}"
+            counter += 1
+
+        return unique_path
 
     def convert_image(self, image, output_dir: str) -> dict:
-        """Handles image extraction and saving."""
+        """Handles image extraction and saving with collision avoidance and length limits."""
         os.makedirs(output_dir, exist_ok=True)
 
         raw_name = image.alt_text or f"image_{hash(image)}"
-        image_name = self.sanitize_filename(raw_name) + ".png"
-        image_path = os.path.join(output_dir, image_name)
+        sanitized_name = self.sanitize_filename(raw_name)
+        truncated_name = self.truncate_filename(sanitized_name, 251, ".png")
+        image_path = os.path.join(output_dir, truncated_name + ".png")
+
+        # Ensure unique filename
+        image_path = self.unique_filename(image_path)
 
         try:
             with image.open() as image_bytes:
