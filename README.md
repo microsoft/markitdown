@@ -66,6 +66,29 @@ result = md.convert("example.jpg")
 print(result.text_content)
 ```
 
+### RESTful API
+
+MarkItDown also provides a RESTful API using FastAPI. You can deploy the application on Vercel or another hosting service.
+
+#### Endpoints
+
+- `GET /`: Returns a welcome message.
+- `POST /convert`: Converts an uploaded file to Markdown.
+
+#### Example Usage
+
+Using `curl`:
+
+```sh
+curl -X POST "http://<your-deployment-url>/convert" -F "file=@path-to-file.pdf"
+```
+
+Using `httpie`:
+
+```sh
+http --form POST "http://<your-deployment-url>/convert" file@path-to-file.pdf
+```
+
 ### Docker
 
 ```sh
