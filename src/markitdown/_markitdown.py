@@ -223,6 +223,9 @@ class HtmlConverter(DocumentConverter):
 
         assert isinstance(webpage_text, str)
 
+        # remove leading and trailing \n
+        webpage_text = webpage_text.strip()
+
         return DocumentConverterResult(
             title=None if soup.title is None else soup.title.string,
             text_content=webpage_text,
