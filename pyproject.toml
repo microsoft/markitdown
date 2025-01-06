@@ -34,6 +34,7 @@ dependencies = [
   "openpyxl",
   "xlrd",
   "pdfminer.six",
+  "pymupdf4llm",
   "puremagic",
   "pydub",
   "olefile",

@@ -14,7 +14,7 @@ import tempfile
 import traceback
 import zipfile
 from xml.dom import minidom
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Literal, Mapping
 from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse, urlunparse
 from warnings import warn, resetwarnings, catch_warnings
@@ -25,6 +25,7 @@ import olefile
 import pandas as pd
 import pdfminer
 import pdfminer.high_level
+import pymupdf4llm
 import pptx
 
 # File-format detection
@@ -681,19 +682,38 @@ class BingSerpConverter(DocumentConverter):
 
 class PdfConverter(DocumentConverter):
     """
-    Converts PDFs to Markdown. Most style information is ignored, so the results are essentially plain-text.
+    Converts PDFs to Markdown. Most style information is ignored, so the results are essentially plain-text.    
     """
+    _engines: Mapping[str, Any] = {
+        "pdfminer": pdfminer.high_level.extract_text,
+        "pymupdf4llm": pymupdf4llm.to_markdown,
+    }
 
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
+    def convert(
+        self,
+        local_path,
+        engine: Literal["pdfminer", "pymupdf4llm"] = "pdfminer",
+        engine_kwargs={},
+        **kwargs,
+    ) -> Union[None, DocumentConverterResult]:
+        """
+        Example:
+        >>> source = "https://arxiv.org/pdf/2308.08155v2.pdf"
+        >>> markitdown.convert(source, engine="pymupdf4llm")
+        """
         # Bail if not a PDF
         extension = kwargs.get("file_extension", "")
         if extension.lower() != ".pdf":
             return None
-
-        return DocumentConverterResult(
-            title=None,
-            text_content=pdfminer.high_level.extract_text(local_path),
-        )
+        if engine is not None and engine not in self._engines:
+            raise FileConversionException(
+                "'engine' not valid for {} files. Please choose between {}.".format(
+                    extension, list(self._engines.keys())
+                )
+            )
+        else:
+            text_content = self._engines[engine](local_path, **engine_kwargs)
+        return DocumentConverterResult(title=None, text_content=text_content)
 
 
 class DocxConverter(HtmlConverter):

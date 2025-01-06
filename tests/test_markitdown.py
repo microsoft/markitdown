@@ -7,7 +7,6 @@ import pytest
 import requests
 
 from warnings import catch_warnings, resetwarnings
-
 from markitdown import MarkItDown
 
 skip_remote = (
@@ -338,6 +337,42 @@ def test_markitdown_llm() -> None:
     for test_string in ["red", "circle", "blue", "square"]:
         assert test_string in result.text_content.lower()
 
+def test_markitdown_pdf() -> None:
+    markitdown = MarkItDown()
+
+    # I test by local pdf, using PDF_TEST_URL may also be fine.
+
+    # By pymupdf4llm
+    result = markitdown.convert(
+        os.path.join(TEST_FILES_DIR, "2308.08155v2.pdf"),
+        engine="pymupdf4llm",
+        
+        engine_kwargs={"show_progress": False, "pages": range(10),},  # additional kwargs
+    )
+    for test_string in PDF_TEST_STRINGS:
+        assert test_string in result.text_content
+
+    # By pymupdf4llm and extract images
+    result = markitdown.convert(
+        os.path.join(TEST_FILES_DIR, "2308.08155v2.pdf"),
+        engine="pymupdf4llm",
+        engine_kwargs={
+            "show_progress": False,
+            "write_images": True,
+            "image_path": "tests/out",
+            "pages": range(10),
+        },  # `write_images` must be True, setting `image_path` for images saving dir.
+    )
+    for test_string in PDF_TEST_STRINGS:
+        assert test_string in result.text_content
+
+    # By pdfminer
+    result = markitdown.convert(
+        os.path.join(TEST_FILES_DIR, "2308.08155v2.pdf"), engine="pdfminer",
+        enging_kwargs={"page_numbers": range(10),}
+    )
+    for test_string in PDF_TEST_STRINGS:
+        assert test_string in result.text_content
 
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
@@ -346,3 +381,4 @@ if __name__ == "__main__":
     test_markitdown_exiftool()
     test_markitdown_deprecation()
     test_markitdown_llm()
+    test_markitdown_pdf()
