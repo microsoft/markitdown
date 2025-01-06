@@ -13,6 +13,7 @@ import sys
 import tempfile
 import traceback
 import zipfile
+from http.client import responses
 from xml.dom import minidom
 from typing import Any, Dict, List, Optional, Union
 from pathlib import Path
@@ -1085,24 +1086,42 @@ class ImageConverter(MediaConverter):
                 content_type = "image/jpeg"
             image_base64 = base64.b64encode(image_file.read()).decode("utf-8")
             data_uri = f"data:{content_type};base64,{image_base64}"
+        # check if Ollama client
+        if str(type(client)) == "<class 'ollama._client.Client'>":
+            messages = [
+                {
+                    "role": "user",
+                    "content": prompt,
+                    'images': [local_path]
 
-        messages = [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": data_uri,
+                }
+            ]
+
+            response = client.chat(
+            model = model,
+            messages = messages,
+
+        )
+
+            return response.message.content
+
+        else:# use openai
+            messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": data_uri,
+                            },
                         },
-                    },
-                ],
-            }
-        ]
-
-        response = client.chat.completions.create(model=model, messages=messages)
-        return response.choices[0].message.content
+                    ],
+                }
+            ]
+            response = client.chat.completions.create(model=model, messages=messages)
+            return response.choices[0].message.content
 
 
 class OutlookMsgConverter(DocumentConverter):

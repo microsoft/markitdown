@@ -42,6 +42,7 @@ dependencies = [
   "pathvalidate",
   "charset-normalizer",
   "openai",
+  "ollama"
 ]
 
 [project.urls]
