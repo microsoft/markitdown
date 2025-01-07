@@ -57,7 +57,18 @@ def main():
         "--output",
         help="Output file name. If not provided, output is written to stdout.",
     )
+    # adding CLI option for extra parameters for PdfConverter
+    parser.add_argument(
+        "-e",
+        "--engine",
+        help="Engine name for converters. If not provided will use default.",
+    )
+    
     args = parser.parse_args()
+    
+    kwargs = {}
+    if args.engine:
+        kwargs.update({"engine": args.engine})
 
     if args.filename is None:
         markitdown = MarkItDown()
@@ -65,7 +76,7 @@ def main():
         _handle_output(args, result)
     else:
         markitdown = MarkItDown()
-        result = markitdown.convert(args.filename)
+        result = markitdown.convert(args.filename, **kwargs)
         _handle_output(args, result)
 
 
