@@ -55,6 +55,12 @@ XLSX_TEST_STRINGS = [
     "affc7dad-52dc-4b98-9b5d-51e65d8a8ad0",
 ]
 
+XLS_TEST_STRINGS = [
+    "## 09060124-b5e7-4717-9d07-3c046eb",
+    "6ff4173b-42a5-4784-9b19-f49caff4d93d",
+    "affc7dad-52dc-4b98-9b5d-51e65d8a8ad0",
+]
+
 DOCX_TEST_STRINGS = [
     "314b0a30-5b04-470b-b9f7-eed2c2bec74a",
     "49e168b7-d2ae-407f-a055-2167576f39a1",
@@ -62,6 +68,15 @@ DOCX_TEST_STRINGS = [
     "# Abstract",
     "# Introduction",
     "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation",
+]
+
+MSG_TEST_STRINGS = [
+    "# Email Message",
+    "**From:** test.sender@example.com",
+    "**To:** test.recipient@example.com",
+    "**Subject:** Test Email Message",
+    "## Content",
+    "This is the body of the test email message",
 ]
 
 DOCX_COMMENT_TEST_STRINGS = [
@@ -132,6 +147,11 @@ LLM_TEST_STRINGS = [
     "5bda1dd6",
 ]
 
+JSON_TEST_STRINGS = [
+    "5b64c88c-b3c3-4510-bcb8-da0b200602d8",
+    "9700dc99-6685-40b4-9a3a-5e406dcb37f3",
+]
+
 
 # --- Helper Functions ---
 def validate_strings(result, expected_strings, exclude_strings=None):
@@ -190,6 +210,12 @@ def test_markitdown_local(use_mlm = False) -> None:
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.xlsx"))
     validate_strings(result, XLSX_TEST_STRINGS)
 
+    # Test XLS processing
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.xls"))
+    for test_string in XLS_TEST_STRINGS:
+        text_content = result.text_content.replace("\\", "")
+        assert test_string in text_content
+
     # Test DOCX processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.docx"))
     validate_strings(result, DOCX_TEST_STRINGS)
@@ -246,15 +272,48 @@ def test_markitdown_local(use_mlm = False) -> None:
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test_mskanji.csv"))
     validate_strings(result, CSV_CP932_TEST_STRINGS)
 
+    # Test MSG (Outlook email) processing
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test_outlook_msg.msg"))
+    validate_strings(result, MSG_TEST_STRINGS)
+
+    # Test JSON processing
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.json"))
+    validate_strings(result, JSON_TEST_STRINGS)
+
+    # Test input with leading blank characters
+    input_data = b"   \n\n\n<html><body><h1>Test</h1></body></html>"
+    result = markitdown.convert_stream(io.BytesIO(input_data))
+    assert "# Test" in result.text_content
+
 
 @pytest.mark.skipif(
     skip_exiftool,
     reason="do not run if exiftool is not installed",
 )
 def test_markitdown_exiftool() -> None:
-    markitdown = MarkItDown()
+    # Test the automatic discovery of exiftool throws a warning
+    # and is disabled
+    try:
+        with catch_warnings(record=True) as w:
+            markitdown = MarkItDown()
+            result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.jpg"))
+            assert len(w) == 1
+            assert w[0].category is DeprecationWarning
+            assert result.text_content.strip() == ""
+    finally:
+        resetwarnings()
 
-    # Test JPG metadata processing
+    # Test explicitly setting the location of exiftool
+    which_exiftool = shutil.which("exiftool")
+    markitdown = MarkItDown(exiftool_path=which_exiftool)
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.jpg"))
+    for key in JPG_TEST_EXIFTOOL:
+        target = f"{key}: {JPG_TEST_EXIFTOOL[key]}"
+        assert target in result.text_content
+
+    # Test setting the exiftool path through an environment variable
+    os.environ["EXIFTOOL_PATH"] = which_exiftool
+    markitdown = MarkItDown()
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.jpg"))
     for key in JPG_TEST_EXIFTOOL:
         target = f"{key}: {JPG_TEST_EXIFTOOL[key]}"
@@ -317,6 +376,8 @@ if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     test_markitdown_remote()
     test_markitdown_local(True)
+    # test_markitdown_remote()
+    # test_markitdown_local()
     test_markitdown_exiftool()
-    test_markitdown_deprecation()
-    test_markitdown_llm()
+    # test_markitdown_deprecation()
+    # test_markitdown_llm()
