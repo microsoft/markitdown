@@ -1440,7 +1440,10 @@ class MarkItDown:
         self._llm_model = llm_model
         self._style_map = style_map
         self._exiftool_path = exiftool_path
+
         self._docintel_endpoint = docintel_endpoint
+        if self._docintel_endpoint is not None:
+            self._docintel_client = DocumentIntelligenceConverter(endpoint=self._docintel_endpoint)
 
         self._page_converters: List[DocumentConverter] = []
 
