@@ -33,6 +33,9 @@ import requests
 from bs4 import BeautifulSoup
 from charset_normalizer import from_path
 
+# Override mimetype for csv to fix issue on windows
+mimetypes.add_type("text/csv", ".csv")
+
 # Optional Transcription support
 IS_AUDIO_TRANSCRIPTION_CAPABLE = False
 try:
