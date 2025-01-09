@@ -38,10 +38,12 @@ from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.ai.documentintelligence.models import (
     AnalyzeDocumentRequest,
     AnalyzeResult,
-    ContentFormat,
     DocumentAnalysisFeature,
 )
 from azure.identity import DefaultAzureCredential
+# TODO: currently, there is a bug in the document intelligence SDK with importing the "ContentFormat" enum.
+# This constant is a temporary fix until the bug is resolved.
+CONTENT_FORMAT = "markdown"
 
 # Optional Transcription support
 IS_AUDIO_TRANSCRIPTION_CAPABLE = False
@@ -1367,7 +1369,7 @@ class DocumentIntelligenceConverter(DocumentConverter):
             model_id="prebuilt-layout",
             analyze_request=AnalyzeDocumentRequest(bytes_source=file_bytes),
             features=analysis_features,
-            output_content_format=ContentFormat.MARKDOWN,
+            output_content_format=CONTENT_FORMAT, # TODO: replace with "ContentFormat.MARKDOWN" when the bug is fixed
         )
         result: AnalyzeResult = poller.result()
 
@@ -1446,6 +1448,8 @@ class MarkItDown:
 
         if docintel_endpoint is not None:
             self._docintel_converter = DocumentIntelligenceConverter(endpoint=docintel_endpoint)
+        else:
+            self._docintel_converter = None
 
         self._page_converters: List[DocumentConverter] = []
 
