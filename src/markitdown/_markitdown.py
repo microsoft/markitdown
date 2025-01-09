@@ -26,6 +26,9 @@ import pandas as pd
 import pdfminer
 import pdfminer.high_level
 import pptx
+from ebooklib import epub, ITEM_DOCUMENT
+import html2text
+
 
 # File-format detection
 import puremagic
@@ -74,6 +77,10 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         options["heading_style"] = options.get("heading_style", markdownify.ATX)
         # Explicitly cast options to the expected type if necessary
         super().__init__(**options)
+
+    def convert_em(self, el: Any, text: str, convert_as_inline: bool) -> str:
+        """Convert emphasis tags (<em>) to markdown style (_text_)"""
+        return f"_{text}_" if text.strip() else ""
 
     def convert_hn(self, n: int, el: Any, text: str, convert_as_inline: bool) -> str:
         """Same as usual, but be sure to start with a new line"""
@@ -694,6 +701,60 @@ class PdfConverter(DocumentConverter):
             title=None,
             text_content=pdfminer.high_level.extract_text(local_path),
         )
+
+
+class EpubConverter(DocumentConverter):
+    """Converts EPUB files to Markdown. Preserves chapter structure and metadata."""
+
+    def convert(self, local_path: str, **kwargs: Any) -> DocumentConverterResult:
+        """Convert an EPUB file to markdown.
+
+        Args:
+            local_path: Path to the EPUB file
+            **kwargs: Additional arguments (unused)
+
+        Returns:
+            DocumentConverterResult containing the converted markdown
+
+        Raises:
+            FileConversionException: If the file is not an EPUB file
+        """
+        # Check if this is an EPUB file
+        file_ext = kwargs.get("file_extension", "").lower()
+        if not file_ext.endswith(".epub"):
+            return None
+
+        book = epub.read_epub(local_path)
+
+        # Initialize result with book title
+        result = DocumentConverterResult(
+            title=(
+                book.get_metadata("DC", "title")[0][0]
+                if book.get_metadata("DC", "title")
+                else None
+            )
+        )
+
+        # Start with metadata
+        metadata_md = []
+        if book.get_metadata("DC", "creator"):
+            metadata_md.append(f"Author: {book.get_metadata('DC', 'creator')[0][0]}")
+        if book.get_metadata("DC", "description"):
+            metadata_md.append(f"\n{book.get_metadata('DC', 'description')[0][0]}")
+
+        # Convert content
+        content_md = []
+        for item in book.get_items():
+            if item.get_type() == ITEM_DOCUMENT:
+                content = item.get_content().decode("utf-8")
+                html_result = HtmlConverter()._convert(content)
+                if html_result and html_result.text_content:
+                    content_md.append(html_result.text_content)
+
+        # Combine all parts
+        result.text_content = "\n\n".join(metadata_md + content_md)
+
+        return result
 
 
 class DocxConverter(HtmlConverter):
@@ -1405,6 +1466,7 @@ class MarkItDown:
         self.register_page_converter(PdfConverter())
         self.register_page_converter(ZipConverter())
         self.register_page_converter(OutlookMsgConverter())
+        self.register_page_converter(EpubConverter())
 
     def convert(
         self, source: Union[str, requests.Response, Path], **kwargs: Any
