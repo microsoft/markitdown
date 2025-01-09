@@ -126,6 +126,20 @@ CSV_CP932_TEST_STRINGS = [
     "髙橋淳,35,名古屋",
 ]
 
+EML_TEST_STRINGS = [
+    "## Email Headers",
+    "**From:** John Doe <john.doe@example.com>",
+    "**To:** Jane Smith <jane.smith@example.com>",
+    "**Subject:** Test Email Document",
+    "**CC:** cc.person@example.com",
+    "## Email Content",
+    "This is a test email with multiple parts",
+    "- Plain text content",
+    "- An attachment",
+    "## Attachments",
+    "- test.txt (application/txt, 31 bytes)",
+]
+
 LLM_TEST_STRINGS = [
     "5bda1dd6",
 ]
@@ -194,6 +208,13 @@ def test_markitdown_local() -> None:
     # Test PPTX processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.pptx"))
     for test_string in PPTX_TEST_STRINGS:
+        text_content = result.text_content.replace("\\", "")
+        assert test_string in text_content
+
+    # Test EML processing
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.eml"))
+    assert result.title == "Test Email Document"
+    for test_string in EML_TEST_STRINGS:
         text_content = result.text_content.replace("\\", "")
         assert test_string in text_content
 
