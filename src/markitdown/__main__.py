@@ -4,8 +4,8 @@
 import argparse
 import sys
 from textwrap import dedent
-from .__about__ import __version__
-from ._markitdown import MarkItDown, DocumentConverterResult
+from __about__ import __version__
+from _markitdown import MarkItDown, DocumentConverterResult
 
 
 def main():
@@ -76,7 +76,7 @@ def main():
             raise ValueError("Document Intelligence Endpoint is required when using Document Intelligence.")
         elif args.filename is None:
             raise ValueError("Filename is required when using Document Intelligence.")
-        markitdown = MarkItDown(endpoint=args.endpoint)
+        markitdown = MarkItDown(docintel_endpoint=args.endpoint)
     else:
         markitdown = MarkItDown()
 
