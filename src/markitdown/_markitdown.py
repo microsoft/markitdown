@@ -78,6 +78,10 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         # Explicitly cast options to the expected type if necessary
         super().__init__(**options)
 
+    def convert_em(self, el: Any, text: str, convert_as_inline: bool) -> str:
+        """Convert emphasis tags (<em>) to markdown style (_text_)"""
+        return f"_{text}_" if text.strip() else ""
+
     def convert_hn(self, n: int, el: Any, text: str, convert_as_inline: bool) -> str:
         """Same as usual, but be sure to start with a new line"""
         if not convert_as_inline:
@@ -740,15 +744,12 @@ class EpubConverter(DocumentConverter):
 
         # Convert content
         content_md = []
-        h = html2text.HTML2Text()
-        h.body_width = 0  # Don't wrap lines
-
         for item in book.get_items():
             if item.get_type() == ITEM_DOCUMENT:
                 content = item.get_content().decode("utf-8")
-                # Convert HTML content to markdown
-                markdown_content = h.handle(content)
-                content_md.append(markdown_content)
+                html_result = HtmlConverter()._convert(content)
+                if html_result and html_result.text_content:
+                    content_md.append(html_result.text_content)
 
         # Combine all parts
         result.text_content = "\n\n".join(metadata_md + content_md)
