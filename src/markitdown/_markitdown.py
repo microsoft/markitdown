@@ -72,6 +72,7 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
 
     def __init__(self, **options: Any):
         options["heading_style"] = options.get("heading_style", markdownify.ATX)
+        self.keep_data_uris = options.pop("keep_data_uris", False)
         # Explicitly cast options to the expected type if necessary
         super().__init__(**options)
 
@@ -133,10 +134,10 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
             return alt
 
         # Remove dataURIs
-        if src.startswith("data:"):
+        if not self.keep_data_uris and src.startswith("data:"):
             src = src.split(",")[0] + "..."
 
-        return "![%s](%s%s)" % (alt, src, title_part)
+        return "![%s%s](%s)" % (alt, title_part, src)
 
     def convert_soup(self, soup: Any) -> str:
         return super().convert_soup(soup)  # type: ignore
@@ -189,6 +190,10 @@ class PlainTextConverter(DocumentConverter):
 class HtmlConverter(DocumentConverter):
     """Anything with content type text/html"""
 
+    def __init__(self, keep_data_uris: Optional[bool] = False):
+        self.keep_data_uris = keep_data_uris
+        super().__init__()
+
     def convert(
         self, local_path: str, **kwargs: Any
     ) -> Union[None, DocumentConverterResult]:
@@ -217,9 +222,13 @@ class HtmlConverter(DocumentConverter):
         body_elm = soup.find("body")
         webpage_text = ""
         if body_elm:
-            webpage_text = _CustomMarkdownify().convert_soup(body_elm)
+            webpage_text = _CustomMarkdownify(
+                keep_data_uris=self.keep_data_uris
+            ).convert_soup(body_elm)
         else:
-            webpage_text = _CustomMarkdownify().convert_soup(soup)
+            webpage_text = _CustomMarkdownify(
+                keep_data_uris=self.keep_data_uris
+            ).convert_soup(soup)
 
         assert isinstance(webpage_text, str)
 
@@ -231,6 +240,10 @@ class HtmlConverter(DocumentConverter):
 
 class RSSConverter(DocumentConverter):
     """Convert RSS / Atom type to markdown"""
+
+    def __init__(self, keep_data_uris: Optional[bool] = False):
+        self.keep_data_uris = keep_data_uris
+        super().__init__()
 
     def convert(
         self, local_path: str, **kwargs
@@ -347,7 +360,9 @@ class RSSConverter(DocumentConverter):
         try:
             # using bs4 because many RSS feeds have HTML-styled content
             soup = BeautifulSoup(content, "html.parser")
-            return _CustomMarkdownify().convert_soup(soup)
+            return _CustomMarkdownify(keep_data_uris=self.keep_data_uris).convert_soup(
+                soup
+            )
         except BaseException as _:
             return content
 
@@ -368,6 +383,10 @@ class RSSConverter(DocumentConverter):
 
 class WikipediaConverter(DocumentConverter):
     """Handle Wikipedia pages separately, focusing only on the main document content."""
+
+    def __init__(self, keep_data_uris: Optional[bool] = False):
+        self.keep_data_uris = keep_data_uris
+        super().__init__()
 
     def convert(
         self, local_path: str, **kwargs: Any
@@ -403,11 +422,13 @@ class WikipediaConverter(DocumentConverter):
                 assert isinstance(main_title, str)
 
             # Convert the page
-            webpage_text = f"# {main_title}\n\n" + _CustomMarkdownify().convert_soup(
-                body_elm
-            )
+            webpage_text = f"# {main_title}\n\n" + _CustomMarkdownify(
+                keep_data_uris=self.keep_data_uris
+            ).convert_soup(body_elm)
         else:
-            webpage_text = _CustomMarkdownify().convert_soup(soup)
+            webpage_text = _CustomMarkdownify(
+                keep_data_uris=self.keep_data_uris
+            ).convert_soup(soup)
 
         return DocumentConverterResult(
             title=main_title,
@@ -609,6 +630,10 @@ class IpynbConverter(DocumentConverter):
 
 
 class BingSerpConverter(DocumentConverter):
+    def __init__(self, keep_data_uris: Optional[bool] = False):
+        self.keep_data_uris = keep_data_uris
+        super().__init__()
+
     """
     Handle Bing results pages (only the organic search results).
     NOTE: It is better to use the Bing API
@@ -640,7 +665,7 @@ class BingSerpConverter(DocumentConverter):
             slug.extract()
 
         # Parse the algorithmic results
-        _markdownify = _CustomMarkdownify()
+        _markdownify = _CustomMarkdownify(keep_data_uris=self.keep_data_uris)
         results = list()
         for result in soup.find_all(class_="b_algo"):
             # Rewrite redirect urls
@@ -700,6 +725,9 @@ class DocxConverter(HtmlConverter):
     """
     Converts DOCX files to Markdown. Style information (e.g.m headings) and tables are preserved where possible.
     """
+
+    def __init__(self, keep_data_uris: Optional[bool] = False):
+        super().__init__(keep_data_uris=keep_data_uris)
 
     def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
         # Bail if not a DOCX
@@ -1337,6 +1365,7 @@ class MarkItDown:
         llm_model: Optional[str] = None,
         style_map: Optional[str] = None,
         exiftool_path: Optional[str] = None,
+        keep_data_uris: Optional[bool] = False,
         # Deprecated
         mlm_client: Optional[Any] = None,
         mlm_model: Optional[str] = None,
@@ -1389,12 +1418,12 @@ class MarkItDown:
         # Later registrations are tried first / take higher priority than earlier registrations
         # To this end, the most specific converters should appear below the most generic converters
         self.register_page_converter(PlainTextConverter())
-        self.register_page_converter(HtmlConverter())
-        self.register_page_converter(RSSConverter())
-        self.register_page_converter(WikipediaConverter())
+        self.register_page_converter(HtmlConverter(keep_data_uris=keep_data_uris))
+        self.register_page_converter(RSSConverter(keep_data_uris=keep_data_uris))
+        self.register_page_converter(WikipediaConverter(keep_data_uris=keep_data_uris))
         self.register_page_converter(YouTubeConverter())
-        self.register_page_converter(BingSerpConverter())
-        self.register_page_converter(DocxConverter())
+        self.register_page_converter(BingSerpConverter(keep_data_uris=keep_data_uris))
+        self.register_page_converter(DocxConverter(keep_data_uris=keep_data_uris))
         self.register_page_converter(XlsxConverter())
         self.register_page_converter(XlsConverter())
         self.register_page_converter(PptxConverter())
