@@ -54,6 +54,12 @@ XLSX_TEST_STRINGS = [
     "affc7dad-52dc-4b98-9b5d-51e65d8a8ad0",
 ]
 
+XLS_TEST_STRINGS = [
+    "## 09060124-b5e7-4717-9d07-3c046eb",
+    "6ff4173b-42a5-4784-9b19-f49caff4d93d",
+    "affc7dad-52dc-4b98-9b5d-51e65d8a8ad0",
+]
+
 DOCX_TEST_STRINGS = [
     "314b0a30-5b04-470b-b9f7-eed2c2bec74a",
     "49e168b7-d2ae-407f-a055-2167576f39a1",
@@ -61,6 +67,15 @@ DOCX_TEST_STRINGS = [
     "# Abstract",
     "# Introduction",
     "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation",
+]
+
+MSG_TEST_STRINGS = [
+    "# Email Message",
+    "**From:** test.sender@example.com",
+    "**To:** test.recipient@example.com",
+    "**Subject:** Test Email Message",
+    "## Content",
+    "This is the body of the test email message",
 ]
 
 DOCX_COMMENT_TEST_STRINGS = [
@@ -142,6 +157,34 @@ EPUB_TEST_STRINGS = [
     "> This is a blockquote for testing",
 ]
 
+EPUB_TEST_STRINGS = [
+    "Author: Test Author",
+    "A test EPUB document for MarkItDown testing",
+    "# Chapter 1: Test Content",
+    "This is a **test** paragraph with some formatting",
+    "* A bullet point",
+    "* Another point",
+    "# Chapter 2: More Content",
+    "_different_ style",
+    "> This is a blockquote for testing",
+]
+
+JSON_TEST_STRINGS = [
+    "5b64c88c-b3c3-4510-bcb8-da0b200602d8",
+    "9700dc99-6685-40b4-9a3a-5e406dcb37f3",
+]
+
+
+# --- Helper Functions ---
+def validate_strings(result, expected_strings, exclude_strings=None):
+    """Validate presence or absence of specific strings."""
+    text_content = result.text_content.replace("\\", "")
+    for string in expected_strings:
+        assert string in text_content
+    if exclude_strings:
+        for string in exclude_strings:
+            assert string not in text_content
+
 
 @pytest.mark.skipif(
     skip_remote,
@@ -182,73 +225,59 @@ def test_markitdown_local() -> None:
 
     # Test XLSX processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.xlsx"))
-    for test_string in XLSX_TEST_STRINGS:
+    validate_strings(result, XLSX_TEST_STRINGS)
+
+    # Test XLS processing
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.xls"))
+    for test_string in XLS_TEST_STRINGS:
         text_content = result.text_content.replace("\\", "")
         assert test_string in text_content
 
     # Test DOCX processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.docx"))
-    for test_string in DOCX_TEST_STRINGS:
-        text_content = result.text_content.replace("\\", "")
-        assert test_string in text_content
+    validate_strings(result, DOCX_TEST_STRINGS)
 
     # Test DOCX processing, with comments
     result = markitdown.convert(
         os.path.join(TEST_FILES_DIR, "test_with_comment.docx"),
         style_map="comment-reference => ",
     )
-    for test_string in DOCX_COMMENT_TEST_STRINGS:
-        text_content = result.text_content.replace("\\", "")
-        assert test_string in text_content
+    validate_strings(result, DOCX_COMMENT_TEST_STRINGS)
 
     # Test DOCX processing, with comments and setting style_map on init
     markitdown_with_style_map = MarkItDown(style_map="comment-reference => ")
     result = markitdown_with_style_map.convert(
         os.path.join(TEST_FILES_DIR, "test_with_comment.docx")
     )
-    for test_string in DOCX_COMMENT_TEST_STRINGS:
-        text_content = result.text_content.replace("\\", "")
-        assert test_string in text_content
+    validate_strings(result, DOCX_COMMENT_TEST_STRINGS)
 
     # Test PPTX processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.pptx"))
-    for test_string in PPTX_TEST_STRINGS:
-        text_content = result.text_content.replace("\\", "")
-        assert test_string in text_content
+    validate_strings(result, PPTX_TEST_STRINGS)
 
     # Test HTML processing
     result = markitdown.convert(
         os.path.join(TEST_FILES_DIR, "test_blog.html"), url=BLOG_TEST_URL
     )
-    for test_string in BLOG_TEST_STRINGS:
-        text_content = result.text_content.replace("\\", "")
-        assert test_string in text_content
+    validate_strings(result, BLOG_TEST_STRINGS)
 
     # Test ZIP file processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test_files.zip"))
-    for test_string in DOCX_TEST_STRINGS:
-        text_content = result.text_content.replace("\\", "")
-        assert test_string in text_content
+    validate_strings(result, XLSX_TEST_STRINGS)
 
     # Test Wikipedia processing
     result = markitdown.convert(
         os.path.join(TEST_FILES_DIR, "test_wikipedia.html"), url=WIKIPEDIA_TEST_URL
     )
     text_content = result.text_content.replace("\\", "")
-    for test_string in WIKIPEDIA_TEST_EXCLUDES:
-        assert test_string not in text_content
-    for test_string in WIKIPEDIA_TEST_STRINGS:
-        assert test_string in text_content
+    validate_strings(result, WIKIPEDIA_TEST_STRINGS, WIKIPEDIA_TEST_EXCLUDES)
 
     # Test Bing processing
     result = markitdown.convert(
         os.path.join(TEST_FILES_DIR, "test_serp.html"), url=SERP_TEST_URL
     )
     text_content = result.text_content.replace("\\", "")
-    for test_string in SERP_TEST_EXCLUDES:
-        assert test_string not in text_content
-    for test_string in SERP_TEST_STRINGS:
-        assert test_string in text_content
+    validate_strings(result, SERP_TEST_STRINGS, SERP_TEST_EXCLUDES)
 
     # Test RSS processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test_rss.xml"))
@@ -258,9 +287,20 @@ def test_markitdown_local() -> None:
 
     ## Test non-UTF-8 encoding
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test_mskanji.csv"))
-    text_content = result.text_content.replace("\\", "")
-    for test_string in CSV_CP932_TEST_STRINGS:
-        assert test_string in text_content
+    validate_strings(result, CSV_CP932_TEST_STRINGS)
+
+    # Test MSG (Outlook email) processing
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test_outlook_msg.msg"))
+    validate_strings(result, MSG_TEST_STRINGS)
+
+    # Test JSON processing
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.json"))
+    validate_strings(result, JSON_TEST_STRINGS)
+
+    # Test input with leading blank characters
+    input_data = b"   \n\n\n<html><body><h1>Test</h1></body></html>"
+    result = markitdown.convert_stream(io.BytesIO(input_data))
+    assert "# Test" in result.text_content
 
 
 @pytest.mark.skipif(
@@ -268,9 +308,29 @@ def test_markitdown_local() -> None:
     reason="do not run if exiftool is not installed",
 )
 def test_markitdown_exiftool() -> None:
-    markitdown = MarkItDown()
+    # Test the automatic discovery of exiftool throws a warning
+    # and is disabled
+    try:
+        with catch_warnings(record=True) as w:
+            markitdown = MarkItDown()
+            result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.jpg"))
+            assert len(w) == 1
+            assert w[0].category is DeprecationWarning
+            assert result.text_content.strip() == ""
+    finally:
+        resetwarnings()
 
-    # Test JPG metadata processing
+    # Test explicitly setting the location of exiftool
+    which_exiftool = shutil.which("exiftool")
+    markitdown = MarkItDown(exiftool_path=which_exiftool)
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.jpg"))
+    for key in JPG_TEST_EXIFTOOL:
+        target = f"{key}: {JPG_TEST_EXIFTOOL[key]}"
+        assert target in result.text_content
+
+    # Test setting the exiftool path through an environment variable
+    os.environ["EXIFTOOL_PATH"] = which_exiftool
+    markitdown = MarkItDown()
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.jpg"))
     for key in JPG_TEST_EXIFTOOL:
         target = f"{key}: {JPG_TEST_EXIFTOOL[key]}"
@@ -332,8 +392,8 @@ def test_markitdown_llm() -> None:
 
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
-    test_markitdown_remote()
-    test_markitdown_local()
+    # test_markitdown_remote()
+    # test_markitdown_local()
     test_markitdown_exiftool()
-    test_markitdown_deprecation()
-    test_markitdown_llm()
+    # test_markitdown_deprecation()
+    # test_markitdown_llm()

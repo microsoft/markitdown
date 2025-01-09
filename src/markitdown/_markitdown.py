@@ -15,11 +15,13 @@ import traceback
 import zipfile
 from xml.dom import minidom
 from typing import Any, Dict, List, Optional, Union
+from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse, urlunparse
 from warnings import warn, resetwarnings, catch_warnings
 
 import mammoth
 import markdownify
+import olefile
 import pandas as pd
 import pdfminer
 import pdfminer.high_level
@@ -35,6 +37,7 @@ from bs4 import BeautifulSoup
 from charset_normalizer import from_path
 
 # Optional Transcription support
+IS_AUDIO_TRANSCRIPTION_CAPABLE = False
 try:
     # Using warnings' catch_warnings to catch
     # pydub's warning of ffmpeg or avconv missing
@@ -173,7 +176,10 @@ class PlainTextConverter(DocumentConverter):
         # Only accept text files
         if content_type is None:
             return None
-        elif "text/" not in content_type.lower():
+        elif all(
+            not content_type.lower().startswith(type_prefix)
+            for type_prefix in ["text/", "application/json"]
+        ):
             return None
 
         text_content = str(from_path(local_path).best())
@@ -783,7 +789,31 @@ class XlsxConverter(HtmlConverter):
         if extension.lower() != ".xlsx":
             return None
 
-        sheets = pd.read_excel(local_path, sheet_name=None)
+        sheets = pd.read_excel(local_path, sheet_name=None, engine="openpyxl")
+        md_content = ""
+        for s in sheets:
+            md_content += f"## {s}\n"
+            html_content = sheets[s].to_html(index=False)
+            md_content += self._convert(html_content).text_content.strip() + "\n\n"
+
+        return DocumentConverterResult(
+            title=None,
+            text_content=md_content.strip(),
+        )
+
+
+class XlsConverter(HtmlConverter):
+    """
+    Converts XLS files to Markdown, with each sheet presented as a separate Markdown table.
+    """
+
+    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
+        # Bail if not a XLS
+        extension = kwargs.get("file_extension", "")
+        if extension.lower() != ".xls":
+            return None
+
+        sheets = pd.read_excel(local_path, sheet_name=None, engine="xlrd")
         md_content = ""
         for s in sheets:
             md_content += f"## {s}\n"
@@ -922,14 +952,25 @@ class MediaConverter(DocumentConverter):
     Abstract class for multi-modal media (e.g., images and audio)
     """
 
-    def _get_metadata(self, local_path):
-        exiftool = shutil.which("exiftool")
-        if not exiftool:
+    def _get_metadata(self, local_path, exiftool_path=None):
+        if not exiftool_path:
+            which_exiftool = shutil.which("exiftool")
+            if which_exiftool:
+                warn(
+                    f"""Implicit discovery of 'exiftool' is disabled. If you would like to continue to use exiftool in MarkItDown, please set the exiftool_path parameter in the MarkItDown consructor. E.g., 
+
+    md = MarkItDown(exiftool_path="{which_exiftool}")
+
+This warning will be removed in future releases.
+""",
+                    DeprecationWarning,
+                )
+
             return None
         else:
             try:
                 result = subprocess.run(
-                    [exiftool, "-json", local_path], capture_output=True, text=True
+                    [exiftool_path, "-json", local_path], capture_output=True, text=True
                 ).stdout
                 return json.loads(result)[0]
             except Exception:
@@ -950,7 +991,7 @@ class WavConverter(MediaConverter):
         md_content = ""
 
         # Add metadata
-        metadata = self._get_metadata(local_path)
+        metadata = self._get_metadata(local_path, kwargs.get("exiftool_path"))
         if metadata:
             for f in [
                 "Title",
@@ -1005,7 +1046,7 @@ class Mp3Converter(WavConverter):
         md_content = ""
 
         # Add metadata
-        metadata = self._get_metadata(local_path)
+        metadata = self._get_metadata(local_path, kwargs.get("exiftool_path"))
         if metadata:
             for f in [
                 "Title",
@@ -1066,7 +1107,7 @@ class ImageConverter(MediaConverter):
         md_content = ""
 
         # Add metadata
-        metadata = self._get_metadata(local_path)
+        metadata = self._get_metadata(local_path, kwargs.get("exiftool_path"))
         if metadata:
             for f in [
                 "ImageSize",
@@ -1135,6 +1176,79 @@ class ImageConverter(MediaConverter):
         return response.choices[0].message.content
 
 
+class OutlookMsgConverter(DocumentConverter):
+    """Converts Outlook .msg files to markdown by extracting email metadata and content.
+
+    Uses the olefile package to parse the .msg file structure and extract:
+    - Email headers (From, To, Subject)
+    - Email body content
+    """
+
+    def convert(
+        self, local_path: str, **kwargs: Any
+    ) -> Union[None, DocumentConverterResult]:
+        # Bail if not a MSG file
+        extension = kwargs.get("file_extension", "")
+        if extension.lower() != ".msg":
+            return None
+
+        try:
+            msg = olefile.OleFileIO(local_path)
+            # Extract email metadata
+            md_content = "# Email Message\n\n"
+
+            # Get headers
+            headers = {
+                "From": self._get_stream_data(msg, "__substg1.0_0C1F001F"),
+                "To": self._get_stream_data(msg, "__substg1.0_0E04001F"),
+                "Subject": self._get_stream_data(msg, "__substg1.0_0037001F"),
+            }
+
+            # Add headers to markdown
+            for key, value in headers.items():
+                if value:
+                    md_content += f"**{key}:** {value}\n"
+
+            md_content += "\n## Content\n\n"
+
+            # Get email body
+            body = self._get_stream_data(msg, "__substg1.0_1000001F")
+            if body:
+                md_content += body
+
+            msg.close()
+
+            return DocumentConverterResult(
+                title=headers.get("Subject"), text_content=md_content.strip()
+            )
+
+        except Exception as e:
+            raise FileConversionException(
+                f"Could not convert MSG file '{local_path}': {str(e)}"
+            )
+
+    def _get_stream_data(
+        self, msg: olefile.OleFileIO, stream_path: str
+    ) -> Union[str, None]:
+        """Helper to safely extract and decode stream data from the MSG file."""
+        try:
+            if msg.exists(stream_path):
+                data = msg.openstream(stream_path).read()
+                # Try UTF-16 first (common for .msg files)
+                try:
+                    return data.decode("utf-16-le").strip()
+                except UnicodeDecodeError:
+                    # Fall back to UTF-8
+                    try:
+                        return data.decode("utf-8").strip()
+                    except UnicodeDecodeError:
+                        # Last resort - ignore errors
+                        return data.decode("utf-8", errors="ignore").strip()
+        except Exception:
+            pass
+        return None
+
+
 class ZipConverter(DocumentConverter):
     """Converts ZIP files to markdown by extracting and converting all contained files.
 
@@ -1193,27 +1307,33 @@ class ZipConverter(DocumentConverter):
         extracted_zip_folder_name = (
             f"extracted_{os.path.basename(local_path).replace('.zip', '_zip')}"
         )
-        new_folder = os.path.normpath(
+        extraction_dir = os.path.normpath(
             os.path.join(os.path.dirname(local_path), extracted_zip_folder_name)
         )
         md_content = f"Content from the zip file `{os.path.basename(local_path)}`:\n\n"
 
-        # Safety check for path traversal
-        if not new_folder.startswith(os.path.dirname(local_path)):
-            return DocumentConverterResult(
-                title=None, text_content=f"[ERROR] Invalid zip file path: {local_path}"
-            )
-
         try:
-            # Extract the zip file
+            # Extract the zip file safely
             with zipfile.ZipFile(local_path, "r") as zipObj:
-                zipObj.extractall(path=new_folder)
+                # Safeguard against path traversal
+                for member in zipObj.namelist():
+                    member_path = os.path.normpath(os.path.join(extraction_dir, member))
+                    if (
+                        not os.path.commonprefix([extraction_dir, member_path])
+                        == extraction_dir
+                    ):
+                        raise ValueError(
+                            f"Path traversal detected in zip file: {member}"
+                        )
+
+                # Extract all files safely
+                zipObj.extractall(path=extraction_dir)
 
             # Process each extracted file
-            for root, dirs, files in os.walk(new_folder):
+            for root, dirs, files in os.walk(extraction_dir):
                 for name in files:
                     file_path = os.path.join(root, name)
-                    relative_path = os.path.relpath(file_path, new_folder)
+                    relative_path = os.path.relpath(file_path, extraction_dir)
 
                     # Get file extension
                     _, file_extension = os.path.splitext(name)
@@ -1237,7 +1357,7 @@ class ZipConverter(DocumentConverter):
 
             # Clean up extracted files if specified
             if kwargs.get("cleanup_extracted", True):
-                shutil.rmtree(new_folder)
+                shutil.rmtree(extraction_dir)
 
             return DocumentConverterResult(title=None, text_content=md_content.strip())
 
@@ -1245,6 +1365,11 @@ class ZipConverter(DocumentConverter):
             return DocumentConverterResult(
                 title=None,
                 text_content=f"[ERROR] Invalid or corrupted zip file: {local_path}",
+            )
+        except ValueError as ve:
+            return DocumentConverterResult(
+                title=None,
+                text_content=f"[ERROR] Security error in zip file {local_path}: {str(ve)}",
             )
         except Exception as e:
             return DocumentConverterResult(
@@ -1271,6 +1396,7 @@ class MarkItDown:
         llm_client: Optional[Any] = None,
         llm_model: Optional[str] = None,
         style_map: Optional[str] = None,
+        exiftool_path: Optional[str] = None,
         # Deprecated
         mlm_client: Optional[Any] = None,
         mlm_model: Optional[str] = None,
@@ -1279,6 +1405,9 @@ class MarkItDown:
             self._requests_session = requests.Session()
         else:
             self._requests_session = requests_session
+
+        if exiftool_path is None:
+            exiftool_path = os.environ.get("EXIFTOOL_PATH")
 
         # Handle deprecation notices
         #############################
@@ -1312,6 +1441,7 @@ class MarkItDown:
         self._llm_client = llm_client
         self._llm_model = llm_model
         self._style_map = style_map
+        self._exiftool_path = exiftool_path
 
         self._page_converters: List[DocumentConverter] = []
 
@@ -1326,6 +1456,7 @@ class MarkItDown:
         self.register_page_converter(BingSerpConverter())
         self.register_page_converter(DocxConverter())
         self.register_page_converter(XlsxConverter())
+        self.register_page_converter(XlsConverter())
         self.register_page_converter(PptxConverter())
         self.register_page_converter(WavConverter())
         self.register_page_converter(Mp3Converter())
@@ -1333,14 +1464,15 @@ class MarkItDown:
         self.register_page_converter(IpynbConverter())
         self.register_page_converter(PdfConverter())
         self.register_page_converter(ZipConverter())
+        self.register_page_converter(OutlookMsgConverter())
         self.register_page_converter(EpubConverter())
 
     def convert(
-        self, source: Union[str, requests.Response], **kwargs: Any
+        self, source: Union[str, requests.Response, Path], **kwargs: Any
     ) -> DocumentConverterResult:  # TODO: deal with kwargs
         """
         Args:
-            - source: can be a string representing a path or url, or a requests.response object
+            - source: can be a string representing a path either as string pathlib path object or url, or a requests.response object
             - extension: specifies the file extension to use when interpreting the file. If None, infer from source (path, uri, content-type, etc.)
         """
 
@@ -1357,10 +1489,14 @@ class MarkItDown:
         # Request response
         elif isinstance(source, requests.Response):
             return self.convert_response(source, **kwargs)
+        elif isinstance(source, Path):
+            return self.convert_local(source, **kwargs)
 
     def convert_local(
-        self, path: str, **kwargs: Any
+        self, path: Union[str, Path], **kwargs: Any
     ) -> DocumentConverterResult:  # TODO: deal with kwargs
+        if isinstance(path, Path):
+            path = str(path)
         # Prepare a list of extensions to try (in order of priority)
         ext = kwargs.get("file_extension")
         extensions = [ext] if ext is not None else []
@@ -1490,11 +1626,14 @@ class MarkItDown:
                 if "llm_model" not in _kwargs and self._llm_model is not None:
                     _kwargs["llm_model"] = self._llm_model
 
-                # Add the list of converters for nested processing
-                _kwargs["_parent_converters"] = self._page_converters
-
                 if "style_map" not in _kwargs and self._style_map is not None:
                     _kwargs["style_map"] = self._style_map
+
+                if "exiftool_path" not in _kwargs and self._exiftool_path is not None:
+                    _kwargs["exiftool_path"] = self._exiftool_path
+
+                # Add the list of converters for nested processing
+                _kwargs["_parent_converters"] = self._page_converters
 
                 # If we hit an error log it and keep trying
                 try:
@@ -1538,6 +1677,25 @@ class MarkItDown:
         # Use puremagic to guess
         try:
             guesses = puremagic.magic_file(path)
+
+            # Fix for: https://github.com/microsoft/markitdown/issues/222
+            # If there are no guesses, then try again after trimming leading ASCII whitespaces.
+            # ASCII whitespace characters are those byte values in the sequence b' \t\n\r\x0b\f'
+            # (space, tab, newline, carriage return, vertical tab, form feed).
+            if len(guesses) == 0:
+                with open(path, "rb") as file:
+                    while True:
+                        char = file.read(1)
+                        if not char:  # End of file
+                            break
+                        if not char.isspace():
+                            file.seek(file.tell() - 1)
+                            break
+                    try:
+                        guesses = puremagic.magic_stream(file)
+                    except puremagic.main.PureError:
+                        pass
+
             extensions = list()
             for g in guesses:
                 ext = g.extension.strip()
