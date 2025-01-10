@@ -1352,7 +1352,8 @@ class DocumentIntelligenceConverter(DocumentConverter):
             return None
 
         # Get the bytestring for the local path
-        file_bytes = open(local_path, "rb").read()
+        with open(local_path, "rb") as f:
+            file_bytes = f.read()
 
         # Certain document analysis features are not availiable for filetypes (.xlsx, .pptx, .html)
         if extension.lower() in [".xlsx", ".pptx", ".html"]:
@@ -1367,7 +1368,7 @@ class DocumentIntelligenceConverter(DocumentConverter):
         # Extract the text using Azure Document Intelligence
         poller = self.doc_intel_client.begin_analyze_document(
             model_id="prebuilt-layout",
-            analyze_request=AnalyzeDocumentRequest(bytes_source=file_bytes),
+            body=AnalyzeDocumentRequest(bytes_source=file_bytes),
             features=analysis_features,
             output_content_format=CONTENT_FORMAT, # TODO: replace with "ContentFormat.MARKDOWN" when the bug is fixed
         )
@@ -1604,7 +1605,8 @@ class MarkItDown:
             # Convert
             if self._docintel_converter is not None:
                 result = self._convert_docintel(temp_path, extensions, url=response.url, **kwargs)
-            result = self._convert(temp_path, extensions, url=response.url, **kwargs)
+            else:
+                result = self._convert(temp_path, extensions, url=response.url, **kwargs)
         # Clean up
         finally:
             try:
@@ -1690,18 +1692,18 @@ class MarkItDown:
              # If we hit an error log it and keep trying
             try:
                 res = self._docintel_converter.convert(local_path, **_kwargs)
+
+                if res is not None:
+                    # Normalize the content
+                    res.text_content = "\n".join(
+                        [line.rstrip() for line in re.split(r"\r?\n", res.text_content)]
+                    )
+                    res.text_content = re.sub(r"\n{3,}", "\n\n", res.text_content)
+
+                    # Todo
+                    return res
             except Exception:
                 error_trace = ("\n\n" + traceback.format_exc()).strip()
-
-            if res is not None:
-                # Normalize the content
-                res.text_content = "\n".join(
-                    [line.rstrip() for line in re.split(r"\r?\n", res.text_content)]
-                )
-                res.text_content = re.sub(r"\n{3,}", "\n\n", res.text_content)
-
-                # Todo
-                return res
             
         # If we got this far without success, report any exceptions
         if len(error_trace) > 0:
