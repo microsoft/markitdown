@@ -39,28 +39,28 @@ You can also pipe content:
 cat path-to-file.pdf | markitdown
 ```
 
-### Python API
+### TypeScript SDK
 
-Basic usage in Python:
+Basic usage in TypeScript:
 
-```python
-from markitdown import MarkItDown
+```typescript
+import { MarkItDown } from 'markitdown';
 
-md = MarkItDown()
-result = md.convert("test.xlsx")
-print(result.text_content)
+const md = new MarkItDown();
+const result = md.convert('test.xlsx');
+console.log(result.text_content);
 ```
 
 To use Large Language Models for image descriptions, provide `llm_client` and `llm_model`:
 
-```python
-from markitdown import MarkItDown
-from openai import OpenAI
+```typescript
+import { MarkItDown } from 'markitdown';
+import { OpenAI } from 'openai';
 
-client = OpenAI()
-md = MarkItDown(llm_client=client, llm_model="gpt-4o")
-result = md.convert("example.jpg")
-print(result.text_content)
+const client = new OpenAI();
+const md = new MarkItDown({ llm_client: client, llm_model: 'gpt-4o' });
+const result = md.convert('example.jpg');
+console.log(result.text_content);
 ```
 
 ### Docker
@@ -76,31 +76,34 @@ docker run --rm -i markitdown:latest < ~/your-file.pdf > output.md
 This example shows how to convert multiple files to markdown format in a single run. The script processes all supported files in a directory and creates corresponding markdown files.
 
 
-```python convert.py
-from markitdown import MarkItDown
-from openai import OpenAI
-import os
-client = OpenAI(api_key="your-api-key-here")
-md = MarkItDown(llm_client=client, llm_model="gpt-4o-2024-11-20")
-supported_extensions = ('.pptx', '.docx', '.pdf', '.jpg', '.jpeg', '.png')
-files_to_convert = [f for f in os.listdir('.') if f.lower().endswith(supported_extensions)]
-for file in files_to_convert:
-    print(f"\nConverting {file}...")
-    try:
-        md_file = os.path.splitext(file)[0] + '.md'
-        result = md.convert(file)
-        with open(md_file, 'w') as f:
-            f.write(result.text_content)
-        
-        print(f"Successfully converted {file} to {md_file}")
-    except Exception as e:
-        print(f"Error converting {file}: {str(e)}")
+```typescript
+import { MarkItDown } from 'markitdown';
+import { OpenAI } from 'openai';
+import * as fs from 'fs';
+import * as path from 'path';
 
-print("\nAll conversions completed!")
+const client = new OpenAI({ apiKey: 'your-api-key-here' });
+const md = new MarkItDown({ llm_client: client, llm_model: 'gpt-4o-2024-11-20' });
+const supportedExtensions = ['.pptx', '.docx', '.pdf', '.jpg', '.jpeg', '.png'];
+const filesToConvert = fs.readdirSync('.').filter(file => supportedExtensions.includes(path.extname(file).toLowerCase()));
+
+filesToConvert.forEach(file => {
+    console.log(`\nConverting ${file}...`);
+    try {
+        const mdFile = path.basename(file, path.extname(file)) + '.md';
+        const result = md.convert(file);
+        fs.writeFileSync(mdFile, result.text_content);
+        console.log(`Successfully converted ${file} to ${mdFile}`);
+    } catch (e) {
+        console.error(`Error converting ${file}: ${e.message}`);
+    }
+});
+
+console.log('\nAll conversions completed!');
 ```
 2. Place the script in the same directory as your files
 3. Install required packages: like openai
-4. Run script ```bash python convert.py ```
+4. Run script ```bash ts-node convert.ts ```
 
 Note that original files will remain unchanged and new markdown files are created with the same base name.
 
