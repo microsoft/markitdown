@@ -1447,11 +1447,6 @@ class MarkItDown:
         self._style_map = style_map
         self._exiftool_path = exiftool_path
 
-        if docintel_endpoint is not None:
-            self._docintel_converter = DocumentIntelligenceConverter(endpoint=docintel_endpoint)
-        else:
-            self._docintel_converter = None
-
         self._page_converters: List[DocumentConverter] = []
 
         # Register converters for successful browsing operations
@@ -1474,6 +1469,10 @@ class MarkItDown:
         self.register_page_converter(PdfConverter())
         self.register_page_converter(ZipConverter())
         self.register_page_converter(OutlookMsgConverter())
+
+        # Register Document Intelligence converter at the top of the stack if endpoint is provided
+        if docintel_endpoint is not None:
+            self.register_page_converter(DocumentIntelligenceConverter(endpoint=docintel_endpoint))
 
     def convert(
         self, source: Union[str, requests.Response, Path], **kwargs: Any
@@ -1517,8 +1516,6 @@ class MarkItDown:
             self._append_ext(extensions, g)
 
         # Convert
-        if self._docintel_converter is not None:
-            return self._convert_docintel(path, extensions, **kwargs)
         return self._convert(path, extensions, **kwargs)
 
     # TODO what should stream's type be?
@@ -1603,10 +1600,7 @@ class MarkItDown:
                 self._append_ext(extensions, g)
 
             # Convert
-            if self._docintel_converter is not None:
-                result = self._convert_docintel(temp_path, extensions, url=response.url, **kwargs)
-            else:
-                result = self._convert(temp_path, extensions, url=response.url, **kwargs)
+            result = self._convert(temp_path, extensions, url=response.url, **kwargs)
         # Clean up
         finally:
             try:
@@ -1673,47 +1667,6 @@ class MarkItDown:
         # Nothing can handle it!
         raise UnsupportedFormatException(
             f"Could not convert '{local_path}' to Markdown. The formats {extensions} are not supported."
-        )
-    
-    def _convert_docintel(
-            self, local_path: str, extensions: List[Union[str, None]], **kwargs
-    ) -> DocumentConverterResult:
-        error_trace = ""
-        for ext in extensions + [None]:  # Try last with no extension
-            _kwargs = copy.deepcopy(kwargs)
-
-            # Overwrite file_extension appropriately
-            if ext is None:
-                if "file_extension" in _kwargs:
-                    del _kwargs["file_extension"]
-            else:
-                _kwargs.update({"file_extension": ext})
-
-             # If we hit an error log it and keep trying
-            try:
-                res = self._docintel_converter.convert(local_path, **_kwargs)
-
-                if res is not None:
-                    # Normalize the content
-                    res.text_content = "\n".join(
-                        [line.rstrip() for line in re.split(r"\r?\n", res.text_content)]
-                    )
-                    res.text_content = re.sub(r"\n{3,}", "\n\n", res.text_content)
-
-                    # Todo
-                    return res
-            except Exception:
-                error_trace = ("\n\n" + traceback.format_exc()).strip()
-            
-        # If we got this far without success, report any exceptions
-        if len(error_trace) > 0:
-            raise FileConversionException(
-                f"Could not convert '{local_path}' to Markdown. File type was recognized as {extensions}. While converting the file, the following error was encountered:\n\n{error_trace}"
-            )
-
-        # Extension not supported by Document Intelligence
-        raise UnsupportedFormatException(
-            f"Could not convert '{local_path}' to Markdown. The formats {extensions} are not supported by Document Intelligence."
         )
 
     def _append_ext(self, extensions, ext):
