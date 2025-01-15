@@ -76,6 +76,17 @@ except ModuleNotFoundError:
     pass
 
 
+try:
+    from guesslang import Guess
+except ImportError:
+    warn("The 'guesslang' package is not installed. Please install it via 'pip install guesslang'.")
+    class Guess:
+        def language_name(self, code: str) -> str:
+            return ""
+
+guess = Guess()
+
+
 class _CustomMarkdownify(markdownify.MarkdownConverter):
     """
     A custom version of markdownify's MarkdownConverter. Changes include:
@@ -88,6 +99,19 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
 
     def __init__(self, **options: Any):
         options["heading_style"] = options.get("heading_style", markdownify.ATX)
+        
+        # Keep inline images in table elements
+        options["keep_inline_images_in"] = options.get("keep_inline_images_in", ["td", "tr", "div", "p", "span"])
+
+        # Add a custom code language callback to guess the language of code snippets
+        def code_language_callback(el):
+            extracted_code_snippet = el.get_text()
+            if not extracted_code_snippet:
+                return ""
+            language = guess.language_name(extracted_code_snippet)
+            return language.lower() if language else ""
+        options["code_language_callback"] = options.get("code_language_callback", code_language_callback)
+        
         # Explicitly cast options to the expected type if necessary
         super().__init__(**options)
 
