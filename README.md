@@ -1,6 +1,3 @@
-> [!IMPORTANT]
-> (12/19/24) Hello! MarkItDown team members will be resting and recharging with family and friends over the holiday period. Activity/responses on the project may be delayed during the period of Dec 21-Jan 06. We will be excited to engage with you in the new year!
-
 # MarkItDown
 
 [![PyPI](https://img.shields.io/pypi/v/markitdown.svg)](https://pypi.org/project/markitdown/)
