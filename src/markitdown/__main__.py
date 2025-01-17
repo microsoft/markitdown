@@ -51,12 +51,13 @@ def main():
         help="show the version number and exit",
     )
 
-    parser.add_argument("filename", nargs="?")
     parser.add_argument(
         "-o",
         "--output",
         help="Output file name. If not provided, output is written to stdout.",
     )
+
+    parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
 
     if args.filename is None:
