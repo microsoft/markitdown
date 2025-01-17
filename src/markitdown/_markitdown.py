@@ -1048,19 +1048,38 @@ class ImageConverter(MediaConverter):
     def _get_llm_description(self, local_path, extension, client, model, prompt=None):
         if prompt is None or prompt.strip() == "":
             prompt = '''
-                Analyze the image and extract all visible text in the original language.
-                Reproduce the extracted text in a structured Markdown format, preserving
-                any formatting such as headings, bullet points, and highlights. Ensure
-                the output accurately reflects the structure and style of the original
-                document. 
+                Analyze the image and extract all visible text in the original language. Reproduce the extracted text in a structured Markdown format, preserving any formatting such as headings, bullet points, and highlights. Ensure the output accurately reflects the structure and style of the original document.
 
-                Additionally, if the image includes any visual elements (e.g., diagrams,
-                logos, or specific layouts) that cannot be represented directly in Markdown,
-                describe them in plain text as part of the Markdown document under a section
-                titled "Visual Notes."
+                Follow these additional guidelines based on the content type:
 
-                Output only the converted Markdown text without any additional commentary
-                or explanations.
+                **Tables:**
+                    * Create exact markdown representation of the table using markdown syntax (|column1|column2|)
+                    * Create a separator row (|---|---|) after the header
+                    * Transcribe all values exactly as they appear in the table
+
+                **Mathematical Formulas:**
+                    * Use LaTeX notation within markdown delimiters, e.g., `$$ y = mx + b $$`
+
+                **Charts and Graphs:**
+                    * Identify the graph type (bar, line, pie, etc.)
+                    * Extract data points into a markdown table
+                    * Include axis labels, units, and scale information
+                    * Describe patterns (e.g., linear, exponential) under markdown headers
+                    * Record maximums, minimums, and important values
+
+                **Flowcharts and Diagrams:**
+                    * Use mermaid markdown syntax where possible:
+                ```mermaid
+                graph LR
+                    A-->B
+                    B-->C
+                ```
+                    * For process flows, create a numbered list with clear step progression and any branching conditions
+                    * For technical diagrams, list components and their relationships in a structured way, preserving measurements/specifications in tables
+
+                For any visual elements that cannot be represented directly in Markdown, describe them in plain text under a section titled "Visual Notes."
+
+                Maintain numerical precision exactly as shown, preserve all labels and annotations as markdown text, and structure the output for both human and machine readability. Output only the converted Markdown text without any additional commentary or explanations.
             '''
 
         data_uri = ""
