@@ -8,11 +8,13 @@ import mimetypes
 import os
 import re
 import shutil
+import string
 import subprocess
 import sys
 import tempfile
 import traceback
 import zipfile
+from io import BytesIO
 from xml.dom import minidom
 from typing import Any, Dict, List, Optional, Union
 from pathlib import Path
@@ -32,6 +34,7 @@ import puremagic
 import requests
 from bs4 import BeautifulSoup
 from charset_normalizer import from_path
+from lxml import etree as ET
 
 # Optional Transcription support
 IS_AUDIO_TRANSCRIPTION_CAPABLE = False
