@@ -704,6 +704,42 @@ class DocxConverter(HtmlConverter):
     Converts DOCX files to Markdown. Style information (e.g.m headings) and tables are preserved where possible.
     """
 
+        self.nsmap = {
+            "m": "http://schemas.openxmlformats.org/officeDocument/2006/math",
+            "o": "urn:schemas-microsoft-com:office:office",
+            "r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+            "v": "urn:schemas-microsoft-com:vml",
+            "w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+            "cx": "http://schemas.microsoft.com/office/drawing/2014/chartex",
+            "cx1": "http://schemas.microsoft.com/office/drawing/2015/9/8/chartex",
+            "mc": "http://schemas.openxmlformats.org/markup-compatibility/2006",
+            "w10": "urn:schemas-microsoft-com:office:word",
+            "w14": "http://schemas.microsoft.com/office/word/2010/wordml",
+            "w15": "http://schemas.microsoft.com/office/word/2012/wordml",
+            "w16se": "http://schemas.microsoft.com/office/word/2015/wordml/symex",
+            "wpc": "http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas",
+            "wne": "http://schemas.microsoft.com/office/word/2006/wordml",
+            "wp": "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing",
+            "wp14": "http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing",
+            "wpg": "http://schemas.microsoft.com/office/word/2010/wordprocessingGroup",
+            "wpi": "http://schemas.microsoft.com/office/word/2010/wordprocessingInk",
+            "wps": "http://schemas.microsoft.com/office/word/2010/wordprocessingShape",
+        }
+    def _mml2tex(self, mml_xml: str) -> str:
+        tree = ET.fromstring(mml_xml)
+        transform = ET.XSLT(ET.parse(self._mml2tex_xsl_filename))
+        return str(transform(tree))
+
+    def _omml2mml(self, omml_xml: str) -> str:
+        xml_content = self._template.safe_substitute(omml_xml=omml_xml)
+        tree = ET.fromstring(xml_content)
+        transform = ET.XSLT(ET.parse(self._omml2mml_xsl_filename))
+        return str(transform(tree))
+
+    def _omml2tex(self, omml_xml: str) -> str:
+        mml_xml = self._omml2mml(omml_xml)
+        return self._mml2tex(mml_xml)
+
     def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
         # Bail if not a DOCX
         extension = kwargs.get("file_extension", "")
@@ -711,14 +747,56 @@ class DocxConverter(HtmlConverter):
             return None
 
         result = None
-        with open(local_path, "rb") as docx_file:
-            style_map = kwargs.get("style_map", None)
+        # preprocess docx equations in docx file
+        docx_file = self._encapsulate_equations(local_path)
+        style_map = kwargs.get("style_map", None)
 
-            result = mammoth.convert_to_html(docx_file, style_map=style_map)
-            html_content = result.value
-            result = self._convert(html_content)
+        result = mammoth.convert_to_html(docx_file, style_map=style_map)
+        html_content = self._convert_omath_to_tex(result.value)
+        result = self._convert(html_content)
 
         return result
+
+    def _encapsulate_omath(self, xml_content: str) -> str:
+        def replace(match):
+            quoted_omath = quote(match.group(0))
+            return "<w:t>$omml$ {} $/omml$</w:t>".format(quoted_omath)
+
+        xml_content = self._omath_pattern.sub(replace, xml_content)
+        xml_content = self._omath_para_pattern.sub(lambda m: m.group(1), xml_content)
+        return xml_content
+
+    def _convert_omath_to_tex(self, html: str) -> str:
+        def replace(match):
+            omml_content = unquote(match.group(1))
+            return self._omml2tex(omml_content)
+
+        return self._omml_pattern.sub(replace, html)
+
+    def _encapsulate_equations(self, docx_filename: str) -> BytesIO:
+        """
+
+        Args:
+        docx_filename: The path to the docx file to process.
+
+        Returns:
+        docx file with OMML equations encapsulated in $omml$ and $/omml$ tags.
+        """
+        doc_files = ("word/document.xml", "word/footnotes.xml", "word/endnotes.xml")
+        output_zip = BytesIO()
+        with zipfile.ZipFile(docx_filename, "r") as z_in:
+            with zipfile.ZipFile(output_zip, "w", zipfile.ZIP_DEFLATED) as z_out:
+                z_out.comment = z_in.comment
+                for item in z_in.infolist():
+                    if item.filename not in doc_files:
+                        z_out.writestr(item, z_in.read(item.filename))
+                    else:
+                        xml_content = self._encapsulate_omath(
+                            z_in.read(item.filename).decode("utf8")
+                        ).encode("utf8")
+                        z_out.writestr(item.filename, xml_content)
+        output_zip.seek(0)
+        return output_zip
 
 
 class XlsxConverter(HtmlConverter):
