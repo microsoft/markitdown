@@ -704,6 +704,13 @@ class DocxConverter(HtmlConverter):
     Converts DOCX files to Markdown. Style information (e.g.m headings) and tables are preserved where possible.
     """
 
+    def __init__(self):
+        self._omath_re = re.compile(r"<m:oMath[^<>]*>.+?</m:oMath>", flags=re.S)
+        self._omath_para_re = re.compile(
+            r"<m:oMathPara\s*>(.+?)</m:oMathPara>", flags=re.S
+        )
+        self._formula_re = re.compile(r"\$formula\$(.+?)\$/formula\$")
+
         self.nsmap = {
             "m": "http://schemas.openxmlformats.org/officeDocument/2006/math",
             "o": "urn:schemas-microsoft-com:office:office",
@@ -725,15 +732,34 @@ class DocxConverter(HtmlConverter):
             "wpi": "http://schemas.microsoft.com/office/word/2010/wordprocessingInk",
             "wps": "http://schemas.microsoft.com/office/word/2010/wordprocessingShape",
         }
+        self._xmlns_str = " ".join(
+            'xmlns:{}="{}"'.format(key, value) for key, value in self.nsmap.items()
+        )
+        self._template = string.Template(
+            """<?xml version="1.0" standalone="yes"?>
+        <w:document mc:Ignorable="w14 w15 w16se wp14" {}>
+            $formula_xml
+        </w:document>""".format(
+                self._xmlns_str
+            )
+        )
+        self._xsl_folder = os.path.join(
+                os.path.dirname(
+                  os.path.dirname(os.path.abspath(__file__))),
+                'xsl',
+        )
+        self._mml2tex_xsl = os.path.join(self._xsl_folder, "mmltex.xsl")
+        self._omml2mml_xsl = os.path.join(self._xsl_folder, "omml2mml.xsl")
+
     def _mml2tex(self, mml_xml: str) -> str:
         tree = ET.fromstring(mml_xml)
-        transform = ET.XSLT(ET.parse(self._mml2tex_xsl_filename))
+        transform = ET.XSLT(ET.parse(self._mml2tex_xsl))
         return str(transform(tree))
 
-    def _omml2mml(self, omml_xml: str) -> str:
-        xml_content = self._template.safe_substitute(omml_xml=omml_xml)
+    def _omml2mml(self, formula_xml: str) -> str:
+        xml_content = self._template.safe_substitute(formula_xml=formula_xml)
         tree = ET.fromstring(xml_content)
-        transform = ET.XSLT(ET.parse(self._omml2mml_xsl_filename))
+        transform = ET.XSLT(ET.parse(self._omml2mml_xsl))
         return str(transform(tree))
 
     def _omml2tex(self, omml_xml: str) -> str:
@@ -760,10 +786,10 @@ class DocxConverter(HtmlConverter):
     def _encapsulate_omath(self, xml_content: str) -> str:
         def replace(match):
             quoted_omath = quote(match.group(0))
-            return "<w:t>$omml$ {} $/omml$</w:t>".format(quoted_omath)
+            return "<w:t>$formula$ {} $/formula$</w:t>".format(quoted_omath)
 
-        xml_content = self._omath_pattern.sub(replace, xml_content)
-        xml_content = self._omath_para_pattern.sub(lambda m: m.group(1), xml_content)
+        xml_content = self._omath_re.sub(replace, xml_content)
+        xml_content = self._omath_para_re.sub(lambda m: m.group(1), xml_content)
         return xml_content
 
     def _convert_omath_to_tex(self, html: str) -> str:
@@ -771,16 +797,17 @@ class DocxConverter(HtmlConverter):
             omml_content = unquote(match.group(1))
             return self._omml2tex(omml_content)
 
-        return self._omml_pattern.sub(replace, html)
+        return self._formula_re.sub(replace, html)
 
     def _encapsulate_equations(self, docx_filename: str) -> BytesIO:
         """
+        Surrounds all OMML equations in the docx file with $formula$ and $/formula$ tags.
 
         Args:
         docx_filename: The path to the docx file to process.
 
         Returns:
-        docx file with OMML equations encapsulated in $omml$ and $/omml$ tags.
+        docx file with OMML equations encapsulated in $formula$ and $/formula$ tags.
         """
         doc_files = ("word/document.xml", "word/footnotes.xml", "word/endnotes.xml")
         output_zip = BytesIO()
