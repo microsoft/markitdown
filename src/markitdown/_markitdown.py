@@ -13,6 +13,7 @@ import sys
 import tempfile
 import traceback
 import zipfile
+from tempfile import NamedTemporaryFile
 from xml.dom import minidom
 from typing import Any, Dict, List, Optional, Union
 from pathlib import Path
@@ -1430,6 +1431,23 @@ class MarkItDown:
             return self.convert_response(source, **kwargs)
         elif isinstance(source, Path):
             return self.convert_local(source, **kwargs)
+
+    def convert_local_content(self, content: str, **kwargs: Any) -> DocumentConverterResult:
+        """Directly converts file content to Markdown."""
+        ext = kwargs.get("file_extension", ".unknown")
+        encoding = kwargs.get("encoding", "utf-8")
+
+        # Note: NamedTemporaryFile is not used because the file is not closed until the context manager exits
+        fd, temp_path = tempfile.mkstemp(suffix=ext, text=True)
+        try:
+            with os.fdopen(fd, "w", encoding=encoding) as temp_file:
+                temp_file.write(content)
+
+            result = self.convert_local(temp_path, **kwargs)
+        finally:
+            os.remove(temp_path)
+
+        return result
 
     def convert_local(
         self, path: Union[str, Path], **kwargs: Any
