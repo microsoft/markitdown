@@ -189,6 +189,73 @@ def test_markitdown_remote() -> None:
     #     assert test_string in result.text_content
 
 
+def test_markitdown_local_content() -> None:
+    markitdown = MarkItDown()
+
+    # Test HTML processing (Blog)
+    blog_html_path = os.path.join(TEST_FILES_DIR, "test_blog.html")
+    with open(blog_html_path, "r", encoding="utf-8") as f:
+        blog_html_content = f.read()
+    result = markitdown.convert_local_content(
+        blog_html_content,
+        file_extension=".html",
+        url=BLOG_TEST_URL
+    )
+    validate_strings(result, BLOG_TEST_STRINGS)
+
+    # Test Wikipedia HTML processing
+    wikipedia_html_path = os.path.join(TEST_FILES_DIR, "test_wikipedia.html")
+    with open(wikipedia_html_path, "r", encoding="utf-8") as f:
+        wikipedia_html_content = f.read()
+    result = markitdown.convert_local_content(
+        wikipedia_html_content,
+        file_extension=".html",
+        url=WIKIPEDIA_TEST_URL
+    )
+    text_content = result.text_content.replace("\\", "")
+    validate_strings(result, WIKIPEDIA_TEST_STRINGS, WIKIPEDIA_TEST_EXCLUDES)
+
+    # Test Bing SERP HTML processing
+    serp_html_path = os.path.join(TEST_FILES_DIR, "test_serp.html")
+    with open(serp_html_path, "r", encoding="utf-8") as f:
+        serp_html_content = f.read()
+    result = markitdown.convert_local_content(
+        serp_html_content,
+        file_extension=".html",
+        url=SERP_TEST_URL
+    )
+    text_content = result.text_content.replace("\\", "")
+    validate_strings(result, SERP_TEST_STRINGS, SERP_TEST_EXCLUDES)
+
+    # Test RSS processing
+    rss_path = os.path.join(TEST_FILES_DIR, "test_rss.xml")
+    with open(rss_path, "r", encoding="utf-8") as f:
+        rss_content = f.read()
+    result = markitdown.convert_local_content(rss_content, file_extension=".xml")
+    text_content = result.text_content.replace("\\", "")
+    for test_string in RSS_TEST_STRINGS:
+        assert test_string in text_content
+
+    # Test non-UTF-8 encoding (CSV CP932)
+    csv_cp932_path = os.path.join(TEST_FILES_DIR, "test_mskanji.csv")
+    with open(csv_cp932_path, "r", encoding="cp932") as f:
+        csv_cp932_content = f.read()
+    result = markitdown.convert_local_content(
+        csv_cp932_content,
+        file_extension=".csv",
+        encoding="cp932"
+    )
+    validate_strings(result, CSV_CP932_TEST_STRINGS)
+
+    # Test JSON processing
+    json_path = os.path.join(TEST_FILES_DIR, "test.json")
+    with open(json_path, "r", encoding="utf-8") as f:
+        json_content = f.read()
+    result = markitdown.convert_local_content(json_content, file_extension=".json")
+    validate_strings(result, JSON_TEST_STRINGS)
+
+
+
 def test_markitdown_local() -> None:
     markitdown = MarkItDown()
 
