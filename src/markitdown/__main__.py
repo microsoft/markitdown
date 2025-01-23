@@ -73,7 +73,9 @@ def main():
 
     if args.use_docintel:
         if args.endpoint is None:
-            raise ValueError("Document Intelligence Endpoint is required when using Document Intelligence.")
+            raise ValueError(
+                "Document Intelligence Endpoint is required when using Document Intelligence."
+            )
         elif args.filename is None:
             raise ValueError("Filename is required when using Document Intelligence.")
         markitdown = MarkItDown(docintel_endpoint=args.endpoint)
@@ -86,6 +88,7 @@ def main():
         result = markitdown.convert(args.filename)
 
     _handle_output(args, result)
+
 
 def _handle_output(args, result: DocumentConverterResult):
     """Handle output to stdout or file"""

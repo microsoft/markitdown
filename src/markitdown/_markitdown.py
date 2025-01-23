@@ -41,6 +41,7 @@ from azure.ai.documentintelligence.models import (
     DocumentAnalysisFeature,
 )
 from azure.identity import DefaultAzureCredential
+
 # TODO: currently, there is a bug in the document intelligence SDK with importing the "ContentFormat" enum.
 # This constant is a temporary fix until the bug is resolved.
 CONTENT_FORMAT = "markdown"
@@ -169,6 +170,7 @@ class DocumentConverter:
         self, local_path: str, **kwargs: Any
     ) -> Union[None, DocumentConverterResult]:
         raise NotImplementedError()
+
 
 class PlainTextConverter(DocumentConverter):
     """Anything with content type text/plain"""
@@ -1327,7 +1329,8 @@ class ZipConverter(DocumentConverter):
                 title=None,
                 text_content=f"[ERROR] Failed to process zip file {local_path}: {str(e)}",
             )
-        
+
+
 class DocumentIntelligenceConverter(DocumentConverter):
     """Specialized DocumentConverter that uses Document Intelligence to extract text from documents."""
 
@@ -1339,7 +1342,9 @@ class DocumentIntelligenceConverter(DocumentConverter):
         self.endpoint = endpoint
         self.api_version = api_version
         self.doc_intel_client = DocumentIntelligenceClient(
-            endpoint=self.endpoint, api_version=self.api_version, credential=DefaultAzureCredential()
+            endpoint=self.endpoint,
+            api_version=self.api_version,
+            credential=DefaultAzureCredential(),
         )
 
     def convert(
@@ -1347,7 +1352,19 @@ class DocumentIntelligenceConverter(DocumentConverter):
     ) -> Union[None, DocumentConverterResult]:
         # Bail if extension is not supported by Document Intelligence
         extension = kwargs.get("file_extension", "")
-        docintel_extensions = [".pdf", ".docx", ".xlsx", ".pptx", ".html", ".jpeg", ".jpg", ".png", ".bmp", ".tiff", ".heif"]
+        docintel_extensions = [
+            ".pdf",
+            ".docx",
+            ".xlsx",
+            ".pptx",
+            ".html",
+            ".jpeg",
+            ".jpg",
+            ".png",
+            ".bmp",
+            ".tiff",
+            ".heif",
+        ]
         if extension.lower() not in docintel_extensions:
             return None
 
@@ -1362,15 +1379,15 @@ class DocumentIntelligenceConverter(DocumentConverter):
             analysis_features = [
                 DocumentAnalysisFeature.FORMULAS,  # enable formula extraction
                 DocumentAnalysisFeature.OCR_HIGH_RESOLUTION,  # enable high resolution OCR
-                DocumentAnalysisFeature.STYLE_FONT  # enable font style extraction
+                DocumentAnalysisFeature.STYLE_FONT,  # enable font style extraction
             ]
-        
+
         # Extract the text using Azure Document Intelligence
         poller = self.doc_intel_client.begin_analyze_document(
             model_id="prebuilt-layout",
             body=AnalyzeDocumentRequest(bytes_source=file_bytes),
             features=analysis_features,
-            output_content_format=CONTENT_FORMAT, # TODO: replace with "ContentFormat.MARKDOWN" when the bug is fixed
+            output_content_format=CONTENT_FORMAT,  # TODO: replace with "ContentFormat.MARKDOWN" when the bug is fixed
         )
         result: AnalyzeResult = poller.result()
 
@@ -1380,6 +1397,7 @@ class DocumentIntelligenceConverter(DocumentConverter):
             title=None,
             text_content=markdown_text,
         )
+
 
 class FileConversionException(BaseException):
     pass
@@ -1472,7 +1490,9 @@ class MarkItDown:
 
         # Register Document Intelligence converter at the top of the stack if endpoint is provided
         if docintel_endpoint is not None:
-            self.register_page_converter(DocumentIntelligenceConverter(endpoint=docintel_endpoint))
+            self.register_page_converter(
+                DocumentIntelligenceConverter(endpoint=docintel_endpoint)
+            )
 
     def convert(
         self, source: Union[str, requests.Response, Path], **kwargs: Any
