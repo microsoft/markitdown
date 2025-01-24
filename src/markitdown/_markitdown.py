@@ -893,14 +893,25 @@ class MediaConverter(DocumentConverter):
     Abstract class for multi-modal media (e.g., images and audio)
     """
 
-    def _get_metadata(self, local_path):
-        exiftool = shutil.which("exiftool")
-        if not exiftool:
+    def _get_metadata(self, local_path, exiftool_path=None):
+        if not exiftool_path:
+            which_exiftool = shutil.which("exiftool")
+            if which_exiftool:
+                warn(
+                    f"""Implicit discovery of 'exiftool' is disabled. If you would like to continue to use exiftool in MarkItDown, please set the exiftool_path parameter in the MarkItDown consructor. E.g., 
+
+    md = MarkItDown(exiftool_path="{which_exiftool}")
+
+This warning will be removed in future releases.
+""",
+                    DeprecationWarning,
+                )
+
             return None
         else:
             try:
                 result = subprocess.run(
-                    [exiftool, "-json", local_path], capture_output=True, text=True
+                    [exiftool_path, "-json", local_path], capture_output=True, text=True
                 ).stdout
                 return json.loads(result)[0]
             except Exception:
@@ -921,7 +932,7 @@ class WavConverter(MediaConverter):
         md_content = ""
 
         # Add metadata
-        metadata = self._get_metadata(local_path)
+        metadata = self._get_metadata(local_path, kwargs.get("exiftool_path"))
         if metadata:
             for f in [
                 "Title",
@@ -976,7 +987,7 @@ class Mp3Converter(WavConverter):
         md_content = ""
 
         # Add metadata
-        metadata = self._get_metadata(local_path)
+        metadata = self._get_metadata(local_path, kwargs.get("exiftool_path"))
         if metadata:
             for f in [
                 "Title",
@@ -1037,7 +1048,7 @@ class ImageConverter(MediaConverter):
         md_content = ""
 
         # Add metadata
-        metadata = self._get_metadata(local_path)
+        metadata = self._get_metadata(local_path, kwargs.get("exiftool_path"))
         if metadata:
             for f in [
                 "ImageSize",
@@ -1344,6 +1355,7 @@ class MarkItDown:
         llm_client: Optional[Any] = None,
         llm_model: Optional[str] = None,
         style_map: Optional[str] = None,
+        exiftool_path: Optional[str] = None,
         # Deprecated
         mlm_client: Optional[Any] = None,
         mlm_model: Optional[str] = None,
@@ -1352,6 +1364,9 @@ class MarkItDown:
             self._requests_session = requests.Session()
         else:
             self._requests_session = requests_session
+
+        if exiftool_path is None:
+            exiftool_path = os.environ.get("EXIFTOOL_PATH")
 
         # Handle deprecation notices
         #############################
@@ -1385,6 +1400,7 @@ class MarkItDown:
         self._llm_client = llm_client
         self._llm_model = llm_model
         self._style_map = style_map
+        self._exiftool_path = exiftool_path
 
         self._page_converters: List[DocumentConverter] = []
 
@@ -1568,11 +1584,14 @@ class MarkItDown:
                 if "llm_model" not in _kwargs and self._llm_model is not None:
                     _kwargs["llm_model"] = self._llm_model
 
-                # Add the list of converters for nested processing
-                _kwargs["_parent_converters"] = self._page_converters
-
                 if "style_map" not in _kwargs and self._style_map is not None:
                     _kwargs["style_map"] = self._style_map
+
+                if "exiftool_path" not in _kwargs and self._exiftool_path is not None:
+                    _kwargs["exiftool_path"] = self._exiftool_path
+
+                # Add the list of converters for nested processing
+                _kwargs["_parent_converters"] = self._page_converters
 
                 # If we hit an error log it and keep trying
                 try:

@@ -277,9 +277,29 @@ def test_markitdown_local() -> None:
     reason="do not run if exiftool is not installed",
 )
 def test_markitdown_exiftool() -> None:
-    markitdown = MarkItDown()
+    # Test the automatic discovery of exiftool throws a warning
+    # and is disabled
+    try:
+        with catch_warnings(record=True) as w:
+            markitdown = MarkItDown()
+            result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.jpg"))
+            assert len(w) == 1
+            assert w[0].category is DeprecationWarning
+            assert result.text_content.strip() == ""
+    finally:
+        resetwarnings()
 
-    # Test JPG metadata processing
+    # Test explicitly setting the location of exiftool
+    which_exiftool = shutil.which("exiftool")
+    markitdown = MarkItDown(exiftool_path=which_exiftool)
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.jpg"))
+    for key in JPG_TEST_EXIFTOOL:
+        target = f"{key}: {JPG_TEST_EXIFTOOL[key]}"
+        assert target in result.text_content
+
+    # Test setting the exiftool path through an environment variable
+    os.environ["EXIFTOOL_PATH"] = which_exiftool
+    markitdown = MarkItDown()
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.jpg"))
     for key in JPG_TEST_EXIFTOOL:
         target = f"{key}: {JPG_TEST_EXIFTOOL[key]}"
@@ -341,8 +361,8 @@ def test_markitdown_llm() -> None:
 
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
-    test_markitdown_remote()
-    test_markitdown_local()
+    # test_markitdown_remote()
+    # test_markitdown_local()
     test_markitdown_exiftool()
-    test_markitdown_deprecation()
-    test_markitdown_llm()
+    # test_markitdown_deprecation()
+    # test_markitdown_llm()
