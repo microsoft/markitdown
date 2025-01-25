@@ -43,6 +43,8 @@ dependencies = [
   "charset-normalizer",
   "openai",
   "ollama",
+  "azure-ai-documentintelligence",
+  "azure-identity"
 ]
 
 [project.urls]
