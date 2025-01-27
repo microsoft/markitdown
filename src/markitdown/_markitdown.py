@@ -784,6 +784,35 @@ class PptxConverter(HtmlConverter):
     Converts PPTX files to Markdown. Supports heading, tables and images with alt text.
     """
 
+    def _get_llm_description(
+        self, llm_client, llm_model, image_blob, content_type, prompt=None
+    ):
+        if prompt is None or prompt.strip() == "":
+            prompt = "Write a detailed alt text for this image with less than 50 words."
+
+        image_base64 = base64.b64encode(image_blob).decode("utf-8")
+        data_uri = f"data:{content_type};base64,{image_base64}"
+
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": data_uri,
+                        },
+                    },
+                    {"type": "text", "text": prompt},
+                ],
+            }
+        ]
+
+        response = llm_client.chat.completions.create(
+            model=llm_model, messages=messages
+        )
+        return response.choices[0].message.content
+
     def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
         # Bail if not a PPTX
         extension = kwargs.get("file_extension", "")
@@ -804,17 +833,38 @@ class PptxConverter(HtmlConverter):
                 # Pictures
                 if self._is_picture(shape):
                     # https://github.com/scanny/python-pptx/pull/512#issuecomment-1713100069
-                    alt_text = ""
-                    try:
-                        alt_text = shape._element._nvXxPr.cNvPr.attrib.get("descr", "")
-                    except Exception:
-                        pass
+
+                    llm_description = None
+                    alt_text = None
+
+                    llm_client = kwargs.get("llm_client")
+                    llm_model = kwargs.get("llm_model")
+                    if llm_client is not None and llm_model is not None:
+                        try:
+                            llm_description = self._get_llm_description(
+                                llm_client,
+                                llm_model,
+                                shape.image.blob,
+                                shape.image.content_type,
+                            )
+                        except Exception:
+                            # Unable to describe with LLM
+                            pass
+
+                    if not llm_description:
+                        try:
+                            alt_text = shape._element._nvXxPr.cNvPr.attrib.get(
+                                "descr", ""
+                            )
+                        except Exception:
+                            # Unable to get alt text
+                            pass
 
                     # A placeholder name
                     filename = re.sub(r"\W", "", shape.name) + ".jpg"
                     md_content += (
                         "\n!["
-                        + (alt_text if alt_text else shape.name)
+                        + (llm_description or alt_text or shape.name)
                         + "]("
                         + filename
                         + ")\n"
