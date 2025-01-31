@@ -45,6 +45,8 @@ You can also pipe content:
 cat path-to-file.pdf | markitdown
 ```
 
+More information about how to set up an Azure Document Intelligence Resource can be found [here](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/how-to-guides/create-document-intelligence-resource?view=doc-intel-4.0.0)
+
 ### Python API
 
 Basic usage in Python:
