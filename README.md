@@ -33,6 +33,12 @@ Or use `-o` to specify the output file:
 markitdown path-to-file.pdf -o document.md
 ```
 
+To use Document Intelligence conversion:
+
+```bash
+markitdown path-to-file.pdf -o document.md -d -e "<document_intelligence_endpoint>"
+```
+
 You can also pipe content:
 
 ```bash
@@ -48,6 +54,16 @@ from markitdown import MarkItDown
 
 md = MarkItDown()
 result = md.convert("test.xlsx")
+print(result.text_content)
+```
+
+Document Intelligence conversion in Python:
+
+```python
+from markitdown import MarkItDown
+
+md = MarkItDown(docintel_endpoint="<document_intelligence_endpoint>")
+result = md.convert("test.pdf")
 print(result.text_content)
 ```
 
