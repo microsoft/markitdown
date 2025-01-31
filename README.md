@@ -15,6 +15,8 @@ It supports:
 - Audio (EXIF metadata and speech transcription)
 - HTML
 - Text-based formats (CSV, JSON, XML)
+  - XML support includes general XML files, RSS feeds, and Atom feeds
+  - Preserves XML structure and attributes in Markdown format
 - ZIP files (iterates over contents)
 
 To install MarkItDown, use pip: `pip install markitdown`. Alternatively, you can install it from the source: `pip install -e .`
@@ -50,6 +52,31 @@ md = MarkItDown()
 result = md.convert("test.xlsx")
 print(result.text_content)
 ```
+
+#### XML Support
+
+The library provides comprehensive XML support:
+
+```python
+from markitdown import MarkItDown
+
+md = MarkItDown()
+
+# General XML files
+result = md.convert("data.xml")
+
+# RSS feeds
+result = md.convert("feed.rss")
+
+# Atom feeds
+result = md.convert("feed.atom")
+```
+
+XML files are converted to a structured Markdown format that preserves:
+- XML element hierarchy using Markdown headers
+- Element attributes as lists
+- Text content
+- Special handling for RSS and Atom feeds with proper formatting
 
 To use Large Language Models for image descriptions, provide `llm_client` and `llm_model`:
 
