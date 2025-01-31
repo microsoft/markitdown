@@ -1399,6 +1399,91 @@ class DocumentIntelligenceConverter(DocumentConverter):
         )
 
 
+class XMLConverter(DocumentConverter):
+    """Convert general XML files to markdown.
+    
+    This converter handles general XML files and converts them to a structured Markdown format.
+    It preserves the XML hierarchy, attributes, and text content. For RSS and Atom feeds,
+    it delegates to the specialized RSSConverter.
+    
+    Features:
+    - Converts XML element hierarchy to Markdown headers
+    - Preserves element attributes as lists
+    - Maintains text content
+    - Automatically detects and delegates RSS/Atom feeds
+    - Provides clear error messages for invalid XML
+    
+    Supported file extensions:
+    - .xml: General XML files
+    - .docbook: DocBook XML files
+    - .qtl: QTL files
+    - .rng: RELAX NG files
+    """
+
+    def convert(self, local_path: str, **kwargs) -> Union[None, DocumentConverterResult]:
+        # Bail if not XML type
+        extension = kwargs.get("file_extension", "")
+        if extension.lower() not in [".xml", ".docbook", ".qtl", ".rng"]:
+            return None
+
+        try:
+            doc = minidom.parse(local_path)
+            
+            # Check if it's an RSS or Atom feed - if so, let RSSConverter handle it
+            if (doc.getElementsByTagName("rss") or 
+                (doc.getElementsByTagName("feed") and doc.getElementsByTagName("entry"))):
+                return None
+            
+            md_content = self._convert_xml_to_markdown(doc)
+            return DocumentConverterResult(
+                title=None,
+                text_content=md_content
+            )
+        except Exception as e:
+            # Provide more detailed error information
+            error_msg = f"XML dönüştürme hatası: {str(e)}\n"
+            error_msg += "Lütfen dosyanın geçerli bir XML dosyası olduğunu kontrol edin."
+            return DocumentConverterResult(
+                title=None,
+                text_content=error_msg
+            )
+
+    def _convert_xml_to_markdown(self, doc: minidom.Document) -> str:
+        """Convert XML document to markdown format"""
+        md_content = ""
+        
+        # Get root element
+        root = doc.documentElement
+        md_content += f"# {root.tagName}\n\n"
+        
+        # Convert child nodes
+        md_content += self._process_node(root, level=1)
+        
+        return md_content.strip()
+    
+    def _process_node(self, node: minidom.Element, level: int = 0) -> str:
+        """Process an XML node and its children recursively"""
+        content = ""
+        
+        # Process attributes
+        if node.attributes and node.attributes.length > 0:
+            content += "**Attributes:**\n\n"
+            for attr in node.attributes.items():
+                content += f"- {attr[0]}: {attr[1]}\n"
+            content += "\n"
+        
+        # Process child nodes
+        for child in node.childNodes:
+            if child.nodeType == minidom.Node.TEXT_NODE:
+                text = child.data.strip()
+                if text:
+                    content += f"{text}\n"
+            elif child.nodeType == minidom.Node.ELEMENT_NODE:
+                content += f"{'#' * (level + 2)} {child.tagName}\n\n"
+                content += self._process_node(child, level + 1)
+        
+        return content
+
 class FileConversionException(BaseException):
     pass
 
@@ -1472,7 +1557,8 @@ class MarkItDown:
         # To this end, the most specific converters should appear below the most generic converters
         self.register_page_converter(PlainTextConverter())
         self.register_page_converter(HtmlConverter())
-        self.register_page_converter(RSSConverter())
+        self.register_page_converter(XMLConverter())  # Generic XML converter
+        self.register_page_converter(RSSConverter())  # Specific XML type
         self.register_page_converter(WikipediaConverter())
         self.register_page_converter(YouTubeConverter())
         self.register_page_converter(BingSerpConverter())
