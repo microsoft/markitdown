@@ -748,23 +748,23 @@ class DocxConverter(HtmlConverter):
                   os.path.dirname(os.path.abspath(__file__))),
                 'xsl',
         )
-        self._mml2tex_xsl = os.path.join(self._xsl_folder, "mmltex.xsl")
-        self._omml2mml_xsl = os.path.join(self._xsl_folder, "omml2mml.xsl")
+        self._mml_to_tex_xsl = os.path.join(self._xsl_folder, "mmltex.xsl")
+        self._omml_to_mml_xsl = os.path.join(self._xsl_folder, "omml2mml.xsl")
 
-    def _mml2tex(self, mml_xml: str) -> str:
+    def _mml_to_tex(self, mml_xml: str) -> str:
         tree = ET.fromstring(mml_xml)
-        transform = ET.XSLT(ET.parse(self._mml2tex_xsl))
+        transform = ET.XSLT(ET.parse(self._mml_to_tex_xsl))
         return str(transform(tree))
 
-    def _omml2mml(self, formula_xml: str) -> str:
+    def _omml_to_mml(self, formula_xml: str) -> str:
         xml_content = self._template.safe_substitute(formula_xml=formula_xml)
         tree = ET.fromstring(xml_content)
-        transform = ET.XSLT(ET.parse(self._omml2mml_xsl))
+        transform = ET.XSLT(ET.parse(self._omml_to_mml_xsl))
         return str(transform(tree))
 
-    def _omml2tex(self, omml_xml: str) -> str:
-        mml_xml = self._omml2mml(omml_xml)
-        return self._mml2tex(mml_xml)
+    def _omml_to_tex(self, omml_xml: str) -> str:
+        mml_xml = self._omml_to_mml(omml_xml)
+        return self._mml_to_tex(mml_xml)
 
     def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
         # Bail if not a DOCX
@@ -774,16 +774,16 @@ class DocxConverter(HtmlConverter):
 
         result = None
         # preprocess docx equations in docx file
-        docx_file = self._encapsulate_equations(local_path)
+        docx_file = self._quote_equations(local_path)
         style_map = kwargs.get("style_map", None)
 
         result = mammoth.convert_to_html(docx_file, style_map=style_map)
-        html_content = self._convert_omath_to_tex(result.value)
+        html_content = self._unquote_omath_to_tex(result.value)
         result = self._convert(html_content)
 
         return result
 
-    def _encapsulate_omath(self, xml_content: str) -> str:
+    def _quote_omath(self, xml_content: str) -> str:
         def replace(match):
             quoted_omath = quote(match.group(0))
             return "<w:t>$formula$ {} $/formula$</w:t>".format(quoted_omath)
@@ -792,22 +792,17 @@ class DocxConverter(HtmlConverter):
         xml_content = self._omath_para_re.sub(lambda m: m.group(1), xml_content)
         return xml_content
 
-    def _convert_omath_to_tex(self, html: str) -> str:
+    def _unquote_omath_to_tex(self, html: str) -> str:
         def replace(match):
             omml_content = unquote(match.group(1))
-            return self._omml2tex(omml_content)
+            return self._omml_to_tex(omml_content)
 
         return self._formula_re.sub(replace, html)
 
-    def _encapsulate_equations(self, docx_filename: str) -> BytesIO:
+    def _quote_equations(self, docx_filename: str) -> BytesIO:
         """
-        Surrounds all OMML equations in the docx file with $formula$ and $/formula$ tags.
-
-        Args:
-        docx_filename: The path to the docx file to process.
-
-        Returns:
-        docx file with OMML equations encapsulated in $formula$ and $/formula$ tags.
+        Surrounds all OMML equations in the docx file with $formula$ and
+        $/formula$ tags.
         """
         doc_files = ("word/document.xml", "word/footnotes.xml", "word/endnotes.xml")
         output_zip = BytesIO()
@@ -818,7 +813,7 @@ class DocxConverter(HtmlConverter):
                     if item.filename not in doc_files:
                         z_out.writestr(item, z_in.read(item.filename))
                     else:
-                        xml_content = self._encapsulate_omath(
+                        xml_content = self._quote_omath(
                             z_in.read(item.filename).decode("utf8")
                         ).encode("utf8")
                         z_out.writestr(item.filename, xml_content)
