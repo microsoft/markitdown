@@ -42,6 +42,8 @@ dependencies = [
   "pathvalidate",
   "charset-normalizer",
   "openai",
+  "azure-ai-documentintelligence",
+  "azure-identity"
 ]
 
 [project.urls]
