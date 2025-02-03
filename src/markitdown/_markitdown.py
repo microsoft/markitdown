@@ -1092,6 +1092,20 @@ class ImageConverter(MediaConverter):
                 ).strip()
                 + "\n"
             )
+        # add ocr only when MLM is not available
+        if mlm_client is None or mlm_model is None:
+            try:
+                import easyocr
+                reader = easyocr.Reader(['ch_sim','en']) # support chinese and english 
+                ocr_result = reader.readtext(local_path)
+                if ocr_result:
+                    md_content += "\n"
+                    for detection in ocr_result:
+                        text = detection[1]  # extract text
+                        md_content += f"- {text}\n"
+            except ImportError:
+                # easyocr not installed
+                pass
 
         return DocumentConverterResult(
             title=None,
