@@ -1,6 +1,3 @@
-> [!IMPORTANT]
-> (12/19/24) Hello! MarkItDown team members will be resting and recharging with family and friends over the holiday period. Activity/responses on the project may be delayed during the period of Dec 21-Jan 06. We will be excited to engage with you in the new year!
-
 # MarkItDown
 
 [![PyPI](https://img.shields.io/pypi/v/markitdown.svg)](https://pypi.org/project/markitdown/)
@@ -36,11 +33,19 @@ Or use `-o` to specify the output file:
 markitdown path-to-file.pdf -o document.md
 ```
 
+To use Document Intelligence conversion:
+
+```bash
+markitdown path-to-file.pdf -o document.md -d -e "<document_intelligence_endpoint>"
+```
+
 You can also pipe content:
 
 ```bash
 cat path-to-file.pdf | markitdown
 ```
+
+More information about how to set up an Azure Document Intelligence Resource can be found [here](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/how-to-guides/create-document-intelligence-resource?view=doc-intel-4.0.0)
 
 ### Python API
 
@@ -51,6 +56,16 @@ from markitdown import MarkItDown
 
 md = MarkItDown()
 result = md.convert("test.xlsx")
+print(result.text_content)
+```
+
+Document Intelligence conversion in Python:
+
+```python
+from markitdown import MarkItDown
+
+md = MarkItDown(docintel_endpoint="<document_intelligence_endpoint>")
+result = md.convert("test.pdf")
 print(result.text_content)
 ```
 
