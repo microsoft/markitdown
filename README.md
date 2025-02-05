@@ -81,14 +81,41 @@ result = md.convert("example.jpg")
 print(result.text_content)
 ```
 
-### Docker
+<details>
+<summary>Docker</summary>
+
+#### Build
 
 ```sh
 docker build -t markitdown:latest .
-docker run --rm -i markitdown:latest < ~/your-file.pdf > output.md
 ```
+
+#### Check version
+
+```sh
+docker run --rm markitdown:latest --version
+```
+
+#### Convert
+
+- On Windows (PowerShell):
+
+```sh
+docker run --rm --volume ${pwd}:/src --workdir /src markitdown:latest ./path-to-your-file.pdf
+```
+
+- On Linux:
+
+```sh
+docker run --rm --volume $(pwd):/src --workdir /src markitdown:latest ./path-to-your-file.pdf
+```
+
+Note: When specifying the file path, always use `/` as the separator, even on Windows (e.g., ./my-folder/my-file.pdf).
+
+</details>
+
 <details>
-    
+
 <summary>Batch Processing Multiple Files</summary>
 
 This example shows how to convert multiple files to markdown format in a single run. The script processes all supported files in a directory and creates corresponding markdown files.
@@ -109,7 +136,7 @@ for file in files_to_convert:
         result = md.convert(file)
         with open(md_file, 'w') as f:
             f.write(result.text_content)
-        
+
         print(f"Successfully converted {file} to {md_file}")
     except Exception as e:
         print(f"Error converting {file}: {str(e)}")
@@ -123,7 +150,7 @@ print("\nAll conversions completed!")
 Note that original files will remain unchanged and new markdown files are created with the same base name.
 
 </details>
-   
+
 ## Contributing
 
 This project welcomes contributions and suggestions.  Most contributions require you to agree to a
