@@ -4,8 +4,8 @@
 import argparse
 import sys
 from textwrap import dedent
-from .__about__ import __version__
-from ._markitdown import MarkItDown, DocumentConverterResult
+from __about__ import __version__
+from _markitdown import MarkItDown, DocumentConverterResult
 
 
 def main():
@@ -57,17 +57,40 @@ def main():
         help="Output file name. If not provided, output is written to stdout.",
     )
 
+    parser.add_argument(
+        "-d",
+        "--use-docintel",
+        action="store_true",
+        help="Use Document Intelligence to extract text instead of offline conversion. Requires a valid Document Intelligence Endpoint.",
+    )
+    
+    parser.add_argument(
+        "-e",
+        "--endpoint",
+        type=str,
+        help="Document Intelligence Endpoint. Required if using Document Intelligence.",
+    )
+
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
 
-    if args.filename is None:
-        markitdown = MarkItDown()
-        result = markitdown.convert_stream(sys.stdin.buffer)
-        _handle_output(args, result)
+    if args.use_docintel:
+        if args.endpoint is None:
+            raise ValueError(
+                "Document Intelligence Endpoint is required when using Document Intelligence."
+            )
+        elif args.filename is None:
+            raise ValueError("Filename is required when using Document Intelligence.")
+        markitdown = MarkItDown(docintel_endpoint=args.endpoint)
     else:
         markitdown = MarkItDown()
+
+    if args.filename is None:
+        result = markitdown.convert_stream(sys.stdin.buffer)
+    else:
         result = markitdown.convert(args.filename)
-        _handle_output(args, result)
+
+    _handle_output(args, result)
 
 
 def _handle_output(args, result: DocumentConverterResult):
