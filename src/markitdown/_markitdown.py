@@ -33,6 +33,19 @@ import requests
 from bs4 import BeautifulSoup
 from charset_normalizer import from_path
 
+# Azure imports
+from azure.ai.documentintelligence import DocumentIntelligenceClient
+from azure.ai.documentintelligence.models import (
+    AnalyzeDocumentRequest,
+    AnalyzeResult,
+    DocumentAnalysisFeature,
+)
+from azure.identity import DefaultAzureCredential
+
+# TODO: currently, there is a bug in the document intelligence SDK with importing the "ContentFormat" enum.
+# This constant is a temporary fix until the bug is resolved.
+CONTENT_FORMAT = "markdown"
+
 # Optional Transcription support
 IS_AUDIO_TRANSCRIPTION_CAPABLE = False
 try:
@@ -895,14 +908,25 @@ class MediaConverter(DocumentConverter):
     Abstract class for multi-modal media (e.g., images and audio)
     """
 
-    def _get_metadata(self, local_path):
-        exiftool = shutil.which("exiftool")
-        if not exiftool:
+    def _get_metadata(self, local_path, exiftool_path=None):
+        if not exiftool_path:
+            which_exiftool = shutil.which("exiftool")
+            if which_exiftool:
+                warn(
+                    f"""Implicit discovery of 'exiftool' is disabled. If you would like to continue to use exiftool in MarkItDown, please set the exiftool_path parameter in the MarkItDown consructor. E.g., 
+
+    md = MarkItDown(exiftool_path="{which_exiftool}")
+
+This warning will be removed in future releases.
+""",
+                    DeprecationWarning,
+                )
+
             return None
         else:
             try:
                 result = subprocess.run(
-                    [exiftool, "-json", local_path], capture_output=True, text=True
+                    [exiftool_path, "-json", local_path], capture_output=True, text=True
                 ).stdout
                 return json.loads(result)[0]
             except Exception:
@@ -923,7 +947,7 @@ class WavConverter(MediaConverter):
         md_content = ""
 
         # Add metadata
-        metadata = self._get_metadata(local_path)
+        metadata = self._get_metadata(local_path, kwargs.get("exiftool_path"))
         if metadata:
             for f in [
                 "Title",
@@ -978,7 +1002,7 @@ class Mp3Converter(WavConverter):
         md_content = ""
 
         # Add metadata
-        metadata = self._get_metadata(local_path)
+        metadata = self._get_metadata(local_path, kwargs.get("exiftool_path"))
         if metadata:
             for f in [
                 "Title",
@@ -1039,7 +1063,7 @@ class ImageConverter(MediaConverter):
         md_content = ""
 
         # Add metadata
-        metadata = self._get_metadata(local_path)
+        metadata = self._get_metadata(local_path, kwargs.get("exiftool_path"))
         if metadata:
             for f in [
                 "ImageSize",
@@ -1310,6 +1334,74 @@ class ZipConverter(DocumentConverter):
             )
 
 
+class DocumentIntelligenceConverter(DocumentConverter):
+    """Specialized DocumentConverter that uses Document Intelligence to extract text from documents."""
+
+    def __init__(
+        self,
+        endpoint: str,
+        api_version: str = "2024-07-31-preview",
+    ):
+        self.endpoint = endpoint
+        self.api_version = api_version
+        self.doc_intel_client = DocumentIntelligenceClient(
+            endpoint=self.endpoint,
+            api_version=self.api_version,
+            credential=DefaultAzureCredential(),
+        )
+
+    def convert(
+        self, local_path: str, **kwargs: Any
+    ) -> Union[None, DocumentConverterResult]:
+        # Bail if extension is not supported by Document Intelligence
+        extension = kwargs.get("file_extension", "")
+        docintel_extensions = [
+            ".pdf",
+            ".docx",
+            ".xlsx",
+            ".pptx",
+            ".html",
+            ".jpeg",
+            ".jpg",
+            ".png",
+            ".bmp",
+            ".tiff",
+            ".heif",
+        ]
+        if extension.lower() not in docintel_extensions:
+            return None
+
+        # Get the bytestring for the local path
+        with open(local_path, "rb") as f:
+            file_bytes = f.read()
+
+        # Certain document analysis features are not availiable for filetypes (.xlsx, .pptx, .html)
+        if extension.lower() in [".xlsx", ".pptx", ".html"]:
+            analysis_features = []
+        else:
+            analysis_features = [
+                DocumentAnalysisFeature.FORMULAS,  # enable formula extraction
+                DocumentAnalysisFeature.OCR_HIGH_RESOLUTION,  # enable high resolution OCR
+                DocumentAnalysisFeature.STYLE_FONT,  # enable font style extraction
+            ]
+
+        # Extract the text using Azure Document Intelligence
+        poller = self.doc_intel_client.begin_analyze_document(
+            model_id="prebuilt-layout",
+            body=AnalyzeDocumentRequest(bytes_source=file_bytes),
+            features=analysis_features,
+            output_content_format=CONTENT_FORMAT,  # TODO: replace with "ContentFormat.MARKDOWN" when the bug is fixed
+        )
+        result: AnalyzeResult = poller.result()
+
+        # remove comments from the markdown content generated by Doc Intelligence and append to markdown string
+        markdown_text = re.sub(r"<!--.*?-->", "", result.content, flags=re.DOTALL)
+        return DocumentConverterResult(
+            title=None,
+            text_content=markdown_text,
+        )
+
+
 class FileConversionException(BaseException):
     pass
 
@@ -1328,6 +1420,8 @@ class MarkItDown:
         llm_client: Optional[Any] = None,
         llm_model: Optional[str] = None,
         style_map: Optional[str] = None,
+        exiftool_path: Optional[str] = None,
+        docintel_endpoint: Optional[str] = None,
         # Deprecated
         mlm_client: Optional[Any] = None,
         mlm_model: Optional[str] = None,
@@ -1336,6 +1430,9 @@ class MarkItDown:
             self._requests_session = requests.Session()
         else:
             self._requests_session = requests_session
+
+        if exiftool_path is None:
+            exiftool_path = os.environ.get("EXIFTOOL_PATH")
 
         # Handle deprecation notices
         #############################
@@ -1369,6 +1466,7 @@ class MarkItDown:
         self._llm_client = llm_client
         self._llm_model = llm_model
         self._style_map = style_map
+        self._exiftool_path = exiftool_path
 
         self._page_converters: List[DocumentConverter] = []
 
@@ -1392,6 +1490,12 @@ class MarkItDown:
         self.register_page_converter(PdfConverter())
         self.register_page_converter(ZipConverter())
         self.register_page_converter(OutlookMsgConverter())
+
+        # Register Document Intelligence converter at the top of the stack if endpoint is provided
+        if docintel_endpoint is not None:
+            self.register_page_converter(
+                DocumentIntelligenceConverter(endpoint=docintel_endpoint)
+            )
 
     def convert(
         self, source: Union[str, requests.Response, Path], **kwargs: Any
@@ -1552,11 +1656,14 @@ class MarkItDown:
                 if "llm_model" not in _kwargs and self._llm_model is not None:
                     _kwargs["llm_model"] = self._llm_model
 
-                # Add the list of converters for nested processing
-                _kwargs["_parent_converters"] = self._page_converters
-
                 if "style_map" not in _kwargs and self._style_map is not None:
                     _kwargs["style_map"] = self._style_map
+
+                if "exiftool_path" not in _kwargs and self._exiftool_path is not None:
+                    _kwargs["exiftool_path"] = self._exiftool_path
+
+                # Add the list of converters for nested processing
+                _kwargs["_parent_converters"] = self._page_converters
 
                 # If we hit an error log it and keep trying
                 try:
