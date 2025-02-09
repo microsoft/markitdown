@@ -55,6 +55,12 @@ from .converters import (
     YouTubeConverter,
     IpynbConverter,
     BingSerpConverter,
+    PdfConverter,
+    DocxConverter,
+    XlsxConverter,
+    XlsConverter,
+    PptxConverter,
+    ImageConverter,
 )
 from .converters._markdownify import _CustomMarkdownify
 
@@ -92,264 +98,6 @@ except ModuleNotFoundError:
     pass
 finally:
     resetwarnings()
-
-
-class PdfConverter(DocumentConverter):
-    """
-    Converts PDFs to Markdown. Most style information is ignored, so the results are essentially plain-text.
-    """
-
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
-        # Bail if not a PDF
-        extension = kwargs.get("file_extension", "")
-        if extension.lower() != ".pdf":
-            return None
-
-        return DocumentConverterResult(
-            title=None,
-            text_content=pdfminer.high_level.extract_text(local_path),
-        )
-
-
-class DocxConverter(HtmlConverter):
-    """
-    Converts DOCX files to Markdown. Style information (e.g.m headings) and tables are preserved where possible.
-    """
-
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
-        # Bail if not a DOCX
-        extension = kwargs.get("file_extension", "")
-        if extension.lower() != ".docx":
-            return None
-
-        result = None
-        with open(local_path, "rb") as docx_file:
-            style_map = kwargs.get("style_map", None)
-
-            result = mammoth.convert_to_html(docx_file, style_map=style_map)
-            html_content = result.value
-            result = self._convert(html_content)
-
-        return result
-
-
-class XlsxConverter(HtmlConverter):
-    """
-    Converts XLSX files to Markdown, with each sheet presented as a separate Markdown table.
-    """
-
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
-        # Bail if not a XLSX
-        extension = kwargs.get("file_extension", "")
-        if extension.lower() != ".xlsx":
-            return None
-
-        sheets = pd.read_excel(local_path, sheet_name=None, engine="openpyxl")
-        md_content = ""
-        for s in sheets:
-            md_content += f"## {s}\n"
-            html_content = sheets[s].to_html(index=False)
-            md_content += self._convert(html_content).text_content.strip() + "\n\n"
-
-        return DocumentConverterResult(
-            title=None,
-            text_content=md_content.strip(),
-        )
-
-
-class XlsConverter(HtmlConverter):
-    """
-    Converts XLS files to Markdown, with each sheet presented as a separate Markdown table.
-    """
-
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
-        # Bail if not a XLS
-        extension = kwargs.get("file_extension", "")
-        if extension.lower() != ".xls":
-            return None
-
-        sheets = pd.read_excel(local_path, sheet_name=None, engine="xlrd")
-        md_content = ""
-        for s in sheets:
-            md_content += f"## {s}\n"
-            html_content = sheets[s].to_html(index=False)
-            md_content += self._convert(html_content).text_content.strip() + "\n\n"
-
-        return DocumentConverterResult(
-            title=None,
-            text_content=md_content.strip(),
-        )
-
-
-class PptxConverter(HtmlConverter):
-    """
-    Converts PPTX files to Markdown. Supports heading, tables and images with alt text.
-    """
-
-    def _get_llm_description(
-        self, llm_client, llm_model, image_blob, content_type, prompt=None
-    ):
-        if prompt is None or prompt.strip() == "":
-            prompt = "Write a detailed alt text for this image with less than 50 words."
-
-        image_base64 = base64.b64encode(image_blob).decode("utf-8")
-        data_uri = f"data:{content_type};base64,{image_base64}"
-
-        messages = [
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": data_uri,
-                        },
-                    },
-                    {"type": "text", "text": prompt},
-                ],
-            }
-        ]
-
-        response = llm_client.chat.completions.create(
-            model=llm_model, messages=messages
-        )
-        return response.choices[0].message.content
-
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
-        # Bail if not a PPTX
-        extension = kwargs.get("file_extension", "")
-        if extension.lower() != ".pptx":
-            return None
-
-        md_content = ""
-
-        presentation = pptx.Presentation(local_path)
-        slide_num = 0
-        for slide in presentation.slides:
-            slide_num += 1
-
-            md_content += f"\n\n<!-- Slide number: {slide_num} -->\n"
-
-            title = slide.shapes.title
-            for shape in slide.shapes:
-                # Pictures
-                if self._is_picture(shape):
-                    # https://github.com/scanny/python-pptx/pull/512#issuecomment-1713100069
-
-                    llm_description = None
-                    alt_text = None
-
-                    llm_client = kwargs.get("llm_client")
-                    llm_model = kwargs.get("llm_model")
-                    if llm_client is not None and llm_model is not None:
-                        try:
-                            llm_description = self._get_llm_description(
-                                llm_client,
-                                llm_model,
-                                shape.image.blob,
-                                shape.image.content_type,
-                            )
-                        except Exception:
-                            # Unable to describe with LLM
-                            pass
-
-                    if not llm_description:
-                        try:
-                            alt_text = shape._element._nvXxPr.cNvPr.attrib.get(
-                                "descr", ""
-                            )
-                        except Exception:
-                            # Unable to get alt text
-                            pass
-
-                    # A placeholder name
-                    filename = re.sub(r"\W", "", shape.name) + ".jpg"
-                    md_content += (
-                        "\n!["
-                        + (llm_description or alt_text or shape.name)
-                        + "]("
-                        + filename
-                        + ")\n"
-                    )
-
-                # Tables
-                if self._is_table(shape):
-                    html_table = "<html><body><table>"
-                    first_row = True
-                    for row in shape.table.rows:
-                        html_table += "<tr>"
-                        for cell in row.cells:
-                            if first_row:
-                                html_table += "<th>" + html.escape(cell.text) + "</th>"
-                            else:
-                                html_table += "<td>" + html.escape(cell.text) + "</td>"
-                        html_table += "</tr>"
-                        first_row = False
-                    html_table += "</table></body></html>"
-                    md_content += (
-                        "\n" + self._convert(html_table).text_content.strip() + "\n"
-                    )
-
-                # Charts
-                if shape.has_chart:
-                    md_content += self._convert_chart_to_markdown(shape.chart)
-
-                # Text areas
-                elif shape.has_text_frame:
-                    if shape == title:
-                        md_content += "# " + shape.text.lstrip() + "\n"
-                    else:
-                        md_content += shape.text + "\n"
-
-            md_content = md_content.strip()
-
-            if slide.has_notes_slide:
-                md_content += "\n\n### Notes:\n"
-                notes_frame = slide.notes_slide.notes_text_frame
-                if notes_frame is not None:
-                    md_content += notes_frame.text
-                md_content = md_content.strip()
-
-        return DocumentConverterResult(
-            title=None,
-            text_content=md_content.strip(),
-        )
-
-    def _is_picture(self, shape):
-        if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.PICTURE:
-            return True
-        if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.PLACEHOLDER:
-            if hasattr(shape, "image"):
-                return True
-        return False
-
-    def _is_table(self, shape):
-        if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.TABLE:
-            return True
-        return False
-
-    def _convert_chart_to_markdown(self, chart):
-        md = "\n\n### Chart"
-        if chart.has_title:
-            md += f": {chart.chart_title.text_frame.text}"
-        md += "\n\n"
-        data = []
-        category_names = [c.label for c in chart.plots[0].categories]
-        series_names = [s.name for s in chart.series]
-        data.append(["Category"] + series_names)
-
-        for idx, category in enumerate(category_names):
-            row = [category]
-            for series in chart.series:
-                row.append(series.values[idx])
-            data.append(row)
-
-        markdown_table = []
-        for row in data:
-            markdown_table.append("| " + " | ".join(map(str, row)) + " |")
-        header = markdown_table[0]
-        separator = "|" + "|".join(["---"] * len(data[0])) + "|"
-        return md + "\n".join([header, separator] + markdown_table[1:])
 
 
 class MediaConverter(DocumentConverter):
@@ -496,89 +244,6 @@ class Mp3Converter(WavConverter):
             title=None,
             text_content=md_content.strip(),
         )
-
-
-class ImageConverter(MediaConverter):
-    """
-    Converts images to markdown via extraction of metadata (if `exiftool` is installed), OCR (if `easyocr` is installed), and description via a multimodal LLM (if an llm_client is configured).
-    """
-
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
-        # Bail if not an image
-        extension = kwargs.get("file_extension", "")
-        if extension.lower() not in [".jpg", ".jpeg", ".png"]:
-            return None
-
-        md_content = ""
-
-        # Add metadata
-        metadata = self._get_metadata(local_path, kwargs.get("exiftool_path"))
-        if metadata:
-            for f in [
-                "ImageSize",
-                "Title",
-                "Caption",
-                "Description",
-                "Keywords",
-                "Artist",
-                "Author",
-                "DateTimeOriginal",
-                "CreateDate",
-                "GPSPosition",
-            ]:
-                if f in metadata:
-                    md_content += f"{f}: {metadata[f]}\n"
-
-        # Try describing the image with GPTV
-        llm_client = kwargs.get("llm_client")
-        llm_model = kwargs.get("llm_model")
-        if llm_client is not None and llm_model is not None:
-            md_content += (
-                "\n# Description:\n"
-                + self._get_llm_description(
-                    local_path,
-                    extension,
-                    llm_client,
-                    llm_model,
-                    prompt=kwargs.get("llm_prompt"),
-                ).strip()
-                + "\n"
-            )
-
-        return DocumentConverterResult(
-            title=None,
-            text_content=md_content,
-        )
-
-    def _get_llm_description(self, local_path, extension, client, model, prompt=None):
-        if prompt is None or prompt.strip() == "":
-            prompt = "Write a detailed caption for this image."
-
-        data_uri = ""
-        with open(local_path, "rb") as image_file:
-            content_type, encoding = mimetypes.guess_type("_dummy" + extension)
-            if content_type is None:
-                content_type = "image/jpeg"
-            image_base64 = base64.b64encode(image_file.read()).decode("utf-8")
-            data_uri = f"data:{content_type};base64,{image_base64}"
-
-        messages = [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": data_uri,
-                        },
-                    },
-                ],
-            }
-        ]
-
-        response = client.chat.completions.create(model=model, messages=messages)
-        return response.choices[0].message.content
 
 
 class OutlookMsgConverter(DocumentConverter):
@@ -915,6 +580,7 @@ class MarkItDown:
         # Later registrations are tried first / take higher priority than earlier registrations
         # To this end, the most specific converters should appear below the most generic converters
         self.register_page_converter(PlainTextConverter())
+        self.register_page_converter(ZipConverter())
         self.register_page_converter(HtmlConverter())
         self.register_page_converter(RssConverter())
         self.register_page_converter(WikipediaConverter())
@@ -930,7 +596,6 @@ class MarkItDown:
         self.register_page_converter(ImageConverter())
         self.register_page_converter(IpynbConverter())
         self.register_page_converter(PdfConverter())
-        self.register_page_converter(ZipConverter())
         self.register_page_converter(OutlookMsgConverter())
 
         #        print("Discovering plugins")
