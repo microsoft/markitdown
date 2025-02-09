@@ -733,6 +733,29 @@ class DocxConverter(HtmlConverter):
             result = mammoth.convert_to_html(docx_file, style_map=style_map)
             html_content = result.value
             result = self._convert(html_content)
+            
+        # Extract any base64 encoded images from the HTML
+        descriptions = []
+        if kwargs.get("llm_client") and kwargs.get("llm_model"):
+            for match in re.finditer(r'data:image/[^;]+;base64,([^"\']+)', html_content):
+                img_converter = ImageConverter()
+                descriptions.append(img_converter.convert_from_base64(match.group(1),'.png',**kwargs))
+
+        # Replace each base64 image with its description
+        if descriptions and result:
+            text_content = result.text_content
+
+            # Find all base64 image markdown patterns
+            base64_pattern = r'!\[[\s\S]*?\]\(data:image/[a-z]+;base64.*?\)'
+
+            # Find all base64 image markdown patterns
+            matches = list(re.finditer(base64_pattern, text_content))
+            
+            # Replace each match with corresponding description
+            for i, match in enumerate(matches):
+                if i < len(descriptions):
+                    text_content = text_content.replace(match.group(), f'[Image description {i}] \n{descriptions[i]}\n[End Image description {i}]')
+            result.text_content = text_content
 
         return result
 
@@ -1183,6 +1206,59 @@ class ImageConverter(MediaConverter):
 
         response = client.chat.completions.create(model=model, messages=messages)
         return response.choices[0].message.content
+    
+    def _get_llm_description_from_base64(
+        self, 
+        base64_str: str, 
+        extension: str, 
+        client: Any, 
+        model: str, 
+        prompt: Optional[str] = None
+    ) -> str:
+        """Get LLM description for a base64-encoded image string."""
+        if prompt is None or prompt.strip() == "":
+            prompt = "Write a detailed caption for this image."
+
+        # Remove data URI prefix if present
+        if ',' in base64_str:
+            base64_str = base64_str.split(',')[1]
+
+        # Create data URI
+        content_type, encoding = mimetypes.guess_type("_dummy" + extension)
+        if content_type is None:
+            content_type = "image/jpeg"
+
+        data_uri = f"data:{content_type};base64,{base64_str}"
+        messages = [
+            {
+                "role": "user", 
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": data_uri,
+                        },
+                    },
+                ],
+            }
+        ]
+
+        response = client.chat.completions.create(model=model, messages=messages)
+        return response.choices[0].message.content
+
+    def convert_from_base64(
+        self, 
+        base64_str: str, 
+        extension: str, 
+        **kwargs: Any
+    ) -> Union[None, DocumentConverterResult]:
+        """Convert a base64-encoded image string to markdown."""
+        client = kwargs.get("llm_client")
+        model = kwargs.get("llm_model")
+        prompt = kwargs.get("llm_prompt")
+        result = self._get_llm_description_from_base64(base64_str, extension, client, model, prompt)
+        return result
 
 
 class OutlookMsgConverter(DocumentConverter):
