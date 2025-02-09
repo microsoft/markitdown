@@ -717,24 +717,99 @@ class PdfConverter(DocumentConverter):
 
 class DocxConverter(HtmlConverter):
     """
-    Converts DOCX files to Markdown. Style information (e.g.m headings) and tables are preserved where possible.
+    Converts DOCX files to Markdown. Style information (e.g., headings) and tables are preserved where possible.
     """
 
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
+    def sanitize_filename(self, name: str) -> str:
+        """Sanitizes a string to make it a valid file name across different operating systems."""
+        # Normalize underscore
+        name = re.sub(r"\s+", "_", name.strip())
+
+        # Replace invalid characters with underscores
+        name = re.sub(r'[\\/*?:"<>|]', "_", name)
+
+        # Remove leading and trailing dots and spaces
+        name = name.strip(" .")
+
+        # Limit the length of the filename to a reasonable length (e.g., 251 characters)
+        max_length = 251
+        if len(name) > max_length:
+            name = name[:max_length]
+
+        return name
+
+    def truncate_filename(self, name: str, max_length: int, extension: str = "") -> str:
+        """Truncates the filename to ensure the final length is within the limit."""
+        max_base_length = max_length - len(extension)
+        if len(name) > max_base_length:
+            return name[:max_base_length]
+        return name
+
+    def unique_filename(self, base_path: str, max_length: int = 251) -> str:
+        """Generates a unique filename while ensuring it stays within the length limit."""
+        base, ext = os.path.splitext(base_path)
+        truncated_base = self.truncate_filename(base, max_length, ext)
+
+        counter = 1
+        unique_path = f"{truncated_base}{ext}"
+        while os.path.exists(unique_path):
+            suffix = f"_{counter}"
+            # Ensure base is short enough to add the suffix
+            truncated_base = self.truncate_filename(
+                base, max_length - len(suffix) - len(ext)
+            )
+            unique_path = f"{truncated_base}{suffix}{ext}"
+            counter += 1
+
+        return unique_path
+
+    def convert_image(self, image, output_dir: str) -> dict:
+        """Handles image extraction and saving with collision avoidance and length limits."""
+        os.makedirs(output_dir, exist_ok=True)
+
+        image.alt_text = image.alt_text.replace("\n", " ")
+        raw_name = image.alt_text or f"image_{hash(image)}"
+        sanitized_name = self.sanitize_filename(raw_name)
+        truncated_name = self.truncate_filename(sanitized_name, 251, ".png")
+        image_path = os.path.join(output_dir, truncated_name + ".png")
+
+        # Ensure unique filename
+        image_path = self.unique_filename(image_path)
+
+        try:
+            with image.open() as image_bytes:
+                with open(image_path, "wb") as img_file:
+                    img_file.write(image_bytes.read())
+            return {"src": image_path, "alt": image.alt_text}
+        except Exception:
+            # Return an empty src if saving fails
+            return {"src": ""}
+
+    def convert(
+        self, local_path: str, **kwargs
+    ) -> Union[None, DocumentConverterResult]:
         # Bail if not a DOCX
         extension = kwargs.get("file_extension", "")
         if extension.lower() != ".docx":
             return None
 
-        result = None
-        with open(local_path, "rb") as docx_file:
-            style_map = kwargs.get("style_map", None)
+        try:
+            with open(local_path, "rb") as docx_file:
+                style_map = kwargs.get("style_map")
+                image_output_dir = kwargs.get("image_output_dir", "images")
 
-            result = mammoth.convert_to_html(docx_file, style_map=style_map)
-            html_content = result.value
-            result = self._convert(html_content)
+                mammoth_result = mammoth.convert_to_html(
+                    docx_file,
+                    style_map=style_map,
+                    convert_image=mammoth.images.inline(
+                        lambda img: self.convert_image(img, image_output_dir)
+                    ),
+                )
 
-        return result
+                html_content = mammoth_result.value
+                return self._convert(html_content)
+        except Exception:
+            return None
 
 
 class XlsxConverter(HtmlConverter):
