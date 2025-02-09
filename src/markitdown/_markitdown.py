@@ -217,7 +217,7 @@ class HtmlConverter(DocumentConverter):
         return result
 
     def _convert(self, html_content: str) -> Union[None, DocumentConverterResult]:
-        """Helper function that converts and HTML string."""
+        """Helper function that converts an HTML string."""
 
         # Parse the string
         soup = BeautifulSoup(html_content, "html.parser")
@@ -235,6 +235,9 @@ class HtmlConverter(DocumentConverter):
             webpage_text = _CustomMarkdownify().convert_soup(soup)
 
         assert isinstance(webpage_text, str)
+
+        # remove leading and trailing \n
+        webpage_text = webpage_text.strip()
 
         return DocumentConverterResult(
             title=None if soup.title is None else soup.title.string,
