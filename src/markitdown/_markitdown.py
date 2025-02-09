@@ -13,6 +13,9 @@ import sys
 import tempfile
 import traceback
 import zipfile
+import importlib
+import sys
+from importlib.metadata import entry_points
 from xml.dom import minidom
 from typing import Any, Dict, List, Optional, Union
 from pathlib import Path
@@ -42,12 +45,30 @@ from azure.ai.documentintelligence.models import (
 )
 from azure.identity import DefaultAzureCredential
 
+from .converters import (
+    DocumentConverter,
+    DocumentConverterResult,
+    PlainTextConverter,
+    HtmlConverter,
+)
+from .converters._markdownify import _CustomMarkdownify
+
+from ._exceptions import (
+    MarkItDownException,
+    ConverterPrerequisiteException,
+    FileConversionException,
+    UnsupportedFormatException,
+)
+
 # TODO: currently, there is a bug in the document intelligence SDK with importing the "ContentFormat" enum.
 # This constant is a temporary fix until the bug is resolved.
 CONTENT_FORMAT = "markdown"
 
 # Override mimetype for csv to fix issue on windows
 mimetypes.add_type("text/csv", ".csv")
+
+PRIORITY_SPECIFIC_FILE_FORMAT = 0.0
+PRIORITY_GENERIC_FILE_FORMAT = -10.0
 
 # Optional Transcription support
 IS_AUDIO_TRANSCRIPTION_CAPABLE = False
@@ -74,178 +95,6 @@ try:
     IS_YOUTUBE_TRANSCRIPT_CAPABLE = True
 except ModuleNotFoundError:
     pass
-
-
-class _CustomMarkdownify(markdownify.MarkdownConverter):
-    """
-    A custom version of markdownify's MarkdownConverter. Changes include:
-
-    - Altering the default heading style to use '#', '##', etc.
-    - Removing javascript hyperlinks.
-    - Truncating images with large data:uri sources.
-    - Ensuring URIs are properly escaped, and do not conflict with Markdown syntax
-    """
-
-    def __init__(self, **options: Any):
-        options["heading_style"] = options.get("heading_style", markdownify.ATX)
-        # Explicitly cast options to the expected type if necessary
-        super().__init__(**options)
-
-    def convert_hn(self, n: int, el: Any, text: str, convert_as_inline: bool) -> str:
-        """Same as usual, but be sure to start with a new line"""
-        if not convert_as_inline:
-            if not re.search(r"^\n", text):
-                return "\n" + super().convert_hn(n, el, text, convert_as_inline)  # type: ignore
-
-        return super().convert_hn(n, el, text, convert_as_inline)  # type: ignore
-
-    def convert_a(self, el: Any, text: str, convert_as_inline: bool):
-        """Same as usual converter, but removes Javascript links and escapes URIs."""
-        prefix, suffix, text = markdownify.chomp(text)  # type: ignore
-        if not text:
-            return ""
-        href = el.get("href")
-        title = el.get("title")
-
-        # Escape URIs and skip non-http or file schemes
-        if href:
-            try:
-                parsed_url = urlparse(href)  # type: ignore
-                if parsed_url.scheme and parsed_url.scheme.lower() not in ["http", "https", "file"]:  # type: ignore
-                    return "%s%s%s" % (prefix, text, suffix)
-                href = urlunparse(parsed_url._replace(path=quote(unquote(parsed_url.path))))  # type: ignore
-            except ValueError:  # It's not clear if this ever gets thrown
-                return "%s%s%s" % (prefix, text, suffix)
-
-        # For the replacement see #29: text nodes underscores are escaped
-        if (
-            self.options["autolinks"]
-            and text.replace(r"\_", "_") == href
-            and not title
-            and not self.options["default_title"]
-        ):
-            # Shortcut syntax
-            return "<%s>" % href
-        if self.options["default_title"] and not title:
-            title = href
-        title_part = ' "%s"' % title.replace('"', r"\"") if title else ""
-        return (
-            "%s[%s](%s%s)%s" % (prefix, text, href, title_part, suffix)
-            if href
-            else text
-        )
-
-    def convert_img(self, el: Any, text: str, convert_as_inline: bool) -> str:
-        """Same as usual converter, but removes data URIs"""
-
-        alt = el.attrs.get("alt", None) or ""
-        src = el.attrs.get("src", None) or ""
-        title = el.attrs.get("title", None) or ""
-        title_part = ' "%s"' % title.replace('"', r"\"") if title else ""
-        if (
-            convert_as_inline
-            and el.parent.name not in self.options["keep_inline_images_in"]
-        ):
-            return alt
-
-        # Remove dataURIs
-        if src.startswith("data:"):
-            src = src.split(",")[0] + "..."
-
-        return "![%s](%s%s)" % (alt, src, title_part)
-
-    def convert_soup(self, soup: Any) -> str:
-        return super().convert_soup(soup)  # type: ignore
-
-
-class DocumentConverterResult:
-    """The result of converting a document to text."""
-
-    def __init__(self, title: Union[str, None] = None, text_content: str = ""):
-        self.title: Union[str, None] = title
-        self.text_content: str = text_content
-
-
-class DocumentConverter:
-    """Abstract superclass of all DocumentConverters."""
-
-    def convert(
-        self, local_path: str, **kwargs: Any
-    ) -> Union[None, DocumentConverterResult]:
-        raise NotImplementedError()
-
-
-class PlainTextConverter(DocumentConverter):
-    """Anything with content type text/plain"""
-
-    def convert(
-        self, local_path: str, **kwargs: Any
-    ) -> Union[None, DocumentConverterResult]:
-        # Guess the content type from any file extension that might be around
-        content_type, _ = mimetypes.guess_type(
-            "__placeholder" + kwargs.get("file_extension", "")
-        )
-
-        # Only accept text files
-        if content_type is None:
-            return None
-        elif all(
-            not content_type.lower().startswith(type_prefix)
-            for type_prefix in ["text/", "application/json"]
-        ):
-            return None
-
-        text_content = str(from_path(local_path).best())
-        return DocumentConverterResult(
-            title=None,
-            text_content=text_content,
-        )
-
-
-class HtmlConverter(DocumentConverter):
-    """Anything with content type text/html"""
-
-    def convert(
-        self, local_path: str, **kwargs: Any
-    ) -> Union[None, DocumentConverterResult]:
-        # Bail if not html
-        extension = kwargs.get("file_extension", "")
-        if extension.lower() not in [".html", ".htm"]:
-            return None
-
-        result = None
-        with open(local_path, "rt", encoding="utf-8") as fh:
-            result = self._convert(fh.read())
-
-        return result
-
-    def _convert(self, html_content: str) -> Union[None, DocumentConverterResult]:
-        """Helper function that converts an HTML string."""
-
-        # Parse the string
-        soup = BeautifulSoup(html_content, "html.parser")
-
-        # Remove javascript and style blocks
-        for script in soup(["script", "style"]):
-            script.extract()
-
-        # Print only the main content
-        body_elm = soup.find("body")
-        webpage_text = ""
-        if body_elm:
-            webpage_text = _CustomMarkdownify().convert_soup(body_elm)
-        else:
-            webpage_text = _CustomMarkdownify().convert_soup(soup)
-
-        assert isinstance(webpage_text, str)
-
-        # remove leading and trailing \n
-        webpage_text = webpage_text.strip()
-
-        return DocumentConverterResult(
-            title=None if soup.title is None else soup.title.string,
-            text_content=webpage_text,
-        )
 
 
 class RSSConverter(DocumentConverter):
@@ -1455,14 +1304,6 @@ class DocumentIntelligenceConverter(DocumentConverter):
         )
 
 
-class FileConversionException(BaseException):
-    pass
-
-
-class UnsupportedFormatException(BaseException):
-    pass
-
-
 class MarkItDown:
     """(In preview) An extremely simple text-based document reader, suitable for LLM use.
     This reader will convert common file-types or webpages to Markdown."""
@@ -1543,6 +1384,27 @@ class MarkItDown:
         self.register_page_converter(PdfConverter())
         self.register_page_converter(ZipConverter())
         self.register_page_converter(OutlookMsgConverter())
+
+        #        print("Discovering plugins")
+        #        for entry_point in entry_points(group="markitdown.converters"):
+        #            args = {
+        #                "required1": "Override1",
+        #                "required2": "Override2",
+        #                "required3": "Override3"
+        #            }
+        #
+        #            #print(entry_point)
+        #            plugin = entry_point.load()
+        #            instance = plugin(**args)
+        #            print(instance)
+
+        #    try:
+        #        ConverterClass = entry_point.load()
+        #        self.register_page_converter(ConverterClass())
+        #        print(f"✔ Registered converter: {entry_point.name}")
+        #    except Exception as e:
+        #        print(f" Failed to load {entry_point.name}: {e}")
+        #        print("Done")
 
         # Register Document Intelligence converter at the top of the stack if endpoint is provided
         if docintel_endpoint is not None:
@@ -1691,8 +1553,14 @@ class MarkItDown:
         self, local_path: str, extensions: List[Union[str, None]], **kwargs
     ) -> DocumentConverterResult:
         error_trace = ""
+
+        # Create a copy of the page_converters list, sorted by priority.
+        # We do this with each call to _convert because the priority of converters may change between calls.
+        # The sort is guaranteed to be stable, so converters with the same priority will remain in the same order.
+        sorted_converters = sorted(self._page_converters, key=lambda x: x.priority)
+
         for ext in extensions + [None]:  # Try last with no extension
-            for converter in self._page_converters:
+            for converter in sorted_converters:
                 _kwargs = copy.deepcopy(kwargs)
 
                 # Overwrite file_extension appropriately
