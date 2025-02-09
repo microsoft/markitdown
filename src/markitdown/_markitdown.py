@@ -8,11 +8,13 @@ import mimetypes
 import os
 import re
 import shutil
+import string
 import subprocess
 import sys
 import tempfile
 import traceback
 import zipfile
+from io import BytesIO
 from xml.dom import minidom
 from typing import Any, Dict, List, Optional, Union
 from pathlib import Path
@@ -32,6 +34,7 @@ import puremagic
 import requests
 from bs4 import BeautifulSoup
 from charset_normalizer import from_path
+from lxml import etree as ET
 
 # Azure imports
 from azure.ai.documentintelligence import DocumentIntelligenceClient
@@ -720,6 +723,68 @@ class DocxConverter(HtmlConverter):
     Converts DOCX files to Markdown. Style information (e.g.m headings) and tables are preserved where possible.
     """
 
+    def __init__(self):
+        self._omath_re = re.compile(r"<m:oMath[^<>]*>.+?</m:oMath>", flags=re.S)
+        self._omath_para_re = re.compile(
+            r"<m:oMathPara\s*>(.+?)</m:oMathPara>", flags=re.S
+        )
+        self._formula_re = re.compile(r"\$formula\$(.+?)\$/formula\$")
+
+        self.nsmap = {
+            "m": "http://schemas.openxmlformats.org/officeDocument/2006/math",
+            "o": "urn:schemas-microsoft-com:office:office",
+            "r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+            "v": "urn:schemas-microsoft-com:vml",
+            "w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+            "cx": "http://schemas.microsoft.com/office/drawing/2014/chartex",
+            "cx1": "http://schemas.microsoft.com/office/drawing/2015/9/8/chartex",
+            "mc": "http://schemas.openxmlformats.org/markup-compatibility/2006",
+            "w10": "urn:schemas-microsoft-com:office:word",
+            "w14": "http://schemas.microsoft.com/office/word/2010/wordml",
+            "w15": "http://schemas.microsoft.com/office/word/2012/wordml",
+            "w16se": "http://schemas.microsoft.com/office/word/2015/wordml/symex",
+            "wpc": "http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas",
+            "wne": "http://schemas.microsoft.com/office/word/2006/wordml",
+            "wp": "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing",
+            "wp14": "http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing",
+            "wpg": "http://schemas.microsoft.com/office/word/2010/wordprocessingGroup",
+            "wpi": "http://schemas.microsoft.com/office/word/2010/wordprocessingInk",
+            "wps": "http://schemas.microsoft.com/office/word/2010/wordprocessingShape",
+        }
+        self._xmlns_str = " ".join(
+            'xmlns:{}="{}"'.format(key, value) for key, value in self.nsmap.items()
+        )
+        self._template = string.Template(
+            """<?xml version="1.0" standalone="yes"?>
+        <w:document mc:Ignorable="w14 w15 w16se wp14" {}>
+            $formula_xml
+        </w:document>""".format(
+                self._xmlns_str
+            )
+        )
+        self._xsl_folder = os.path.join(
+                os.path.dirname(
+                  os.path.dirname(os.path.abspath(__file__))),
+                'xsl',
+        )
+        self._mml_to_tex_xsl = os.path.join(self._xsl_folder, "mmltex.xsl")
+        self._omml_to_mml_xsl = os.path.join(self._xsl_folder, "omml2mml.xsl")
+
+    def _mml_to_tex(self, mml_xml: str) -> str:
+        tree = ET.fromstring(mml_xml)
+        transform = ET.XSLT(ET.parse(self._mml_to_tex_xsl))
+        return str(transform(tree))
+
+    def _omml_to_mml(self, formula_xml: str) -> str:
+        xml_content = self._template.safe_substitute(formula_xml=formula_xml)
+        tree = ET.fromstring(xml_content)
+        transform = ET.XSLT(ET.parse(self._omml_to_mml_xsl))
+        return str(transform(tree))
+
+    def _omml_to_tex(self, omml_xml: str) -> str:
+        mml_xml = self._omml_to_mml(omml_xml)
+        return self._mml_to_tex(mml_xml)
+
     def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
         # Bail if not a DOCX
         extension = kwargs.get("file_extension", "")
@@ -727,14 +792,52 @@ class DocxConverter(HtmlConverter):
             return None
 
         result = None
-        with open(local_path, "rb") as docx_file:
-            style_map = kwargs.get("style_map", None)
+        # preprocess docx equations in docx file
+        docx_file = self._quote_equations(local_path)
+        style_map = kwargs.get("style_map", None)
 
-            result = mammoth.convert_to_html(docx_file, style_map=style_map)
-            html_content = result.value
-            result = self._convert(html_content)
+        result = mammoth.convert_to_html(docx_file, style_map=style_map)
+        html_content = self._unquote_omath_to_tex(result.value)
+        result = self._convert(html_content)
 
         return result
+
+    def _quote_omath(self, xml_content: str) -> str:
+        def replace(match):
+            quoted_omath = quote(match.group(0))
+            return "<w:t>$formula$ {} $/formula$</w:t>".format(quoted_omath)
+
+        xml_content = self._omath_re.sub(replace, xml_content)
+        xml_content = self._omath_para_re.sub(lambda m: m.group(1), xml_content)
+        return xml_content
+
+    def _unquote_omath_to_tex(self, html: str) -> str:
+        def replace(match):
+            omml_content = unquote(match.group(1))
+            return self._omml_to_tex(omml_content)
+
+        return self._formula_re.sub(replace, html)
+
+    def _quote_equations(self, docx_filename: str) -> BytesIO:
+        """
+        Surrounds all OMML equations in the docx file with $formula$ and
+        $/formula$ tags.
+        """
+        doc_files = ("word/document.xml", "word/footnotes.xml", "word/endnotes.xml")
+        output_zip = BytesIO()
+        with zipfile.ZipFile(docx_filename, "r") as z_in:
+            with zipfile.ZipFile(output_zip, "w", zipfile.ZIP_DEFLATED) as z_out:
+                z_out.comment = z_in.comment
+                for item in z_in.infolist():
+                    if item.filename not in doc_files:
+                        z_out.writestr(item, z_in.read(item.filename))
+                    else:
+                        xml_content = self._quote_omath(
+                            z_in.read(item.filename).decode("utf8")
+                        ).encode("utf8")
+                        z_out.writestr(item.filename, xml_content)
+        output_zip.seek(0)
+        return output_zip
 
 
 class XlsxConverter(HtmlConverter):
