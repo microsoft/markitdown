@@ -46,6 +46,13 @@ dependencies = [
   "azure-identity"
 ]
 
+[tool.uv]
+dev-dependencies = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.23.0",
+    "black>=23.7.0",
+]
+
 [project.urls]
 Documentation = "https://github.com/microsoft/markitdown#readme"
 Issues = "https://github.com/microsoft/markitdown/issues"
