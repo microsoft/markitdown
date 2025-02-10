@@ -4,6 +4,8 @@
 ![PyPI - Downloads](https://img.shields.io/pypi/dd/markitdown)
 [![Built by AutoGen Team](https://img.shields.io/badge/Built%20by-AutoGen%20Team-blue)](https://github.com/microsoft/autogen)
 
+> [!IMPORTANT]
+> MarkItDown 0.0.2 alpha 1 (0.0.2a1) introduces a plugin-based architecture. As much as was possible, command-line and Python interfaces have remained the same as 0.0.1a3 to support backward compatibility. Please report any issues you encounter. Some interface changes may yet occur as we continue to refine MarkItDown to a first non-alpha release.
 
 MarkItDown is a utility for converting various files to Markdown (e.g., for indexing, text analysis, etc).
 It supports:
