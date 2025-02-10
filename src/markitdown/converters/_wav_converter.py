@@ -1,25 +1,15 @@
 from typing import Union
-from ._base import DocumentConverter, DocumentConverterResult
+from ._base import DocumentConverterResult
 from ._media_converter import MediaConverter
-from warnings import warn, resetwarnings, catch_warnings
 
 # Optional Transcription support
 IS_AUDIO_TRANSCRIPTION_CAPABLE = False
 try:
-    # Using warnings' catch_warnings to catch
-    # pydub's warning of ffmpeg or avconv missing
-    with catch_warnings(record=True) as w:
-        import pydub
-
-        if w:
-            raise ModuleNotFoundError
     import speech_recognition as sr
 
     IS_AUDIO_TRANSCRIPTION_CAPABLE = True
 except ModuleNotFoundError:
     pass
-finally:
-    resetwarnings()
 
 
 class WavConverter(MediaConverter):

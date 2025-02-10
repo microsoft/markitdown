@@ -2,8 +2,8 @@
 import base64
 import re
 
-from typing import Any, Union
-from urllib.parse import parse_qs, quote, unquote, urlparse, urlunparse
+from typing import Union
+from urllib.parse import parse_qs, urlparse
 from bs4 import BeautifulSoup
 
 from ._base import DocumentConverter, DocumentConverterResult

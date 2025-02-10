@@ -11,12 +11,6 @@ from azure.identity import DefaultAzureCredential
 
 from ._base import DocumentConverter, DocumentConverterResult
 
-from .._exceptions import (
-    MarkItDownException,
-    ConverterPrerequisiteException,
-    FileConversionException,
-    UnsupportedFormatException,
-)
 
 # TODO: currently, there is a bug in the document intelligence SDK with importing the "ContentFormat" enum.
 # This constant is a temporary fix until the bug is resolved.

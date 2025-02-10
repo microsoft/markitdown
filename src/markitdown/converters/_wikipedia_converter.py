@@ -1,7 +1,6 @@
 import re
 
 from typing import Any, Union
-from urllib.parse import parse_qs, quote, unquote, urlparse, urlunparse
 from bs4 import BeautifulSoup
 
 from ._base import DocumentConverter, DocumentConverterResult

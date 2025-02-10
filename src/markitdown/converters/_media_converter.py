@@ -1,10 +1,9 @@
-# type: ignore
 import subprocess
 import shutil
 import json
 from warnings import warn
 
-from ._base import DocumentConverter, DocumentConverterResult
+from ._base import DocumentConverter
 
 
 class MediaConverter(DocumentConverter):

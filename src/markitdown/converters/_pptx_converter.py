@@ -1,4 +1,3 @@
-# type: ignore
 import base64
 import pptx
 import re
@@ -6,7 +5,7 @@ import html
 
 from typing import Union
 
-from ._base import DocumentConverter, DocumentConverterResult
+from ._base import DocumentConverterResult, DocumentConverter
 from ._html_converter import HtmlConverter
 
 

@@ -1,8 +1,8 @@
 import tempfile
-from typing import Any, Dict, List, Optional, Union
-from ._base import DocumentConverter, DocumentConverterResult
+from typing import Union
+from ._base import DocumentConverterResult
 from ._wav_converter import WavConverter
-from warnings import warn, resetwarnings, catch_warnings
+from warnings import resetwarnings, catch_warnings
 
 # Optional Transcription support
 IS_AUDIO_TRANSCRIPTION_CAPABLE = False

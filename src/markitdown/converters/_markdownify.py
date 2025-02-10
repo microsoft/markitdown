@@ -1,8 +1,8 @@
 import re
 import markdownify
 
-from typing import Any, Union
-from urllib.parse import parse_qs, quote, unquote, urlparse, urlunparse
+from typing import Any
+from urllib.parse import quote, unquote, urlparse, urlunparse
 
 
 class _CustomMarkdownify(markdownify.MarkdownConverter):

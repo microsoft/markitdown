@@ -1,6 +1,5 @@
-# type: ignore
 from xml.dom import minidom
-from typing import Any, Dict, List, Optional, Union
+from typing import Union
 from bs4 import BeautifulSoup
 
 from ._markdownify import _CustomMarkdownify

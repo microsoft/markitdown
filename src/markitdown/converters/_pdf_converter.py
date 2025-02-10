@@ -1,4 +1,3 @@
-# type: ignore
 import pdfminer
 import pdfminer.high_level
 from typing import Union

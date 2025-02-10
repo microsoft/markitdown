@@ -1,18 +1,11 @@
 import re
 
 from typing import Any, Union, Dict, List
-from urllib.parse import parse_qs, quote, unquote, urlparse, urlunparse
+from urllib.parse import parse_qs, urlparse
 from bs4 import BeautifulSoup
 
 from ._base import DocumentConverter, DocumentConverterResult
-from ._markdownify import _CustomMarkdownify
 
-from .._exceptions import (
-    MarkItDownException,
-    ConverterPrerequisiteException,
-    FileConversionException,
-    UnsupportedFormatException,
-)
 
 # Optional YouTube transcription support
 try:

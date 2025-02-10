@@ -1,49 +1,19 @@
-# type: ignore
-import base64
-import binascii
 import copy
-import html
-import json
 import mimetypes
 import os
 import re
-import shutil
-import subprocess
-import sys
 import tempfile
-import traceback
-import zipfile
-import importlib
-import sys
-from importlib.metadata import entry_points
-from xml.dom import minidom
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, List, Optional, Union
 from pathlib import Path
-from urllib.parse import parse_qs, quote, unquote, urlparse, urlunparse
-from warnings import warn, resetwarnings, catch_warnings
+from urllib.parse import urlparse
+from warnings import warn
 
-import mammoth
-import markdownify
-import olefile
-import pandas as pd
-import pdfminer
-import pdfminer.high_level
-import pptx
 
 # File-format detection
 import puremagic
 import requests
-from bs4 import BeautifulSoup
-from charset_normalizer import from_path
 
 # Azure imports
-from azure.ai.documentintelligence import DocumentIntelligenceClient
-from azure.ai.documentintelligence.models import (
-    AnalyzeDocumentRequest,
-    AnalyzeResult,
-    DocumentAnalysisFeature,
-)
-from azure.identity import DefaultAzureCredential
 
 from .converters import (
     DocumentConverter,
@@ -67,11 +37,8 @@ from .converters import (
     ZipConverter,
     DocumentIntelligenceConverter,
 )
-from .converters._markdownify import _CustomMarkdownify
 
 from ._exceptions import (
-    MarkItDownException,
-    ConverterPrerequisiteException,
     FileConversionException,
     UnsupportedFormatException,
 )
@@ -151,7 +118,6 @@ class MarkItDown:
         self.register_page_converter(HtmlConverter())
         self.register_page_converter(RssConverter())
         self.register_page_converter(WikipediaConverter())
-
         self.register_page_converter(YouTubeConverter())
         self.register_page_converter(BingSerpConverter())
         self.register_page_converter(DocxConverter())
@@ -165,32 +131,16 @@ class MarkItDown:
         self.register_page_converter(PdfConverter())
         self.register_page_converter(OutlookMsgConverter())
 
-        #        print("Discovering plugins")
-        #        for entry_point in entry_points(group="markitdown.converters"):
-        #            args = {
-        #                "required1": "Override1",
-        #                "required2": "Override2",
-        #                "required3": "Override3"
-        #            }
-        #
-        #            #print(entry_point)
-        #            plugin = entry_point.load()
-        #            instance = plugin(**args)
-        #            print(instance)
-
-        #    try:
-        #        ConverterClass = entry_point.load()
-        #        self.register_page_converter(ConverterClass())
-        #        print(f"✔ Registered converter: {entry_point.name}")
-        #    except Exception as e:
-        #        print(f" Failed to load {entry_point.name}: {e}")
-        #        print("Done")
-
         # Register Document Intelligence converter at the top of the stack if endpoint is provided
         if docintel_endpoint is not None:
             self.register_page_converter(
                 DocumentIntelligenceConverter(endpoint=docintel_endpoint)
             )
+
+        #        print("Discovering plugins")
+        #        for entry_point in entry_points(group="markitdown.converters"):
+        #            #print(entry_point)
+        #            plugin = entry_point.load()
 
     def convert(
         self, source: Union[str, requests.Response, Path], **kwargs: Any

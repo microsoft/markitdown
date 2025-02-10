@@ -1,5 +1,5 @@
-from typing import Any, Dict, List, Optional, Union
-from ._base import DocumentConverter, DocumentConverterResult
+from typing import Union
+from ._base import DocumentConverterResult
 from ._media_converter import MediaConverter
 
 
