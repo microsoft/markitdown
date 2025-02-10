@@ -88,6 +88,12 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
 
     def __init__(self, **options: Any):
         options["heading_style"] = options.get("heading_style", markdownify.ATX)
+
+        # Keep inline images in table elements
+        options["keep_inline_images_in"] = options.get(
+            "keep_inline_images_in", ["td", "tr", "div", "p", "span"]
+        )
+
         # Explicitly cast options to the expected type if necessary
         super().__init__(**options)
 
