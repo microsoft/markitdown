@@ -1386,6 +1386,42 @@ class ZipConverter(DocumentConverter):
                 text_content=f"[ERROR] Failed to process zip file {local_path}: {str(e)}",
             )
 
+class JsonConverter(DocumentConverter):
+    """
+    Converts Jsons to Markdown. The output preserves the structure of the JSON file as closely as possible, while using Markdown syntax for readability.
+    """
+
+    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
+        # Bail if not a Json
+        extension = kwargs.get("file_extension", "")
+        if extension.lower() != ".json":
+            return None
+
+        list_heading = kwargs.get("list_heading", "Elem")
+        with open(local_path, "r") as f:
+            json_data = json.load(f)
+
+        md_content = ""
+
+        if isinstance(json_data, dict):
+            md_content += json.dumps(json_data, indent=4, ensure_ascii=False) + "\n"
+        elif isinstance(json_data, list):
+            for idx, item in enumerate(json_data, start=1):
+                md_content += f"# {list_heading} {idx}\n"
+                if isinstance(item, (dict, list)):
+                    md_content += json.dumps(item, indent=4, ensure_ascii=False) + "\n\n"
+                else:
+                    md_content += f"{item}\n\n"
+        else:
+            md_content += f"{json_data}\n"
+
+        # removing tailing \n
+        md_content = md_content.strip()
+
+        return DocumentConverterResult(
+            title=None,
+            text_content=md_content,
+        )
 
 class DocumentIntelligenceConverter(DocumentConverter):
     """Specialized DocumentConverter that uses Document Intelligence to extract text from documents."""
@@ -1532,6 +1568,7 @@ class MarkItDown:
         self.register_page_converter(WikipediaConverter())
         self.register_page_converter(YouTubeConverter())
         self.register_page_converter(BingSerpConverter())
+        self.register_page_converter(JsonConverter())
         self.register_page_converter(DocxConverter())
         self.register_page_converter(XlsxConverter())
         self.register_page_converter(XlsConverter())
