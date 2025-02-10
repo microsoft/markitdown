@@ -11,12 +11,9 @@ from pathlib import Path
 from urllib.parse import urlparse
 from warnings import warn
 
-
 # File-format detection
 import puremagic
 import requests
-
-# Azure imports
 
 from .converters import (
     DocumentConverter,
@@ -84,96 +81,98 @@ class MarkItDown:
     def __init__(
         self,
         *,
-        load_plugins: bool = True,
-        requests_session: Optional[requests.Session] = None,
-        llm_client: Optional[Any] = None,
-        llm_model: Optional[str] = None,
-        style_map: Optional[str] = None,
-        exiftool_path: Optional[str] = None,
-        docintel_endpoint: Optional[str] = None,
-        # Deprecated
-        mlm_client: Optional[Any] = None,
-        mlm_model: Optional[str] = None,
+        enable_builtins: Union[None, bool] = None,
+        enable_plugins: Union[None, bool] = None,
+        **kwargs,
     ):
+        self._builtins_enabled = False
+        self._plugins_enabled = False
+
+        requests_session = kwargs.get("requests_session")
         if requests_session is None:
             self._requests_session = requests.Session()
         else:
             self._requests_session = requests_session
 
-        if exiftool_path is None:
-            exiftool_path = os.environ.get("EXIFTOOL_PATH")
+        # TODO - remove these (see enable_builtins)
+        self._llm_client = None
+        self._llm_model = None
+        self._exiftool_path = None
+        self._style_map = None
 
-        # Handle deprecation notices
-        #############################
-        if mlm_client is not None:
-            if llm_client is None:
-                warn(
-                    "'mlm_client' is deprecated, and was renamed 'llm_client'.",
-                    DeprecationWarning,
-                )
-                llm_client = mlm_client
-                mlm_client = None
-            else:
-                raise ValueError(
-                    "'mlm_client' is deprecated, and was renamed 'llm_client'. Do not use both at the same time. Just use 'llm_client' instead."
-                )
-
-        if mlm_model is not None:
-            if llm_model is None:
-                warn(
-                    "'mlm_model' is deprecated, and was renamed 'llm_model'.",
-                    DeprecationWarning,
-                )
-                llm_model = mlm_model
-                mlm_model = None
-            else:
-                raise ValueError(
-                    "'mlm_model' is deprecated, and was renamed 'llm_model'. Do not use both at the same time. Just use 'llm_model' instead."
-                )
-        #############################
-
-        self._llm_client = llm_client
-        self._llm_model = llm_model
-        self._style_map = style_map
-        self._exiftool_path = exiftool_path
-
+        # Register the converters
         self._page_converters: List[DocumentConverter] = []
 
-        # Register converters for successful browsing operations
-        # Later registrations are tried first / take higher priority than earlier registrations
-        # To this end, the most specific converters should appear below the most generic converters
-        self.register_converter(PlainTextConverter())
-        self.register_converter(ZipConverter())
-        self.register_converter(HtmlConverter())
-        self.register_converter(RssConverter())
-        self.register_converter(WikipediaConverter())
-        self.register_converter(YouTubeConverter())
-        self.register_converter(BingSerpConverter())
-        self.register_converter(DocxConverter())
-        self.register_converter(XlsxConverter())
-        self.register_converter(XlsConverter())
-        self.register_converter(PptxConverter())
-        self.register_converter(WavConverter())
-        self.register_converter(Mp3Converter())
-        self.register_converter(ImageConverter())
-        self.register_converter(IpynbConverter())
-        self.register_converter(PdfConverter())
-        self.register_converter(OutlookMsgConverter())
+        if (
+            enable_builtins is None or enable_builtins
+        ):  # Default to True when not specified
+            self.enable_builtins(**kwargs)
 
-        # Register Document Intelligence converter at the top of the stack if endpoint is provided
-        if docintel_endpoint is not None:
-            self.register_converter(
-                DocumentIntelligenceConverter(endpoint=docintel_endpoint)
-            )
+        if enable_plugins:
+            self.enable_plugins(**kwargs)
 
-        # Load plugins
-        if load_plugins:
+    def enable_builtins(self, **kwargs) -> None:
+        """
+        Enable and register built-in converters.
+        Built-in converters are enabled by default.
+        This method should only be called once, if built-ins were initially disabled.
+        """
+        if not self._builtins_enabled:
+            # TODO: Move these into converter constructors
+            self._llm_client = kwargs.get("llm_client")
+            self._llm_model = kwargs.get("llm_model")
+            self._exiftool_path = kwargs.get("exiftool_path")
+            self._style_map = kwargs.get("style_map")
+
+            # Register converters for successful browsing operations
+            # Later registrations are tried first / take higher priority than earlier registrations
+            # To this end, the most specific converters should appear below the most generic converters
+            self.register_converter(PlainTextConverter())
+            self.register_converter(ZipConverter())
+            self.register_converter(HtmlConverter())
+            self.register_converter(RssConverter())
+            self.register_converter(WikipediaConverter())
+            self.register_converter(YouTubeConverter())
+            self.register_converter(BingSerpConverter())
+            self.register_converter(DocxConverter())
+            self.register_converter(XlsxConverter())
+            self.register_converter(XlsConverter())
+            self.register_converter(PptxConverter())
+            self.register_converter(WavConverter())
+            self.register_converter(Mp3Converter())
+            self.register_converter(ImageConverter())
+            self.register_converter(IpynbConverter())
+            self.register_converter(PdfConverter())
+            self.register_converter(OutlookMsgConverter())
+
+            # Register Document Intelligence converter at the top of the stack if endpoint is provided
+            docintel_endpoint = kwargs.get("docintel_endpoint")
+            if docintel_endpoint is not None:
+                self.register_converter(
+                    DocumentIntelligenceConverter(endpoint=docintel_endpoint)
+                )
+
+            self._builtins_enabled = True
+        else:
+            warn("Built-in converters are already enabled.", RuntimeWarning)
+
+    def enable_plugins(self, **kwargs) -> None:
+        """
+        Enable and register converters provided by plugins.
+        Plugins are disabled by default.
+        This method should only be called once, if plugins were initially disabled.
+        """
+        if not self._plugins_enabled:
+            # Load plugins
             for plugin in _load_plugins():
                 try:
-                    plugin.register_converters(self)
+                    plugin.register_converters(self, **kwargs)
                 except Exception:
                     tb = traceback.format_exc()
                     warn(f"Plugin '{plugin}' failed to register converters:\n{tb}")
+            self._plugins_enabled = True
+        else:
+            warn("Plugins converters are already enabled.", RuntimeWarning)
 
     def convert(
         self, source: Union[str, requests.Response, Path], **kwargs: Any
