@@ -1,8 +1,8 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Union
 
 import pandas as pd
 
-from ._base import DocumentConverter, DocumentConverterResult
+from ._base import DocumentConverterResult
 from ._html_converter import HtmlConverter
 
 

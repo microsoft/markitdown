@@ -6,6 +6,8 @@ from ._base import (
     DocumentConverterResult,
 )
 
+from .._exceptions import FileConversionException
+
 
 class IpynbConverter(DocumentConverter):
     """Converts Jupyter Notebook (.ipynb) files to Markdown."""

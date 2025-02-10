@@ -15,6 +15,11 @@ from ._docx_converter import DocxConverter
 from ._xlsx_converter import XlsxConverter, XlsConverter
 from ._pptx_converter import PptxConverter
 from ._image_converter import ImageConverter
+from ._wav_converter import WavConverter
+from ._mp3_converter import Mp3Converter
+from ._outlook_msg_converter import OutlookMsgConverter
+from ._zip_converter import ZipConverter
+from ._doc_intel_converter import DocumentIntelligenceConverter
 
 __all__ = [
     "DocumentConverter",
@@ -32,4 +37,9 @@ __all__ = [
     "XlsConverter",
     "PptxConverter",
     "ImageConverter",
+    "WavConverter",
+    "Mp3Converter",
+    "OutlookMsgConverter",
+    "ZipConverter",
+    "DocumentIntelligenceConverter",
 ]
