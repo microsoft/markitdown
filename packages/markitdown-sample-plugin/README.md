@@ -7,7 +7,7 @@
 
 This project shows how to create a sample plugin for MarkItDown. The two most important parts are as follows:
 
-First, implement you custom DocumentConverter:
+First, implement your custom DocumentConverter:
 
 ```python
 from typing import Union
@@ -30,7 +30,7 @@ class RtfConverter(DocumentConverter):
         )
 ```
 
-Second, you create an entrypoint in the `pyproject.toml` file:
+Second, create an entrypoint in the `pyproject.toml` file:
 
 ```toml
 [project.entry-points."markitdown.plugin.converters"]
