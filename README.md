@@ -81,12 +81,6 @@ result = md.convert("example.jpg")
 print(result.text_content)
 ```
 
-### Extensions
-
-#### Automatic Code Language Detection
-
-Install `guesslang` with the command `pip install guesslang` to enable automatic code language recognition, especially useful for converting documents from web pages.
-
 ### Docker
 
 ```sh
