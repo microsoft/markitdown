@@ -22,4 +22,5 @@ jobs:
       - name: Install Hatch
         run: pipx install hatch
       - name: Run tests
-        run: hatch test
+        run: cd packages/markitdown |
+             hatch test
