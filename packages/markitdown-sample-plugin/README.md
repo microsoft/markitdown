@@ -56,8 +56,36 @@ sample_plugin = "markitdown_sample_plugin"
 
 Here, the value of `sample_plugin` can be any key, but should ideally be the name of the plugin. The value is the fully qualified name of the package implementing the plugin.
 
-Once the plugin package is installed (e.g., `pip install -e .`), MarkItDown will automatically discover register it for use.
 
+## Installation
+
+To use the plugin with MarkItDown, it must be installed. To install the plugin from the current directory use:
+
+```bash
+pip install -e .
+```
+
+Once the plugin package is installed, verify that it is available to MarkItDown by running:
+
+```bash
+markitdown --list-plugins
+```
+
+To use the plugin for a conversion use the `--use-plugins` flag. For example, to convert a PDF:
+
+```bash
+markitdown --use-plugins path-to-file.pdf
+```
+
+In Python, plugins can be enabled as follows:
+
+```python
+from markitdown import MarkItDown
+
+md = MarkItDown(enable_plugins=True) 
+result = md.convert("path-to-file.pdf")
+print(result.text_content)
+```
 
 ## Trademarks
 

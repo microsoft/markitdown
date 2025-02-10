@@ -16,12 +16,14 @@ It supports:
 - HTML
 - Text-based formats (CSV, JSON, XML)
 - ZIP files (iterates over contents)
-... and more!
+- ... and more!
 
 To install MarkItDown, use pip: `pip install markitdown`. Alternatively, you can install it from the source: 
 
 ```bash
-pip install -e ./packages/markitdown`
+git clone git@github.com:microsoft/markitdown.git
+cd markitdown
+pip install -e packages/markitdown
 ```
 
 ## Usage
@@ -141,6 +143,12 @@ You can help by looking at issues or helping review PRs. Any issue or PR is welc
 </div>
 
 ### Running Tests and Checks
+
+- Navigate to the MarkItDown package:
+
+    ```sh
+    cd packages/markitdown
+    ```
 
 - Install `hatch` in your environment and run tests:
     ```sh
