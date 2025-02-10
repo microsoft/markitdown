@@ -5,14 +5,13 @@
 [![Built by AutoGen Team](https://img.shields.io/badge/Built%20by-AutoGen%20Team-blue)](https://github.com/microsoft/autogen)
 
 
-This project shows how to create a sample plugin for MarkItDown. The two most important parts are as follows:
+This project shows how to create a sample plugin for MarkItDown. The most important parts are as follows:
 
-First, implement your custom DocumentConverter:
+FNext, implement your custom DocumentConverter:
 
 ```python
 from typing import Union
 from markitdown import DocumentConverter, DocumentConverterResult
-
 
 class RtfConverter(DocumentConverter):
     def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
@@ -30,17 +29,34 @@ class RtfConverter(DocumentConverter):
         )
 ```
 
-Second, create an entrypoint in the `pyproject.toml` file:
+Next, make sure your package implements and exports the following:
 
-```toml
-[project.entry-points."markitdown.plugin.converters"]
-rtf = "markitdown_sample_plugin:RtfConverter"
+```python
+# The version of the plugin interface that this plugin uses. 
+# The only supported version is 1 for now.
+__plugin_interface_version__ = 1 
+
+# The main entrypoint for the plugin. This is called each time MarkItDown instances are created.
+def register_converters(markitdown: MarkItDown, **kwargs):
+    """
+    Called during construction of MarkItDown instances to register converters provided by plugins.
+    """
+
+    # Simply create and attach an RtfConverter instance
+    markitdown.register_converter(RtfConverter())
 ```
 
-Here, the value of `rtf` can be any key, but should ideally be the name of the plugin, or the extension it supports. The value is the fully qualified name of the class that implements the `DocumentConverter` interface.
 
+Finally, create an entrypoint in the `pyproject.toml` file:
 
-Once the plugin package is installed (e.g., `pip install -e .`), MarkItDown will automatically discover the plugin and register it for use.
+```toml
+[project.entry-points."markitdown.plugin"]
+sample_plugin = "markitdown_sample_plugin"
+```
+
+Here, the value of `sample_plugin` can be any key, but should ideally be the name of the plugin. The value is the fully qualified name of the package implementing the plugin.
+
+Once the plugin package is installed (e.g., `pip install -e .`), MarkItDown will automatically discover register it for use.
 
 
 ## Trademarks

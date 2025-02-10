@@ -3,6 +3,8 @@ import mimetypes
 import os
 import re
 import tempfile
+import warnings
+import traceback
 from importlib.metadata import entry_points
 from typing import Any, List, Optional, Union
 from pathlib import Path
@@ -49,7 +51,30 @@ from ._exceptions import (
 mimetypes.add_type("text/csv", ".csv")
 
 PRIORITY_SPECIFIC_FILE_FORMAT = 0.0
-PRIORITY_GENERIC_FILE_FORMAT = -10.0
+PRIORITY_GENERIC_FILE_FORMAT = 10.0
+
+
+_plugins: Union[None | List[Any]] = None
+
+
+def _load_plugins() -> Union[None | List[Any]]:
+    """Lazy load plugins, exiting early if already loaded."""
+    global _plugins
+
+    # Skip if we've already loaded plugins
+    if _plugins is not None:
+        return _plugins
+
+    # Load plugins
+    _plugins = []
+    for entry_point in entry_points(group="markitdown.plugin"):
+        try:
+            _plugins.append(entry_point.load())
+        except Exception:
+            tb = traceback.format_exc()
+            warn(f"Plugin '{entry_point.name}' failed to load ... skipping:\n{tb}")
+
+    return _plugins
 
 
 class MarkItDown:
@@ -58,6 +83,8 @@ class MarkItDown:
 
     def __init__(
         self,
+        *,
+        load_plugins: bool = True,
         requests_session: Optional[requests.Session] = None,
         llm_client: Optional[Any] = None,
         llm_model: Optional[str] = None,
@@ -115,40 +142,38 @@ class MarkItDown:
         # Register converters for successful browsing operations
         # Later registrations are tried first / take higher priority than earlier registrations
         # To this end, the most specific converters should appear below the most generic converters
-        self.register_page_converter(PlainTextConverter())
-        self.register_page_converter(ZipConverter())
-        self.register_page_converter(HtmlConverter())
-        self.register_page_converter(RssConverter())
-        self.register_page_converter(WikipediaConverter())
-        self.register_page_converter(YouTubeConverter())
-        self.register_page_converter(BingSerpConverter())
-        self.register_page_converter(DocxConverter())
-        self.register_page_converter(XlsxConverter())
-        self.register_page_converter(XlsConverter())
-        self.register_page_converter(PptxConverter())
-        self.register_page_converter(WavConverter())
-        self.register_page_converter(Mp3Converter())
-        self.register_page_converter(ImageConverter())
-        self.register_page_converter(IpynbConverter())
-        self.register_page_converter(PdfConverter())
-        self.register_page_converter(OutlookMsgConverter())
+        self.register_converter(PlainTextConverter())
+        self.register_converter(ZipConverter())
+        self.register_converter(HtmlConverter())
+        self.register_converter(RssConverter())
+        self.register_converter(WikipediaConverter())
+        self.register_converter(YouTubeConverter())
+        self.register_converter(BingSerpConverter())
+        self.register_converter(DocxConverter())
+        self.register_converter(XlsxConverter())
+        self.register_converter(XlsConverter())
+        self.register_converter(PptxConverter())
+        self.register_converter(WavConverter())
+        self.register_converter(Mp3Converter())
+        self.register_converter(ImageConverter())
+        self.register_converter(IpynbConverter())
+        self.register_converter(PdfConverter())
+        self.register_converter(OutlookMsgConverter())
 
         # Register Document Intelligence converter at the top of the stack if endpoint is provided
         if docintel_endpoint is not None:
-            self.register_page_converter(
+            self.register_converter(
                 DocumentIntelligenceConverter(endpoint=docintel_endpoint)
             )
 
         # Load plugins
-        for entry_point in entry_points(group="markitdown.plugin.converters"):
-            try:
-                plugin = entry_point.load()
-                self.register_page_converter(plugin())
-                # print(f"Loaded plugin {entry_point.value} as {entry_point.name}")
-
-            except ConverterPrerequisiteException as e:
-                # print(f"Skipping plugin {entry_point.name} because of missing prerequisite: {e}")
-                pass
+        if load_plugins:
+            for plugin in _load_plugins():
+                try:
+                    plugin.register_converters(self)
+                except Exception:
+                    tb = traceback.format_exc()
+                    warn(f"Plugin '{plugin}' failed to register converters:\n{tb}")
 
     def convert(
         self, source: Union[str, requests.Response, Path], **kwargs: Any
@@ -404,5 +429,13 @@ class MarkItDown:
         return []
 
     def register_page_converter(self, converter: DocumentConverter) -> None:
+        """DEPRECATED: User register_converter instead."""
+        warn(
+            "register_page_converter is deprecated. Use register_converter instead.",
+            DeprecationWarning,
+        )
+        self.register_converter(converter)
+
+    def register_converter(self, converter: DocumentConverter) -> None:
         """Register a page text converter."""
         self._page_converters.insert(0, converter)

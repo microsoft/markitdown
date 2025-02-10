@@ -37,8 +37,8 @@ Source = "https://github.com/microsoft/markitdown"
 path = "src/markitdown_sample_plugin/__about__.py"
 
 # IMPORTANT: MarkItDown will look for this entry point to find the plugin.
-[project.entry-points."markitdown.plugin.converters"]
-rtf = "markitdown_sample_plugin:RtfConverter"
+[project.entry-points."markitdown.plugin"]
+sample_plugin = "markitdown_sample_plugin"
 
 [tool.hatch.envs.types]
 extra-dependencies = [

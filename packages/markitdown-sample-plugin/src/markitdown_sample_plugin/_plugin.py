@@ -1,7 +1,20 @@
 from typing import Union
 from striprtf.striprtf import rtf_to_text
 
-from markitdown import DocumentConverter, DocumentConverterResult
+from markitdown import MarkItDown, DocumentConverter, DocumentConverterResult
+
+__plugin_interface_version__ = (
+    1  # The version of the plugin interface that this plugin uses
+)
+
+
+def register_converters(markitdown: MarkItDown, **kwargs):
+    """
+    Called during construction of MarkItDown instances to register converters provided by plugins.
+    """
+
+    # Simply create and attach an RtfConverter instance
+    markitdown.register_converter(RtfConverter())
 
 
 class RtfConverter(DocumentConverter):
