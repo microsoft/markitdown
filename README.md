@@ -60,7 +60,7 @@ To enable plugins use:
 markitdown --use-plugins path-to-file.pdf
 ```
 
-To find available plugins, search GitHub for the hashtag `#markitdown-plugin`.
+To find available plugins, search GitHub for the hashtag `#markitdown-plugin`. To develop a plugin, see `packages/markitdown-sample-plugin`.
 
 ### Azure Document Intelligence
 
