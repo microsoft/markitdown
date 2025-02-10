@@ -3,6 +3,7 @@ import mimetypes
 import os
 import re
 import tempfile
+from importlib.metadata import entry_points
 from typing import Any, List, Optional, Union
 from pathlib import Path
 from urllib.parse import urlparse
@@ -41,6 +42,7 @@ from .converters import (
 from ._exceptions import (
     FileConversionException,
     UnsupportedFormatException,
+    ConverterPrerequisiteException,
 )
 
 # Override mimetype for csv to fix issue on windows
@@ -137,10 +139,16 @@ class MarkItDown:
                 DocumentIntelligenceConverter(endpoint=docintel_endpoint)
             )
 
-        #        print("Discovering plugins")
-        #        for entry_point in entry_points(group="markitdown.converters"):
-        #            #print(entry_point)
-        #            plugin = entry_point.load()
+        # Load plugins
+        for entry_point in entry_points(group="markitdown.plugin.converters"):
+            try:
+                plugin = entry_point.load()
+                self.register_page_converter(plugin())
+                # print(f"Loaded plugin {entry_point.value} as {entry_point.name}")
+
+            except ConverterPrerequisiteException as e:
+                # print(f"Skipping plugin {entry_point.name} because of missing prerequisite: {e}")
+                pass
 
     def convert(
         self, source: Union[str, requests.Response, Path], **kwargs: Any
