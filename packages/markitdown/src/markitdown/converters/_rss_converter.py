@@ -9,6 +9,11 @@ from ._base import DocumentConverter, DocumentConverterResult
 class RssConverter(DocumentConverter):
     """Convert RSS / Atom type to markdown"""
 
+    def __init__(
+        self, priority: float = DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT
+    ):
+        super().__init__(priority=priority)
+
     def convert(
         self, local_path: str, **kwargs
     ) -> Union[None, DocumentConverterResult]:

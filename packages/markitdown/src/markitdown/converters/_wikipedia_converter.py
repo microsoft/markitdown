@@ -10,6 +10,11 @@ from ._markdownify import _CustomMarkdownify
 class WikipediaConverter(DocumentConverter):
     """Handle Wikipedia pages separately, focusing only on the main document content."""
 
+    def __init__(
+        self, priority: float = DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT
+    ):
+        super().__init__(priority=priority)
+
     def convert(
         self, local_path: str, **kwargs: Any
     ) -> Union[None, DocumentConverterResult]:

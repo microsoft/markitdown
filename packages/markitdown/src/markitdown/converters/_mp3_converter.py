@@ -1,6 +1,6 @@
 import tempfile
 from typing import Union
-from ._base import DocumentConverterResult
+from ._base import DocumentConverter, DocumentConverterResult
 from ._wav_converter import WavConverter
 from warnings import resetwarnings, catch_warnings
 
@@ -27,6 +27,11 @@ class Mp3Converter(WavConverter):
     """
     Converts MP3 files to markdown via extraction of metadata (if `exiftool` is installed), and speech transcription (if `speech_recognition` AND `pydub` are installed).
     """
+
+    def __init__(
+        self, priority: float = DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT
+    ):
+        super().__init__(priority=priority)
 
     def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
         # Bail if not a MP3

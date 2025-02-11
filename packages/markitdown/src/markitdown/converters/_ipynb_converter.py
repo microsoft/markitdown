@@ -12,6 +12,11 @@ from .._exceptions import FileConversionException
 class IpynbConverter(DocumentConverter):
     """Converts Jupyter Notebook (.ipynb) files to Markdown."""
 
+    def __init__(
+        self, priority: float = DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT
+    ):
+        super().__init__(priority=priority)
+
     def convert(
         self, local_path: str, **kwargs: Any
     ) -> Union[None, DocumentConverterResult]:

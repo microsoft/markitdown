@@ -23,7 +23,7 @@ class RtfConverter(DocumentConverter):
     """
 
     def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
-        # Bail if not a DOCX
+        # Bail if not a RTF
         extension = kwargs.get("file_extension", "")
         if extension.lower() != ".rtf":
             return None

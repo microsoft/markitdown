@@ -1,5 +1,5 @@
 from typing import Union
-from ._base import DocumentConverterResult
+from ._base import DocumentConverter, DocumentConverterResult
 from ._media_converter import MediaConverter
 
 
@@ -7,6 +7,11 @@ class ImageConverter(MediaConverter):
     """
     Converts images to markdown via extraction of metadata (if `exiftool` is installed), OCR (if `easyocr` is installed), and description via a multimodal LLM (if an llm_client is configured).
     """
+
+    def __init__(
+        self, priority: float = DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT
+    ):
+        super().__init__(priority=priority)
 
     def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
         # Bail if not an image

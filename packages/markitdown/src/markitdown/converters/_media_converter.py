@@ -11,6 +11,11 @@ class MediaConverter(DocumentConverter):
     Abstract class for multi-modal media (e.g., images and audio)
     """
 
+    def __init__(
+        self, priority: float = DocumentConverter.PRIORITY_GENERIC_FILE_FORMAT
+    ):
+        super().__init__(priority=priority)
+
     def _get_metadata(self, local_path, exiftool_path=None):
         if not exiftool_path:
             which_exiftool = shutil.which("exiftool")
@@ -27,10 +32,10 @@ This warning will be removed in future releases.
 
             return None
         else:
-            try:
+            if True:
                 result = subprocess.run(
                     [exiftool_path, "-json", local_path], capture_output=True, text=True
                 ).stdout
                 return json.loads(result)[0]
-            except Exception:
-                return None
+            # except Exception:
+            #    return None

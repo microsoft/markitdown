@@ -23,10 +23,14 @@ class DocumentIntelligenceConverter(DocumentConverter):
 
     def __init__(
         self,
+        *,
+        priority: float = DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT,
         endpoint: str,
         api_version: str = "2024-07-31-preview",
         priority: float = 0.0,
     ):
+        super().__init__(priority=priority)
+
         self.endpoint = endpoint
         self.api_version = api_version
         self.doc_intel_client = DocumentIntelligenceClient(

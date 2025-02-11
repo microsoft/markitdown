@@ -2,7 +2,7 @@ from typing import Union
 
 import pandas as pd
 
-from ._base import DocumentConverterResult
+from ._base import DocumentConverter, DocumentConverterResult
 from ._html_converter import HtmlConverter
 
 
@@ -10,6 +10,11 @@ class XlsxConverter(HtmlConverter):
     """
     Converts XLSX files to Markdown, with each sheet presented as a separate Markdown table.
     """
+
+    def __init__(
+        self, priority: float = DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT
+    ):
+        super().__init__(priority=priority)
 
     def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
         # Bail if not a XLSX

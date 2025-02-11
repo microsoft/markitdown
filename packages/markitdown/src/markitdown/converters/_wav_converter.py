@@ -1,5 +1,5 @@
 from typing import Union
-from ._base import DocumentConverterResult
+from ._base import DocumentConverter, DocumentConverterResult
 from ._media_converter import MediaConverter
 
 # Optional Transcription support
@@ -16,6 +16,11 @@ class WavConverter(MediaConverter):
     """
     Converts WAV files to markdown via extraction of metadata (if `exiftool` is installed), and speech transcription (if `speech_recognition` is installed).
     """
+
+    def __init__(
+        self, priority: float = DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT
+    ):
+        super().__init__(priority=priority)
 
     def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
         # Bail if not a WAV

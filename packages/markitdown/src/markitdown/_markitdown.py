@@ -47,10 +47,6 @@ from ._exceptions import (
 # Override mimetype for csv to fix issue on windows
 mimetypes.add_type("text/csv", ".csv")
 
-PRIORITY_SPECIFIC_FILE_FORMAT = 0.0
-PRIORITY_GENERIC_FILE_FORMAT = 10.0
-
-
 _plugins: Union[None | List[Any]] = None
 
 
@@ -123,6 +119,8 @@ class MarkItDown:
             self._llm_model = kwargs.get("llm_model")
             self._exiftool_path = kwargs.get("exiftool_path")
             self._style_map = kwargs.get("style_map")
+            if self._exiftool_path is None:
+                self._exiftool_path = os.getenv("EXIFTOOL_PATH")
 
             # Register converters for successful browsing operations
             # Later registrations are tried first / take higher priority than earlier registrations
@@ -349,11 +347,10 @@ class MarkItDown:
                 _kwargs["_parent_converters"] = self._page_converters
 
                 # If we hit an error log it and keep trying
-                # try:
-                if True:
+                try:
                     res = converter.convert(local_path, **_kwargs)
-                # except Exception:
-                #    error_trace = ("\n\n" + traceback.format_exc()).strip()
+                except Exception:
+                    error_trace = ("\n\n" + traceback.format_exc()).strip()
 
                 if res is not None:
                     # Normalize the content
