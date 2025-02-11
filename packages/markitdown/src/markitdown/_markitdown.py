@@ -99,23 +99,6 @@ class MarkItDown:
         # Register the converters
         self._page_converters: List[DocumentConverter] = []
 
-        # Note: We have tight control over the order of built-in converters, but
-        # plugins can register converters in any order. A converter's .priority
-        # reasserts some control over the order of converters.
-        #
-        # Priorities work as follows. By default, most converters get priority
-        # DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT (== 0). The exception
-        # is the PlainTextConverter, which gets priority PRIORITY_SPECIFIC_FILE_FORMAT (== 10),
-        # with lower values being tried first (i.e., higher priority).
-        #
-        # Just prior to conversion, the converters are sorted by priority, using
-        # a stable sort. This means that converters with the same priority will
-        # remain in the same order, with the most recently registered converters
-        # appearing first.
-        #
-        # Plugins can register converters with any priority, to appear before or
-        # after the built-ins. For example, a plugin with priority 9 will run
-        # before the PlainTextConverter, but after the built-in converters.
         if (
             enable_builtins is None or enable_builtins
         ):  # Default to True when not specified
@@ -128,7 +111,6 @@ class MarkItDown:
         """
         Enable and register built-in converters.
         Built-in converters are enabled by default.
-        This method should only be called once, if built-ins were initially disabled.
         """
         if not self._builtins_enabled:
             # TODO: Move these into converter constructors
