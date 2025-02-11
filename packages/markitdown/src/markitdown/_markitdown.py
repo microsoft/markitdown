@@ -225,7 +225,7 @@ class MarkItDown:
             else:
                 raise ValueError(f"Unable to determine input type: {type(source)}")
 
-        elif input_type == "url":
+        if input_type == "url":
             return self.convert_url(source, **kwargs)
         elif input_type == "local_file":
             return self.convert_local(source, **kwargs)
