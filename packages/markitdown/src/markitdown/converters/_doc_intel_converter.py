@@ -61,8 +61,8 @@ class DocumentIntelligenceConverter(DocumentConverter):
         with open(local_path, "rb") as f:
             file_bytes = f.read()
 
-        # Certain document analysis features are not availiable for filetypes (.xlsx, .pptx, .html)
-        if extension.lower() in [".xlsx", ".pptx", ".html"]:
+        # Certain document analysis features are not availiable for office filetypes (.xlsx, .pptx, .html, .docx)
+        if extension.lower() in [".xlsx", ".pptx", ".html", ".docx"]:
             analysis_features = []
         else:
             analysis_features = [
