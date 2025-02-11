@@ -37,7 +37,6 @@ class DocumentConverter:
         We have tight control over the order of built-in converters, but
         plugins can register converters in any order. A converter's priority
         field reasserts some control over the order of converters.
-        This method should only be called once, if built-ins were initially disabled.
 
         Plugins can register converters with any priority, to appear before or
         after the built-ins. For example, a plugin with priority 9 will run

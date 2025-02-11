@@ -111,6 +111,7 @@ class MarkItDown:
         """
         Enable and register built-in converters.
         Built-in converters are enabled by default.
+        This method should only be called once, if built-ins were initially disabled.
         """
         if not self._builtins_enabled:
             # TODO: Move these into converter constructors
