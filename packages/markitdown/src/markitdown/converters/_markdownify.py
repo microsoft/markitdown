@@ -33,6 +33,10 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         prefix, suffix, text = markdownify.chomp(text)  # type: ignore
         if not text:
             return ""
+
+        if el.find_parent("pre") is not None:
+            return text
+
         href = el.get("href")
         title = el.get("title")
 
