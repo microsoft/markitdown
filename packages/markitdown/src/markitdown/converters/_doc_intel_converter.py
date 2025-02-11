@@ -1,4 +1,5 @@
 from typing import Any, Union
+import re
 
 # Azure imports
 from azure.ai.documentintelligence import DocumentIntelligenceClient
@@ -24,6 +25,7 @@ class DocumentIntelligenceConverter(DocumentConverter):
         self,
         endpoint: str,
         api_version: str = "2024-07-31-preview",
+        priority: float = 0.0
     ):
         self.endpoint = endpoint
         self.api_version = api_version
@@ -32,6 +34,7 @@ class DocumentIntelligenceConverter(DocumentConverter):
             api_version=self.api_version,
             credential=DefaultAzureCredential(),
         )
+        self._priority = priority
 
     def convert(
         self, local_path: str, **kwargs: Any
