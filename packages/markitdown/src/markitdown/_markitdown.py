@@ -364,11 +364,10 @@ class MarkItDown:
                 _kwargs["_parent_converters"] = self._page_converters
 
                 # If we hit an error log it and keep trying
-                # try:
-                if True:
+                try:
                     res = converter.convert(local_path, **_kwargs)
-                # except Exception:
-                #    error_trace = ("\n\n" + traceback.format_exc()).strip()
+                except Exception:
+                    error_trace = ("\n\n" + traceback.format_exc()).strip()
 
                 if res is not None:
                     # Normalize the content
