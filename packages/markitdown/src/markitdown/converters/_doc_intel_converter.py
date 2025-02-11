@@ -25,7 +25,7 @@ class DocumentIntelligenceConverter(DocumentConverter):
         self,
         endpoint: str,
         api_version: str = "2024-07-31-preview",
-        priority: float = 0.0
+        priority: float = 0.0,
     ):
         self.endpoint = endpoint
         self.api_version = api_version
