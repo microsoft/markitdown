@@ -12,7 +12,15 @@ class DocumentConverterResult:
 class DocumentConverter:
     """Abstract superclass of all DocumentConverters."""
 
-    def __init__(self, priority: float = 0.0):
+    # Lower priority values are tried first.
+    PRIORITY_SPECIFIC_FILE_FORMAT = (
+        0.0  # e.g., .docx, .pdf, .xlsx, Or specific pages, e.g., wikipedia
+    )
+    PRIORITY_GENERIC_FILE_FORMAT = (
+        10.0  # Near catch-all converters for mimetypes like text/*, etc.
+    )
+
+    def __init__(self, priority: float = PRIORITY_SPECIFIC_FILE_FORMAT):
         self._priority = priority
 
     def convert(

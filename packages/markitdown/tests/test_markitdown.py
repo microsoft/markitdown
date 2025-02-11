@@ -327,8 +327,8 @@ def test_markitdown_llm() -> None:
 
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
-    # test_markitdown_remote()
-    # test_markitdown_local()
+    test_markitdown_remote()
+    test_markitdown_local()
     test_markitdown_exiftool()
-    # test_markitdown_deprecation()
     # test_markitdown_llm()
+    print("All tests passed!")

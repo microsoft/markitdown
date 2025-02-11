@@ -16,6 +16,11 @@ class BingSerpConverter(DocumentConverter):
     NOTE: It is better to use the Bing API
     """
 
+    def __init__(
+        self, priority: float = DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT
+    ):
+        super().__init__(priority=priority)
+
     def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
         # Bail if not a Bing SERP
         extension = kwargs.get("file_extension", "")

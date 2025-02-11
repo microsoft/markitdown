@@ -8,6 +8,11 @@ from ._markdownify import _CustomMarkdownify
 class HtmlConverter(DocumentConverter):
     """Anything with content type text/html"""
 
+    def __init__(
+        self, priority: float = DocumentConverter.PRIORITY_GENERIC_FILE_FORMAT
+    ):
+        super().__init__(priority=priority)
+
     def convert(
         self, local_path: str, **kwargs: Any
     ) -> Union[None, DocumentConverterResult]:
