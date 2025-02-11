@@ -6,7 +6,7 @@ import tempfile
 import warnings
 import traceback
 from importlib.metadata import entry_points
-from typing import Any, List, Optional, Union
+from typing import Any, List, Optional, Union, Literal
 from pathlib import Path
 from urllib.parse import urlparse
 from warnings import warn
