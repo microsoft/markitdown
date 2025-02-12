@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: MIT
 
+from .__about__ import __version__
 from ._markitdown import MarkItDown
 from ._exceptions import (
     MarkItDownException,
@@ -12,6 +13,7 @@ from ._exceptions import (
 from .converters import DocumentConverter, DocumentConverterResult
 
 __all__ = [
+    "__version__",
     "MarkItDown",
     "DocumentConverter",
     "DocumentConverterResult",
