@@ -757,9 +757,8 @@ class DocxConverter(HtmlConverter):
             )
         )
         self._xsl_folder = os.path.join(
-                os.path.dirname(
-                  os.path.dirname(os.path.abspath(__file__))),
-                'xsl',
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "xsl",
         )
         self._mml_to_tex_xsl = os.path.join(self._xsl_folder, "mmltex.xsl")
         self._omml_to_mml_xsl = os.path.join(self._xsl_folder, "omml2mml.xsl")

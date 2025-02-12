@@ -272,10 +272,6 @@ def test_markitdown_local() -> None:
     assert "# Test" in result.text_content
 
 
-
-
-
-
 @pytest.mark.skipif(
     skip_exiftool,
     reason="do not run if exiftool is not installed",
@@ -362,10 +358,11 @@ def test_markitdown_llm() -> None:
     for test_string in ["red", "circle", "blue", "square"]:
         assert test_string in result.text_content.lower()
 
+
 def test_equation() -> None:
-    expected_string = r'${\left(x+a\right)}^{n}={\sum }\_{k=0}^{n}\left(\begin{array}{c}n\\ k\end{array}\right){x}^{k}{a}^{n-k}$'
+    expected_string = r"${\left(x+a\right)}^{n}={\sum }\_{k=0}^{n}\left(\begin{array}{c}n\\ k\end{array}\right){x}^{k}{a}^{n-k}$"
     markitdown = MarkItDown()
-    result = markitdown.convert( os.path.join(TEST_FILES_DIR, "equation.docx"))
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "equation.docx"))
     assert expected_string == result.text_content.strip()
 
 
