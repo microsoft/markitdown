@@ -127,7 +127,7 @@ class PptxConverter(HtmlConverter):
 
                 # Charts
                 if shape.has_chart:
-                    self._convert_chart_to_markdown(shape.chart)
+                    md_content += self._convert_chart_to_markdown(shape.chart)
 
                 # Text areas
                 elif shape.has_text_frame:
