@@ -150,6 +150,10 @@ JSON_TEST_STRINGS = [
     "9700dc99-6685-40b4-9a3a-5e406dcb37f3",
 ]
 
+AUDIO_TEST_STRINGS = [
+    "small step",
+]
+
 
 # --- Helper Functions ---
 def validate_strings(result, expected_strings, exclude_strings=None):
@@ -325,10 +329,27 @@ def test_markitdown_llm() -> None:
         assert test_string in result.text_content.lower()
 
 
+@pytest.mark.skipif(
+    skip_llm,
+    reason="do not run llm tests without a key",
+)
+def test_markitdown_audio_transcription() -> None:
+    """Test audio transcription capabilities."""
+    client = openai.OpenAI()
+    markitdown = MarkItDown(llm_client=client)
+
+    # Test WAV transcription with Whisper
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.wav"))
+    
+    for test_string in AUDIO_TEST_STRINGS:
+        assert test_string.lower() in result.text_content.lower()
+
+
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     test_markitdown_remote()
     test_markitdown_local()
     test_markitdown_exiftool()
     # test_markitdown_llm()
+    # test_markitdown_audio_transcription()
     print("All tests passed!")
