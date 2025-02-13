@@ -64,7 +64,9 @@ class PptxConverter(HtmlConverter):
             md_content += f"\n\n<!-- Slide number: {slide_num} -->\n"
 
             title = slide.shapes.title
-            for shape in slide.shapes:
+
+            def get_shape_content(shape, **kwargs):
+                nonlocal md_content
                 # Pictures
                 if self._is_picture(shape):
                     # https://github.com/scanny/python-pptx/pull/512#issuecomment-1713100069
@@ -125,7 +127,7 @@ class PptxConverter(HtmlConverter):
 
                 # Charts
                 if shape.has_chart:
-                    md_content += self._convert_chart_to_markdown(shape.chart)
+                    self._convert_chart_to_markdown(shape.chart)
 
                 # Text areas
                 elif shape.has_text_frame:
@@ -133,6 +135,14 @@ class PptxConverter(HtmlConverter):
                         md_content += "# " + shape.text.lstrip() + "\n"
                     else:
                         md_content += shape.text + "\n"
+
+                # Group Shapes
+                if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.GROUP:
+                    for subshape in shape.shapes:
+                        get_shape_content(subshape, **kwargs)
+
+            for shape in slide.shapes:
+                get_shape_content(shape, **kwargs)
 
             md_content = md_content.strip()
 
