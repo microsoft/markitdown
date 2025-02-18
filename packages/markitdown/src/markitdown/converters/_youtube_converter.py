@@ -1,5 +1,7 @@
 import re
 import json
+import urllib.parse
+import time
 
 from typing import Any, Union, Dict, List
 from urllib.parse import parse_qs, urlparse
@@ -25,6 +27,20 @@ class YouTubeConverter(DocumentConverter):
     ):
         super().__init__(priority=priority)
 
+    def retry_operation(self, operation, retries=3, delay=2):
+        """Retries the operation if it fails."""
+        attempt = 0
+        while attempt < retries:
+            try:
+                return operation()  # Attempt the operation
+            except Exception as e:
+                print(f"Attempt {attempt + 1} failed: {e}")
+                if attempt < retries - 1:
+                    time.sleep(delay)  # Wait before retrying
+                attempt += 1
+        # If all attempts fail, raise the last exception
+        raise Exception(f"Operation failed after {retries} attempts.")
+
     def convert(
         self, local_path: str, **kwargs: Any
     ) -> Union[None, DocumentConverterResult]:
@@ -33,6 +49,10 @@ class YouTubeConverter(DocumentConverter):
         if extension.lower() not in [".html", ".htm"]:
             return None
         url = kwargs.get("url", "")
+
+        url = urllib.parse.unquote(url)
+        url = url.replace(r"\?", "?").replace(r"\=", "=")
+
         if not url.startswith("https://www.youtube.com/watch?"):
             return None
 
@@ -57,7 +77,7 @@ class YouTubeConverter(DocumentConverter):
                         metadata[meta[a]] = content
                     break
 
-        # We can also try to read the full description. This is more prone to breaking, since it reaches into the page implementation
+        # Try reading the description
         try:
             for script in soup(["script"]):
                 if not script.string:  # Skip empty scripts
@@ -114,10 +134,14 @@ class YouTubeConverter(DocumentConverter):
                     youtube_transcript_languages = kwargs.get(
                         "youtube_transcript_languages", ("en",)
                     )
-                    # Must be a single transcript.
-                    transcript = YouTubeTranscriptApi.get_transcript(
-                        video_id, languages=youtube_transcript_languages
-                    )  # type: ignore
+                    # Retry the transcript fetching operation
+                    transcript = self.retry_operation(
+                        lambda: YouTubeTranscriptApi.get_transcript(
+                            video_id, languages=youtube_transcript_languages
+                        ),
+                        retries=3,  # Retry 3 times
+                        delay=2,  # 2 seconds delay between retries
+                    )
                     if transcript:
                         transcript_text = " ".join(
                             [part["text"] for part in transcript]
@@ -125,8 +149,8 @@ class YouTubeConverter(DocumentConverter):
                     # Alternative formatting:
                     # formatter = TextFormatter()
                     # formatter.format_transcript(transcript)
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"Error fetching transcript: {e}")
             if transcript_text:
                 webpage_text += f"\n### Transcript\n{transcript_text}\n"
 

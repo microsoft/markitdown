@@ -184,9 +184,9 @@ def test_markitdown_remote() -> None:
 
     # Youtube
     # TODO: This test randomly fails for some reason. Haven't been able to repro it yet. Disabling until I can debug the issue
-    # result = markitdown.convert(YOUTUBE_TEST_URL)
-    # for test_string in YOUTUBE_TEST_STRINGS:
-    #     assert test_string in result.text_content
+    result = markitdown.convert(YOUTUBE_TEST_URL)
+    for test_string in YOUTUBE_TEST_STRINGS:
+        assert test_string in result.text_content
 
 
 def test_markitdown_local() -> None:
