@@ -48,29 +48,31 @@ class YouTubeConverter(DocumentConverter):
             return None
 
         # Read the meta tags
-        assert soup.title is not None and soup.title.string is not None
         metadata: Dict[str, str] = {"title": soup.title.string}
         for meta in soup(["meta"]):
             for a in meta.attrs:
                 if a in ["itemprop", "property", "name"]:
-                    metadata[meta[a]] = meta.get("content", "")
+                    content = meta.get("content", "")
+                    if content:  # Only add non-empty content
+                        metadata[meta[a]] = content
                     break
 
         # We can also try to read the full description. This is more prone to breaking, since it reaches into the page implementation
         try:
             for script in soup(["script"]):
-                content = script.text
+                if not script.string:  # Skip empty scripts
+                    continue
+                content = script.string
                 if "ytInitialData" in content:
-                    lines = re.split(r"\r?\n", content)
-                    obj_start = lines[0].find("{")
-                    obj_end = lines[0].rfind("}")
-                    if obj_start >= 0 and obj_end >= 0:
-                        data = json.loads(lines[0][obj_start : obj_end + 1])
-                        attrdesc = self._findKey(data, "attributedDescriptionBodyText")  # type: ignore
-                        if attrdesc:
-                            metadata["description"] = str(attrdesc["content"])
+                    match = re.search(r"var ytInitialData = ({.*?});", content)
+                    if match:
+                        data = json.loads(match.group(1))
+                        attrdesc = self._findKey(data, "attributedDescriptionBodyText")
+                        if attrdesc and isinstance(attrdesc, dict):
+                            metadata["description"] = str(attrdesc.get("content", ""))
                     break
-        except Exception:
+        except Exception as e:
+            print(f"Error extracting description: {e}")
             pass
 
         # Start preparing the page
