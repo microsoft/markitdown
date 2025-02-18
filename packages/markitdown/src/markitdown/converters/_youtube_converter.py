@@ -108,8 +108,7 @@ class YouTubeConverter(DocumentConverter):
             transcript_text = ""
             parsed_url = urlparse(url)  # type: ignore
             params = parse_qs(parsed_url.query)  # type: ignore
-            if "v" in params:
-                assert isinstance(params["v"][0], str)
+            if "v" in params and params["v"][0]:
                 video_id = str(params["v"][0])
                 try:
                     youtube_transcript_languages = kwargs.get(
@@ -119,7 +118,10 @@ class YouTubeConverter(DocumentConverter):
                     transcript = YouTubeTranscriptApi.get_transcript(
                         video_id, languages=youtube_transcript_languages
                     )  # type: ignore
-                    transcript_text = " ".join([part["text"] for part in transcript])  # type: ignore
+                    if transcript:
+                        transcript_text = " ".join(
+                            [part["text"] for part in transcript]
+                        )  # type: ignore
                     # Alternative formatting:
                     # formatter = TextFormatter()
                     # formatter.format_transcript(transcript)
