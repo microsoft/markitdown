@@ -8,6 +8,7 @@ from ._base import (
 
 from ._base import DocumentConverter
 from ._html_converter import HtmlConverter
+from ._converter_input import ConverterInput
 
 
 class DocxConverter(HtmlConverter):
@@ -20,18 +21,20 @@ class DocxConverter(HtmlConverter):
     ):
         super().__init__(priority=priority)
 
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
+    def convert(
+        self, input: ConverterInput, **kwargs
+    ) -> Union[None, DocumentConverterResult]:
         # Bail if not a DOCX
         extension = kwargs.get("file_extension", "")
         if extension.lower() != ".docx":
             return None
 
         result = None
-        with open(local_path, "rb") as docx_file:
-            style_map = kwargs.get("style_map", None)
-
-            result = mammoth.convert_to_html(docx_file, style_map=style_map)
-            html_content = result.value
-            result = self._convert(html_content)
+        style_map = kwargs.get("style_map", None)
+        file_obj = input.read_file(mode="rb")
+        result = mammoth.convert_to_html(file_obj, style_map=style_map)
+        file_obj.close()
+        html_content = result.value
+        result = self._convert(html_content)
 
         return result

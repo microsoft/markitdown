@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 
 from ._base import DocumentConverter, DocumentConverterResult
 from ._markdownify import _CustomMarkdownify
+from ._converter_input import ConverterInput
 
 
 class BingSerpConverter(DocumentConverter):
@@ -21,7 +22,9 @@ class BingSerpConverter(DocumentConverter):
     ):
         super().__init__(priority=priority)
 
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
+    def convert(
+        self, input: ConverterInput, **kwargs
+    ) -> Union[None, DocumentConverterResult]:
         # Bail if not a Bing SERP
         extension = kwargs.get("file_extension", "")
         if extension.lower() not in [".html", ".htm"]:
@@ -36,8 +39,9 @@ class BingSerpConverter(DocumentConverter):
 
         # Parse the file
         soup = None
-        with open(local_path, "rt", encoding="utf-8") as fh:
-            soup = BeautifulSoup(fh.read(), "html.parser")
+        file_obj = input.read_file(mode="rt", encoding="utf-8")
+        soup = BeautifulSoup(file_obj.read(), "html.parser")
+        file_obj.close()
 
         # Clean up some formatting
         for tptt in soup.find_all(class_="tptt"):

@@ -7,6 +7,7 @@ from typing import Union
 
 from ._base import DocumentConverterResult, DocumentConverter
 from ._html_converter import HtmlConverter
+from ._converter_input import ConverterInput
 
 
 class PptxConverter(HtmlConverter):
@@ -48,7 +49,9 @@ class PptxConverter(HtmlConverter):
         )
         return response.choices[0].message.content
 
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
+    def convert(
+        self, input: ConverterInput, **kwargs
+    ) -> Union[None, DocumentConverterResult]:
         # Bail if not a PPTX
         extension = kwargs.get("file_extension", "")
         if extension.lower() != ".pptx":
@@ -56,7 +59,10 @@ class PptxConverter(HtmlConverter):
 
         md_content = ""
 
-        presentation = pptx.Presentation(local_path)
+        file_obj = input.read_file(mode="rb")
+        presentation = pptx.Presentation(file_obj)
+        file_obj.close()
+
         slide_num = 0
         for slide in presentation.slides:
             slide_num += 1

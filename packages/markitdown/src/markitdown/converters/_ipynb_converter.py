@@ -7,6 +7,7 @@ from ._base import (
 )
 
 from .._exceptions import FileConversionException
+from ._converter_input import ConverterInput
 
 
 class IpynbConverter(DocumentConverter):
@@ -18,7 +19,7 @@ class IpynbConverter(DocumentConverter):
         super().__init__(priority=priority)
 
     def convert(
-        self, local_path: str, **kwargs: Any
+        self, input: ConverterInput, **kwargs: Any
     ) -> Union[None, DocumentConverterResult]:
         # Bail if not ipynb
         extension = kwargs.get("file_extension", "")
@@ -27,9 +28,10 @@ class IpynbConverter(DocumentConverter):
 
         # Parse and convert the notebook
         result = None
-        with open(local_path, "rt", encoding="utf-8") as fh:
-            notebook_content = json.load(fh)
-            result = self._convert(notebook_content)
+        file_obj = input.read_file(mode="rt", encoding="utf-8")
+        notebook_content = json.load(file_obj)
+        file_obj.close()
+        result = self._convert(notebook_content)
 
         return result
 

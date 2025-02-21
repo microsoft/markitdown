@@ -4,6 +4,7 @@ from charset_normalizer import from_path
 from typing import Any, Union
 
 from ._base import DocumentConverter, DocumentConverterResult
+from ._converter_input import ConverterInput
 
 
 class PlainTextConverter(DocumentConverter):
@@ -15,8 +16,13 @@ class PlainTextConverter(DocumentConverter):
         super().__init__(priority=priority)
 
     def convert(
-        self, local_path: str, **kwargs: Any
+        self, input: ConverterInput, **kwargs: Any
     ) -> Union[None, DocumentConverterResult]:
+        # Bail if a local path is not provided
+        if input.input_type != "filepath":
+            return None
+        local_path = input.filepath
+
         # Guess the content type from any file extension that might be around
         content_type, _ = mimetypes.guess_type(
             "__placeholder" + kwargs.get("file_extension", "")

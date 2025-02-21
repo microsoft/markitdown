@@ -1,10 +1,12 @@
 import re
+import json
 
 from typing import Any, Union, Dict, List
 from urllib.parse import parse_qs, urlparse
 from bs4 import BeautifulSoup
 
 from ._base import DocumentConverter, DocumentConverterResult
+from ._converter_input import ConverterInput
 
 
 # Optional YouTube transcription support
@@ -25,7 +27,7 @@ class YouTubeConverter(DocumentConverter):
         super().__init__(priority=priority)
 
     def convert(
-        self, local_path: str, **kwargs: Any
+        self, input: ConverterInput, **kwargs: Any
     ) -> Union[None, DocumentConverterResult]:
         # Bail if not YouTube
         extension = kwargs.get("file_extension", "")
@@ -37,8 +39,9 @@ class YouTubeConverter(DocumentConverter):
 
         # Parse the file
         soup = None
-        with open(local_path, "rt", encoding="utf-8") as fh:
-            soup = BeautifulSoup(fh.read(), "html.parser")
+        file_obj = input.read_file(mode="rt", encoding="utf-8")
+        soup = BeautifulSoup(file_obj.read(), "html.parser")
+        file_obj.close()
 
         # Read the meta tags
         assert soup.title is not None and soup.title.string is not None

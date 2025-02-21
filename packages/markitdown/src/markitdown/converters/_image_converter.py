@@ -1,6 +1,7 @@
 from typing import Union
 from ._base import DocumentConverter, DocumentConverterResult
 from ._media_converter import MediaConverter
+from ._converter_input import ConverterInput
 
 
 class ImageConverter(MediaConverter):
@@ -13,7 +14,9 @@ class ImageConverter(MediaConverter):
     ):
         super().__init__(priority=priority)
 
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
+    def convert(
+        self, input: ConverterInput, **kwargs
+    ) -> Union[None, DocumentConverterResult]:
         # Bail if not an image
         extension = kwargs.get("file_extension", "")
         if extension.lower() not in [".jpg", ".jpeg", ".png"]:
@@ -21,8 +24,9 @@ class ImageConverter(MediaConverter):
 
         md_content = ""
 
-        # Add metadata
-        metadata = self._get_metadata(local_path, kwargs.get("exiftool_path"))
+        # Add metadata if a local path is provided
+        if input.input_type == "filepath":
+            metadata = self._get_metadata(input.filepath, kwargs.get("exiftool_path"))
 
         if metadata:
             for f in [
@@ -47,7 +51,7 @@ class ImageConverter(MediaConverter):
             md_content += (
                 "\n# Description:\n"
                 + self._get_llm_description(
-                    local_path,
+                    input,
                     extension,
                     llm_client,
                     llm_model,
@@ -61,17 +65,20 @@ class ImageConverter(MediaConverter):
             text_content=md_content,
         )
 
-    def _get_llm_description(self, local_path, extension, client, model, prompt=None):
+    def _get_llm_description(
+        self, input: ConverterInput, extension, client, model, prompt=None
+    ):
         if prompt is None or prompt.strip() == "":
             prompt = "Write a detailed caption for this image."
 
         data_uri = ""
-        with open(local_path, "rb") as image_file:
-            content_type, encoding = mimetypes.guess_type("_dummy" + extension)
-            if content_type is None:
-                content_type = "image/jpeg"
-            image_base64 = base64.b64encode(image_file.read()).decode("utf-8")
-            data_uri = f"data:{content_type};base64,{image_base64}"
+        content_type, encoding = mimetypes.guess_type("_dummy" + extension)
+        if content_type is None:
+            content_type = "image/jpeg"
+        image_file = input.read_file(mode="rb")
+        image_base64 = base64.b64encode(image_file.read()).decode("utf-8")
+        image_file.close()
+        data_uri = f"data:{content_type};base64,{image_base64}"
 
         messages = [
             {

@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 
 from ._base import DocumentConverter, DocumentConverterResult
 from ._markdownify import _CustomMarkdownify
+from ._converter_input import ConverterInput
 
 
 class HtmlConverter(DocumentConverter):
@@ -14,7 +15,7 @@ class HtmlConverter(DocumentConverter):
         super().__init__(priority=priority)
 
     def convert(
-        self, local_path: str, **kwargs: Any
+        self, input: ConverterInput, **kwargs: Any
     ) -> Union[None, DocumentConverterResult]:
         # Bail if not html
         extension = kwargs.get("file_extension", "")
@@ -22,8 +23,9 @@ class HtmlConverter(DocumentConverter):
             return None
 
         result = None
-        with open(local_path, "rt", encoding="utf-8") as fh:
-            result = self._convert(fh.read())
+        file_obj = input.read_file(mode="rt", encoding="utf-8")
+        result = self._convert(file_obj.read())
+        file_obj.close()
 
         return result
 
