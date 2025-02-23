@@ -1,4 +1,3 @@
-# type: ignore
 from typing import Any
 
 from ebooklib import epub, ITEM_DOCUMENT

@@ -43,7 +43,6 @@ dependencies = [
   "charset-normalizer",
   "openai",
   "ebooklib",
-  "html2text",
   "azure-ai-documentintelligence",
   "azure-identity"
 ]
