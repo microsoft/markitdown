@@ -4,6 +4,8 @@
 ![PyPI - Downloads](https://img.shields.io/pypi/dd/markitdown)
 [![Built by AutoGen Team](https://img.shields.io/badge/Built%20by-AutoGen%20Team-blue)](https://github.com/microsoft/autogen)
 
+> [!IMPORTANT]
+> MarkItDown 0.0.2 alpha 1 (0.0.2a1) introduces a plugin-based architecture. As much as was possible, command-line and Python interfaces have remained the same as 0.0.1a3 to support backward compatibility. Please report any issues you encounter. Some interface changes may yet occur as we continue to refine MarkItDown to a first non-alpha release.
 
 MarkItDown is a utility for converting various files to Markdown (e.g., for indexing, text analysis, etc).
 It supports:
@@ -16,8 +18,15 @@ It supports:
 - HTML
 - Text-based formats (CSV, JSON, XML)
 - ZIP files (iterates over contents)
+- ... and more!
 
-To install MarkItDown, use pip: `pip install markitdown`. Alternatively, you can install it from the source: `pip install -e .`
+To install MarkItDown, use pip: `pip install markitdown`. Alternatively, you can install it from the source: 
+
+```bash
+git clone git@github.com:microsoft/markitdown.git
+cd markitdown
+pip install -e packages/markitdown
+```
 
 ## Usage
 
@@ -39,6 +48,33 @@ You can also pipe content:
 cat path-to-file.pdf | markitdown
 ```
 
+### Plugins
+
+MarkItDown also supports 3rd-party plugins. Plugins are disabled by default. To list installed plugins:
+
+```bash
+markitdown --list-plugins
+```
+
+To enable plugins use:
+
+```bash
+markitdown --use-plugins path-to-file.pdf
+```
+
+To find available plugins, search GitHub for the hashtag `#markitdown-plugin`. To develop a plugin, see `packages/markitdown-sample-plugin`.
+
+### Azure Document Intelligence
+
+To use Microsoft Document Intelligence for conversion:
+
+```bash
+markitdown path-to-file.pdf -o document.md -d -e "<document_intelligence_endpoint>"
+```
+
+More information about how to set up an Azure Document Intelligence Resource can be found [here](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/how-to-guides/create-document-intelligence-resource?view=doc-intel-4.0.0)
+
+
 ### Python API
 
 Basic usage in Python:
@@ -46,8 +82,18 @@ Basic usage in Python:
 ```python
 from markitdown import MarkItDown
 
-md = MarkItDown()
+md = MarkItDown(enable_plugins=False) # Set to True to enable plugins
 result = md.convert("test.xlsx")
+print(result.text_content)
+```
+
+Document Intelligence conversion in Python:
+
+```python
+from markitdown import MarkItDown
+
+md = MarkItDown(docintel_endpoint="<document_intelligence_endpoint>")
+result = md.convert("test.pdf")
 print(result.text_content)
 ```
 
@@ -69,42 +115,6 @@ print(result.text_content)
 docker build -t markitdown:latest .
 docker run --rm -i markitdown:latest < ~/your-file.pdf > output.md
 ```
-<details>
-    
-<summary>Batch Processing Multiple Files</summary>
-
-This example shows how to convert multiple files to markdown format in a single run. The script processes all supported files in a directory and creates corresponding markdown files.
-
-
-```python convert.py
-from markitdown import MarkItDown
-from openai import OpenAI
-import os
-client = OpenAI(api_key="your-api-key-here")
-md = MarkItDown(llm_client=client, llm_model="gpt-4o-2024-11-20")
-supported_extensions = ('.pptx', '.docx', '.pdf', '.jpg', '.jpeg', '.png')
-files_to_convert = [f for f in os.listdir('.') if f.lower().endswith(supported_extensions)]
-for file in files_to_convert:
-    print(f"\nConverting {file}...")
-    try:
-        md_file = os.path.splitext(file)[0] + '.md'
-        result = md.convert(file)
-        with open(md_file, 'w') as f:
-            f.write(result.text_content)
-        
-        print(f"Successfully converted {file} to {md_file}")
-    except Exception as e:
-        print(f"Error converting {file}: {str(e)}")
-
-print("\nAll conversions completed!")
-```
-2. Place the script in the same directory as your files
-3. Install required packages: like openai
-4. Run script ```bash python convert.py ```
-
-Note that original files will remain unchanged and new markdown files are created with the same base name.
-
-</details>
    
 ## Contributing
 
@@ -136,6 +146,12 @@ You can help by looking at issues or helping review PRs. Any issue or PR is welc
 
 ### Running Tests and Checks
 
+- Navigate to the MarkItDown package:
+
+    ```sh
+    cd packages/markitdown
+    ```
+
 - Install `hatch` in your environment and run tests:
     ```sh
     pip install hatch  # Other ways of installing hatch: https://hatch.pypa.io/dev/install/
@@ -150,6 +166,11 @@ You can help by looking at issues or helping review PRs. Any issue or PR is welc
     ```
 
 - Run pre-commit checks before submitting a PR: `pre-commit run --all-files`
+
+### Contributing 3rd-party Plugins
+
+You can also contribute by creating and sharing 3rd party plugins. See `packages/markitdown-sample-plugin` for more details.
+
 
 ## Trademarks
 

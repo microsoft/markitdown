@@ -1,0 +1,89 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "markitdown"
+dynamic = ["version"]
+description = 'Utility tool for converting various files to Markdown'
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+keywords = []
+authors = [
+  { name = "Adam Fourney", email = "adamfo@microsoft.com" },
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+]
+dependencies = [
+  "beautifulsoup4",
+  "requests",
+  "mammoth",
+  "markdownify",
+  "numpy",
+  "python-pptx",
+  "pandas",
+  "openpyxl",
+  "xlrd",
+  "pdfminer.six",
+  "puremagic",
+  "pydub",
+  "olefile",
+  "youtube-transcript-api",
+  "SpeechRecognition",
+  "pathvalidate",
+  "charset-normalizer",
+  "openai",
+  "ebooklib",
+  "html2text",
+  "azure-ai-documentintelligence",
+  "azure-identity"
+]
+
+[project.urls]
+Documentation = "https://github.com/microsoft/markitdown#readme"
+Issues = "https://github.com/microsoft/markitdown/issues"
+Source = "https://github.com/microsoft/markitdown"
+
+[tool.hatch.version]
+path = "src/markitdown/__about__.py"
+
+[project.scripts]
+markitdown = "markitdown.__main__:main"
+
+[tool.hatch.envs.types]
+extra-dependencies = [
+  "mypy>=1.0.0",
+]
+[tool.hatch.envs.types.scripts]
+check = "mypy --install-types --non-interactive {args:src/markitdown tests}"
+
+[tool.coverage.run]
+source_pkgs = ["markitdown", "tests"]
+branch = true
+parallel = true
+omit = [
+  "src/markitdown/__about__.py",
+]
+
+[tool.coverage.paths]
+markitdown = ["src/markitdown", "*/markitdown/src/markitdown"]
+tests = ["tests", "*/markitdown/tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+]
+
+[tool.hatch.build.targets.sdist]
+only-include = ["src/markitdown"]
