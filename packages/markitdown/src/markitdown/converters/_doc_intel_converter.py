@@ -11,6 +11,7 @@ from azure.ai.documentintelligence.models import (
 from azure.identity import DefaultAzureCredential
 
 from ._base import DocumentConverter, DocumentConverterResult
+from ._converter_input import ConverterInput
 
 
 # TODO: currently, there is a bug in the document intelligence SDK with importing the "ContentFormat" enum.
@@ -37,10 +38,9 @@ class DocumentIntelligenceConverter(DocumentConverter):
             api_version=self.api_version,
             credential=DefaultAzureCredential(),
         )
-        self._priority = priority
 
     def convert(
-        self, local_path: str, **kwargs: Any
+        self, input: ConverterInput, **kwargs: Any
     ) -> Union[None, DocumentConverterResult]:
         # Bail if extension is not supported by Document Intelligence
         extension = kwargs.get("file_extension", "")
@@ -60,9 +60,10 @@ class DocumentIntelligenceConverter(DocumentConverter):
         if extension.lower() not in docintel_extensions:
             return None
 
-        # Get the bytestring for the local path
-        with open(local_path, "rb") as f:
-            file_bytes = f.read()
+        # Get the bytestring from the converter input
+        file_obj = input.read_file(mode="rb")
+        file_bytes = file_obj.read()
+        file_obj.close()
 
         # Certain document analysis features are not availiable for office filetypes (.xlsx, .pptx, .html, .docx)
         if extension.lower() in [".xlsx", ".pptx", ".html", ".docx"]:

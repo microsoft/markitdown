@@ -4,6 +4,7 @@ import shutil
 from typing import Any, Union
 
 from ._base import DocumentConverter, DocumentConverterResult
+from ._converter_input import ConverterInput
 
 
 class ZipConverter(DocumentConverter):
@@ -51,12 +52,17 @@ class ZipConverter(DocumentConverter):
         super().__init__(priority=priority)
 
     def convert(
-        self, local_path: str, **kwargs: Any
+        self, input: ConverterInput, **kwargs: Any
     ) -> Union[None, DocumentConverterResult]:
         # Bail if not a ZIP
         extension = kwargs.get("file_extension", "")
         if extension.lower() != ".zip":
             return None
+
+        # Bail if a local path is not provided
+        if input.input_type != "filepath":
+            return None
+        local_path = input.filepath
 
         # Get parent converters list if available
         parent_converters = kwargs.get("_parent_converters", [])
@@ -111,7 +117,11 @@ class ZipConverter(DocumentConverter):
                         if isinstance(converter, ZipConverter):
                             continue
 
-                        result = converter.convert(file_path, **file_kwargs)
+                        # Create a ConverterInput for the parent converter and attempt conversion
+                        input = ConverterInput(
+                            input_type="filepath", filepath=file_path
+                        )
+                        result = converter.convert(input, **file_kwargs)
                         if result is not None:
                             md_content += f"\n## File: {relative_path}\n\n"
                             md_content += result.text_content + "\n\n"

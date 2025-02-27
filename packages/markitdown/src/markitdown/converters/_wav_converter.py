@@ -1,6 +1,7 @@
 from typing import Union
 from ._base import DocumentConverter, DocumentConverterResult
 from ._media_converter import MediaConverter
+from ._converter_input import ConverterInput
 
 # Optional Transcription support
 IS_AUDIO_TRANSCRIPTION_CAPABLE = False
@@ -22,11 +23,18 @@ class WavConverter(MediaConverter):
     ):
         super().__init__(priority=priority)
 
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
+    def convert(
+        self, input: ConverterInput, **kwargs
+    ) -> Union[None, DocumentConverterResult]:
         # Bail if not a WAV
         extension = kwargs.get("file_extension", "")
         if extension.lower() != ".wav":
             return None
+
+        # Bail if a local path was not provided
+        if input.input_type != "filepath":
+            return None
+        local_path = input.filepath
 
         md_content = ""
 

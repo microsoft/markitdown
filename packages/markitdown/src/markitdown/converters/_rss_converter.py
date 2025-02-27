@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup
 
 from ._markdownify import _CustomMarkdownify
 from ._base import DocumentConverter, DocumentConverterResult
+from ._converter_input import ConverterInput
 
 
 class RssConverter(DocumentConverter):
@@ -15,16 +16,21 @@ class RssConverter(DocumentConverter):
         super().__init__(priority=priority)
 
     def convert(
-        self, local_path: str, **kwargs
+        self, input: ConverterInput, **kwargs
     ) -> Union[None, DocumentConverterResult]:
         # Bail if not RSS type
         extension = kwargs.get("file_extension", "")
         if extension.lower() not in [".xml", ".rss", ".atom"]:
             return None
+        # Read file object from input
+        file_obj = input.read_file(mode="rb")
+
         try:
-            doc = minidom.parse(local_path)
+            doc = minidom.parse(file_obj)
         except BaseException as _:
             return None
+        file_obj.close()
+
         result = None
         if doc.getElementsByTagName("rss"):
             # A RSS feed must have a root element of <rss>

@@ -4,6 +4,7 @@ import pandas as pd
 
 from ._base import DocumentConverter, DocumentConverterResult
 from ._html_converter import HtmlConverter
+from ._converter_input import ConverterInput
 
 
 class XlsxConverter(HtmlConverter):
@@ -16,13 +17,18 @@ class XlsxConverter(HtmlConverter):
     ):
         super().__init__(priority=priority)
 
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
+    def convert(
+        self, input: ConverterInput, **kwargs
+    ) -> Union[None, DocumentConverterResult]:
         # Bail if not a XLSX
         extension = kwargs.get("file_extension", "")
         if extension.lower() != ".xlsx":
             return None
 
-        sheets = pd.read_excel(local_path, sheet_name=None, engine="openpyxl")
+        file_obj = input.read_file(mode="rb")
+        sheets = pd.read_excel(file_obj, sheet_name=None, engine="openpyxl")
+        file_obj.close()
+
         md_content = ""
         for s in sheets:
             md_content += f"## {s}\n"
@@ -40,13 +46,18 @@ class XlsConverter(HtmlConverter):
     Converts XLS files to Markdown, with each sheet presented as a separate Markdown table.
     """
 
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
+    def convert(
+        self, input: ConverterInput, **kwargs
+    ) -> Union[None, DocumentConverterResult]:
         # Bail if not a XLS
         extension = kwargs.get("file_extension", "")
         if extension.lower() != ".xls":
             return None
 
-        sheets = pd.read_excel(local_path, sheet_name=None, engine="xlrd")
+        file_obj = input.read_file(mode="rb")
+        sheets = pd.read_excel(file_obj, sheet_name=None, engine="xlrd")
+        file_obj.close()
+
         md_content = ""
         for s in sheets:
             md_content += f"## {s}\n"

@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup
 
 from ._base import DocumentConverter, DocumentConverterResult
 from ._markdownify import _CustomMarkdownify
+from ._converter_input import ConverterInput
 
 
 class WikipediaConverter(DocumentConverter):
@@ -16,7 +17,7 @@ class WikipediaConverter(DocumentConverter):
         super().__init__(priority=priority)
 
     def convert(
-        self, local_path: str, **kwargs: Any
+        self, input: ConverterInput, **kwargs: Any
     ) -> Union[None, DocumentConverterResult]:
         # Bail if not Wikipedia
         extension = kwargs.get("file_extension", "")
@@ -28,8 +29,9 @@ class WikipediaConverter(DocumentConverter):
 
         # Parse the file
         soup = None
-        with open(local_path, "rt", encoding="utf-8") as fh:
-            soup = BeautifulSoup(fh.read(), "html.parser")
+        file_obj = input.read_file(mode="rt", encoding="utf-8")
+        soup = BeautifulSoup(file_obj.read(), "html.parser")
+        file_obj.close()
 
         # Remove javascript and style blocks
         for script in soup(["script", "style"]):

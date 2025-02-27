@@ -1,6 +1,7 @@
 import olefile
 from typing import Any, Union
 from ._base import DocumentConverter, DocumentConverterResult
+from ._converter_input import ConverterInput
 
 
 class OutlookMsgConverter(DocumentConverter):
@@ -17,7 +18,7 @@ class OutlookMsgConverter(DocumentConverter):
         super().__init__(priority=priority)
 
     def convert(
-        self, local_path: str, **kwargs: Any
+        self, input: ConverterInput, **kwargs: Any
     ) -> Union[None, DocumentConverterResult]:
         # Bail if not a MSG file
         extension = kwargs.get("file_extension", "")
@@ -25,7 +26,9 @@ class OutlookMsgConverter(DocumentConverter):
             return None
 
         try:
-            msg = olefile.OleFileIO(local_path)
+            file_obj = input.read_file(mode="rb")
+            msg = olefile.OleFileIO(file_obj)
+
             # Extract email metadata
             md_content = "# Email Message\n\n"
 
@@ -49,6 +52,7 @@ class OutlookMsgConverter(DocumentConverter):
                 md_content += body
 
             msg.close()
+            file_obj.close()
 
             return DocumentConverterResult(
                 title=headers.get("Subject"), text_content=md_content.strip()
@@ -56,7 +60,7 @@ class OutlookMsgConverter(DocumentConverter):
 
         except Exception as e:
             raise FileConversionException(
-                f"Could not convert MSG file '{local_path}': {str(e)}"
+                f"Could not convert MSG file '{input.filepath}': {str(e)}"
             )
 
     def _get_stream_data(

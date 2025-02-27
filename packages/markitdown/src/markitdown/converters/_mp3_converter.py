@@ -1,8 +1,10 @@
 import tempfile
+import os
 from typing import Union
 from ._base import DocumentConverter, DocumentConverterResult
 from ._wav_converter import WavConverter
 from warnings import resetwarnings, catch_warnings
+from ._converter_input import ConverterInput
 
 # Optional Transcription support
 IS_AUDIO_TRANSCRIPTION_CAPABLE = False
@@ -33,11 +35,18 @@ class Mp3Converter(WavConverter):
     ):
         super().__init__(priority=priority)
 
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
+    def convert(
+        self, input: ConverterInput, **kwargs
+    ) -> Union[None, DocumentConverterResult]:
         # Bail if not a MP3
         extension = kwargs.get("file_extension", "")
         if extension.lower() != ".mp3":
             return None
+
+        # Bail if a local path was not provided
+        if input.input_type != "filepath":
+            return None
+        local_path = input.filepath
 
         md_content = ""
 
