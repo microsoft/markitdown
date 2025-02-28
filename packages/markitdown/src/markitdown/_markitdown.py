@@ -312,6 +312,7 @@ class MarkItDown:
     def _convert(
         self, local_path: str, extensions: List[Union[str, None]], **kwargs
     ) -> DocumentConverterResult:
+        res: Union[None, DocumentConverterResult] = None
         error_trace = ""
 
         # Create a copy of the page_converters list, sorted by priority.

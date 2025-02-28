@@ -1,6 +1,8 @@
 from typing import Union
 from ._base import DocumentConverter, DocumentConverterResult
 from ._media_converter import MediaConverter
+import base64
+import mimetypes
 
 
 class ImageConverter(MediaConverter):
