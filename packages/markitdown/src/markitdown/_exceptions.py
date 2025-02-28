@@ -6,15 +6,16 @@ class MarkItDownException(BaseException):
     pass
 
 
-class ConverterPrerequisiteException(MarkItDownException):
+class MissingOptionalDependencyException(MarkItDownException):
     """
-    Thrown when instantiating a DocumentConverter in cases where
-    a required library or dependency is not installed, an API key
-    is not set, or some other prerequisite is not met.
+    Converters shipped with MarkItDown may depend on optional
+    dependencies. This exception is thrown when a converter's
+    convert() method is called, but the required dependency is not
+    installed. This is not necessarily a fatal error, as the converter
+    will simply be skipped (an error will bubble up only if no other
+    suitable converter is found).
 
-    This is not necessarily a fatal error. If thrown during
-    MarkItDown's plugin loading phase, the converter will simply be
-    skipped, and a warning will be issued.
+    Error messages should clearly indicate which dependency is missing.
     """
 
     pass
