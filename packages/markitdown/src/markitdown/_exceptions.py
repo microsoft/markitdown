@@ -6,7 +6,7 @@ class MarkItDownException(BaseException):
     pass
 
 
-class MissingOptionalDependencyException(MarkItDownException):
+class MissingDependencyException(MarkItDownException):
     """
     Converters shipped with MarkItDown may depend on optional
     dependencies. This exception is thrown when a converter's
