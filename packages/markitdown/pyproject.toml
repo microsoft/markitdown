@@ -27,7 +27,7 @@ dependencies = [
   "beautifulsoup4",
   "requests",
   "mammoth",
-  "markdownify",
+  "markdownify~=0.14.1",
   "numpy",
   "python-pptx",
   "pandas",
