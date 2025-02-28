@@ -381,7 +381,8 @@ class MarkItDown:
         ext = ext.strip()
         if ext == "":
             return
-        # if ext not in extensions:
+        if ext in extensions:
+            return
         extensions.append(ext)
 
     def _guess_ext_magic(self, path):
