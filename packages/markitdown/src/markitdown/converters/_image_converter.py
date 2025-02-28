@@ -4,6 +4,7 @@ from ._media_converter import MediaConverter
 import base64
 import mimetypes
 
+
 class ImageConverter(MediaConverter):
     """
     Converts images to markdown via extraction of metadata (if `exiftool` is installed), OCR (if `easyocr` is installed), and description via a multimodal LLM (if an llm_client is configured).
