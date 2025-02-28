@@ -1701,7 +1701,6 @@ class MarkItDown:
     def _convert(
         self, local_path: str, extensions: List[Union[str, None]], **kwargs
     ) -> DocumentConverterResult:
-
         error_trace = ""
         for ext in extensions + [None]:  # Try last with no extension
             for converter in self._page_converters:
