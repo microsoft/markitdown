@@ -1703,7 +1703,7 @@ class MarkItDown:
     ) -> DocumentConverterResult:
         # Deduplicate the list of extensions
         extensions = list(set(extensions))
-        
+
         error_trace = ""
         for ext in extensions + [None]:  # Try last with no extension
             for converter in self._page_converters:
