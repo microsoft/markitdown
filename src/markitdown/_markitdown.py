@@ -1701,8 +1701,6 @@ class MarkItDown:
     def _convert(
         self, local_path: str, extensions: List[Union[str, None]], **kwargs
     ) -> DocumentConverterResult:
-        # Deduplicate the list of extensions
-        extensions = list(set(extensions))
 
         error_trace = ""
         for ext in extensions + [None]:  # Try last with no extension
@@ -1765,6 +1763,8 @@ class MarkItDown:
             return
         ext = ext.strip()
         if ext == "":
+            return
+        if ext in extensions:
             return
         # if ext not in extensions:
         extensions.append(ext)
