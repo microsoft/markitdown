@@ -84,7 +84,9 @@ def main():
             )
         elif args.filename is None:
             raise ValueError("Filename is required when using Document Intelligence.")
-        markitdown = MarkItDown(exiftool_path=which_exiftool, docintel_endpoint=args.endpoint)
+        markitdown = MarkItDown(
+            exiftool_path=which_exiftool, docintel_endpoint=args.endpoint
+        )
     else:
         markitdown = MarkItDown(exiftool_path=which_exiftool)
 
