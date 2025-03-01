@@ -1,7 +1,7 @@
 from typing import Optional, List, Any
 
 
-class MarkItDownException(BaseException):
+class MarkItDownException(Exception):
     """
     Base exception class for MarkItDown.
     """
