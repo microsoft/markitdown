@@ -44,7 +44,6 @@ all = [
   "pydub",
   "SpeechRecognition",
   "youtube-transcript-api",
-  "openai",
   "azure-ai-documentintelligence",
   "azure-identity"
 ]
@@ -56,7 +55,6 @@ pdf = ["pdfminer.six"]
 outlook = ["olefile"]
 audio-transcription = ["pydub", "SpeechRecognition"]
 youtube-transcription = ["youtube-transcript-api"]
-openai = ["openai"]
 az-doc-intel = ["azure-ai-documentintelligence", "azure-identity"]
 
 [project.urls]
@@ -75,6 +73,9 @@ features = ["all"]
 
 [tool.hatch.envs.hatch-test]
 features = ["all"]
+extra-dependencies = [
+  "openai",
+]
 
 [tool.hatch.envs.types]
 extra-dependencies = [
