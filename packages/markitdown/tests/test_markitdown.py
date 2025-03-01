@@ -8,7 +8,7 @@ import requests
 
 from warnings import catch_warnings, resetwarnings
 
-from markitdown import MarkItDown
+from markitdown import MarkItDown, UnsupportedFormatException, FileConversionException
 
 skip_remote = (
     True if os.environ.get("GITHUB_ACTIONS") else False
@@ -272,6 +272,21 @@ def test_markitdown_local() -> None:
     assert "# Test" in result.text_content
 
 
+def test_exceptions() -> None:
+    # Check that an exception is raised when trying to convert an unsupported format
+    markitdown = MarkItDown()
+    with pytest.raises(UnsupportedFormatException):
+        markitdown.convert(os.path.join(TEST_FILES_DIR, "random.bin"))
+
+    # Check that an exception is raised when trying to convert a file that is corrupted
+    with pytest.raises(FileConversionException) as exc_info:
+        markitdown.convert(
+            os.path.join(TEST_FILES_DIR, "random.bin"), file_extension=".pptx"
+        )
+    assert len(exc_info.value.attempts) == 1
+    assert type(exc_info.value.attempts[0].converter).__name__ == "PptxConverter"
+
+
 @pytest.mark.skipif(
     skip_exiftool,
     reason="do not run if exiftool is not installed",
@@ -329,6 +344,7 @@ if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     test_markitdown_remote()
     test_markitdown_local()
+    test_exceptions()
     test_markitdown_exiftool()
     # test_markitdown_llm()
     print("All tests passed!")

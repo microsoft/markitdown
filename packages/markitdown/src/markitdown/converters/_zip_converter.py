@@ -77,6 +77,10 @@ class ZipConverter(DocumentConverter):
         try:
             # Extract the zip file safely
             with zipfile.ZipFile(local_path, "r") as zipObj:
+                # Bail if we discover it's an Office OOXML file
+                if "[Content_Types].xml" in zipObj.namelist():
+                    return None
+
                 # Safeguard against path traversal
                 for member in zipObj.namelist():
                     member_path = os.path.normpath(os.path.join(extraction_dir, member))

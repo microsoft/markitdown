@@ -7,6 +7,7 @@ from ._markitdown import MarkItDown
 from ._exceptions import (
     MarkItDownException,
     ConverterPrerequisiteException,
+    FailedConversionAttempt,
     FileConversionException,
     UnsupportedFormatException,
 )
@@ -19,6 +20,7 @@ __all__ = [
     "DocumentConverterResult",
     "MarkItDownException",
     "ConverterPrerequisiteException",
+    "FailedConversionAttempt",
     "FileConversionException",
     "UnsupportedFormatException",
 ]
