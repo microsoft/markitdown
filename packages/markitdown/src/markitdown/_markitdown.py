@@ -354,7 +354,6 @@ class MarkItDown:
                 try:
                     res = converter.convert(local_path, **_kwargs)
                 except Exception:
-                    print("HERE!")
                     failed_attempts.append(
                         FailedConversionAttempt(
                             converter=converter, exc_info=sys.exc_info()
