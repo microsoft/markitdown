@@ -145,6 +145,19 @@ LLM_TEST_STRINGS = [
     "5bda1dd6",
 ]
 
+
+EPUB_TEST_STRINGS = [
+    "Author: Test Author",
+    "A test EPUB document for MarkItDown testing",
+    "# Chapter 1: Test Content",
+    "This is a **test** paragraph with some formatting",
+    "* A bullet point",
+    "* Another point",
+    "# Chapter 2: More Content",
+    "_different_ style",
+    "> This is a blockquote for testing",
+]
+
 JSON_TEST_STRINGS = [
     "5b64c88c-b3c3-4510-bcb8-da0b200602d8",
     "9700dc99-6685-40b4-9a3a-5e406dcb37f3",
@@ -191,6 +204,13 @@ def test_markitdown_remote() -> None:
 
 def test_markitdown_local() -> None:
     markitdown = MarkItDown()
+
+    # Test EPUB processing
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.epub"))
+    assert result.title == "Test EPUB Document"
+    for test_string in EPUB_TEST_STRINGS:
+        text_content = result.text_content.replace("\\", "")
+        assert test_string in text_content
 
     # Test XLSX processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.xlsx"))

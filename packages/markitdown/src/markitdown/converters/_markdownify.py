@@ -87,5 +87,14 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
 
         return "![%s](%s%s)" % (alt, src, title_part)
 
+    def convert_em(self, el: Any, text: str, convert_as_inline: bool) -> str:
+        """Convert emphasized text to Markdown format using underscores."""
+        if not text:
+            return ''
+        prefix, suffix, text = markdownify.chomp(text)  # type: ignore
+        if not text:
+            return ''
+        return '%s_%s_%s' % (prefix, text, suffix)
+
     def convert_soup(self, soup: Any) -> str:
         return super().convert_soup(soup)  # type: ignore

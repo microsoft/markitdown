@@ -37,6 +37,7 @@ from .converters import (
     OutlookMsgConverter,
     ZipConverter,
     DocumentIntelligenceConverter,
+    EpubConverter,
 )
 
 from ._exceptions import (
@@ -144,6 +145,7 @@ class MarkItDown:
             self.register_converter(IpynbConverter())
             self.register_converter(PdfConverter())
             self.register_converter(OutlookMsgConverter())
+            self.register_converter(EpubConverter())
 
             # Register Document Intelligence converter at the top of the stack if endpoint is provided
             docintel_endpoint = kwargs.get("docintel_endpoint")

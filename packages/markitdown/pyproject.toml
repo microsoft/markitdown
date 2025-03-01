@@ -42,6 +42,7 @@ dependencies = [
   "pathvalidate",
   "charset-normalizer",
   "openai",
+  "ebooklib",
   "azure-ai-documentintelligence",
   "azure-identity"
 ]
