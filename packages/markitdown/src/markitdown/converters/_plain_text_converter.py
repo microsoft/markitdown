@@ -6,6 +6,13 @@ from typing import Any, Union
 from ._base import DocumentConverter, DocumentConverterResult
 
 
+# Mimetypes to ignore (commonly confused extensions)
+IGNORE_MIMETYPES = [
+    "text/vnd.in3d.spot",  # .spo wich is confused with xls, doc, etc.
+    "text/vnd.graphviz",  # .dot which is confused with xls, doc, etc.
+]
+
+
 class PlainTextConverter(DocumentConverter):
     """Anything with content type text/plain"""
 
@@ -21,6 +28,10 @@ class PlainTextConverter(DocumentConverter):
         content_type, _ = mimetypes.guess_type(
             "__placeholder" + kwargs.get("file_extension", "")
         )
+
+        # Ignore common false positives
+        if content_type in IGNORE_MIMETYPES:
+            content_type = None
 
         # Only accept text files
         if content_type is None:
