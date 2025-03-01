@@ -36,7 +36,7 @@ class DocxConverter(HtmlConverter):
         if extension.lower() != ".docx":
             return None
 
-        # Load the dependencies
+        # Check: the dependencies
         if _dependency_exc_info is not None:
             raise MissingDependencyException(
                 MISSING_DEPENDENCY_MESSAGE.format(

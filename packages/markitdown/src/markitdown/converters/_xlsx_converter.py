@@ -39,7 +39,7 @@ class XlsxConverter(HtmlConverter):
         if extension.lower() != ".xlsx":
             return None
 
-        # Load the dependencies
+        # Check the dependencies
         if _xlsx_dependency_exc_info is not None:
             raise MissingDependencyException(
                 MISSING_DEPENDENCY_MESSAGE.format(

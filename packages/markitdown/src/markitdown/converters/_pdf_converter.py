@@ -1,7 +1,17 @@
-import pdfminer
-import pdfminer.high_level
+import sys
 from typing import Union
 from ._base import DocumentConverter, DocumentConverterResult
+from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+
+# Try loading optional (but in this case, required) dependencies
+# Save reporting of any exceptions for later
+_dependency_exc_info = None
+try:
+    import pdfminer
+    import pdfminer.high_level
+except ImportError:
+    # Preserve the error and stack trace for later
+    _dependency_exc_info = sys.exc_info()
 
 
 class PdfConverter(DocumentConverter):
@@ -19,6 +29,18 @@ class PdfConverter(DocumentConverter):
         extension = kwargs.get("file_extension", "")
         if extension.lower() != ".pdf":
             return None
+
+        # Check the dependencies
+        if _dependency_exc_info is not None:
+            raise MissingDependencyException(
+                MISSING_DEPENDENCY_MESSAGE.format(
+                    converter=type(self).__name__,
+                    extension=".pdf",
+                    feature="pdf",
+                )
+            ) from _dependency_exc_info[1].with_traceback(
+                _dependency_exc_info[2]
+            )  # Restore the original traceback
 
         return DocumentConverterResult(
             title=None,

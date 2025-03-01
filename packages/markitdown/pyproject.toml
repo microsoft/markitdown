@@ -28,7 +28,6 @@ dependencies = [
   "requests",
   "markdownify~=0.14.1",
   "numpy",
-  "pdfminer.six",
   "puremagic",
   "pydub",
   "olefile",
@@ -47,12 +46,14 @@ all = [
   "mammoth",
   "pandas",
   "openpyxl",
-  "xlrd"
+  "xlrd",
+  "pdfminer.six"
 ]
 pptx = ["python-pptx"]
 docx = ["mammoth"]
 xlsx = ["pandas", "openpyxl"]
 xls = ["pandas", "xlrd"]
+pdf = ["pdfminer.six"]
 
 [project.urls]
 Documentation = "https://github.com/microsoft/markitdown#readme"
