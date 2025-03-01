@@ -1,6 +1,16 @@
-import olefile
+import sys
 from typing import Any, Union
 from ._base import DocumentConverter, DocumentConverterResult
+from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+
+# Try loading optional (but in this case, required) dependencies
+# Save reporting of any exceptions for later
+_dependency_exc_info = None
+try:
+    import olefile
+except ImportError:
+    # Preserve the error and stack trace for later
+    _dependency_exc_info = sys.exc_info()
 
 
 class OutlookMsgConverter(DocumentConverter):
@@ -23,6 +33,18 @@ class OutlookMsgConverter(DocumentConverter):
         extension = kwargs.get("file_extension", "")
         if extension.lower() != ".msg":
             return None
+
+        # Check: the dependencies
+        if _dependency_exc_info is not None:
+            raise MissingDependencyException(
+                MISSING_DEPENDENCY_MESSAGE.format(
+                    converter=type(self).__name__,
+                    extension=".msg",
+                    feature="outlook",
+                )
+            ) from _dependency_exc_info[1].with_traceback(
+                _dependency_exc_info[2]
+            )  # Restore the original traceback
 
         try:
             msg = olefile.OleFileIO(local_path)
@@ -59,10 +81,12 @@ class OutlookMsgConverter(DocumentConverter):
                 f"Could not convert MSG file '{local_path}': {str(e)}"
             )
 
-    def _get_stream_data(
-        self, msg: olefile.OleFileIO, stream_path: str
-    ) -> Union[str, None]:
+    def _get_stream_data(self, msg: Any, stream_path: str) -> Union[str, None]:
         """Helper to safely extract and decode stream data from the MSG file."""
+        assert isinstance(
+            msg, olefile.OleFileIO
+        )  # Ensure msg is of the correct type (type hinting is not possible with the optional olefile package)
+
         try:
             if msg.exists(stream_path):
                 data = msg.openstream(stream_path).read()

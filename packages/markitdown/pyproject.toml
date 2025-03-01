@@ -30,7 +30,6 @@ dependencies = [
   "numpy",
   "puremagic",
   "pydub",
-  "olefile",
   "youtube-transcript-api",
   "SpeechRecognition",
   "pathvalidate",
@@ -47,13 +46,15 @@ all = [
   "pandas",
   "openpyxl",
   "xlrd",
-  "pdfminer.six"
+  "pdfminer.six",
+  "olefile"
 ]
 pptx = ["python-pptx"]
 docx = ["mammoth"]
 xlsx = ["pandas", "openpyxl"]
 xls = ["pandas", "xlrd"]
 pdf = ["pdfminer.six"]
+outlook = ["olefile"]
 
 [project.urls]
 Documentation = "https://github.com/microsoft/markitdown#readme"
