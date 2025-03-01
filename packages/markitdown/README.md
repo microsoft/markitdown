@@ -16,7 +16,7 @@ pip install markitdown
 From source:
 
 ```bash
-git clone git@github.com:microsoft/markitdown.git
+git clone https://github.com/microsoft/markitdown.git
 cd markitdown
 pip install -e packages/markitdown
 ```
