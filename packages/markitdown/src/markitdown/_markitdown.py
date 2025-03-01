@@ -2,6 +2,7 @@ import copy
 import mimetypes
 import os
 import re
+import sys
 import tempfile
 import warnings
 import traceback
@@ -41,7 +42,7 @@ from .converters import (
 from ._exceptions import (
     FileConversionException,
     UnsupportedFormatException,
-    ConverterPrerequisiteException,
+    FailedConversionAttempt,
 )
 
 # Override mimetype for csv to fix issue on windows
@@ -313,7 +314,9 @@ class MarkItDown:
         self, local_path: str, extensions: List[Union[str, None]], **kwargs
     ) -> DocumentConverterResult:
         res: Union[None, DocumentConverterResult] = None
-        error_trace = ""
+
+        # Keep track of which converters throw exceptions
+        failed_attempts: List[FailedConversionAttempt] = []
 
         # Create a copy of the page_converters list, sorted by priority.
         # We do this with each call to _convert because the priority of converters may change between calls.
@@ -351,7 +354,12 @@ class MarkItDown:
                 try:
                     res = converter.convert(local_path, **_kwargs)
                 except Exception:
-                    error_trace = ("\n\n" + traceback.format_exc()).strip()
+                    print("HERE!")
+                    failed_attempts.append(
+                        FailedConversionAttempt(
+                            converter=converter, exc_info=sys.exc_info()
+                        )
+                    )
 
                 if res is not None:
                     # Normalize the content
@@ -364,14 +372,12 @@ class MarkItDown:
                     return res
 
         # If we got this far without success, report any exceptions
-        if len(error_trace) > 0:
-            raise FileConversionException(
-                f"Could not convert '{local_path}' to Markdown. File type was recognized as {extensions}. While converting the file, the following error was encountered:\n\n{error_trace}"
-            )
+        if len(failed_attempts) > 0:
+            raise FileConversionException(attempts=failed_attempts)
 
         # Nothing can handle it!
         raise UnsupportedFormatException(
-            f"Could not convert '{local_path}' to Markdown. The formats {extensions} are not supported."
+            f"Could not convert '{local_path}' to Markdown. No converter attempted a conversion, suggesting that the filetype is simply not supported."
         )
 
     def _append_ext(self, extensions, ext):
