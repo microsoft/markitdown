@@ -27,16 +27,9 @@ dependencies = [
   "beautifulsoup4",
   "requests",
   "markdownify~=0.14.1",
-  "numpy",
   "puremagic",
-  "pydub",
-  "youtube-transcript-api",
-  "SpeechRecognition",
   "pathvalidate",
   "charset-normalizer",
-  "openai",
-  "azure-ai-documentintelligence",
-  "azure-identity"
 ]
 
 [project.optional-dependencies]
@@ -47,7 +40,13 @@ all = [
   "openpyxl",
   "xlrd",
   "pdfminer.six",
-  "olefile"
+  "olefile",
+  "pydub",
+  "SpeechRecognition",
+  "youtube-transcript-api",
+  "openai",
+  "azure-ai-documentintelligence",
+  "azure-identity"
 ]
 pptx = ["python-pptx"]
 docx = ["mammoth"]
@@ -55,6 +54,10 @@ xlsx = ["pandas", "openpyxl"]
 xls = ["pandas", "xlrd"]
 pdf = ["pdfminer.six"]
 outlook = ["olefile"]
+audio-transcription = ["pydub", "SpeechRecognition"]
+youtube-transcription = ["youtube-transcript-api"]
+openai = ["openai"]
+az-doc-intel = ["azure-ai-documentintelligence", "azure-identity"]
 
 [project.urls]
 Documentation = "https://github.com/microsoft/markitdown#readme"
