@@ -67,7 +67,7 @@ class PptxConverter(HtmlConverter):
         # Load the dependencies
         if _dependency_exc_info is not None:
             raise MissingDependencyException(
-                f"""{type(self).__name__} recognized the input as a .pptx file, but the dependencies needed to read .pptx files have not been installed. To resolve this error, include the optional dependency [pptx] or [all] when installing MarkItDown. For example:
+                f"""{type(self).__name__} recognized the input as a potential .pptx file, but the dependencies needed to read .pptx files have not been installed. To resolve this error, include the optional dependency [pptx] or [all] when installing MarkItDown. For example:
 
 * pip install markitdown[pptx]
 * pip install markitdown[all]

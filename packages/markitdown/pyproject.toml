@@ -26,7 +26,6 @@ classifiers = [
 dependencies = [
   "beautifulsoup4",
   "requests",
-  "mammoth",
   "markdownify~=0.14.1",
   "numpy",
   "pandas",
@@ -46,8 +45,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-all = ["python-pptx"]
+all = [
+  "python-pptx",
+  "mammoth"
+]
 pptx = ["python-pptx"]
+docx = ["mammoth"]
 
 [project.urls]
 Documentation = "https://github.com/microsoft/markitdown#readme"
