@@ -8,7 +8,7 @@ from ._base import (
 
 from ._base import DocumentConverter
 from ._html_converter import HtmlConverter
-from .._exceptions import MissingDependencyException
+from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 
 # Try loading optional (but in this case, required) dependencies
 # Save reporting of any exceptions for later
@@ -39,12 +39,11 @@ class DocxConverter(HtmlConverter):
         # Load the dependencies
         if _dependency_exc_info is not None:
             raise MissingDependencyException(
-                f"""{type(self).__name__} recognized the input as a potential .docx file, but the dependencies needed to read .docx files have not been installed. To resolve this error, include the optional dependency [docx] or [all] when installing MarkItDown. For example:
-
-* pip install markitdown[docx]
-* pip install markitdown[all]
-* pip install markitdown[pptx, docx, ...]
-* etc."""
+                MISSING_DEPENDENCY_MESSAGE.format(
+                    converter=type(self).__name__,
+                    extension=".docx",
+                    feature="docx",
+                )
             ) from _dependency_exc_info[1].with_traceback(
                 _dependency_exc_info[2]
             )  # Restore the original traceback
