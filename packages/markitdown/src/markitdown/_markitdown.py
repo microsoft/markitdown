@@ -42,7 +42,6 @@ from .converters import (
 from ._exceptions import (
     FileConversionException,
     UnsupportedFormatException,
-    ConverterPrerequisiteException,
     FailedConversionAttempt,
 )
 

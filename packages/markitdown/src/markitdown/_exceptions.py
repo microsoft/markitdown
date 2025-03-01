@@ -1,5 +1,12 @@
 from typing import Optional, List, Any
 
+MISSING_DEPENDENCY_MESSAGE = """{converter} recognized the input as a potential {extension} file, but the dependencies needed to read {extension} files have not been installed. To resolve this error, include the optional dependency [{feature}] or [all] when installing MarkItDown. For example:
+
+* pip install markitdown[{feature}]
+* pip install markitdown[all]
+* pip install markitdown[{feature}, ...]
+* etc."""
+
 
 class MarkItDownException(Exception):
     """
@@ -9,15 +16,16 @@ class MarkItDownException(Exception):
     pass
 
 
-class ConverterPrerequisiteException(MarkItDownException):
+class MissingDependencyException(MarkItDownException):
     """
-    Thrown when instantiating a DocumentConverter in cases where
-    a required library or dependency is not installed, an API key
-    is not set, or some other prerequisite is not met.
+    Converters shipped with MarkItDown may depend on optional
+    dependencies. This exception is thrown when a converter's
+    convert() method is called, but the required dependency is not
+    installed. This is not necessarily a fatal error, as the converter
+    will simply be skipped (an error will bubble up only if no other
+    suitable converter is found).
 
-    This is not necessarily a fatal error. If thrown during
-    MarkItDown's plugin loading phase, the converter will simply be
-    skipped, and a warning will be issued.
+    Error messages should clearly indicate which dependency is missing.
     """
 
     pass

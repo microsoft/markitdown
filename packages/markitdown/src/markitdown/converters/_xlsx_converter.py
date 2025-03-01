@@ -1,9 +1,26 @@
-from typing import Union
+import sys
 
-import pandas as pd
+from typing import Union
 
 from ._base import DocumentConverter, DocumentConverterResult
 from ._html_converter import HtmlConverter
+from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+
+# Try loading optional (but in this case, required) dependencies
+# Save reporting of any exceptions for later
+_xlsx_dependency_exc_info = None
+try:
+    import pandas as pd
+    import openpyxl
+except ImportError:
+    _xlsx_dependency_exc_info = sys.exc_info()
+
+_xls_dependency_exc_info = None
+try:
+    import pandas as pd
+    import xlrd
+except ImportError:
+    _xls_dependency_exc_info = sys.exc_info()
 
 
 class XlsxConverter(HtmlConverter):
@@ -21,6 +38,18 @@ class XlsxConverter(HtmlConverter):
         extension = kwargs.get("file_extension", "")
         if extension.lower() != ".xlsx":
             return None
+
+        # Check the dependencies
+        if _xlsx_dependency_exc_info is not None:
+            raise MissingDependencyException(
+                MISSING_DEPENDENCY_MESSAGE.format(
+                    converter=type(self).__name__,
+                    extension=".xlsx",
+                    feature="xlsx",
+                )
+            ) from _xlsx_dependency_exc_info[1].with_traceback(
+                _xlsx_dependency_exc_info[2]
+            )  # Restore the original traceback
 
         sheets = pd.read_excel(local_path, sheet_name=None, engine="openpyxl")
         md_content = ""
@@ -45,6 +74,18 @@ class XlsConverter(HtmlConverter):
         extension = kwargs.get("file_extension", "")
         if extension.lower() != ".xls":
             return None
+
+        # Load the dependencies
+        if _xls_dependency_exc_info is not None:
+            raise MissingDependencyException(
+                MISSING_DEPENDENCY_MESSAGE.format(
+                    converter=type(self).__name__,
+                    extension=".xls",
+                    feature="xls",
+                )
+            ) from _xls_dependency_exc_info[1].with_traceback(
+                _xls_dependency_exc_info[2]
+            )  # Restore the original traceback
 
         sheets = pd.read_excel(local_path, sheet_name=None, engine="xlrd")
         md_content = ""

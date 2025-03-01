@@ -1,12 +1,22 @@
 import base64
-import pptx
 import re
 import html
+import sys
 
 from typing import Union
 
 from ._base import DocumentConverterResult, DocumentConverter
 from ._html_converter import HtmlConverter
+from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+
+# Try loading optional (but in this case, required) dependencies
+# Save reporting of any exceptions for later
+_dependency_exc_info = None
+try:
+    import pptx
+except ImportError:
+    # Preserve the error and stack trace for later
+    _dependency_exc_info = sys.exc_info()
 
 
 class PptxConverter(HtmlConverter):
@@ -54,9 +64,20 @@ class PptxConverter(HtmlConverter):
         if extension.lower() != ".pptx":
             return None
 
-        md_content = ""
+        # Check the dependencies
+        if _dependency_exc_info is not None:
+            raise MissingDependencyException(
+                MISSING_DEPENDENCY_MESSAGE.format(
+                    converter=type(self).__name__,
+                    extension=".pptx",
+                    feature="pptx",
+                )
+            ) from _dependency_exc_info[1].with_traceback(
+                _dependency_exc_info[2]
+            )  # Restore the original traceback
 
         presentation = pptx.Presentation(local_path)
+        md_content = ""
         slide_num = 0
         for slide in presentation.slides:
             slide_num += 1

@@ -1,6 +1,6 @@
-from typing import Union
+import sys
 
-import mammoth
+from typing import Union
 
 from ._base import (
     DocumentConverterResult,
@@ -8,6 +8,16 @@ from ._base import (
 
 from ._base import DocumentConverter
 from ._html_converter import HtmlConverter
+from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+
+# Try loading optional (but in this case, required) dependencies
+# Save reporting of any exceptions for later
+_dependency_exc_info = None
+try:
+    import mammoth
+except ImportError:
+    # Preserve the error and stack trace for later
+    _dependency_exc_info = sys.exc_info()
 
 
 class DocxConverter(HtmlConverter):
@@ -25,6 +35,18 @@ class DocxConverter(HtmlConverter):
         extension = kwargs.get("file_extension", "")
         if extension.lower() != ".docx":
             return None
+
+        # Check: the dependencies
+        if _dependency_exc_info is not None:
+            raise MissingDependencyException(
+                MISSING_DEPENDENCY_MESSAGE.format(
+                    converter=type(self).__name__,
+                    extension=".docx",
+                    feature="docx",
+                )
+            ) from _dependency_exc_info[1].with_traceback(
+                _dependency_exc_info[2]
+            )  # Restore the original traceback
 
         result = None
         with open(local_path, "rb") as docx_file:

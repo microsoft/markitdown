@@ -5,7 +5,8 @@
 [![Built by AutoGen Team](https://img.shields.io/badge/Built%20by-AutoGen%20Team-blue)](https://github.com/microsoft/autogen)
 
 > [!IMPORTANT]
-> MarkItDown 0.0.2 alpha 1 (0.0.2a1) introduces a plugin-based architecture. As much as was possible, command-line and Python interfaces have remained the same as 0.0.1a3 to support backward compatibility. Please report any issues you encounter. Some interface changes may yet occur as we continue to refine MarkItDown to a first non-alpha release.
+> Breaking changes between 0.0.1 to 0.0.2:
+> * Dependencies are now organized into optional feature-groups (further details below). Use `pip install markitdown[all]` to have backward-compatible behavior. 
 
 MarkItDown is a utility for converting various files to Markdown (e.g., for indexing, text analysis, etc).
 It supports:
@@ -22,12 +23,12 @@ It supports:
 - Youtube URLs
 - ... and more!
 
-To install MarkItDown, use pip: `pip install markitdown`. Alternatively, you can install it from the source:
+To install MarkItDown, use pip: `pip install markitdown[all]`. Alternatively, you can install it from the source:
 
 ```bash
 git clone git@github.com:microsoft/markitdown.git
 cd markitdown
-pip install -e packages/markitdown
+pip install -e packages/markitdown[all]
 ```
 
 ## Usage
@@ -49,6 +50,28 @@ You can also pipe content:
 ```bash
 cat path-to-file.pdf | markitdown
 ```
+
+### Optional Dependencies
+MarkItDown has optional dependencies for activating various file formats. Earlier in this document, we installed all optional dependencies with the `[all]` option. However, you can also install them individually for more control. For example:
+
+```bash
+pip install markitdown[pdf, docx, pptx]
+```
+
+will install only the dependencies for PDF, DOCX, and PPTX files.
+
+At the moment, the following optional dependencies are available:
+
+* `[all]` Installs all optional dependencies
+* `[pptx]` Installs dependencies for PowerPoint files
+* `[docx]` Installs dependencies for Word files
+* `[xlsx]` Installs dependencies for Excel files
+* `[xls]` Installs dependencies for older Excel files
+* `[pdf]` Installs dependencies for PDF files
+* `[outlook]` Installs dependencies for Outlook messages
+* `[az-doc-intel]` Installs dependencies for Azure Document Intelligence
+* `[audio-transcription]` Installs dependencies for audio transcription of wav and mp3 files
+* `[youtube-transcription]` Installs dependencies for fetching YouTube video transcription
 
 ### Plugins
 

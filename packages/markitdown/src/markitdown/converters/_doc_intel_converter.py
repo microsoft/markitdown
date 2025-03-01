@@ -1,16 +1,24 @@
 from typing import Any, Union
 import re
-
-# Azure imports
-from azure.ai.documentintelligence import DocumentIntelligenceClient
-from azure.ai.documentintelligence.models import (
-    AnalyzeDocumentRequest,
-    AnalyzeResult,
-    DocumentAnalysisFeature,
-)
-from azure.identity import DefaultAzureCredential
+import sys
 
 from ._base import DocumentConverter, DocumentConverterResult
+from .._exceptions import MissingDependencyException
+
+# Try loading optional (but in this case, required) dependencies
+# Save reporting of any exceptions for later
+_dependency_exc_info = None
+try:
+    from azure.ai.documentintelligence import DocumentIntelligenceClient
+    from azure.ai.documentintelligence.models import (
+        AnalyzeDocumentRequest,
+        AnalyzeResult,
+        DocumentAnalysisFeature,
+    )
+    from azure.identity import DefaultAzureCredential
+except ImportError:
+    # Preserve the error and stack trace for later
+    _dependency_exc_info = sys.exc_info()
 
 
 # TODO: currently, there is a bug in the document intelligence SDK with importing the "ContentFormat" enum.
@@ -29,6 +37,16 @@ class DocumentIntelligenceConverter(DocumentConverter):
         api_version: str = "2024-07-31-preview",
     ):
         super().__init__(priority=priority)
+
+        # Raise an error if the dependencies are not available.
+        # This is different than other converters since this one isn't even instantiated
+        # unless explicitly requested.
+        if _dependency_exc_info is not None:
+            raise MissingDependencyException(
+                "DocumentIntelligenceConverter requires the optional dependency [az-doc-intel] (or [all]) to be installed. E.g., `pip install markitdown[az-doc-intel]`"
+            ) from _dependency_exc_info[1].with_traceback(
+                _dependency_exc_info[2]
+            )  # Restore the original traceback
 
         self.endpoint = endpoint
         self.api_version = api_version
