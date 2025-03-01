@@ -25,9 +25,7 @@ It supports:
 To install MarkItDown, use pip: `pip install markitdown`. Alternatively, you can install it from the source:
 
 ```bash
-git clone git@github.com:microsoft/markitdown.git
-cd markitdown
-pip install -e packages/markitdown
+pip install git+https://github.com/microsoft/markitdown.git#subdirectory=packages/markitdown
 ```
 
 ## Usage
