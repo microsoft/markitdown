@@ -7,7 +7,8 @@ from typing import Any, Union, Dict, List
 from urllib.parse import parse_qs, urlparse
 from bs4 import BeautifulSoup
 
-from ._base import DocumentConverter, DocumentConverterResult
+from ._base import DocumentConverter
+from .._base_converter import DocumentConverterResult
 
 
 # Optional YouTube transcription support
@@ -158,8 +159,8 @@ class YouTubeConverter(DocumentConverter):
         assert isinstance(title, str)
 
         return DocumentConverterResult(
+            markdown=webpage_text,
             title=title,
-            text_content=webpage_text,
         )
 
     def _get(

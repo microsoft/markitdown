@@ -1,7 +1,8 @@
 from typing import Any, Union
 from bs4 import BeautifulSoup
 
-from ._base import DocumentConverter, DocumentConverterResult
+from ._base import DocumentConverter
+from .._base_converter import DocumentConverterResult
 from ._markdownify import _CustomMarkdownify
 
 
@@ -51,6 +52,6 @@ class HtmlConverter(DocumentConverter):
         webpage_text = webpage_text.strip()
 
         return DocumentConverterResult(
+            markdown=webpage_text,
             title=None if soup.title is None else soup.title.string,
-            text_content=webpage_text,
         )

@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: MIT
 
-from ._base import DocumentConverter, DocumentConverterResult
+from ._base import DocumentConverter
 from ._plain_text_converter import PlainTextConverter
 from ._html_converter import HtmlConverter
 from ._rss_converter import RssConverter
@@ -23,7 +23,6 @@ from ._doc_intel_converter import DocumentIntelligenceConverter
 
 __all__ = [
     "DocumentConverter",
-    "DocumentConverterResult",
     "PlainTextConverter",
     "HtmlConverter",
     "RssConverter",

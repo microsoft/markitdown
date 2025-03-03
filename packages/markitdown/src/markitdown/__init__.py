@@ -4,6 +4,7 @@
 
 from .__about__ import __version__
 from ._markitdown import MarkItDown
+from ._base_converter import DocumentConverterResult, BaseDocumentConverter
 from ._exceptions import (
     MarkItDownException,
     MissingDependencyException,
@@ -11,12 +12,13 @@ from ._exceptions import (
     FileConversionException,
     UnsupportedFormatException,
 )
-from .converters import DocumentConverter, DocumentConverterResult
+from .converters import DocumentConverter
 
 __all__ = [
     "__version__",
     "MarkItDown",
     "DocumentConverter",
+    "BaseDocumentConverter",
     "DocumentConverterResult",
     "MarkItDownException",
     "MissingDependencyException",

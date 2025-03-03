@@ -1,6 +1,7 @@
 import sys
 from typing import Any, Union
-from ._base import DocumentConverter, DocumentConverterResult
+from ._base import DocumentConverter
+from .._base_converter import DocumentConverterResult
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 
 # Try loading optional (but in this case, required) dependencies
@@ -73,7 +74,8 @@ class OutlookMsgConverter(DocumentConverter):
             msg.close()
 
             return DocumentConverterResult(
-                title=headers.get("Subject"), text_content=md_content.strip()
+                markdown=md_content.strip(),
+                title=headers.get("Subject"),
             )
 
         except Exception as e:

@@ -1,5 +1,6 @@
 from typing import Union
-from ._base import DocumentConverter, DocumentConverterResult
+from ._base import DocumentConverter
+from .._base_converter import DocumentConverterResult
 from ._media_converter import MediaConverter
 import base64
 import mimetypes
@@ -59,8 +60,7 @@ class ImageConverter(MediaConverter):
             )
 
         return DocumentConverterResult(
-            title=None,
-            text_content=md_content,
+            markdown=md_content,
         )
 
     def _get_llm_description(self, local_path, extension, client, model, prompt=None):

@@ -3,7 +3,8 @@ import re
 from typing import Any, Union
 from bs4 import BeautifulSoup
 
-from ._base import DocumentConverter, DocumentConverterResult
+from ._base import DocumentConverter
+from .._base_converter import DocumentConverterResult
 from ._markdownify import _CustomMarkdownify
 
 
@@ -56,6 +57,6 @@ class WikipediaConverter(DocumentConverter):
             webpage_text = _CustomMarkdownify().convert_soup(soup)
 
         return DocumentConverterResult(
+            markdown=webpage_text,
             title=main_title,
-            text_content=webpage_text,
         )

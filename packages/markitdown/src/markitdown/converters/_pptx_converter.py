@@ -5,7 +5,8 @@ import sys
 
 from typing import Union
 
-from ._base import DocumentConverterResult, DocumentConverter
+from ._base import DocumentConverter
+from .._base_converter import DocumentConverterResult
 from ._html_converter import HtmlConverter
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 
@@ -174,10 +175,7 @@ class PptxConverter(HtmlConverter):
                     md_content += notes_frame.text
                 md_content = md_content.strip()
 
-        return DocumentConverterResult(
-            title=None,
-            text_content=md_content.strip(),
-        )
+        return DocumentConverterResult(markdown=md_content.strip())
 
     def _is_picture(self, shape):
         if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.PICTURE:

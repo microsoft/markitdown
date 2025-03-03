@@ -2,11 +2,8 @@ import sys
 
 from typing import Union
 
-from ._base import (
-    DocumentConverterResult,
-)
-
 from ._base import DocumentConverter
+from .._base_converter import DocumentConverterResult
 from ._html_converter import HtmlConverter
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 

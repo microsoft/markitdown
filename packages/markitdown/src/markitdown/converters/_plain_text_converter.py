@@ -3,7 +3,8 @@ import mimetypes
 from charset_normalizer import from_path
 from typing import Any, Union
 
-from ._base import DocumentConverter, DocumentConverterResult
+from ._base import DocumentConverter
+from .._base_converter import DocumentConverterResult
 
 
 # Mimetypes to ignore (commonly confused extensions)
@@ -43,7 +44,4 @@ class PlainTextConverter(DocumentConverter):
             return None
 
         text_content = str(from_path(local_path).best())
-        return DocumentConverterResult(
-            title=None,
-            text_content=text_content,
-        )
+        return DocumentConverterResult(markdown=text_content)

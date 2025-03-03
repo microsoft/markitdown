@@ -3,7 +3,8 @@ import zipfile
 import shutil
 from typing import Any, Union
 
-from ._base import DocumentConverter, DocumentConverterResult
+from ._base import DocumentConverter
+from .._base_converter import DocumentConverterResult
 
 
 class ZipConverter(DocumentConverter):
@@ -62,8 +63,7 @@ class ZipConverter(DocumentConverter):
         parent_converters = kwargs.get("_parent_converters", [])
         if not parent_converters:
             return DocumentConverterResult(
-                title=None,
-                text_content=f"[ERROR] No converters available to process zip contents from: {local_path}",
+                markdown=f"[ERROR] No converters available to process zip contents from: {local_path}",
             )
 
         extracted_zip_folder_name = (
@@ -118,27 +118,24 @@ class ZipConverter(DocumentConverter):
                         result = converter.convert(file_path, **file_kwargs)
                         if result is not None:
                             md_content += f"\n## File: {relative_path}\n\n"
-                            md_content += result.text_content + "\n\n"
+                            md_content += result.markdown + "\n\n"
                             break
 
             # Clean up extracted files if specified
             if kwargs.get("cleanup_extracted", True):
                 shutil.rmtree(extraction_dir)
 
-            return DocumentConverterResult(title=None, text_content=md_content.strip())
+            return DocumentConverterResult(markdown=md_content.strip())
 
         except zipfile.BadZipFile:
             return DocumentConverterResult(
-                title=None,
-                text_content=f"[ERROR] Invalid or corrupted zip file: {local_path}",
+                markdown=f"[ERROR] Invalid or corrupted zip file: {local_path}",
             )
         except ValueError as ve:
             return DocumentConverterResult(
-                title=None,
-                text_content=f"[ERROR] Security error in zip file {local_path}: {str(ve)}",
+                markdown=f"[ERROR] Security error in zip file {local_path}: {str(ve)}",
             )
         except Exception as e:
             return DocumentConverterResult(
-                title=None,
-                text_content=f"[ERROR] Failed to process zip file {local_path}: {str(e)}",
+                markdown=f"[ERROR] Failed to process zip file {local_path}: {str(e)}",
             )

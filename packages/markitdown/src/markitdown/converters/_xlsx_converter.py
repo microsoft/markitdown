@@ -2,7 +2,8 @@ import sys
 
 from typing import Union
 
-from ._base import DocumentConverter, DocumentConverterResult
+from ._base import DocumentConverter
+from .._base_converter import DocumentConverterResult
 from ._html_converter import HtmlConverter
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 
@@ -58,10 +59,7 @@ class XlsxConverter(HtmlConverter):
             html_content = sheets[s].to_html(index=False)
             md_content += self._convert(html_content).text_content.strip() + "\n\n"
 
-        return DocumentConverterResult(
-            title=None,
-            text_content=md_content.strip(),
-        )
+        return DocumentConverterResult(markdown=md_content.strip())
 
 
 class XlsConverter(HtmlConverter):
@@ -94,7 +92,4 @@ class XlsConverter(HtmlConverter):
             html_content = sheets[s].to_html(index=False)
             md_content += self._convert(html_content).text_content.strip() + "\n\n"
 
-        return DocumentConverterResult(
-            title=None,
-            text_content=md_content.strip(),
-        )
+        return DocumentConverterResult(markdown=md_content.strip())

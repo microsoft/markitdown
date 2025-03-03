@@ -1,6 +1,7 @@
 import tempfile
 from typing import Union
-from ._base import DocumentConverter, DocumentConverterResult
+from ._base import DocumentConverter
+from .._base_converter import DocumentConverterResult
 from ._wav_converter import WavConverter
 from warnings import resetwarnings, catch_warnings
 
@@ -83,7 +84,4 @@ class Mp3Converter(WavConverter):
                 os.unlink(temp_path)
 
         # Return the result
-        return DocumentConverterResult(
-            title=None,
-            text_content=md_content.strip(),
-        )
+        return DocumentConverterResult(markdown=md_content.strip())

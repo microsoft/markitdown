@@ -3,7 +3,8 @@ from typing import Union
 from bs4 import BeautifulSoup
 
 from ._markdownify import _CustomMarkdownify
-from ._base import DocumentConverter, DocumentConverterResult
+from ._base import DocumentConverter
+from .._base_converter import DocumentConverterResult
 
 
 class RssConverter(DocumentConverter):
@@ -73,8 +74,8 @@ class RssConverter(DocumentConverter):
                     md_text += self._parse_content(entry_content)
 
             return DocumentConverterResult(
+                markdown=md_text,
                 title=title,
-                text_content=md_text,
             )
         except BaseException as _:
             return None
@@ -117,8 +118,8 @@ class RssConverter(DocumentConverter):
                     md_text += self._parse_content(content)
 
             return DocumentConverterResult(
+                markdown=md_text,
                 title=channel_title,
-                text_content=md_text,
             )
         except BaseException as _:
             print(traceback.format_exc())

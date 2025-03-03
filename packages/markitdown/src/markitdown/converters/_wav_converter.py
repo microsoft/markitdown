@@ -1,5 +1,6 @@
 from typing import Union
-from ._base import DocumentConverter, DocumentConverterResult
+from ._base import DocumentConverter
+from .._base_converter import DocumentConverterResult
 from ._media_converter import MediaConverter
 
 # Optional Transcription support
@@ -60,10 +61,7 @@ class WavConverter(MediaConverter):
                     "\n\n### Audio Transcript:\nError. Could not transcribe this audio."
                 )
 
-        return DocumentConverterResult(
-            title=None,
-            text_content=md_content.strip(),
-        )
+        return DocumentConverterResult(markdown=md_content.strip())
 
     def _transcribe_audio(self, local_path) -> str:
         recognizer = sr.Recognizer()

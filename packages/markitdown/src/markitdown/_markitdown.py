@@ -18,7 +18,6 @@ import requests
 
 from .converters import (
     DocumentConverter,
-    DocumentConverterResult,
     PlainTextConverter,
     HtmlConverter,
     RssConverter,
@@ -38,6 +37,8 @@ from .converters import (
     ZipConverter,
     DocumentIntelligenceConverter,
 )
+
+from ._base_converter import DocumentConverterResult
 
 from ._exceptions import (
     FileConversionException,

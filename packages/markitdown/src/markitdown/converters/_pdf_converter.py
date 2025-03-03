@@ -1,6 +1,7 @@
 import sys
 from typing import Union
-from ._base import DocumentConverter, DocumentConverterResult
+from ._base import DocumentConverter
+from .._base_converter import DocumentConverterResult
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 
 # Try loading optional (but in this case, required) dependencies
@@ -43,6 +44,5 @@ class PdfConverter(DocumentConverter):
             )  # Restore the original traceback
 
         return DocumentConverterResult(
-            title=None,
-            text_content=pdfminer.high_level.extract_text(local_path),
+            markdown=pdfminer.high_level.extract_text(local_path)
         )

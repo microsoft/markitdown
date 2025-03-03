@@ -1,10 +1,8 @@
 import json
 from typing import Any, Union
 
-from ._base import (
-    DocumentConverter,
-    DocumentConverterResult,
-)
+from ._base import DocumentConverter
+from .._base_converter import DocumentConverterResult
 
 from .._exceptions import FileConversionException
 
@@ -65,8 +63,8 @@ class IpynbConverter(DocumentConverter):
             title = notebook_content.get("metadata", {}).get("title", title)
 
             return DocumentConverterResult(
+                markdown=md_text,
                 title=title,
-                text_content=md_text,
             )
 
         except Exception as e:
