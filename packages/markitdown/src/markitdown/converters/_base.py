@@ -55,9 +55,9 @@ class DocumentConverter:
         return self._priority
 
     @priority.setter
-    def radius(self, value: float):
+    def priority(self, value: float):
         self._priority = value
 
     @priority.deleter
-    def radius(self):
+    def priority(self):
         raise AttributeError("Cannot delete the priority attribute")
