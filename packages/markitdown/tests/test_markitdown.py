@@ -8,7 +8,12 @@ import requests
 
 from warnings import catch_warnings, resetwarnings
 
-from markitdown import MarkItDown, UnsupportedFormatException, FileConversionException
+from markitdown import (
+    MarkItDown,
+    UnsupportedFormatException,
+    FileConversionException,
+    StreamInfo,
+)
 
 skip_remote = (
     True if os.environ.get("GITHUB_ACTIONS") else False
@@ -162,6 +167,107 @@ def validate_strings(result, expected_strings, exclude_strings=None):
             assert string not in text_content
 
 
+def test_stream_info_operations() -> None:
+    """Test operations performed on StreamInfo objects."""
+
+    stream_info_original = StreamInfo(
+        mimetype="mimetype.1",
+        extension="extension.1",
+        charset="charset.1",
+        filename="filename.1",
+        local_path="local_path.1",
+        url="url.1",
+    )
+
+    # Check updating all attributes by keyword
+    keywords = ["mimetype", "extension", "charset", "filename", "local_path", "url"]
+    for keyword in keywords:
+        updated_stream_info = stream_info_original.copy_and_update(
+            **{keyword: f"{keyword}.2"}
+        )
+
+        # Make sure the targted attribute is updated
+        assert getattr(updated_stream_info, keyword) == f"{keyword}.2"
+
+        # Make sure the other attributes are unchanged
+        for k in keywords:
+            if k != keyword:
+                assert getattr(stream_info_original, k) == getattr(
+                    updated_stream_info, k
+                )
+
+    # Check updating all attributes by passing a new StreamInfo object
+    keywords = ["mimetype", "extension", "charset", "filename", "local_path", "url"]
+    for keyword in keywords:
+        updated_stream_info = stream_info_original.copy_and_update(
+            StreamInfo(**{keyword: f"{keyword}.2"})
+        )
+
+        # Make sure the targted attribute is updated
+        assert getattr(updated_stream_info, keyword) == f"{keyword}.2"
+
+        # Make sure the other attributes are unchanged
+        for k in keywords:
+            if k != keyword:
+                assert getattr(stream_info_original, k) == getattr(
+                    updated_stream_info, k
+                )
+
+    # Check mixing and matching
+    updated_stream_info = stream_info_original.copy_and_update(
+        StreamInfo(extension="extension.2", filename="filename.2"),
+        mimetype="mimetype.3",
+        charset="charset.3",
+    )
+    assert updated_stream_info.extension == "extension.2"
+    assert updated_stream_info.filename == "filename.2"
+    assert updated_stream_info.mimetype == "mimetype.3"
+    assert updated_stream_info.charset == "charset.3"
+    assert updated_stream_info.local_path == "local_path.1"
+    assert updated_stream_info.url == "url.1"
+
+    # Check multiple StreamInfo objects
+    updated_stream_info = stream_info_original.copy_and_update(
+        StreamInfo(extension="extension.4", filename="filename.5"),
+        StreamInfo(mimetype="mimetype.6", charset="charset.7"),
+    )
+    assert updated_stream_info.extension == "extension.4"
+    assert updated_stream_info.filename == "filename.5"
+    assert updated_stream_info.mimetype == "mimetype.6"
+    assert updated_stream_info.charset == "charset.7"
+    assert updated_stream_info.local_path == "local_path.1"
+    assert updated_stream_info.url == "url.1"
+
+
+def test_stream_info_guesses() -> None:
+    """Test StreamInfo guesses based on stream content."""
+
+    test_tuples = [
+        (
+            os.path.join(TEST_FILES_DIR, "test.xlsx"),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        ),
+        (
+            os.path.join(TEST_FILES_DIR, "test.docx"),
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ),
+        (
+            os.path.join(TEST_FILES_DIR, "test.pptx"),
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        ),
+        (os.path.join(TEST_FILES_DIR, "test.xls"), "application/vnd.ms-excel"),
+    ]
+
+    for file_path, expected_mimetype in test_tuples:
+        with open(file_path, "rb") as f:
+            guesses = StreamInfo.guess_from_stream(
+                f, filename_hint=os.path.basename(file_path)
+            )
+            assert len(guesses) > 0
+            assert guesses[0].mimetype == expected_mimetype
+            assert guesses[0].extension == os.path.splitext(file_path)[1]
+
+
 @pytest.mark.skipif(
     skip_remote,
     reason="do not run tests that query external urls",
@@ -266,6 +372,11 @@ def test_markitdown_local() -> None:
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.json"))
     validate_strings(result, JSON_TEST_STRINGS)
 
+    # Test input from a stream
+    input_data = b"<html><body><h1>Test</h1></body></html>"
+    result = markitdown.convert_stream(io.BytesIO(input_data))
+    assert "# Test" in result.text_content
+
     # Test input with leading blank characters
     input_data = b"   \n\n\n<html><body><h1>Test</h1></body></html>"
     result = markitdown.convert_stream(io.BytesIO(input_data))
@@ -342,9 +453,11 @@ def test_markitdown_llm() -> None:
 
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
+    test_stream_info_operations()
+    test_stream_info_guesses()
     test_markitdown_remote()
     test_markitdown_local()
-    test_exceptions()
-    test_markitdown_exiftool()
+    # test_exceptions()
+    # test_markitdown_exiftool()
     # test_markitdown_llm()
     print("All tests passed!")

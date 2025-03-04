@@ -5,6 +5,7 @@
 from .__about__ import __version__
 from ._markitdown import MarkItDown
 from ._base_converter import DocumentConverterResult, BaseDocumentConverter
+from ._stream_info import StreamInfo
 from ._exceptions import (
     MarkItDownException,
     MissingDependencyException,
@@ -25,4 +26,5 @@ __all__ = [
     "FailedConversionAttempt",
     "FileConversionException",
     "UnsupportedFormatException",
+    "StreamInfo",
 ]

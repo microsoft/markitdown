@@ -1,3 +1,4 @@
+from ._stream_info import StreamInfo
 from typing import Any, Union, BinaryIO, Optional
 
 
@@ -12,6 +13,9 @@ class DocumentConverterResult:
     ):
         """
         Initialize the DocumentConverterResult.
+
+        The only required parameter is the converted Markdown text.
+        The title, and any other metadata that may be added in the future, are optional.
 
         Parameters:
         - markdown: The converted Markdown text.
@@ -72,27 +76,25 @@ class BaseDocumentConverter:
 
     def convert(
         self,
-        file_stream,
-        *,
-        mime_type: str = "application/octet-stream",
-        file_extension: Optional[str] = None,
-        charset: Optional[str] = None,
-        **kwargs: Any,
+        file_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,  # Options to pass to the converter
     ) -> Union[None, DocumentConverterResult]:
         """
         Convert a document to Markdown text, or return None if the converter
         cannot handle the document (causing the next converter to be tried).
 
         The determination of whether a converter can handle a document is primarily based on
-        the provided MIME type. The file extension can serve as a secondary check if the
-        MIME type is not sufficiently specific (e.g., application/octet-stream). Finally, the
-        chatset is used to determine the encoding of the file content in cases of text/*
+        the provided `stream_info.mimetype`. The field `stream_info.extension` can serve as
+        a secondary check if the MIME type is not sufficiently specific
+        (e.g., application/octet-stream). In the case of data retreived via HTTP, the
+        `steam_info.url` might also be referenced to guide conversion (e.g., special-handling
+        for Wikipedia). Finally, the `stream_info.chatset` is used to determine the encoding
+        of the file content in cases of text/*
 
         Prameters:
         - file_stream: The file-like object to convert. Must support seek(), tell(), and read() methods.
-        - mime_type: The MIME type of the file. Default is "application/octet-stream".
-        - file_extension: The file extension of the file. Default is None.
-        - charset: The character set of the file. Default is None.
+        - stream_info: The StreamInfo object containing metadata about the file (mimetype, extension, charset, set)
         - kwargs: Additional keyword arguments for the converter.
 
         Returns:
