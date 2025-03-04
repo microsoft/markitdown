@@ -80,23 +80,46 @@ class DocumentConverter:
         """
         self._priority = priority
 
-    def convert_stream(
+    def accepts(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
         **kwargs: Any,  # Options to pass to the converter
-    ) -> Union[None, DocumentConverterResult]:
+    ) -> bool:
         """
-        Convert a document to Markdown text, or return None if the converter
-        cannot handle the document (causing the next converter to be tried).
+        Return a quick determination on if the converter should attempt converting the document.
+        This is primarily based `stream_info` (typically, `stream_info.mimetype`, `stream_info.extension`).
+        In cases where the data is retreived via HTTP, the `steam_info.url` might also be referenced to
+        make a determination (e.g., special converters for Wikipedia, YouTube etc).
+        Finally, it is conceivable that the `stream_info.filename` might be used to in cases
+        where the filename is well-known (e.g., `Dockerfile`, `Makefile`, etc)
 
-        The determination of whether a converter can handle a document is primarily based on
-        the provided `stream_info.mimetype`. The field `stream_info.extension` can serve as
-        a secondary check if the MIME type is not sufficiently specific
-        (e.g., application/octet-stream). In the case of data retreived via HTTP, the
-        `steam_info.url` might also be referenced to guide conversion (e.g., special-handling
-        for Wikipedia). Finally, the `stream_info.chatset` is used to determine the encoding
-        of the file content in cases of text/*
+        NOTE: The method signature is designed to match that of the convert() method. This provides some
+        assurance that, if accepts() returns True, the convert() method will also be able to handle the document.
+
+        IMPORTANT: If this method advances the position in file_stream, it must also reset the position before
+        returning. This is because the convert() method may be called immediately after accepts().
+
+        Prameters:
+        - file_stream: The file-like object to convert. Must support seek(), tell(), and read() methods.
+        - stream_info: The StreamInfo object containing metadata about the file (mimetype, extension, charset, set)
+        - kwargs: Additional keyword arguments for the converter.
+
+        Returns:
+        - bool: True if the converter can handle the document, False otherwise.
+        """
+        raise NotImplementedError(
+            f"The subclass, {type(self).__name__}, must implement the accepts() method to determine if they can handle the document."
+        )
+
+    def convert(
+        self,
+        file_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,  # Options to pass to the converter
+    ) -> DocumentConverterResult:
+        """
+        Convert a document to Markdown text.
 
         Prameters:
         - file_stream: The file-like object to convert. Must support seek(), tell(), and read() methods.
@@ -105,67 +128,10 @@ class DocumentConverter:
 
         Returns:
         - DocumentConverterResult: The result of the conversion, which includes the title and markdown content.
-        or
-        - None: If the converter cannot handle the document.
 
         Raises:
         - FileConversionException: If the mimetype is recognized, but the conversion fails for some other reason.
         - MissingDependencyException: If the converter requires a dependency that is not installed.
-        """
-
-        # Default implementation ensures backward compatibility with the legacy convert() method, and
-        # should absolutely be overridden in subclasses. This behavior is deprecated and will be removed
-        # in the future.
-        result = None
-        used_legacy = False
-
-        if stream_info.local_path is not None and os.path.exists(
-            stream_info.local_path
-        ):
-            # If the stream is backed by a local file, pass it to the legacy convert() method
-            try:
-                result = self.convert(stream_info.local_path, **kwargs)
-                used_legacy = True
-            except (
-                NotImplementedError
-            ):  # If it wasn't implemented, rethrow the error, but with this as the stack trace
-                raise NotImplementedError(
-                    "Subclasses must implement the convert_stream method."
-                )
-        else:
-            # Otherwise, we need to read the stream into a temporary file. There is potential for
-            # thrashing here if there are many converters or conversion attempts
-            cur_pos = file_stream.tell()
-            temp_fd, temp_path = tempfile.mkstemp()
-            try:
-                with os.fdopen(temp_fd, "wb") as temp_file:
-                    temp_file.write(file_stream.read())
-                try:
-                    result = self.convert(temp_path, **kwargs)
-                    used_legacy = True
-                except NotImplementedError:
-                    raise NotImplementedError(
-                        "Subclasses must implement the convert_stream method."
-                    )
-            finally:
-                os.remove(temp_path)
-                file_stream.seek(0)
-
-        if used_legacy:
-            message = f"{type(self).__name__} uses the legacy convert() method, which is deprecated."
-            if message not in _WARNED:
-                warn(message, DeprecationWarning)
-                _WARNED.append(message)
-
-        return result
-
-    def convert(
-        self, local_path: str, **kwargs: Any
-    ) -> Union[None, DocumentConverterResult]:
-        """
-        Legacy, and deprecated method to convert a document to Markdown text.
-        This method reads from the file at `local_path` and returns the converted Markdown text.
-        This method is deprecated in favor of `convert_stream`, which uses a file-like object.
         """
         raise NotImplementedError("Subclasses must implement this method")
 

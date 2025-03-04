@@ -1,12 +1,13 @@
+import sys
 import base64
 import re
 import html
-import sys
 
-from typing import Union
+from typing import BinaryIO, Any
 
-from .._base_converter import DocumentConverter, DocumentConverterResult
 from ._html_converter import HtmlConverter
+from .._base_converter import DocumentConverter, DocumentConverterResult
+from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 
 # Try loading optional (but in this case, required) dependencies
@@ -19,7 +20,14 @@ except ImportError:
     _dependency_exc_info = sys.exc_info()
 
 
-class PptxConverter(HtmlConverter):
+ACCEPTED_MIME_TYPE_PREFIXES = [
+    "application/vnd.openxmlformats-officedocument.presentationml",
+]
+
+ACCEPTED_FILE_EXTENSIONS = [".pptx"]
+
+
+class PptxConverter(DocumentConverter):
     """
     Converts PPTX files to Markdown. Supports heading, tables and images with alt text.
     """
@@ -28,6 +36,7 @@ class PptxConverter(HtmlConverter):
         self, priority: float = DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT
     ):
         super().__init__(priority=priority)
+        self._html_converter = HtmlConverter()
 
     def _get_llm_description(
         self, llm_client, llm_model, image_blob, content_type, prompt=None
@@ -58,12 +67,30 @@ class PptxConverter(HtmlConverter):
         )
         return response.choices[0].message.content
 
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
-        # Bail if not a PPTX
-        extension = kwargs.get("file_extension", "")
-        if extension.lower() != ".pptx":
-            return None
+    def accepts(
+        self,
+        file_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,  # Options to pass to the converter
+    ) -> bool:
+        mimetype = (stream_info.mimetype or "").lower()
+        extension = (stream_info.extension or "").lower()
 
+        if extension in ACCEPTED_FILE_EXTENSIONS:
+            return True
+
+        for prefix in ACCEPTED_MIME_TYPE_PREFIXES:
+            if mimetype.startswith(prefix):
+                return True
+
+        return False
+
+    def convert(
+        self,
+        file_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,  # Options to pass to the converter
+    ) -> DocumentConverterResult:
         # Check the dependencies
         if _dependency_exc_info is not None:
             raise MissingDependencyException(
@@ -76,7 +103,8 @@ class PptxConverter(HtmlConverter):
                 _dependency_exc_info[2]
             )  # Restore the original traceback
 
-        presentation = pptx.Presentation(local_path)
+        # Perform the conversion
+        presentation = pptx.Presentation(file_stream)
         md_content = ""
         slide_num = 0
         for slide in presentation.slides:
@@ -130,21 +158,7 @@ class PptxConverter(HtmlConverter):
 
                 # Tables
                 if self._is_table(shape):
-                    html_table = "<html><body><table>"
-                    first_row = True
-                    for row in shape.table.rows:
-                        html_table += "<tr>"
-                        for cell in row.cells:
-                            if first_row:
-                                html_table += "<th>" + html.escape(cell.text) + "</th>"
-                            else:
-                                html_table += "<td>" + html.escape(cell.text) + "</td>"
-                        html_table += "</tr>"
-                        first_row = False
-                    html_table += "</table></body></html>"
-                    md_content += (
-                        "\n" + self._convert(html_table).text_content.strip() + "\n"
-                    )
+                    md_content += self._convert_table_to_markdown(shape.table)
 
                 # Charts
                 if shape.has_chart:
@@ -188,6 +202,23 @@ class PptxConverter(HtmlConverter):
         if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.TABLE:
             return True
         return False
+
+    def _convert_table_to_markdown(self, table):
+        # Write the table as HTML, then convert it to Markdown
+        html_table = "<html><body><table>"
+        first_row = True
+        for row in table.rows:
+            html_table += "<tr>"
+            for cell in row.cells:
+                if first_row:
+                    html_table += "<th>" + html.escape(cell.text) + "</th>"
+                else:
+                    html_table += "<td>" + html.escape(cell.text) + "</td>"
+            html_table += "</tr>"
+            first_row = False
+        html_table += "</table></body></html>"
+
+        return self._html_converter.convert_string(html_table).markdown.strip() + "\n"
 
     def _convert_chart_to_markdown(self, chart):
         md = "\n\n### Chart"

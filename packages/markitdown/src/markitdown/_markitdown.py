@@ -414,8 +414,16 @@ class MarkItDown:
         # The sort is guaranteed to be stable, so converters with the same priority will remain in the same order.
         sorted_converters = sorted(self._converters, key=lambda x: x.priority)
 
+        # Remember the initial stream position so that we can return to it
+        cur_pos = file_stream.tell()
+
         for stream_info in stream_info_guesses + [StreamInfo()]:
             for converter in sorted_converters:
+                # Sanity check -- make sure the cur_pos is still the same
+                assert (
+                    cur_pos == file_stream.tell()
+                ), f"File stream position should NOT change between guess iterations"
+
                 _kwargs = copy.deepcopy(kwargs)
 
                 # Copy any additional global options
@@ -442,17 +450,29 @@ class MarkItDown:
                     if stream_info.url is not None:
                         _kwargs["url"] = stream_info.url
 
-                # Attempt the conversion
-                cur_pos = file_stream.tell()
+                # Check if the converter will accept the file, and if so, try to convert it
+                _accepts = False
                 try:
-                    res = converter.convert_stream(file_stream, stream_info, **_kwargs)
-                except Exception:
-                    failed_attempts.append(
-                        FailedConversionAttempt(
-                            converter=converter, exc_info=sys.exc_info()
-                        )
-                    )
-                finally:
+                    _accepts = converter.accepts(file_stream, stream_info, **_kwargs)
+                except NotImplementedError:
+                    pass
+
+                # accept() should not have changed the file stream position
+                assert (
+                    cur_pos == file_stream.tell()
+                ), f"{type(converter).__name__}.accept() should NOT change the file_stream position"
+
+                # Attempt the conversion
+                if _accepts:
+                    # try:
+                    res = converter.convert(file_stream, stream_info, **_kwargs)
+                    # except Exception:
+                    #    failed_attempts.append(
+                    #        FailedConversionAttempt(
+                    #            converter=converter, exc_info=sys.exc_info()
+                    #        )
+                    #    )
+                    # finally:
                     file_stream.seek(cur_pos)
 
                 if res is not None:

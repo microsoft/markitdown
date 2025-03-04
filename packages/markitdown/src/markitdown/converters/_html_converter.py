@@ -1,4 +1,5 @@
-from typing import Any, Union, BinaryIO
+import io
+from typing import Any, BinaryIO, Optional
 from bs4 import BeautifulSoup
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
@@ -24,39 +25,12 @@ class HtmlConverter(DocumentConverter):
     ):
         super().__init__(priority=priority)
 
-    def convert_stream(
+    def accepts(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
         **kwargs: Any,  # Options to pass to the converter
-    ) -> Union[None, DocumentConverterResult]:
-        # Bail if not html
-        if not self._is_html(stream_info):
-            return None
-
-        # Read the stream into a string
-        html_content = str(
-            file_stream.read(),
-            encoding=stream_info.charset if stream_info.charset else "utf-8",
-        )
-        return self._convert(html_content)
-
-    def convert(
-        self, local_path: str, **kwargs: Any
-    ) -> Union[None, DocumentConverterResult]:
-        # Bail if not html
-        extension = kwargs.get("file_extension", "")
-        if extension.lower() not in ACCEPTED_FILE_EXTENSIONS:
-            return None
-
-        result = None
-        with open(local_path, "rt", encoding="utf-8") as fh:
-            result = self._convert(fh.read())
-
-        return result
-
-    def _is_html(self, stream_info: StreamInfo) -> bool:
-        """Helper function that checks if the stream is html."""
+    ) -> bool:
         mimetype = (stream_info.mimetype or "").lower()
         extension = (stream_info.extension or "").lower()
 
@@ -69,11 +43,14 @@ class HtmlConverter(DocumentConverter):
 
         return False
 
-    def _convert(self, html_content: str) -> Union[None, DocumentConverterResult]:
-        """Helper function that converts an HTML string."""
-
-        # Parse the string
-        soup = BeautifulSoup(html_content, "html.parser")
+    def convert(
+        self,
+        file_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,  # Options to pass to the converter
+    ) -> DocumentConverterResult:
+        # Parse the stream
+        soup = BeautifulSoup(file_stream, "html.parser")
 
         # Remove javascript and style blocks
         for script in soup(["script", "style"]):
@@ -95,4 +72,23 @@ class HtmlConverter(DocumentConverter):
         return DocumentConverterResult(
             markdown=webpage_text,
             title=None if soup.title is None else soup.title.string,
+        )
+
+    def convert_string(
+        self, html_content: str, *, url: Optional[str] = None, **kwargs
+    ) -> DocumentConverterResult:
+        """
+        Non-standard convenience method to convert a string to markdown.
+        Given that many converters produce HTML as intermediate output, this
+        allows for easy conversion of HTML to markdown.
+        """
+        return self.convert(
+            file_stream=io.BytesIO(html_content.encode("utf-8")),
+            stream_info=StreamInfo(
+                mimetype="text/html",
+                extension=".html",
+                charset="utf-8",
+                url=url,
+            ),
+            **kwargs,
         )
