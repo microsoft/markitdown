@@ -1,7 +1,6 @@
 import tempfile
 from typing import Union
-from ._base import DocumentConverter
-from .._base_converter import DocumentConverterResult
+from .._base_converter import DocumentConverter, DocumentConverterResult
 from ._wav_converter import WavConverter
 from warnings import resetwarnings, catch_warnings
 

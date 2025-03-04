@@ -1,5 +1,11 @@
+import os
+import tempfile
+from warnings import warn
+from typing import Any, Union, BinaryIO, Optional, List
 from ._stream_info import StreamInfo
-from typing import Any, Union, BinaryIO, Optional
+
+# Avoid printing the same warning multiple times
+_WARNED: List[str] = []
 
 
 class DocumentConverterResult:
@@ -39,7 +45,7 @@ class DocumentConverterResult:
         return self.markdown
 
 
-class BaseDocumentConverter:
+class DocumentConverter:
     """Abstract superclass of all DocumentConverters."""
 
     # Lower priority values are tried first.
@@ -74,7 +80,7 @@ class BaseDocumentConverter:
         """
         self._priority = priority
 
-    def convert(
+    def convert_stream(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
@@ -105,6 +111,61 @@ class BaseDocumentConverter:
         Raises:
         - FileConversionException: If the mimetype is recognized, but the conversion fails for some other reason.
         - MissingDependencyException: If the converter requires a dependency that is not installed.
+        """
+
+        # Default implementation ensures backward compatibility with the legacy convert() method, and
+        # should absolutely be overridden in subclasses. This behavior is deprecated and will be removed
+        # in the future.
+        result = None
+        used_legacy = False
+
+        if stream_info.local_path is not None and os.path.exists(
+            stream_info.local_path
+        ):
+            # If the stream is backed by a local file, pass it to the legacy convert() method
+            try:
+                result = self.convert(stream_info.local_path, **kwargs)
+                used_legacy = True
+            except (
+                NotImplementedError
+            ):  # If it wasn't implemented, rethrow the error, but with this as the stack trace
+                raise NotImplementedError(
+                    "Subclasses must implement the convert_stream method."
+                )
+        else:
+            # Otherwise, we need to read the stream into a temporary file. There is potential for
+            # thrashing here if there are many converters or conversion attempts
+            cur_pos = file_stream.tell()
+            temp_fd, temp_path = tempfile.mkstemp()
+            try:
+                with os.fdopen(temp_fd, "wb") as temp_file:
+                    temp_file.write(file_stream.read())
+                try:
+                    result = self.convert(temp_path, **kwargs)
+                    used_legacy = True
+                except NotImplementedError:
+                    raise NotImplementedError(
+                        "Subclasses must implement the convert_stream method."
+                    )
+            finally:
+                os.remove(temp_path)
+                file_stream.seek(0)
+
+        if used_legacy:
+            message = f"{type(self).__name__} uses the legacy convert() method, which is deprecated."
+            if message not in _WARNED:
+                warn(message, DeprecationWarning)
+                _WARNED.append(message)
+
+        return result
+
+    def convert(
+        self, local_path: str, **kwargs: Any
+    ) -> Union[None, DocumentConverterResult]:
+        """
+        Legacy, and deprecated method to convert a document to Markdown text.
+        This method reads from the file at `local_path` and returns the converted Markdown text.
+        This method is deprecated in favor of `convert_stream`, which uses a file-like object.
         """
         raise NotImplementedError("Subclasses must implement this method")
 

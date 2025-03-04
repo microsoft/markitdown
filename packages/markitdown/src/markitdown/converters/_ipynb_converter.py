@@ -1,8 +1,7 @@
 import json
 from typing import Any, Union
 
-from ._base import DocumentConverter
-from .._base_converter import DocumentConverterResult
+from .._base_converter import DocumentConverter, DocumentConverterResult
 
 from .._exceptions import FileConversionException
 

@@ -1,6 +1,5 @@
 from typing import Union
-from ._base import DocumentConverter
-from .._base_converter import DocumentConverterResult
+from .._base_converter import DocumentConverter, DocumentConverterResult
 from ._media_converter import MediaConverter
 
 # Optional Transcription support

@@ -3,8 +3,7 @@ from typing import Union
 from bs4 import BeautifulSoup
 
 from ._markdownify import _CustomMarkdownify
-from ._base import DocumentConverter
-from .._base_converter import DocumentConverterResult
+from .._base_converter import DocumentConverter, DocumentConverterResult
 
 
 class RssConverter(DocumentConverter):

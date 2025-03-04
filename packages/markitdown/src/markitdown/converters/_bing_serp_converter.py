@@ -6,8 +6,7 @@ from typing import Union
 from urllib.parse import parse_qs, urlparse
 from bs4 import BeautifulSoup
 
-from ._base import DocumentConverter
-from .._base_converter import DocumentConverterResult
+from .._base_converter import DocumentConverter, DocumentConverterResult
 from ._markdownify import _CustomMarkdownify
 
 

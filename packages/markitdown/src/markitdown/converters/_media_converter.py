@@ -3,7 +3,7 @@ import shutil
 import json
 from warnings import warn
 
-from ._base import DocumentConverter
+from .._base_converter import DocumentConverter
 
 
 class MediaConverter(DocumentConverter):

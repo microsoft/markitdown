@@ -3,8 +3,7 @@ import mimetypes
 from charset_normalizer import from_path
 from typing import Any, Union
 
-from ._base import DocumentConverter
-from .._base_converter import DocumentConverterResult
+from .._base_converter import DocumentConverter, DocumentConverterResult
 
 
 # Mimetypes to ignore (commonly confused extensions)

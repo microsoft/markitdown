@@ -2,8 +2,7 @@ from typing import Any, Union
 import re
 import sys
 
-from ._base import DocumentConverter
-from .._base_converter import DocumentConverterResult
+from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._exceptions import MissingDependencyException
 
 # Try loading optional (but in this case, required) dependencies

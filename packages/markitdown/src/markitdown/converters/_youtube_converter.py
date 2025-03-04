@@ -7,8 +7,7 @@ from typing import Any, Union, Dict, List
 from urllib.parse import parse_qs, urlparse
 from bs4 import BeautifulSoup
 
-from ._base import DocumentConverter
-from .._base_converter import DocumentConverterResult
+from .._base_converter import DocumentConverter, DocumentConverterResult
 
 
 # Optional YouTube transcription support

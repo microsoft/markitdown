@@ -20,7 +20,6 @@ import requests
 from ._stream_info import StreamInfo
 
 from .converters import (
-    DocumentConverter,
     PlainTextConverter,
     HtmlConverter,
     RssConverter,
@@ -41,7 +40,7 @@ from .converters import (
     DocumentIntelligenceConverter,
 )
 
-from ._base_converter import DocumentConverterResult
+from ._base_converter import DocumentConverter, DocumentConverterResult
 
 from ._exceptions import (
     FileConversionException,
@@ -102,7 +101,7 @@ class MarkItDown:
         self._style_map = None
 
         # Register the converters
-        self._page_converters: List[DocumentConverter] = []
+        self._converters: List[DocumentConverter] = []
 
         if (
             enable_builtins is None or enable_builtins
@@ -405,108 +404,73 @@ class MarkItDown:
     def _convert(
         self, *, file_stream: BinaryIO, stream_info_guesses: List[StreamInfo], **kwargs
     ) -> DocumentConverterResult:
-        # Lazily create a temporary file, if needed, for backward compatibility
-        # This is to support a deprecated feature, and will be removed in the future
-        temp_file = None
+        res: Union[None, DocumentConverterResult] = None
 
-        def get_temp_file():
-            nonlocal temp_file
+        # Keep track of which converters throw exceptions
+        failed_attempts: List[FailedConversionAttempt] = []
 
-            if temp_file is not None:
-                return temp_file
-            else:
+        # Create a copy of the page_converters list, sorted by priority.
+        # We do this with each call to _convert because the priority of converters may change between calls.
+        # The sort is guaranteed to be stable, so converters with the same priority will remain in the same order.
+        sorted_converters = sorted(self._converters, key=lambda x: x.priority)
+
+        for stream_info in stream_info_guesses + [StreamInfo()]:
+            for converter in sorted_converters:
+                _kwargs = copy.deepcopy(kwargs)
+
+                # Copy any additional global options
+                if "llm_client" not in _kwargs and self._llm_client is not None:
+                    _kwargs["llm_client"] = self._llm_client
+
+                if "llm_model" not in _kwargs and self._llm_model is not None:
+                    _kwargs["llm_model"] = self._llm_model
+
+                if "style_map" not in _kwargs and self._style_map is not None:
+                    _kwargs["style_map"] = self._style_map
+
+                if "exiftool_path" not in _kwargs and self._exiftool_path is not None:
+                    _kwargs["exiftool_path"] = self._exiftool_path
+
+                # Add the list of converters for nested processing
+                _kwargs["_parent_converters"] = self._converters
+
+                # Add legaxy kwargs
+                if stream_info is not None:
+                    if stream_info.extension is not None:
+                        _kwargs["file_extension"] = stream_info.extension
+
+                    if stream_info.url is not None:
+                        _kwargs["url"] = stream_info.url
+
+                # Attempt the conversion
                 cur_pos = file_stream.tell()
-                handle, temp_file = tempfile.mkstemp()
-                fh = os.fdopen(handle, "wb")
-                file_stream.seek(0)
-                fh.write(file_stream.read())
-                file_stream.seek(cur_pos)
-                fh.close()
-            return temp_file
-
-        try:
-            res: Union[None, DocumentConverterResult] = None
-
-            # Keep track of which converters throw exceptions
-            failed_attempts: List[FailedConversionAttempt] = []
-
-            # Create a copy of the page_converters list, sorted by priority.
-            # We do this with each call to _convert because the priority of converters may change between calls.
-            # The sort is guaranteed to be stable, so converters with the same priority will remain in the same order.
-            sorted_converters = sorted(self._page_converters, key=lambda x: x.priority)
-
-            for file_info in stream_info_guesses + [None]:
-                for converter in sorted_converters:
-                    _kwargs = copy.deepcopy(kwargs)
-
-                    # Copy any additional global options
-                    if "llm_client" not in _kwargs and self._llm_client is not None:
-                        _kwargs["llm_client"] = self._llm_client
-
-                    if "llm_model" not in _kwargs and self._llm_model is not None:
-                        _kwargs["llm_model"] = self._llm_model
-
-                    if "style_map" not in _kwargs and self._style_map is not None:
-                        _kwargs["style_map"] = self._style_map
-
-                    if (
-                        "exiftool_path" not in _kwargs
-                        and self._exiftool_path is not None
-                    ):
-                        _kwargs["exiftool_path"] = self._exiftool_path
-
-                    # Add the list of converters for nested processing
-                    _kwargs["_parent_converters"] = self._page_converters
-
-                    # Add backwards compatibility
-                    if isinstance(converter, DocumentConverter):
-                        if file_info is not None:
-                            # Legacy converters need a file_extension
-                            if file_info.extension is not None:
-                                _kwargs["file_extension"] = file_info.extension
-
-                            # And benefit from urls, when available
-                            if file_info.url is not None:
-                                _kwargs["url"] = file_info.url
-
-                        try:
-                            res = converter.convert(get_temp_file(), **_kwargs)
-                        except Exception:
-                            failed_attempts.append(
-                                FailedConversionAttempt(
-                                    converter=converter, exc_info=sys.exc_info()
-                                )
-                            )
-                    else:
-                        raise NotImplementedError("TODO")
-
-                    if res is not None:
-                        # Normalize the content
-                        res.text_content = "\n".join(
-                            [
-                                line.rstrip()
-                                for line in re.split(r"\r?\n", res.text_content)
-                            ]
-                        )
-                        res.text_content = re.sub(r"\n{3,}", "\n\n", res.text_content)
-                        return res
-
-            # If we got this far without success, report any exceptions
-            if len(failed_attempts) > 0:
-                raise FileConversionException(attempts=failed_attempts)
-
-            # Nothing can handle it!
-            raise UnsupportedFormatException(
-                f"Could not convert stream to Markdown. No converter attempted a conversion, suggesting that the filetype is simply not supported."
-            )
-
-        finally:
-            # Clean up the temporary file
-            if temp_file is not None:
                 try:
-                    os.unlink(temp_file)
+                    res = converter.convert_stream(file_stream, stream_info, **_kwargs)
                 except Exception:
-                    pass
+                    failed_attempts.append(
+                        FailedConversionAttempt(
+                            converter=converter, exc_info=sys.exc_info()
+                        )
+                    )
+                finally:
+                    file_stream.seek(cur_pos)
+
+                if res is not None:
+                    # Normalize the content
+                    res.text_content = "\n".join(
+                        [line.rstrip() for line in re.split(r"\r?\n", res.text_content)]
+                    )
+                    res.text_content = re.sub(r"\n{3,}", "\n\n", res.text_content)
+                    return res
+
+        # If we got this far without success, report any exceptions
+        if len(failed_attempts) > 0:
+            raise FileConversionException(attempts=failed_attempts)
+
+        # Nothing can handle it!
+        raise UnsupportedFormatException(
+            f"Could not convert stream to Markdown. No converter attempted a conversion, suggesting that the filetype is simply not supported."
+        )
 
     def register_page_converter(self, converter: DocumentConverter) -> None:
         """DEPRECATED: User register_converter instead."""
@@ -516,6 +480,6 @@ class MarkItDown:
         )
         self.register_converter(converter)
 
-    def register_converter(self, converter: DocumentConverter) -> None:
+    def register_converter(self, converter: Union[DocumentConverter]) -> None:
         """Register a page text converter."""
-        self._page_converters.insert(0, converter)
+        self._converters.insert(0, converter)

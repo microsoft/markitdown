@@ -3,8 +3,7 @@ import re
 from typing import Any, Union
 from bs4 import BeautifulSoup
 
-from ._base import DocumentConverter
-from .._base_converter import DocumentConverterResult
+from .._base_converter import DocumentConverter, DocumentConverterResult
 from ._markdownify import _CustomMarkdownify
 
 
