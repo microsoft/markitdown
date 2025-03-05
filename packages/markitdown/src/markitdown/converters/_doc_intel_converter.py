@@ -92,8 +92,7 @@ class DocumentIntelligenceConverter(DocumentConverter):
             api_version=self.api_version,
             credential=DefaultAzureCredential(),
         )
-        self._priority = priority
-
+        
     def accepts(
         self,
         file_stream: BinaryIO,
