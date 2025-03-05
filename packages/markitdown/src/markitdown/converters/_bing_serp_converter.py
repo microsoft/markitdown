@@ -70,7 +70,8 @@ class BingSerpConverter(DocumentConverter):
         query = parsed_params.get("q", [""])[0]
 
         # Parse the stream
-        soup = BeautifulSoup(file_stream, "html.parser")
+        encoding = "utf-8" if stream_info.charset is None else stream_info.charset
+        soup = BeautifulSoup(file_stream, "html.parser", from_encoding=encoding)
 
         # Clean up some formatting
         for tptt in soup.find_all(class_="tptt"):

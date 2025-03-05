@@ -101,5 +101,4 @@ class StreamInfo:
                 # and, in any case, doesn't add new information.
                 guesses.append(cls(**kwargs))
 
-        # Return the guesses
         return guesses

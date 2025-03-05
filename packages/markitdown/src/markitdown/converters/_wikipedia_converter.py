@@ -61,7 +61,8 @@ class WikipediaConverter(DocumentConverter):
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
         # Parse the stream
-        soup = BeautifulSoup(file_stream, "html.parser")
+        encoding = "utf-8" if stream_info.charset is None else stream_info.charset
+        soup = BeautifulSoup(file_stream, "html.parser", from_encoding=encoding)
 
         # Remove javascript and style blocks
         for script in soup(["script", "style"]):
