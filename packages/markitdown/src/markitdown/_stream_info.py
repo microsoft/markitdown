@@ -62,7 +62,8 @@ def _guess_stream_info_from_stream(
     # Add a guess purely based on the filename hint
     if filename_hint:
         try:
-            mimetype, _ = mimetypes.guess_file_type(filename_hint)
+            # Requires Python 3.13+
+            mimetype, _ = mimetypes.guess_file_type(filename_hint)  # type: ignore
         except AttributeError:
             mimetype, _ = mimetypes.guess_type(filename_hint)
 
