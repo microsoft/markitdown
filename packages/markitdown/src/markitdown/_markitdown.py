@@ -130,7 +130,7 @@ class MarkItDown:
             # Later registrations are tried first / take higher priority than earlier registrations
             # To this end, the most specific converters should appear below the most generic converters
             self.register_converter(PlainTextConverter())
-            self.register_converter(ZipConverter())
+            self.register_converter(ZipConverter(markitdown=self))
             self.register_converter(HtmlConverter())
             self.register_converter(RssConverter())
             self.register_converter(WikipediaConverter())
@@ -464,16 +464,16 @@ class MarkItDown:
 
                 # Attempt the conversion
                 if _accepts:
-                    # try:
-                    res = converter.convert(file_stream, stream_info, **_kwargs)
-                    # except Exception:
-                    #    failed_attempts.append(
-                    #        FailedConversionAttempt(
-                    #            converter=converter, exc_info=sys.exc_info()
-                    #        )
-                    #    )
-                    # finally:
-                    file_stream.seek(cur_pos)
+                    try:
+                        res = converter.convert(file_stream, stream_info, **_kwargs)
+                    except Exception:
+                        failed_attempts.append(
+                            FailedConversionAttempt(
+                                converter=converter, exc_info=sys.exc_info()
+                            )
+                        )
+                    finally:
+                        file_stream.seek(cur_pos)
 
                 if res is not None:
                     # Normalize the content

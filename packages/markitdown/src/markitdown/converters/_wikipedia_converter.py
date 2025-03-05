@@ -36,7 +36,7 @@ class WikipediaConverter(DocumentConverter):
         Make sure we're dealing with HTML content *from* Wikipedia.
         """
 
-        url = (stream_info.url or "").lower()
+        url = stream_info.url or ""
         mimetype = (stream_info.mimetype or "").lower()
         extension = (stream_info.extension or "").lower()
 

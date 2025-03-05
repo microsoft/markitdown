@@ -1,4 +1,6 @@
 import puremagic
+import mimetypes
+import os
 from dataclasses import dataclass, asdict
 from typing import Optional, BinaryIO, List, TypeVar, Type
 
@@ -55,6 +57,18 @@ class StreamInfo:
         Returns a list of StreamInfo objects in order of confidence.
         """
         guesses: List[StreamInfo] = []
+
+        # Add a guess purely based on the filename hint
+        if filename_hint:
+            try:
+                mimetype, _ = mimetypes.guess_file_type(filename_hint)
+            except AttributeError:
+                mimetype, _ = mimetypes.guess_type(filename_hint)
+
+            if mimetype:
+                guesses.append(
+                    cls(mimetype=mimetype, extension=os.path.splitext(filename_hint)[1])
+                )
 
         def _puremagic(
             file_stream, filename_hint

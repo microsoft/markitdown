@@ -1,7 +1,12 @@
 import sys
-from typing import Union
+
+from typing import BinaryIO, Any
+
+from ._html_converter import HtmlConverter
 from .._base_converter import DocumentConverter, DocumentConverterResult
+from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+
 
 # Try loading optional (but in this case, required) dependencies
 # Save reporting of any exceptions for later
@@ -14,6 +19,14 @@ except ImportError:
     _dependency_exc_info = sys.exc_info()
 
 
+ACCEPTED_MIME_TYPE_PREFIXES = [
+    "application/pdf",
+    "application/x-pdf",
+]
+
+ACCEPTED_FILE_EXTENSIONS = [".pdf"]
+
+
 class PdfConverter(DocumentConverter):
     """
     Converts PDFs to Markdown. Most style information is ignored, so the results are essentially plain-text.
@@ -24,12 +37,30 @@ class PdfConverter(DocumentConverter):
     ):
         super().__init__(priority=priority)
 
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
-        # Bail if not a PDF
-        extension = kwargs.get("file_extension", "")
-        if extension.lower() != ".pdf":
-            return None
+    def accepts(
+        self,
+        file_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,  # Options to pass to the converter
+    ) -> bool:
+        mimetype = (stream_info.mimetype or "").lower()
+        extension = (stream_info.extension or "").lower()
 
+        if extension in ACCEPTED_FILE_EXTENSIONS:
+            return True
+
+        for prefix in ACCEPTED_MIME_TYPE_PREFIXES:
+            if mimetype.startswith(prefix):
+                return True
+
+        return False
+
+    def convert(
+        self,
+        file_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,  # Options to pass to the converter
+    ) -> DocumentConverterResult:
         # Check the dependencies
         if _dependency_exc_info is not None:
             raise MissingDependencyException(
@@ -43,5 +74,5 @@ class PdfConverter(DocumentConverter):
             )  # Restore the original traceback
 
         return DocumentConverterResult(
-            markdown=pdfminer.high_level.extract_text(local_path)
+            markdown=pdfminer.high_level.extract_text(file_stream),
         )

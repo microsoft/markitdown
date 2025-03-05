@@ -41,7 +41,7 @@ class DocumentConverterResult:
         self.markdown = markdown
 
     def __str__(self) -> str:
-        """Return the Markdown content."""
+        """Return the converted Markdown text."""
         return self.markdown
 
 

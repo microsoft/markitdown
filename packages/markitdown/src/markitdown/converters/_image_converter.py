@@ -1,4 +1,4 @@
-from typing import BinaryIO, Any
+from typing import BinaryIO, Any, Union
 import base64
 import mimetypes
 from ._exiftool import exiftool_metadata
@@ -71,53 +71,73 @@ class ImageConverter(DocumentConverter):
                 if f in metadata:
                     md_content += f"{f}: {metadata[f]}\n"
 
-        #        # Try describing the image with GPTV
-        #        llm_client = kwargs.get("llm_client")
-        #        llm_model = kwargs.get("llm_model")
-        #        if llm_client is not None and llm_model is not None:
-        #            md_content += (
-        #                "\n# Description:\n"
-        #                + self._get_llm_description(
-        #                    local_path,
-        #                    extension,
-        #                    llm_client,
-        #                    llm_model,
-        #                    prompt=kwargs.get("llm_prompt"),
-        #                ).strip()
-        #                + "\n"
-        #            )
+        # Try describing the image with GPT
+        llm_client = kwargs.get("llm_client")
+        llm_model = kwargs.get("llm_model")
+        if llm_client is not None and llm_model is not None:
+            md_content += (
+                "\n# Description:\n"
+                + self._get_llm_description(
+                    file_stream,
+                    stream_info,
+                    client=llm_client,
+                    model=llm_model,
+                    prompt=kwargs.get("llm_prompt"),
+                ).strip()
+                + "\n"
+            )
 
         return DocumentConverterResult(
             markdown=md_content,
         )
 
+    def _get_llm_description(
+        self,
+        file_stream: BinaryIO,
+        stream_info: StreamInfo,
+        *,
+        client,
+        model,
+        prompt=None,
+    ) -> Union[None, str]:
+        if prompt is None or prompt.strip() == "":
+            prompt = "Write a detailed caption for this image."
 
-#    def _get_llm_description(self, local_path, extension, client, model, prompt=None):
-#        if prompt is None or prompt.strip() == "":
-#            prompt = "Write a detailed caption for this image."
-#
-#        data_uri = ""
-#        with open(local_path, "rb") as image_file:
-#            content_type, encoding = mimetypes.guess_type("_dummy" + extension)
-#            if content_type is None:
-#                content_type = "image/jpeg"
-#            image_base64 = base64.b64encode(image_file.read()).decode("utf-8")
-#            data_uri = f"data:{content_type};base64,{image_base64}"
-#
-#        messages = [
-#            {
-#                "role": "user",
-#                "content": [
-#                    {"type": "text", "text": prompt},
-#                    {
-#                        "type": "image_url",
-#                        "image_url": {
-#                            "url": data_uri,
-#                        },
-#                    },
-#                ],
-#            }
-#        ]
-#
-#        response = client.chat.completions.create(model=model, messages=messages)
-#        return response.choices[0].message.content
+        # Get the content type
+        content_type = stream_info.mimetype
+        if not content_type:
+            content_type, _ = mimetypes.guess_type("_dummy" + stream_info.extension)
+        if not content_type:
+            content_type = "application/octet-stream"
+
+        # Convert to base64
+        cur_pos = file_stream.tell()
+        try:
+            base64_image = base64.b64encode(file_stream.read()).decode("utf-8")
+        except Exception as e:
+            return None
+        finally:
+            file_stream.seek(cur_pos)
+
+        # Prepare the data-uri
+        data_uri = f"data:{content_type};base64,{base64_image}"
+
+        # Prepare the OpenAI API request
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": data_uri,
+                        },
+                    },
+                ],
+            }
+        ]
+
+        # Call the OpenAI API
+        response = client.chat.completions.create(model=model, messages=messages)
+        return response.choices[0].message.content

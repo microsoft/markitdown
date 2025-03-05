@@ -2,6 +2,7 @@
 import io
 import os
 import shutil
+import openai
 
 import pytest
 import requests
@@ -289,7 +290,6 @@ def test_markitdown_remote() -> None:
         assert test_string in result.text_content
 
     # Youtube
-    # TODO: This test randomly fails for some reason. Haven't been able to repro it yet. Disabling until I can debug the issue
     result = markitdown.convert(YOUTUBE_TEST_URL)
     for test_string in YOUTUBE_TEST_STRINGS:
         assert test_string in result.text_content
@@ -297,6 +297,10 @@ def test_markitdown_remote() -> None:
 
 def test_markitdown_local() -> None:
     markitdown = MarkItDown()
+
+    # Test PDF processing
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.pdf"))
+    validate_strings(result, PDF_TEST_STRINGS)
 
     # Test XLSX processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.xlsx"))
@@ -336,10 +340,6 @@ def test_markitdown_local() -> None:
     )
     validate_strings(result, BLOG_TEST_STRINGS)
 
-    # Test ZIP file processing
-    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test_files.zip"))
-    validate_strings(result, XLSX_TEST_STRINGS)
-
     # Test Wikipedia processing
     result = markitdown.convert(
         os.path.join(TEST_FILES_DIR, "test_wikipedia.html"), url=WIKIPEDIA_TEST_URL
@@ -360,17 +360,23 @@ def test_markitdown_local() -> None:
     for test_string in RSS_TEST_STRINGS:
         assert test_string in text_content
 
-    ## Test non-UTF-8 encoding
-    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test_mskanji.csv"))
-    validate_strings(result, CSV_CP932_TEST_STRINGS)
-
     # Test MSG (Outlook email) processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test_outlook_msg.msg"))
     validate_strings(result, MSG_TEST_STRINGS)
 
+    # Test non-UTF-8 encoding
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test_mskanji.csv"))
+    validate_strings(result, CSV_CP932_TEST_STRINGS)
+
     # Test JSON processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.json"))
     validate_strings(result, JSON_TEST_STRINGS)
+
+    # # Test ZIP file processing
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test_files.zip"))
+    validate_strings(result, DOCX_TEST_STRINGS)
+    validate_strings(result, XLSX_TEST_STRINGS)
+    validate_strings(result, BLOG_TEST_STRINGS)
 
     # Test input from a stream
     input_data = b"<html><body><h1>Test</h1></body></html>"
@@ -441,7 +447,6 @@ def test_markitdown_llm() -> None:
     markitdown = MarkItDown(llm_client=client, llm_model="gpt-4o")
 
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test_llm.jpg"))
-
     for test_string in LLM_TEST_STRINGS:
         assert test_string in result.text_content
 
@@ -450,6 +455,14 @@ def test_markitdown_llm() -> None:
     for test_string in ["red", "circle", "blue", "square"]:
         assert test_string in result.text_content.lower()
 
+    # Images embedded in PPTX files
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.pptx"))
+    # LLM Captions are included
+    for test_string in LLM_TEST_STRINGS:
+        assert test_string in result.text_content
+    # Standard alt text is included
+    validate_strings(result, PPTX_TEST_STRINGS)
+
 
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
@@ -457,7 +470,7 @@ if __name__ == "__main__":
     test_stream_info_guesses()
     test_markitdown_remote()
     test_markitdown_local()
-    # test_exceptions()
-    # test_markitdown_exiftool()
-    # test_markitdown_llm()
+    test_exceptions()
+    test_markitdown_exiftool()
+    test_markitdown_llm()
     print("All tests passed!")
