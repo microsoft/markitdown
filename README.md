@@ -7,9 +7,11 @@
 > [!IMPORTANT]
 > Breaking changes between 0.0.1 to 0.0.2:
 > * Dependencies are now organized into optional feature-groups (further details below). Use `pip install markitdown[all]` to have backward-compatible behavior. 
+> * The DocumentConverter class interface has changed to read from file-like streams rather than file paths. *No temporary files are created anymore*. If you are the maintainer of a plugin, or custom DocumentConverter, you likely need to update your code. Otherwise, if only using the MarkItDown class or CLI (as in these examples), you should not need to change anything.
 
-MarkItDown is a utility for converting various files to Markdown (e.g., for indexing, text analysis, etc).
-It supports:
+MarkItDown is a utility for converting various files to Markdown (e.g., for indexing, text analysis, etc). It is comparable to [Apache Tika](https://tika.apache.org/) or [Azure Document Intelligence](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/overview?tabs=doc-intel-4.0.0), but can perform many simple operations locally, without a server or subscription. While the output is often reasonably presentable and human-friendly, it is meant to be consumed by text analysis tools. MarkItDown may not be the best option for high-fidelity document conversions for publication or document sharing, etc.
+
+At present, it supports:
 
 - PDF
 - PowerPoint
