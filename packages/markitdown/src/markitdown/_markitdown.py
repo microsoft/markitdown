@@ -33,8 +33,7 @@ from .converters import (
     XlsConverter,
     PptxConverter,
     ImageConverter,
-    WavConverter,
-    Mp3Converter,
+    AudioConverter,
     OutlookMsgConverter,
     ZipConverter,
     DocumentIntelligenceConverter,
@@ -140,8 +139,7 @@ class MarkItDown:
             self.register_converter(XlsxConverter())
             self.register_converter(XlsConverter())
             self.register_converter(PptxConverter())
-            self.register_converter(WavConverter())
-            self.register_converter(Mp3Converter())
+            self.register_converter(AudioConverter())
             self.register_converter(ImageConverter())
             self.register_converter(IpynbConverter())
             self.register_converter(PdfConverter())

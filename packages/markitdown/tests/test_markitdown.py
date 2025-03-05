@@ -7,7 +7,7 @@ import openai
 import pytest
 import requests
 
-from warnings import catch_warnings, resetwarnings
+import warnings
 
 from markitdown import (
     MarkItDown,
@@ -440,14 +440,15 @@ def test_markitdown_exiftool() -> None:
     # Test the automatic discovery of exiftool throws a warning
     # and is disabled
     try:
-        with catch_warnings(record=True) as w:
+        warnings.simplefilter("default")
+        with warnings.catch_warnings(record=True) as w:
             markitdown = MarkItDown()
             result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.jpg"))
             assert len(w) == 1
             assert w[0].category is DeprecationWarning
             assert result.text_content.strip() == ""
     finally:
-        resetwarnings()
+        warnings.resetwarnings()
 
     # Test explicitly setting the location of exiftool
     which_exiftool = shutil.which("exiftool")

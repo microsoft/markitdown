@@ -1,4 +1,5 @@
 import io
+import sys
 from typing import BinaryIO
 from .._exceptions import MissingDependencyException
 

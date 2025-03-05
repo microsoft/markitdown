@@ -4,7 +4,7 @@ import locale
 import sys
 import shutil
 import os
-from warnings import warn
+import warnings
 from typing import BinaryIO, Literal, Optional
 
 
@@ -15,7 +15,7 @@ def exiftool_metadata(
     if not exiftool_path:
         which_exiftool = shutil.which("exiftool")
         if which_exiftool:
-            warn(
+            warnings.warn(
                 f"""Implicit discovery of 'exiftool' is disabled. If you would like to continue to use exiftool in MarkItDown, please set the exiftool_path parameter in the MarkItDown consructor. E.g., 
 
     md = MarkItDown(exiftool_path="{which_exiftool}")

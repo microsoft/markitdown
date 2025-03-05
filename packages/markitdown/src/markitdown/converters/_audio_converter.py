@@ -21,9 +21,9 @@ ACCEPTED_FILE_EXTENSIONS = [
 ]
 
 
-class WavConverter(DocumentConverter):
+class AudioConverter(DocumentConverter):
     """
-    Converts WAV files to markdown via extraction of metadata (if `exiftool` is installed), and speech transcription (if `speech_recognition` is installed).
+    Converts audio files to markdown via extraction of metadata (if `exiftool` is installed), and speech transcription (if `speech_recognition` is installed).
     """
 
     def __init__(
@@ -37,10 +37,6 @@ class WavConverter(DocumentConverter):
         stream_info: StreamInfo,
         **kwargs: Any,  # Options to pass to the converter
     ) -> bool:
-        """
-        Make sure we're dealing with HTML content *from* Wikipedia.
-        """
-
         mimetype = (stream_info.mimetype or "").lower()
         extension = (stream_info.extension or "").lower()
 
