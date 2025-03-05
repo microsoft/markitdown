@@ -6,7 +6,7 @@
 
 > [!IMPORTANT]
 > Breaking changes between 0.0.1 to 0.0.2:
-> * Dependencies are now organized into optional feature-groups (further details below). Use `pip install markitdown[all]` to have backward-compatible behavior. 
+> * Dependencies are now organized into optional feature-groups (further details below). Use `pip install 'markitdown[all]'` to have backward-compatible behavior. 
 
 MarkItDown is a utility for converting various files to Markdown (e.g., for indexing, text analysis, etc).
 It supports:
@@ -23,7 +23,7 @@ It supports:
 - Youtube URLs
 - ... and more!
 
-To install MarkItDown, use pip: `pip install markitdown[all]`. Alternatively, you can install it from the source:
+To install MarkItDown, use pip: `pip install 'markitdown[all]'`. Alternatively, you can install it from the source:
 
 ```bash
 git clone git@github.com:microsoft/markitdown.git
