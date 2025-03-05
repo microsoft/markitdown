@@ -4,9 +4,6 @@ import os
 from dataclasses import dataclass, asdict
 from typing import Optional, BinaryIO, List, TypeVar, Type
 
-# This is a workaround for Self not being available in Python 3.10
-T = TypeVar("T", bound="StreamInfo")
-
 # Mimetype substitutions table
 MIMETYPE_SUBSTITUTIONS = {
     "application/excel": "application/vnd.ms-excel",
