@@ -3,11 +3,15 @@ import zipfile
 import io
 import os
 
-from typing import BinaryIO, Any
+from typing import BinaryIO, Any, TYPE_CHECKING
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
 from .._exceptions import UnsupportedFormatException, FileConversionException
+
+# Break otherwise circular import for type hinting
+if TYPE_CHECKING:
+    from .._markitdown import MarkItDown
 
 ACCEPTED_MIME_TYPE_PREFIXES = [
     "application/zip",
@@ -59,7 +63,7 @@ class ZipConverter(DocumentConverter):
         self,
         priority: float = DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT,
         *,
-        markitdown: Any,
+        markitdown: "MarkItDown",
     ):
         super().__init__(priority=priority)
         self._markitdown = markitdown
