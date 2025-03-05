@@ -325,7 +325,7 @@ class MarkItDown:
 
         for ext in extensions + [None]:  # Try last with no extension
             for converter in sorted_converters:
-                _kwargs = copy.deepcopy(kwargs)
+                _kwargs = {k:v for k,v in kwargs.items()}
 
                 # Overwrite file_extension appropriately
                 if ext is None:
