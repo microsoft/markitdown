@@ -4,9 +4,6 @@ from warnings import warn
 from typing import Any, Union, BinaryIO, Optional, List
 from ._stream_info import StreamInfo
 
-# Avoid printing the same warning multiple times
-_WARNED: List[str] = []
-
 
 class DocumentConverterResult:
     """The result of converting a document to Markdown."""

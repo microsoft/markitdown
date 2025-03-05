@@ -15,6 +15,7 @@ from markitdown import (
     FileConversionException,
     StreamInfo,
 )
+from markitdown._stream_info import _guess_stream_info_from_stream
 
 skip_remote = (
     True if os.environ.get("GITHUB_ACTIONS") else False
@@ -39,6 +40,13 @@ JPG_TEST_EXIFTOOL = {
     "Description": "AutoGen enables diverse LLM-based applications",
     "ImageSize": "1615x1967",
     "DateTimeOriginal": "2024:03:14 22:10:00",
+}
+
+MP3_TEST_EXIFTOOL = {
+    "Title": "f67a499e-a7d0-4ca3-a49b-358bd934ae3e",
+    "Artist": "Artist Name Test String",
+    "Album": "Album Name Test String",
+    "SampleRate": "48000",
 }
 
 PDF_TEST_URL = "https://arxiv.org/pdf/2308.08155v2.pdf"
@@ -261,7 +269,7 @@ def test_stream_info_guesses() -> None:
 
     for file_path, expected_mimetype in test_tuples:
         with open(file_path, "rb") as f:
-            guesses = StreamInfo.guess_from_stream(
+            guesses = _guess_stream_info_from_stream(
                 f, filename_hint=os.path.basename(file_path)
             )
             assert len(guesses) > 0
@@ -389,6 +397,26 @@ def test_markitdown_local() -> None:
     assert "# Test" in result.text_content
 
 
+@pytest.mark.skipif(
+    skip_remote,
+    reason="do not run remotely run speech transcription tests",
+)
+def test_speech_transcription() -> None:
+    markitdown = MarkItDown()
+
+    # Test WAV files, MP3 and M4A files
+    for file_name in ["test.wav", "test.mp3", "test.m4a"]:
+        result = markitdown.convert(os.path.join(TEST_FILES_DIR, file_name))
+        result_lower = result.text_content.lower()
+        assert (
+            ("1" in result_lower or "one" in result_lower)
+            and ("2" in result_lower or "two" in result_lower)
+            and ("3" in result_lower or "three" in result_lower)
+            and ("4" in result_lower or "four" in result_lower)
+            and ("5" in result_lower or "five" in result_lower)
+        )
+
+
 def test_exceptions() -> None:
     # Check that an exception is raised when trying to convert an unsupported format
     markitdown = MarkItDown()
@@ -437,6 +465,12 @@ def test_markitdown_exiftool() -> None:
         target = f"{key}: {JPG_TEST_EXIFTOOL[key]}"
         assert target in result.text_content
 
+    # Test some other media types
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.mp3"))
+    for key in MP3_TEST_EXIFTOOL:
+        target = f"{key}: {MP3_TEST_EXIFTOOL[key]}"
+        assert target in result.text_content
+
 
 @pytest.mark.skipif(
     skip_llm,
@@ -470,6 +504,7 @@ if __name__ == "__main__":
     test_stream_info_guesses()
     test_markitdown_remote()
     test_markitdown_local()
+    test_speech_transcription()
     test_exceptions()
     test_markitdown_exiftool()
     test_markitdown_llm()

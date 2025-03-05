@@ -43,76 +43,82 @@ class StreamInfo:
 
         return StreamInfo(**new_info)
 
-    @classmethod
-    def guess_from_stream(
-        cls: Type[T], file_stream: BinaryIO, *, filename_hint: Optional[str] = None
-    ) -> List[T]:
-        """
-        Guess StreamInfo properties (mostly mimetype and extension) from a stream.
 
-        Args:
-        - stream: The stream to guess the StreamInfo from.
-        - filename_hint [Optional]: A filename hint to help with the guessing (may be a placeholder, and not actually be the file name)
+# Behavior subject to change.
+# Do not rely on this outside of this module.
+def _guess_stream_info_from_stream(
+    file_stream: BinaryIO,
+    *,
+    filename_hint: Optional[str] = None,
+) -> List[StreamInfo]:
+    """
+    Guess StreamInfo properties (mostly mimetype and extension) from a stream.
 
-        Returns a list of StreamInfo objects in order of confidence.
-        """
-        guesses: List[StreamInfo] = []
+    Args:
+    - stream: The stream to guess the StreamInfo from.
+    - filename_hint [Optional]: A filename hint to help with the guessing (may be a placeholder, and not actually be the file name)
 
-        # Add a guess purely based on the filename hint
-        if filename_hint:
-            try:
-                mimetype, _ = mimetypes.guess_file_type(filename_hint)
-            except AttributeError:
-                mimetype, _ = mimetypes.guess_type(filename_hint)
+    Returns a list of StreamInfo objects in order of confidence.
+    """
+    guesses: List[StreamInfo] = []
 
-            if mimetype:
-                guesses.append(
-                    cls(mimetype=mimetype, extension=os.path.splitext(filename_hint)[1])
+    # Add a guess purely based on the filename hint
+    if filename_hint:
+        try:
+            mimetype, _ = mimetypes.guess_file_type(filename_hint)
+        except AttributeError:
+            mimetype, _ = mimetypes.guess_type(filename_hint)
+
+        if mimetype:
+            guesses.append(
+                StreamInfo(
+                    mimetype=mimetype, extension=os.path.splitext(filename_hint)[1]
                 )
+            )
 
-        def _puremagic(
-            file_stream, filename_hint
-        ) -> puremagic.main.PureMagicWithConfidence:
-            """Wrap guesses to handle exceptions."""
-            try:
-                return puremagic.magic_stream(file_stream, filename=filename_hint)
-            except puremagic.main.PureError as e:
-                return []
+    def _puremagic(
+        file_stream, filename_hint
+    ) -> puremagic.main.PureMagicWithConfidence:
+        """Wrap guesses to handle exceptions."""
+        try:
+            return puremagic.magic_stream(file_stream, filename=filename_hint)
+        except puremagic.main.PureError as e:
+            return []
 
-        cur_pos = file_stream.tell()
-        type_guesses = _puremagic(file_stream, filename_hint=filename_hint)
-        if len(type_guesses) == 0:
-            # Fix for: https://github.com/microsoft/markitdown/issues/222
-            # If there are no guesses, then try again after trimming leading ASCII whitespaces.
-            # ASCII whitespace characters are those byte values in the sequence b' \t\n\r\x0b\f'
-            # (space, tab, newline, carriage return, vertical tab, form feed).
+    cur_pos = file_stream.tell()
+    type_guesses = _puremagic(file_stream, filename_hint=filename_hint)
+    if len(type_guesses) == 0:
+        # Fix for: https://github.com/microsoft/markitdown/issues/222
+        # If there are no guesses, then try again after trimming leading ASCII whitespaces.
+        # ASCII whitespace characters are those byte values in the sequence b' \t\n\r\x0b\f'
+        # (space, tab, newline, carriage return, vertical tab, form feed).
 
-            # Eat all the leading whitespace
-            file_stream.seek(cur_pos)
-            while True:
-                char = file_stream.read(1)
-                if not char:  # End of file
-                    break
-                if not char.isspace():
-                    file_stream.seek(file_stream.tell() - 1)
-                    break
-
-            # Try again
-            type_guesses = _puremagic(file_stream, filename_hint=filename_hint)
+        # Eat all the leading whitespace
         file_stream.seek(cur_pos)
+        while True:
+            char = file_stream.read(1)
+            if not char:  # End of file
+                break
+            if not char.isspace():
+                file_stream.seek(file_stream.tell() - 1)
+                break
 
-        # Convert and return the guesses
-        for guess in type_guesses:
-            kwargs: dict[str, str] = {}
-            if guess.extension:
-                kwargs["extension"] = guess.extension
-            if guess.mime_type:
-                kwargs["mimetype"] = MIMETYPE_SUBSTITUTIONS.get(
-                    guess.mime_type, guess.mime_type
-                )
-            if len(kwargs) > 0:
-                # We don't add the filename_hint, because sometimes it's just a placeholder,
-                # and, in any case, doesn't add new information.
-                guesses.append(cls(**kwargs))
+        # Try again
+        type_guesses = _puremagic(file_stream, filename_hint=filename_hint)
+    file_stream.seek(cur_pos)
 
-        return guesses
+    # Convert and return the guesses
+    for guess in type_guesses:
+        kwargs: dict[str, str] = {}
+        if guess.extension:
+            kwargs["extension"] = guess.extension
+        if guess.mime_type:
+            kwargs["mimetype"] = MIMETYPE_SUBSTITUTIONS.get(
+                guess.mime_type, guess.mime_type
+            )
+        if len(kwargs) > 0:
+            # We don't add the filename_hint, because sometimes it's just a placeholder,
+            # and, in any case, doesn't add new information.
+            guesses.append(StreamInfo(**kwargs))
+
+    return guesses

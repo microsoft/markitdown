@@ -17,7 +17,7 @@ from warnings import warn
 import puremagic
 import requests
 
-from ._stream_info import StreamInfo
+from ._stream_info import StreamInfo, _guess_stream_info_from_stream
 
 from .converters import (
     PlainTextConverter,
@@ -254,7 +254,7 @@ class MarkItDown:
         with open(path, "rb") as fh:
             # Prepare a list of configurations to try, starting with the base_stream_info
             guesses: List[StreamInfo] = [base_stream_info]
-            for guess in StreamInfo.guess_from_stream(
+            for guess in _guess_stream_info_from_stream(
                 file_stream=fh, filename_hint=path
             ):
                 guesses.append(base_stream_info.copy_and_update(guess))
@@ -298,7 +298,7 @@ class MarkItDown:
             placeholder_filename = "placeholder" + base_guess.extension
 
         # Add guesses based on stream content
-        for guess in StreamInfo.guess_from_stream(
+        for guess in _guess_stream_info_from_stream(
             file_stream=stream, filename_hint=placeholder_filename
         ):
             guesses.append(base_guess.copy_and_update(guess))
@@ -393,7 +393,7 @@ class MarkItDown:
             placeholder_filename = "placeholder" + base_guess.extension
 
         # Add guesses based on stream content
-        for guess in StreamInfo.guess_from_stream(
+        for guess in _guess_stream_info_from_stream(
             file_stream=buffer, filename_hint=placeholder_filename
         ):
             guesses.append(base_guess.copy_and_update(guess))
