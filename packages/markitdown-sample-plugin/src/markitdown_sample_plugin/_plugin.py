@@ -45,7 +45,7 @@ class RtfConverter(DocumentConverter):
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
-        **kwargs: Any,  # Options to pass to the converter
+        **kwargs: Any,
     ) -> bool:
         mimetype = (stream_info.mimetype or "").lower()
         extension = (stream_info.extension or "").lower()
@@ -63,7 +63,7 @@ class RtfConverter(DocumentConverter):
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
-        **kwargs: Any,  # Options to pass to the converter
+        **kwargs: Any,
     ) -> DocumentConverterResult:
         # Read the file stream into an str using hte provided charset encoding, or using the system default
         encoding = stream_info.charset or locale.getpreferredencoding()

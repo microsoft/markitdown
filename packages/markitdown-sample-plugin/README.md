@@ -24,7 +24,7 @@ class RtfConverter(DocumentConverter):
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
-        **kwargs: Any,  # Options to pass to the converter
+        **kwargs: Any,
     ) -> bool:
 	
 	# Implement logic to check if the file stream is an RTF file
@@ -36,7 +36,7 @@ class RtfConverter(DocumentConverter):
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
-        **kwargs: Any,  # Options to pass to the converter
+        **kwargs: Any,
     ) -> DocumentConverterResult:
 
 	# Implement logic to convert the file stream to Markdown
