@@ -397,6 +397,86 @@ def test_markitdown_local() -> None:
     assert "# Test" in result.text_content
 
 
+def test_markitdown_streams() -> None:
+    markitdown = MarkItDown()
+ 
+    # Test PDF processing
+    with open(os.path.join(TEST_FILES_DIR, "test.pdf"), "rb") as f:
+        result = markitdown.convert(f, file_extension=".pdf")
+        validate_strings(result, PDF_TEST_STRINGS)
+ 
+    # Test XLSX processing
+    with open(os.path.join(TEST_FILES_DIR, "test.xlsx"), "rb") as f:
+        result = markitdown.convert(f, file_extension=".xlsx")
+        validate_strings(result, XLSX_TEST_STRINGS)
+ 
+    # Test XLS processing
+    with open(os.path.join(TEST_FILES_DIR, "test.xls"), "rb") as f:
+        result = markitdown.convert(f, file_extension=".xls")
+        for test_string in XLS_TEST_STRINGS:
+            text_content = result.text_content.replace("\\", "")
+            assert test_string in text_content
+ 
+    # Test DOCX processing
+    with open(os.path.join(TEST_FILES_DIR, "test.docx"), "rb") as f:
+        result = markitdown.convert(f, file_extension=".docx")
+        validate_strings(result, DOCX_TEST_STRINGS)
+ 
+    # Test DOCX processing, with comments
+    with open(os.path.join(TEST_FILES_DIR, "test_with_comment.docx"), "rb") as f:
+        result = markitdown.convert(
+            f,
+            file_extension=".docx",
+            style_map="comment-reference => ",
+        )
+        validate_strings(result, DOCX_COMMENT_TEST_STRINGS)
+ 
+    # Test DOCX processing, with comments and setting style_map on init
+    markitdown_with_style_map = MarkItDown(style_map="comment-reference => ")
+    with open(os.path.join(TEST_FILES_DIR, "test_with_comment.docx"), "rb") as f:
+        result = markitdown_with_style_map.convert(f, file_extension=".docx")
+        validate_strings(result, DOCX_COMMENT_TEST_STRINGS)
+ 
+    # Test PPTX processing
+    with open(os.path.join(TEST_FILES_DIR, "test.pptx"), "rb") as f:
+        result = markitdown.convert(f, file_extension=".pptx")
+        validate_strings(result, PPTX_TEST_STRINGS)
+ 
+    # Test HTML processing
+    with open(os.path.join(TEST_FILES_DIR, "test_blog.html"), "rb") as f:
+        result = markitdown.convert(f, file_extension=".html", url=BLOG_TEST_URL)
+        validate_strings(result, BLOG_TEST_STRINGS)
+ 
+    # Test Wikipedia processing
+    with open(os.path.join(TEST_FILES_DIR, "test_wikipedia.html"), "rb") as f:
+        result = markitdown.convert(f, file_extension=".html", url=WIKIPEDIA_TEST_URL)
+        text_content = result.text_content.replace("\\", "")
+        validate_strings(result, WIKIPEDIA_TEST_STRINGS, WIKIPEDIA_TEST_EXCLUDES)
+ 
+    # Test Bing processing
+    with open(os.path.join(TEST_FILES_DIR, "test_serp.html"), "rb") as f:
+        result = markitdown.convert(f, file_extension=".html", url=SERP_TEST_URL)
+        text_content = result.text_content.replace("\\", "")
+        validate_strings(result, SERP_TEST_STRINGS, SERP_TEST_EXCLUDES)
+ 
+    # Test RSS processing
+    with open(os.path.join(TEST_FILES_DIR, "test_rss.xml"), "rb") as f:
+        result = markitdown.convert(f, file_extension=".xml")
+        text_content = result.text_content.replace("\\", "")
+        for test_string in RSS_TEST_STRINGS:
+            assert test_string in text_content
+ 
+    # Test MSG (Outlook email) processing
+    with open(os.path.join(TEST_FILES_DIR, "test_outlook_msg.msg"), "rb") as f:
+        result = markitdown.convert(f, file_extension=".msg")
+        validate_strings(result, MSG_TEST_STRINGS)
+ 
+    # Test JSON processing
+    with open(os.path.join(TEST_FILES_DIR, "test.json"), "rb") as f:
+        result = markitdown.convert(f, file_extension=".json")
+        validate_strings(result, JSON_TEST_STRINGS)
+
+
 @pytest.mark.skipif(
     skip_remote,
     reason="do not run remotely run speech transcription tests",
@@ -505,6 +585,7 @@ if __name__ == "__main__":
     test_stream_info_guesses()
     test_markitdown_remote()
     test_markitdown_local()
+    test_markitdown_streams()
     test_speech_transcription()
     test_exceptions()
     test_markitdown_exiftool()
