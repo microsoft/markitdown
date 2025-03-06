@@ -9,9 +9,9 @@
 > * Dependencies are now organized into optional feature-groups (further details below). Use `pip install markitdown[all]` to have backward-compatible behavior. 
 > * The DocumentConverter class interface has changed to read from file-like streams rather than file paths. *No temporary files are created anymore*. If you are the maintainer of a plugin, or custom DocumentConverter, you likely need to update your code. Otherwise, if only using the MarkItDown class or CLI (as in these examples), you should not need to change anything.
 
-MarkItDown is a utility for converting various files to Markdown (e.g., for indexing, text analysis, etc). It is comparable to [Apache Tika](https://tika.apache.org/) or [Azure Document Intelligence](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/overview?tabs=doc-intel-4.0.0), but can perform many simple operations locally, without a server or subscription. While the output is often reasonably presentable and human-friendly, it is meant to be consumed by text analysis tools. MarkItDown may not be the best option for high-fidelity document conversions for publication or document sharing, etc.
+MarkItDown is a lightwight Python utility for converting various files to Markdown for use with LLMs and related text analysis pipelines. To this end, it is most comparable to [textract](https://github.com/deanmalmgren/textract), but with a focus on preserving mportant document structure and content as Markdown (including: headings, lists, tables, links, etc.) While the output is often reasonably presentable and human-friendly, it is meant to be consumed by text analysis tools -- and may not be the best option for high-fidelity document conversions for human consumption.
 
-At present, it supports:
+At present, MarkItDown supports:
 
 - PDF
 - PowerPoint
@@ -24,6 +24,17 @@ At present, it supports:
 - ZIP files (iterates over contents)
 - Youtube URLs
 - ... and more!
+
+## Why Markdown?
+
+Markdown is extremely close to plain text, with minimal markup or formatting, but still
+provides a way to represent important document structure. Importantly, mainstream LLMs,
+such as OpenAI's GPT-4o, natively "_speak_" Markdown, and often incorporate Markdown into 
+their responses unprompted. This suggests that they have been trained on vast amounts of
+Markdown-formatted text, and understand it well. As a side benefit, Markdown conventions
+a are also highly token-efficient.
+
+## Installation
 
 To install MarkItDown, use pip: `pip install markitdown[all]`. Alternatively, you can install it from the source:
 
