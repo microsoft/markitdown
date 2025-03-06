@@ -76,7 +76,7 @@ def _guess_stream_info_from_stream(
 
     def _puremagic(
         file_stream, filename_hint
-    ) -> puremagic.main.PureMagicWithConfidence:
+    ) -> List[puremagic.main.PureMagicWithConfidence]:
         """Wrap guesses to handle exceptions."""
         try:
             return puremagic.magic_stream(file_stream, filename=filename_hint)

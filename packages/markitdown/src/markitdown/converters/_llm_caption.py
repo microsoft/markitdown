@@ -13,7 +13,7 @@ def llm_caption(
     # Get the content type
     content_type = stream_info.mimetype
     if not content_type:
-        content_type, _ = mimetypes.guess_type("_dummy" + stream_info.extension)
+        content_type, _ = mimetypes.guess_type("_dummy" + (stream_info.extension or ""))
     if not content_type:
         content_type = "application/octet-stream"
 

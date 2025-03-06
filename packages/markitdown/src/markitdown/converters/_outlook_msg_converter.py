@@ -87,9 +87,11 @@ class OutlookMsgConverter(DocumentConverter):
                     extension=".msg",
                     feature="outlook",
                 )
-            ) from _dependency_exc_info[1].with_traceback(
+            ) from _dependency_exc_info[
+                1
+            ].with_traceback(  # type: ignore[union-attr]
                 _dependency_exc_info[2]
-            )  # Restore the original traceback
+            )
 
         msg = olefile.OleFileIO(file_stream)
         # Extract email metadata

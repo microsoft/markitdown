@@ -5,12 +5,12 @@ import sys
 import shutil
 import os
 import warnings
-from typing import BinaryIO, Literal, Optional
+from typing import BinaryIO, Optional, Any
 
 
 def exiftool_metadata(
     file_stream: BinaryIO, *, exiftool_path: Optional[str] = None
-) -> dict[str, Literal]:
+) -> Any:  # Need a better type for json data
     # Check if we have a valid pointer to exiftool
     if not exiftool_path:
         which_exiftool = shutil.which("exiftool")

@@ -4,7 +4,6 @@ import mimetypes
 from ._exiftool import exiftool_metadata
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
-from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 
 ACCEPTED_MIME_TYPE_PREFIXES = [
     "image/jpeg",
@@ -75,17 +74,16 @@ class ImageConverter(DocumentConverter):
         llm_client = kwargs.get("llm_client")
         llm_model = kwargs.get("llm_model")
         if llm_client is not None and llm_model is not None:
-            md_content += (
-                "\n# Description:\n"
-                + self._get_llm_description(
-                    file_stream,
-                    stream_info,
-                    client=llm_client,
-                    model=llm_model,
-                    prompt=kwargs.get("llm_prompt"),
-                ).strip()
-                + "\n"
+            llm_description = self._get_llm_description(
+                file_stream,
+                stream_info,
+                client=llm_client,
+                model=llm_model,
+                prompt=kwargs.get("llm_prompt"),
             )
+
+            if llm_description is not None:
+                md_content += "\n# Description:\n" + llm_description.strip() + "\n"
 
         return DocumentConverterResult(
             markdown=md_content,
@@ -106,7 +104,9 @@ class ImageConverter(DocumentConverter):
         # Get the content type
         content_type = stream_info.mimetype
         if not content_type:
-            content_type, _ = mimetypes.guess_type("_dummy" + stream_info.extension)
+            content_type, _ = mimetypes.guess_type(
+                "_dummy" + (stream_info.extension or "")
+            )
         if not content_type:
             content_type = "application/octet-stream"
 

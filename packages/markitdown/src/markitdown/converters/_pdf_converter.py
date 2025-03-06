@@ -1,6 +1,8 @@
 import sys
+import io
 
 from typing import BinaryIO, Any
+
 
 from ._html_converter import HtmlConverter
 from .._base_converter import DocumentConverter, DocumentConverterResult
@@ -69,10 +71,13 @@ class PdfConverter(DocumentConverter):
                     extension=".pdf",
                     feature="pdf",
                 )
-            ) from _dependency_exc_info[1].with_traceback(
+            ) from _dependency_exc_info[
+                1
+            ].with_traceback(  # type: ignore[union-attr]
                 _dependency_exc_info[2]
-            )  # Restore the original traceback
+            )
 
+        assert isinstance(file_stream, io.IOBase)  # for mypy
         return DocumentConverterResult(
             markdown=pdfminer.high_level.extract_text(file_stream),
         )

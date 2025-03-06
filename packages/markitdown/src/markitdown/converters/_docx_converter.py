@@ -67,9 +67,11 @@ class DocxConverter(HtmlConverter):
                     extension=".docx",
                     feature="docx",
                 )
-            ) from _dependency_exc_info[1].with_traceback(
+            ) from _dependency_exc_info[
+                1
+            ].with_traceback(  # type: ignore[union-attr]
                 _dependency_exc_info[2]
-            )  # Restore the original traceback
+            )
 
         style_map = kwargs.get("style_map", None)
         return self._html_converter.convert_string(

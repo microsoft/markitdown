@@ -81,9 +81,11 @@ class DocumentIntelligenceConverter(DocumentConverter):
         if _dependency_exc_info is not None:
             raise MissingDependencyException(
                 "DocumentIntelligenceConverter requires the optional dependency [az-doc-intel] (or [all]) to be installed. E.g., `pip install markitdown[az-doc-intel]`"
-            ) from _dependency_exc_info[1].with_traceback(
+            ) from _dependency_exc_info[
+                1
+            ].with_traceback(  # type: ignore[union-attr]
                 _dependency_exc_info[2]
-            )  # Restore the original traceback
+            )
 
         self.endpoint = endpoint
         self.api_version = api_version

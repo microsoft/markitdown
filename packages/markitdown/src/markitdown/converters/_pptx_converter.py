@@ -73,9 +73,11 @@ class PptxConverter(DocumentConverter):
                     extension=".pptx",
                     feature="pptx",
                 )
-            ) from _dependency_exc_info[1].with_traceback(
+            ) from _dependency_exc_info[
+                1
+            ].with_traceback(  # type: ignore[union-attr]
                 _dependency_exc_info[2]
-            )  # Restore the original traceback
+            )
 
         # Perform the conversion
         presentation = pptx.Presentation(file_stream)

@@ -50,10 +50,10 @@ from ._exceptions import (
 # Override mimetype for csv to fix issue on windows
 mimetypes.add_type("text/csv", ".csv")
 
-_plugins: Union[None | List[Any]] = None
+_plugins: List[Any] = []
 
 
-def _load_plugins() -> Union[None | List[Any]]:
+def _load_plugins() -> List[Any]:
     """Lazy load plugins, exiting early if already loaded."""
     global _plugins
 
@@ -94,10 +94,10 @@ class MarkItDown:
             self._requests_session = requests_session
 
         # TODO - remove these (see enable_builtins)
-        self._llm_client = None
-        self._llm_model = None
-        self._exiftool_path = None
-        self._style_map = None
+        self._llm_client: Any = None
+        self._llm_model: Union[str | None] = None
+        self._exiftool_path: Union[str | None] = None
+        self._style_map: Union[str | None] = None
 
         # Register the converters
         self._converters: List[DocumentConverter] = []
@@ -272,12 +272,20 @@ class MarkItDown:
         # Do we have anything on which to base a guess?
         base_guess = None
         if stream_info is not None or file_extension is not None or url is not None:
-            base_guess = stream_info if stream_info is not None else StreamInfo()
+            # Start with a non-Null base guess
+            if stream_info is None:
+                base_guess = StreamInfo()
+            else:
+                base_guess = stream_info
+
             if file_extension is not None:
                 # Deprecated -- use stream_info
+                assert base_guess is not None  # for mypy
                 base_guess = base_guess.copy_and_update(extension=file_extension)
+
             if url is not None:
                 # Deprecated -- use stream_info
+                assert base_guess is not None  # for mypy
                 base_guess = base_guess.copy_and_update(url=url)
 
         # Append the base guess, if it's non-trivial
@@ -498,6 +506,6 @@ class MarkItDown:
         )
         self.register_converter(converter)
 
-    def register_converter(self, converter: Union[DocumentConverter]) -> None:
+    def register_converter(self, converter: DocumentConverter) -> None:
         """Register a page text converter."""
         self._converters.insert(0, converter)

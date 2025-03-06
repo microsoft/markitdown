@@ -92,7 +92,7 @@ class ZipConverter(DocumentConverter):
         stream_info: StreamInfo,
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
-        file_path = stream_info.url or stream_info.local_path or stream_info.file_name
+        file_path = stream_info.url or stream_info.local_path or stream_info.filename
         md_content = f"Content from the zip file `{file_path}`:\n\n"
 
         with zipfile.ZipFile(file_stream, "r") as zipObj:
