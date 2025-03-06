@@ -1,4 +1,5 @@
 import tempfile
+import os
 from typing import Union
 from ._base import DocumentConverter, DocumentConverterResult
 from ._wav_converter import WavConverter
