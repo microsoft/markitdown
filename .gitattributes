@@ -1,1 +1,2 @@
-tests/test_files/** linguist-vendored
+packages/markitdown/tests/test_files/** linguist-vendored
+packages/markitdown-sample-plugin/tests/test_files/** linguist-vendored

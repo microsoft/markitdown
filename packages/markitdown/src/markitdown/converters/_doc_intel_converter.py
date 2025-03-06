@@ -1,9 +1,12 @@
-from typing import Any, Union
-import re
 import sys
+import re
 
-from ._base import DocumentConverter, DocumentConverterResult
-from .._exceptions import MissingDependencyException
+from typing import BinaryIO, Any, List
+
+from ._html_converter import HtmlConverter
+from .._base_converter import DocumentConverter, DocumentConverterResult
+from .._stream_info import StreamInfo
+from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 
 # Try loading optional (but in this case, required) dependencies
 # Save reporting of any exceptions for later
@@ -26,17 +29,50 @@ except ImportError:
 CONTENT_FORMAT = "markdown"
 
 
+OFFICE_MIME_TYPE_PREFIXES = [
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.openxmlformats-officedocument.presentationml",
+    "application/xhtml",
+    "text/html",
+]
+
+OTHER_MIME_TYPE_PREFIXES = [
+    "application/pdf",
+    "application/x-pdf",
+    "text/html",
+    "image/",
+]
+
+OFFICE_FILE_EXTENSIONS = [
+    ".docx",
+    ".xlsx",
+    ".pptx",
+    ".html",
+    ".htm",
+]
+
+OTHER_FILE_EXTENSIONS = [
+    ".pdf",
+    ".jpeg",
+    ".jpg",
+    ".png",
+    ".bmp",
+    ".tiff",
+    ".heif",
+]
+
+
 class DocumentIntelligenceConverter(DocumentConverter):
     """Specialized DocumentConverter that uses Document Intelligence to extract text from documents."""
 
     def __init__(
         self,
         *,
-        priority: float = DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT,
         endpoint: str,
         api_version: str = "2024-07-31-preview",
     ):
-        super().__init__(priority=priority)
+        super().__init__()
 
         # Raise an error if the dependencies are not available.
         # This is different than other converters since this one isn't even instantiated
@@ -44,9 +80,11 @@ class DocumentIntelligenceConverter(DocumentConverter):
         if _dependency_exc_info is not None:
             raise MissingDependencyException(
                 "DocumentIntelligenceConverter requires the optional dependency [az-doc-intel] (or [all]) to be installed. E.g., `pip install markitdown[az-doc-intel]`"
-            ) from _dependency_exc_info[1].with_traceback(
+            ) from _dependency_exc_info[
+                1
+            ].with_traceback(  # type: ignore[union-attr]
                 _dependency_exc_info[2]
-            )  # Restore the original traceback
+            )
 
         self.endpoint = endpoint
         self.api_version = api_version
@@ -55,55 +93,62 @@ class DocumentIntelligenceConverter(DocumentConverter):
             api_version=self.api_version,
             credential=DefaultAzureCredential(),
         )
-        self._priority = priority
+
+    def accepts(
+        self,
+        file_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,  # Options to pass to the converter
+    ) -> bool:
+        mimetype = (stream_info.mimetype or "").lower()
+        extension = (stream_info.extension or "").lower()
+
+        if extension in OFFICE_FILE_EXTENSIONS + OTHER_FILE_EXTENSIONS:
+            return True
+
+        for prefix in OFFICE_MIME_TYPE_PREFIXES + OTHER_MIME_TYPE_PREFIXES:
+            if mimetype.startswith(prefix):
+                return True
+
+        return False
+
+    def _analysis_features(self, stream_info: StreamInfo) -> List[str]:
+        """
+        Helper needed to determine which analysis features to use.
+        Certain document analysis features are not availiable for
+        office filetypes (.xlsx, .pptx, .html, .docx)
+        """
+        mimetype = (stream_info.mimetype or "").lower()
+        extension = (stream_info.extension or "").lower()
+
+        if extension in OFFICE_FILE_EXTENSIONS:
+            return []
+
+        for prefix in OFFICE_MIME_TYPE_PREFIXES:
+            if mimetype.startswith(prefix):
+                return []
+
+        return [
+            DocumentAnalysisFeature.FORMULAS,  # enable formula extraction
+            DocumentAnalysisFeature.OCR_HIGH_RESOLUTION,  # enable high resolution OCR
+            DocumentAnalysisFeature.STYLE_FONT,  # enable font style extraction
+        ]
 
     def convert(
-        self, local_path: str, **kwargs: Any
-    ) -> Union[None, DocumentConverterResult]:
-        # Bail if extension is not supported by Document Intelligence
-        extension = kwargs.get("file_extension", "")
-        docintel_extensions = [
-            ".pdf",
-            ".docx",
-            ".xlsx",
-            ".pptx",
-            ".html",
-            ".jpeg",
-            ".jpg",
-            ".png",
-            ".bmp",
-            ".tiff",
-            ".heif",
-        ]
-        if extension.lower() not in docintel_extensions:
-            return None
-
-        # Get the bytestring for the local path
-        with open(local_path, "rb") as f:
-            file_bytes = f.read()
-
-        # Certain document analysis features are not availiable for office filetypes (.xlsx, .pptx, .html, .docx)
-        if extension.lower() in [".xlsx", ".pptx", ".html", ".docx"]:
-            analysis_features = []
-        else:
-            analysis_features = [
-                DocumentAnalysisFeature.FORMULAS,  # enable formula extraction
-                DocumentAnalysisFeature.OCR_HIGH_RESOLUTION,  # enable high resolution OCR
-                DocumentAnalysisFeature.STYLE_FONT,  # enable font style extraction
-            ]
-
+        self,
+        file_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,  # Options to pass to the converter
+    ) -> DocumentConverterResult:
         # Extract the text using Azure Document Intelligence
         poller = self.doc_intel_client.begin_analyze_document(
             model_id="prebuilt-layout",
-            body=AnalyzeDocumentRequest(bytes_source=file_bytes),
-            features=analysis_features,
+            body=AnalyzeDocumentRequest(bytes_source=file_stream.read()),
+            features=self._analysis_features(stream_info),
             output_content_format=CONTENT_FORMAT,  # TODO: replace with "ContentFormat.MARKDOWN" when the bug is fixed
         )
         result: AnalyzeResult = poller.result()
 
         # remove comments from the markdown content generated by Doc Intelligence and append to markdown string
         markdown_text = re.sub(r"<!--.*?-->", "", result.content, flags=re.DOTALL)
-        return DocumentConverterResult(
-            title=None,
-            text_content=markdown_text,
-        )
+        return DocumentConverterResult(markdown=markdown_text)

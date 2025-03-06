@@ -1,7 +1,7 @@
 import re
 import markdownify
 
-from typing import Any
+from typing import Any, Optional
 from urllib.parse import quote, unquote, urlparse, urlunparse
 
 
@@ -20,7 +20,14 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         # Explicitly cast options to the expected type if necessary
         super().__init__(**options)
 
-    def convert_hn(self, n: int, el: Any, text: str, convert_as_inline: bool) -> str:
+    def convert_hn(
+        self,
+        n: int,
+        el: Any,
+        text: str,
+        convert_as_inline: Optional[bool] = False,
+        **kwargs,
+    ) -> str:
         """Same as usual, but be sure to start with a new line"""
         if not convert_as_inline:
             if not re.search(r"^\n", text):
@@ -28,7 +35,13 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
 
         return super().convert_hn(n, el, text, convert_as_inline)  # type: ignore
 
-    def convert_a(self, el: Any, text: str, convert_as_inline: bool):
+    def convert_a(
+        self,
+        el: Any,
+        text: str,
+        convert_as_inline: Optional[bool] = False,
+        **kwargs,
+    ):
         """Same as usual converter, but removes Javascript links and escapes URIs."""
         prefix, suffix, text = markdownify.chomp(text)  # type: ignore
         if not text:
@@ -68,7 +81,13 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
             else text
         )
 
-    def convert_img(self, el: Any, text: str, convert_as_inline: bool) -> str:
+    def convert_img(
+        self,
+        el: Any,
+        text: str,
+        convert_as_inline: Optional[bool] = False,
+        **kwargs,
+    ) -> str:
         """Same as usual converter, but removes data URIs"""
 
         alt = el.attrs.get("alt", None) or ""

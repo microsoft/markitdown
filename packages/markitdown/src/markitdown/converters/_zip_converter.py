@@ -1,9 +1,23 @@
-import os
+import sys
 import zipfile
-import shutil
-from typing import Any, Union
+import io
+import os
 
-from ._base import DocumentConverter, DocumentConverterResult
+from typing import BinaryIO, Any, TYPE_CHECKING
+
+from .._base_converter import DocumentConverter, DocumentConverterResult
+from .._stream_info import StreamInfo
+from .._exceptions import UnsupportedFormatException, FileConversionException
+
+# Break otherwise circular import for type hinting
+if TYPE_CHECKING:
+    from .._markitdown import MarkItDown
+
+ACCEPTED_MIME_TYPE_PREFIXES = [
+    "application/zip",
+]
+
+ACCEPTED_FILE_EXTENSIONS = [".zip"]
 
 
 class ZipConverter(DocumentConverter):
@@ -46,99 +60,58 @@ class ZipConverter(DocumentConverter):
     """
 
     def __init__(
-        self, priority: float = DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT
+        self,
+        *,
+        markitdown: "MarkItDown",
     ):
-        super().__init__(priority=priority)
+        super().__init__()
+        self._markitdown = markitdown
+
+    def accepts(
+        self,
+        file_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,  # Options to pass to the converter
+    ) -> bool:
+        mimetype = (stream_info.mimetype or "").lower()
+        extension = (stream_info.extension or "").lower()
+
+        if extension in ACCEPTED_FILE_EXTENSIONS:
+            return True
+
+        for prefix in ACCEPTED_MIME_TYPE_PREFIXES:
+            if mimetype.startswith(prefix):
+                return True
+
+        return False
 
     def convert(
-        self, local_path: str, **kwargs: Any
-    ) -> Union[None, DocumentConverterResult]:
-        # Bail if not a ZIP
-        extension = kwargs.get("file_extension", "")
-        if extension.lower() != ".zip":
-            return None
+        self,
+        file_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,  # Options to pass to the converter
+    ) -> DocumentConverterResult:
+        file_path = stream_info.url or stream_info.local_path or stream_info.filename
+        md_content = f"Content from the zip file `{file_path}`:\n\n"
 
-        # Get parent converters list if available
-        parent_converters = kwargs.get("_parent_converters", [])
-        if not parent_converters:
-            return DocumentConverterResult(
-                title=None,
-                text_content=f"[ERROR] No converters available to process zip contents from: {local_path}",
-            )
+        with zipfile.ZipFile(file_stream, "r") as zipObj:
+            for name in zipObj.namelist():
+                try:
+                    z_file_stream = io.BytesIO(zipObj.read(name))
+                    z_file_stream_info = StreamInfo(
+                        extension=os.path.splitext(name)[1],
+                        filename=os.path.basename(name),
+                    )
+                    result = self._markitdown.convert_stream(
+                        stream=z_file_stream,
+                        stream_info=z_file_stream_info,
+                    )
+                    if result is not None:
+                        md_content += f"## File: {name}\n\n"
+                        md_content += result.markdown + "\n\n"
+                except UnsupportedFormatException:
+                    pass
+                except FileConversionException:
+                    pass
 
-        extracted_zip_folder_name = (
-            f"extracted_{os.path.basename(local_path).replace('.zip', '_zip')}"
-        )
-        extraction_dir = os.path.normpath(
-            os.path.join(os.path.dirname(local_path), extracted_zip_folder_name)
-        )
-        md_content = f"Content from the zip file `{os.path.basename(local_path)}`:\n\n"
-
-        try:
-            # Extract the zip file safely
-            with zipfile.ZipFile(local_path, "r") as zipObj:
-                # Bail if we discover it's an Office OOXML file
-                if "[Content_Types].xml" in zipObj.namelist():
-                    return None
-
-                # Safeguard against path traversal
-                for member in zipObj.namelist():
-                    member_path = os.path.normpath(os.path.join(extraction_dir, member))
-                    if (
-                        not os.path.commonprefix([extraction_dir, member_path])
-                        == extraction_dir
-                    ):
-                        raise ValueError(
-                            f"Path traversal detected in zip file: {member}"
-                        )
-
-                # Extract all files safely
-                zipObj.extractall(path=extraction_dir)
-
-            # Process each extracted file
-            for root, dirs, files in os.walk(extraction_dir):
-                for name in files:
-                    file_path = os.path.join(root, name)
-                    relative_path = os.path.relpath(file_path, extraction_dir)
-
-                    # Get file extension
-                    _, file_extension = os.path.splitext(name)
-
-                    # Update kwargs for the file
-                    file_kwargs = kwargs.copy()
-                    file_kwargs["file_extension"] = file_extension
-                    file_kwargs["_parent_converters"] = parent_converters
-
-                    # Try converting the file using available converters
-                    for converter in parent_converters:
-                        # Skip the zip converter to avoid infinite recursion
-                        if isinstance(converter, ZipConverter):
-                            continue
-
-                        result = converter.convert(file_path, **file_kwargs)
-                        if result is not None:
-                            md_content += f"\n## File: {relative_path}\n\n"
-                            md_content += result.text_content + "\n\n"
-                            break
-
-            # Clean up extracted files if specified
-            if kwargs.get("cleanup_extracted", True):
-                shutil.rmtree(extraction_dir)
-
-            return DocumentConverterResult(title=None, text_content=md_content.strip())
-
-        except zipfile.BadZipFile:
-            return DocumentConverterResult(
-                title=None,
-                text_content=f"[ERROR] Invalid or corrupted zip file: {local_path}",
-            )
-        except ValueError as ve:
-            return DocumentConverterResult(
-                title=None,
-                text_content=f"[ERROR] Security error in zip file {local_path}: {str(ve)}",
-            )
-        except Exception as e:
-            return DocumentConverterResult(
-                title=None,
-                text_content=f"[ERROR] Failed to process zip file {local_path}: {str(e)}",
-            )
+        return DocumentConverterResult(markdown=md_content.strip())
