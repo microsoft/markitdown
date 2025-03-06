@@ -7,15 +7,21 @@
 		"context": "..",
 		// Update the 'dockerFile' property if you aren't using the standard 'Dockerfile' filename.
 		"dockerfile": "../Dockerfile",
-		"args": {
-			"INSTALL_GIT": "true"
-		}
+		"target": "development"
 	},
 
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	// "features": {},
 	"features": {
 		"ghcr.io/devcontainers-extra/features/hatch:2": {}
+	},
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-python.python",
+				"charliermarsh.ruff"
+			]
+		}
 	},
 
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
@@ -28,5 +34,5 @@
 	// "customizations": {},
 
 	// Uncomment to connect as an existing user other than the container default. More info: https://aka.ms/dev-containers-non-root.
-	"remoteUser": "root"
+	// "remoteUser": "root"
 }
