@@ -24,7 +24,7 @@ classifiers = [
   "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dependencies = [
-  "markitdown>=0.2.0a2",
+  "markitdown>=0.1.0a1",
   "striprtf",
 ]
 
