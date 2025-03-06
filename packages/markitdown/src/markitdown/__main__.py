@@ -30,7 +30,7 @@ parser.add_argument(
 parser.add_argument(
     "-o",
     "--output",
-    metavar="outfilename",
+    metavar="OUTFILENAME",
     help="if unspecified, defaults to stdout",
 )
 parser.add_argument(
@@ -56,7 +56,9 @@ parser.add_argument(
     action="store_true",
     help="list installed 3rd-party plugins (loaded with `--use-plugin`)",
 )
-parser.add_argument("filename", nargs="?", help="if unspecified, defaults to stdin")
+parser.add_argument(
+    "filename", metavar="FILENAME", nargs="?", help="if unspecified, defaults to stdin"
+)
 
 
 def main(args=None):
