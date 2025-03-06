@@ -38,10 +38,8 @@ class XlsxConverter(DocumentConverter):
     Converts XLSX files to Markdown, with each sheet presented as a separate Markdown table.
     """
 
-    def __init__(
-        self, priority: float = DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT
-    ):
-        super().__init__(priority=priority)
+    def __init__(self):
+        super().__init__()
         self._html_converter = HtmlConverter()
 
     def accepts(
@@ -100,10 +98,8 @@ class XlsConverter(DocumentConverter):
     Converts XLS files to Markdown, with each sheet presented as a separate Markdown table.
     """
 
-    def __init__(
-        self, priority: float = DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT
-    ):
-        super().__init__(priority=priority)
+    def __init__(self):
+        super().__init__()
         self._html_converter = HtmlConverter()
 
     def accepts(

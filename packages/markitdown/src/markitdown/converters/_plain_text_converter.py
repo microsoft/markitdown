@@ -29,11 +29,6 @@ IGNORE_MIME_TYPE_PREFIXES = [
 class PlainTextConverter(DocumentConverter):
     """Anything with content type text/plain"""
 
-    def __init__(
-        self, priority: float = DocumentConverter.PRIORITY_GENERIC_FILE_FORMAT
-    ):
-        super().__init__(priority=priority)
-
     def accepts(
         self,
         file_stream: BinaryIO,

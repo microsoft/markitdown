@@ -530,8 +530,10 @@ def test_markitdown_exiftool() -> None:
     finally:
         warnings.resetwarnings()
 
-    # Test explicitly setting the location of exiftool
     which_exiftool = shutil.which("exiftool")
+    assert which_exiftool is not None
+
+    # Test explicitly setting the location of exiftool
     markitdown = MarkItDown(exiftool_path=which_exiftool)
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.jpg"))
     for key in JPG_TEST_EXIFTOOL:

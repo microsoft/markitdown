@@ -15,11 +15,6 @@ ACCEPTED_FILE_EXTENSIONS = [".ipynb"]
 class IpynbConverter(DocumentConverter):
     """Converts Jupyter Notebook (.ipynb) files to Markdown."""
 
-    def __init__(
-        self, priority: float = DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT
-    ):
-        super().__init__(priority=priority)
-
     def accepts(
         self,
         file_stream: BinaryIO,

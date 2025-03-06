@@ -34,11 +34,6 @@ ACCEPTED_FILE_EXTENSIONS = [
 class YouTubeConverter(DocumentConverter):
     """Handle YouTube specially, focusing on the video title, description, and transcript."""
 
-    def __init__(
-        self, priority: float = DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT
-    ):
-        super().__init__(priority=priority)
-
     def accepts(
         self,
         file_stream: BinaryIO,

@@ -7,6 +7,7 @@ import tempfile
 import warnings
 import traceback
 import io
+from dataclasses import dataclass
 from importlib.metadata import entry_points
 from typing import Any, List, Optional, Union, BinaryIO
 from pathlib import Path
@@ -47,8 +48,15 @@ from ._exceptions import (
     FailedConversionAttempt,
 )
 
-# Override mimetype for csv to fix issue on windows
-mimetypes.add_type("text/csv", ".csv")
+
+# Lower priority values are tried first.
+PRIORITY_SPECIFIC_FILE_FORMAT = (
+    0.0  # e.g., .docx, .pdf, .xlsx, Or specific pages, e.g., wikipedia
+)
+PRIORITY_GENERIC_FILE_FORMAT = (
+    10.0  # Near catch-all converters for mimetypes like text/*, etc.
+)
+
 
 _plugins: List[Any] = []
 
@@ -71,6 +79,14 @@ def _load_plugins() -> List[Any]:
             warn(f"Plugin '{entry_point.name}' failed to load ... skipping:\n{tb}")
 
     return _plugins
+
+
+@dataclass(kw_only=True, frozen=True)
+class ConverterRegistration:
+    """A registration of a converter with its priority and other metadata."""
+
+    converter: DocumentConverter
+    priority: float
 
 
 class MarkItDown:
@@ -100,7 +116,7 @@ class MarkItDown:
         self._style_map: Union[str | None] = None
 
         # Register the converters
-        self._converters: List[DocumentConverter] = []
+        self._converters: List[ConverterRegistration] = []
 
         if (
             enable_builtins is None or enable_builtins
@@ -128,9 +144,15 @@ class MarkItDown:
             # Register converters for successful browsing operations
             # Later registrations are tried first / take higher priority than earlier registrations
             # To this end, the most specific converters should appear below the most generic converters
-            self.register_converter(PlainTextConverter())
-            self.register_converter(ZipConverter(markitdown=self))
-            self.register_converter(HtmlConverter())
+            self.register_converter(
+                PlainTextConverter(), priority=PRIORITY_GENERIC_FILE_FORMAT
+            )
+            self.register_converter(
+                ZipConverter(markitdown=self), priority=PRIORITY_GENERIC_FILE_FORMAT
+            )
+            self.register_converter(
+                HtmlConverter(), priority=PRIORITY_GENERIC_FILE_FORMAT
+            )
             self.register_converter(RssConverter())
             self.register_converter(WikipediaConverter())
             self.register_converter(YouTubeConverter())
@@ -418,13 +440,14 @@ class MarkItDown:
         # Create a copy of the page_converters list, sorted by priority.
         # We do this with each call to _convert because the priority of converters may change between calls.
         # The sort is guaranteed to be stable, so converters with the same priority will remain in the same order.
-        sorted_converters = sorted(self._converters, key=lambda x: x.priority)
+        sorted_registrations = sorted(self._converters, key=lambda x: x.priority)
 
         # Remember the initial stream position so that we can return to it
         cur_pos = file_stream.tell()
 
         for stream_info in stream_info_guesses + [StreamInfo()]:
-            for converter in sorted_converters:
+            for converter_registration in sorted_registrations:
+                converter = converter_registration.converter
                 # Sanity check -- make sure the cur_pos is still the same
                 assert (
                     cur_pos == file_stream.tell()
@@ -506,6 +529,34 @@ class MarkItDown:
         )
         self.register_converter(converter)
 
-    def register_converter(self, converter: DocumentConverter) -> None:
-        """Register a page text converter."""
-        self._converters.insert(0, converter)
+    def register_converter(
+        self,
+        converter: DocumentConverter,
+        *,
+        priority: float = PRIORITY_SPECIFIC_FILE_FORMAT,
+    ) -> None:
+        """
+        Register a DocumentConverter with a given priority.
+
+        Priorities work as follows: By default, most converters get priority
+        DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT (== 0). The exception
+        is the PlainTextConverter, HtmlConverter, and ZipConverter, which get
+        priority PRIORITY_SPECIFIC_FILE_FORMAT (== 10), with lower values
+        being tried first (i.e., higher priority).
+
+        Just prior to conversion, the converters are sorted by priority, using
+        a stable sort. This means that converters with the same priority will
+        remain in the same order, with the most recently registered converters
+        appearing first.
+
+        We have tight control over the order of built-in converters, but
+        plugins can register converters in any order. The registration's priority
+        field reasserts some control over the order of converters.
+
+        Plugins can register converters with any priority, to appear before or
+        after the built-ins. For example, a plugin with priority 9 will run
+        before the PlainTextConverter, but after the built-in converters.
+        """
+        self._converters.insert(
+            0, ConverterRegistration(converter=converter, priority=priority)
+        )

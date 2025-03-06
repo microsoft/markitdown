@@ -61,11 +61,10 @@ class ZipConverter(DocumentConverter):
 
     def __init__(
         self,
-        priority: float = DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT,
         *,
         markitdown: "MarkItDown",
     ):
-        super().__init__(priority=priority)
+        super().__init__()
         self._markitdown = markitdown
 
     def accepts(

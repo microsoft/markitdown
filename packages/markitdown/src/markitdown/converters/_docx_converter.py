@@ -29,10 +29,8 @@ class DocxConverter(HtmlConverter):
     Converts DOCX files to Markdown. Style information (e.g.m headings) and tables are preserved where possible.
     """
 
-    def __init__(
-        self, priority: float = DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT
-    ):
-        super().__init__(priority=priority)
+    def __init__(self):
+        super().__init__()
         self._html_converter = HtmlConverter()
 
     def accepts(

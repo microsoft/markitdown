@@ -20,11 +20,6 @@ ACCEPTED_FILE_EXTENSIONS = [
 class HtmlConverter(DocumentConverter):
     """Anything with content type text/html"""
 
-    def __init__(
-        self, priority: float = DocumentConverter.PRIORITY_GENERIC_FILE_FORMAT
-    ):
-        super().__init__(priority=priority)
-
     def accepts(
         self,
         file_stream: BinaryIO,

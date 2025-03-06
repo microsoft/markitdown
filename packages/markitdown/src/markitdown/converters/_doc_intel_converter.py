@@ -69,11 +69,10 @@ class DocumentIntelligenceConverter(DocumentConverter):
     def __init__(
         self,
         *,
-        priority: float = DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT,
         endpoint: str,
         api_version: str = "2024-07-31-preview",
     ):
-        super().__init__(priority=priority)
+        super().__init__()
 
         # Raise an error if the dependencies are not available.
         # This is different than other converters since this one isn't even instantiated

@@ -18,11 +18,6 @@ class ImageConverter(DocumentConverter):
     Converts images to markdown via extraction of metadata (if `exiftool` is installed), and description via a multimodal LLM (if an llm_client is configured).
     """
 
-    def __init__(
-        self, priority: float = DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT
-    ):
-        super().__init__(priority=priority)
-
     def accepts(
         self,
         file_stream: BinaryIO,

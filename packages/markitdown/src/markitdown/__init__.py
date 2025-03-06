@@ -3,7 +3,11 @@
 # SPDX-License-Identifier: MIT
 
 from .__about__ import __version__
-from ._markitdown import MarkItDown
+from ._markitdown import (
+    MarkItDown,
+    PRIORITY_SPECIFIC_FILE_FORMAT,
+    PRIORITY_GENERIC_FILE_FORMAT,
+)
 from ._base_converter import DocumentConverterResult, DocumentConverter
 from ._stream_info import StreamInfo
 from ._exceptions import (
@@ -25,4 +29,6 @@ __all__ = [
     "FileConversionException",
     "UnsupportedFormatException",
     "StreamInfo",
+    "PRIORITY_SPECIFIC_FILE_FORMAT",
+    "PRIORITY_GENERIC_FILE_FORMAT",
 ]

@@ -26,11 +26,6 @@ class BingSerpConverter(DocumentConverter):
     NOTE: It is better to use the Bing API
     """
 
-    def __init__(
-        self, priority: float = DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT
-    ):
-        super().__init__(priority=priority)
-
     def accepts(
         self,
         file_stream: BinaryIO,

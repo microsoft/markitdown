@@ -35,10 +35,8 @@ class PptxConverter(DocumentConverter):
     Converts PPTX files to Markdown. Supports heading, tables and images with alt text.
     """
 
-    def __init__(
-        self, priority: float = DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT
-    ):
-        super().__init__(priority=priority)
+    def __init__(self):
+        super().__init__()
         self._html_converter = HtmlConverter()
 
     def accepts(
