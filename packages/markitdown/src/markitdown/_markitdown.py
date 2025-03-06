@@ -58,10 +58,10 @@ PRIORITY_GENERIC_FILE_FORMAT = (
 )
 
 
-_plugins: List[Any] = []
+_plugins: Union[None, List[Any]] = None  # If None, plugins have not been loaded yet.
 
 
-def _load_plugins() -> List[Any]:
+def _load_plugins() -> Union[None, List[Any]]:
     """Lazy load plugins, exiting early if already loaded."""
     global _plugins
 
@@ -186,7 +186,9 @@ class MarkItDown:
         """
         if not self._plugins_enabled:
             # Load plugins
-            for plugin in _load_plugins():
+            plugins = _load_plugins()
+            assert plugins is not None
+            for plugin in plugins:
                 try:
                     plugin.register_converters(self, **kwargs)
                 except Exception:
