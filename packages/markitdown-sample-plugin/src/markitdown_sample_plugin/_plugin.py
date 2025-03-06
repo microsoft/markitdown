@@ -36,11 +36,6 @@ class RtfConverter(DocumentConverter):
     Converts an RTF file to in the simplest possible way.
     """
 
-    def __init__(
-        self, priority: float = DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT
-    ):
-        super().__init__(priority=priority)
-
     def accepts(
         self,
         file_stream: BinaryIO,
