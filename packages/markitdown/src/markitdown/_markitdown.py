@@ -455,7 +455,7 @@ class MarkItDown:
                     cur_pos == file_stream.tell()
                 ), f"File stream position should NOT change between guess iterations"
 
-                _kwargs = {k:v for k,v in kwargs.items()}
+                _kwargs = {k: v for k, v in kwargs.items()}
 
                 # Copy any additional global options
                 if "llm_client" not in _kwargs and self._llm_client is not None:
