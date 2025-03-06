@@ -88,11 +88,11 @@ def main(args=None):
             )
         elif args.filename is None:
             raise ValueError("Filename is required when using Document Intelligence.")
-        markitdown = MarkItDown(
-            enable_plugins=args.use_plugins, docintel_endpoint=args.endpoint
-        )
-    else:
-        markitdown = MarkItDown(enable_plugins=args.use_plugins)
+
+    markitdown = MarkItDown(
+        enable_plugins=args.use_plugins,
+        docintel_endpoint=args.endpoint if args.use_docintel else None,
+    )
 
     if args.filename:
         result = markitdown.convert(args.filename)
