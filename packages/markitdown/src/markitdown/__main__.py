@@ -37,28 +37,26 @@ parser.add_argument(
     "-d",
     "--use-docintel",
     action="store_true",
-    help="Use Document Intelligence to extract text instead of offline conversion. Requires a valid Document Intelligence Endpoint.",
+    help="use online Document Intelligence to extract text (requires a valid `--endpoint`)",
 )
 parser.add_argument(
     "-e",
     "--endpoint",
     type=str,
-    help="Document Intelligence Endpoint. Required if using Document Intelligence.",
+    help="required for `--use-docintel`",
 )
 parser.add_argument(
     "-p",
     "--use-plugins",
     action="store_true",
-    help="Use 3rd-party plugins to convert files. Use --list-plugins to see installed plugins.",
+    help="use 3rd-party plugins to convert files (see `--list-plugins`)",
 )
 parser.add_argument(
     "--list-plugins",
     action="store_true",
-    help="List installed 3rd-party plugins. Plugins are loaded when using the -p or --use-plugin option.",
+    help="list installed 3rd-party plugins (loaded with `--use-plugin`)",
 )
-parser.add_argument(
-    "filename", nargs="?", help="if unspecified, defaults to stdin"
-)
+parser.add_argument("filename", nargs="?", help="if unspecified, defaults to stdin")
 
 
 def main(args=None):
