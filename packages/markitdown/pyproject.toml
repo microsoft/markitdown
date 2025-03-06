@@ -26,7 +26,7 @@ classifiers = [
 dependencies = [
   "beautifulsoup4",
   "requests",
-  "markdownify~=0.14.1",
+  "markdownify",
   "puremagic",
   "pathvalidate",
   "charset-normalizer",
@@ -78,11 +78,14 @@ extra-dependencies = [
 ]
 
 [tool.hatch.envs.types]
+features = ["all"]
 extra-dependencies = [
+  "openai",
   "mypy>=1.0.0",
 ]
+
 [tool.hatch.envs.types.scripts]
-check = "mypy --install-types --non-interactive {args:src/markitdown tests}"
+check = "mypy --install-types --non-interactive --ignore-missing-imports {args:src/markitdown tests}"
 
 [tool.coverage.run]
 source_pkgs = ["markitdown", "tests"]

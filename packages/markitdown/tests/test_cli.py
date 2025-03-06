@@ -7,7 +7,7 @@ from markitdown import __version__
 try:
     from .test_markitdown import TEST_FILES_DIR, DOCX_TEST_STRINGS
 except ImportError:
-    from test_markitdown import TEST_FILES_DIR, DOCX_TEST_STRINGS
+    from test_markitdown import TEST_FILES_DIR, DOCX_TEST_STRINGS  # type: ignore
 
 
 @pytest.fixture(scope="session")

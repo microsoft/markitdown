@@ -1,12 +1,16 @@
+import sys
 import base64
+import os
+import io
 import re
 import html
-import sys
 
-from typing import Union
+from typing import BinaryIO, Any
 
-from ._base import DocumentConverterResult, DocumentConverter
 from ._html_converter import HtmlConverter
+from ._llm_caption import llm_caption
+from .._base_converter import DocumentConverter, DocumentConverterResult
+from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 
 # Try loading optional (but in this case, required) dependencies
@@ -19,51 +23,46 @@ except ImportError:
     _dependency_exc_info = sys.exc_info()
 
 
-class PptxConverter(HtmlConverter):
+ACCEPTED_MIME_TYPE_PREFIXES = [
+    "application/vnd.openxmlformats-officedocument.presentationml",
+]
+
+ACCEPTED_FILE_EXTENSIONS = [".pptx"]
+
+
+class PptxConverter(DocumentConverter):
     """
     Converts PPTX files to Markdown. Supports heading, tables and images with alt text.
     """
 
-    def __init__(
-        self, priority: float = DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT
-    ):
-        super().__init__(priority=priority)
+    def __init__(self):
+        super().__init__()
+        self._html_converter = HtmlConverter()
 
-    def _get_llm_description(
-        self, llm_client, llm_model, image_blob, content_type, prompt=None
-    ):
-        if prompt is None or prompt.strip() == "":
-            prompt = "Write a detailed alt text for this image with less than 50 words."
+    def accepts(
+        self,
+        file_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,  # Options to pass to the converter
+    ) -> bool:
+        mimetype = (stream_info.mimetype or "").lower()
+        extension = (stream_info.extension or "").lower()
 
-        image_base64 = base64.b64encode(image_blob).decode("utf-8")
-        data_uri = f"data:{content_type};base64,{image_base64}"
+        if extension in ACCEPTED_FILE_EXTENSIONS:
+            return True
 
-        messages = [
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": data_uri,
-                        },
-                    },
-                    {"type": "text", "text": prompt},
-                ],
-            }
-        ]
+        for prefix in ACCEPTED_MIME_TYPE_PREFIXES:
+            if mimetype.startswith(prefix):
+                return True
 
-        response = llm_client.chat.completions.create(
-            model=llm_model, messages=messages
-        )
-        return response.choices[0].message.content
+        return False
 
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
-        # Bail if not a PPTX
-        extension = kwargs.get("file_extension", "")
-        if extension.lower() != ".pptx":
-            return None
-
+    def convert(
+        self,
+        file_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,  # Options to pass to the converter
+    ) -> DocumentConverterResult:
         # Check the dependencies
         if _dependency_exc_info is not None:
             raise MissingDependencyException(
@@ -72,11 +71,14 @@ class PptxConverter(HtmlConverter):
                     extension=".pptx",
                     feature="pptx",
                 )
-            ) from _dependency_exc_info[1].with_traceback(
+            ) from _dependency_exc_info[
+                1
+            ].with_traceback(  # type: ignore[union-attr]
                 _dependency_exc_info[2]
-            )  # Restore the original traceback
+            )
 
-        presentation = pptx.Presentation(local_path)
+        # Perform the conversion
+        presentation = pptx.Presentation(file_stream)
         md_content = ""
         slide_num = 0
         for slide in presentation.slides:
@@ -92,59 +94,58 @@ class PptxConverter(HtmlConverter):
                 if self._is_picture(shape):
                     # https://github.com/scanny/python-pptx/pull/512#issuecomment-1713100069
 
-                    llm_description = None
-                    alt_text = None
+                    llm_description = ""
+                    alt_text = ""
 
+                    # Potentially generate a description using an LLM
                     llm_client = kwargs.get("llm_client")
                     llm_model = kwargs.get("llm_model")
                     if llm_client is not None and llm_model is not None:
+                        # Prepare a file_stream and stream_info for the image data
+                        image_filename = shape.image.filename
+                        image_extension = None
+                        if image_filename:
+                            image_extension = os.path.splitext(image_filename)[1]
+                        image_stream_info = StreamInfo(
+                            mimetype=shape.image.content_type,
+                            extension=image_extension,
+                            filename=image_filename,
+                        )
+
+                        image_stream = io.BytesIO(shape.image.blob)
+
+                        # Caption the image
                         try:
-                            llm_description = self._get_llm_description(
-                                llm_client,
-                                llm_model,
-                                shape.image.blob,
-                                shape.image.content_type,
+                            llm_description = llm_caption(
+                                image_stream,
+                                image_stream_info,
+                                client=llm_client,
+                                model=llm_model,
+                                prompt=kwargs.get("llm_prompt"),
                             )
                         except Exception:
-                            # Unable to describe with LLM
+                            # Unable to generate a description
                             pass
 
-                    if not llm_description:
-                        try:
-                            alt_text = shape._element._nvXxPr.cNvPr.attrib.get(
-                                "descr", ""
-                            )
-                        except Exception:
-                            # Unable to get alt text
-                            pass
+                    # Also grab any description embedded in the deck
+                    try:
+                        alt_text = shape._element._nvXxPr.cNvPr.attrib.get("descr", "")
+                    except Exception:
+                        # Unable to get alt text
+                        pass
+
+                    # Prepare the alt, escaping any special characters
+                    alt_text = "\n".join([llm_description, alt_text]) or shape.name
+                    alt_text = re.sub(r"[\r\n\[\]]", " ", alt_text)
+                    alt_text = re.sub(r"\s+", " ", alt_text).strip()
 
                     # A placeholder name
                     filename = re.sub(r"\W", "", shape.name) + ".jpg"
-                    md_content += (
-                        "\n!["
-                        + (llm_description or alt_text or shape.name)
-                        + "]("
-                        + filename
-                        + ")\n"
-                    )
+                    md_content += "\n![" + alt_text + "](" + filename + ")\n"
 
                 # Tables
                 if self._is_table(shape):
-                    html_table = "<html><body><table>"
-                    first_row = True
-                    for row in shape.table.rows:
-                        html_table += "<tr>"
-                        for cell in row.cells:
-                            if first_row:
-                                html_table += "<th>" + html.escape(cell.text) + "</th>"
-                            else:
-                                html_table += "<td>" + html.escape(cell.text) + "</td>"
-                        html_table += "</tr>"
-                        first_row = False
-                    html_table += "</table></body></html>"
-                    md_content += (
-                        "\n" + self._convert(html_table).text_content.strip() + "\n"
-                    )
+                    md_content += self._convert_table_to_markdown(shape.table)
 
                 # Charts
                 if shape.has_chart:
@@ -174,10 +175,7 @@ class PptxConverter(HtmlConverter):
                     md_content += notes_frame.text
                 md_content = md_content.strip()
 
-        return DocumentConverterResult(
-            title=None,
-            text_content=md_content.strip(),
-        )
+        return DocumentConverterResult(markdown=md_content.strip())
 
     def _is_picture(self, shape):
         if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.PICTURE:
@@ -191,6 +189,23 @@ class PptxConverter(HtmlConverter):
         if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.TABLE:
             return True
         return False
+
+    def _convert_table_to_markdown(self, table):
+        # Write the table as HTML, then convert it to Markdown
+        html_table = "<html><body><table>"
+        first_row = True
+        for row in table.rows:
+            html_table += "<tr>"
+            for cell in row.cells:
+                if first_row:
+                    html_table += "<th>" + html.escape(cell.text) + "</th>"
+                else:
+                    html_table += "<td>" + html.escape(cell.text) + "</td>"
+            html_table += "</tr>"
+            first_row = False
+        html_table += "</table></body></html>"
+
+        return self._html_converter.convert_string(html_table).markdown.strip() + "\n"
 
     def _convert_chart_to_markdown(self, chart):
         md = "\n\n### Chart"

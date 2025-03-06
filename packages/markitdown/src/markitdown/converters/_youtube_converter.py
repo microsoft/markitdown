@@ -1,14 +1,15 @@
-import re
+import sys
 import json
-import urllib.parse
 import time
-
-from typing import Any, Union, Dict, List
-from urllib.parse import parse_qs, urlparse
+import io
+import re
+from typing import Any, BinaryIO, Optional, Dict, List, Union
+from urllib.parse import parse_qs, urlparse, unquote
 from bs4 import BeautifulSoup
 
-from ._base import DocumentConverter, DocumentConverterResult
-
+from .._base_converter import DocumentConverter, DocumentConverterResult
+from .._stream_info import StreamInfo
+from ._markdownify import _CustomMarkdownify
 
 # Optional YouTube transcription support
 try:
@@ -19,53 +20,59 @@ except ModuleNotFoundError:
     IS_YOUTUBE_TRANSCRIPT_CAPABLE = False
 
 
+ACCEPTED_MIME_TYPE_PREFIXES = [
+    "text/html",
+    "application/xhtml",
+]
+
+ACCEPTED_FILE_EXTENSIONS = [
+    ".html",
+    ".htm",
+]
+
+
 class YouTubeConverter(DocumentConverter):
     """Handle YouTube specially, focusing on the video title, description, and transcript."""
 
-    def __init__(
-        self, priority: float = DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT
-    ):
-        super().__init__(priority=priority)
+    def accepts(
+        self,
+        file_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,  # Options to pass to the converter
+    ) -> bool:
+        """
+        Make sure we're dealing with HTML content *from* YouTube.
+        """
+        url = stream_info.url or ""
+        mimetype = (stream_info.mimetype or "").lower()
+        extension = (stream_info.extension or "").lower()
 
-    def retry_operation(self, operation, retries=3, delay=2):
-        """Retries the operation if it fails."""
-        attempt = 0
-        while attempt < retries:
-            try:
-                return operation()  # Attempt the operation
-            except Exception as e:
-                print(f"Attempt {attempt + 1} failed: {e}")
-                if attempt < retries - 1:
-                    time.sleep(delay)  # Wait before retrying
-                attempt += 1
-        # If all attempts fail, raise the last exception
-        raise Exception(f"Operation failed after {retries} attempts.")
-
-    def convert(
-        self, local_path: str, **kwargs: Any
-    ) -> Union[None, DocumentConverterResult]:
-        # Bail if not YouTube
-        extension = kwargs.get("file_extension", "")
-        if extension.lower() not in [".html", ".htm"]:
-            return None
-        url = kwargs.get("url", "")
-
-        url = urllib.parse.unquote(url)
+        url = unquote(url)
         url = url.replace(r"\?", "?").replace(r"\=", "=")
 
         if not url.startswith("https://www.youtube.com/watch?"):
-            return None
+            # Not a YouTube URL
+            return False
 
-        # Parse the file with error handling
-        try:
-            with open(local_path, "rt", encoding="utf-8") as fh:
-                soup = BeautifulSoup(fh.read(), "html.parser")
-        except Exception as e:
-            print(f"Error reading YouTube page: {e}")
-            return None
+        if extension in ACCEPTED_FILE_EXTENSIONS:
+            return True
 
-        if not soup.title or not soup.title.string:
-            return None
+        for prefix in ACCEPTED_MIME_TYPE_PREFIXES:
+            if mimetype.startswith(prefix):
+                return True
+
+        # Not HTML content
+        return False
+
+    def convert(
+        self,
+        file_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,  # Options to pass to the converter
+    ) -> DocumentConverterResult:
+        # Parse the stream
+        encoding = "utf-8" if stream_info.charset is None else stream_info.charset
+        soup = BeautifulSoup(file_stream, "html.parser", from_encoding=encoding)
 
         # Read the meta tags
         metadata: Dict[str, str] = {"title": soup.title.string}
@@ -126,7 +133,7 @@ class YouTubeConverter(DocumentConverter):
 
         if IS_YOUTUBE_TRANSCRIPT_CAPABLE:
             transcript_text = ""
-            parsed_url = urlparse(url)  # type: ignore
+            parsed_url = urlparse(stream_info.url)  # type: ignore
             params = parse_qs(parsed_url.query)  # type: ignore
             if "v" in params and params["v"][0]:
                 video_id = str(params["v"][0])
@@ -135,7 +142,7 @@ class YouTubeConverter(DocumentConverter):
                         "youtube_transcript_languages", ("en",)
                     )
                     # Retry the transcript fetching operation
-                    transcript = self.retry_operation(
+                    transcript = self._retry_operation(
                         lambda: YouTubeTranscriptApi.get_transcript(
                             video_id, languages=youtube_transcript_languages
                         ),
@@ -158,8 +165,8 @@ class YouTubeConverter(DocumentConverter):
         assert isinstance(title, str)
 
         return DocumentConverterResult(
+            markdown=webpage_text,
             title=title,
-            text_content=webpage_text,
         )
 
     def _get(
@@ -188,3 +195,17 @@ class YouTubeConverter(DocumentConverter):
                 if result := self._findKey(v, key):
                     return result
         return None
+
+    def _retry_operation(self, operation, retries=3, delay=2):
+        """Retries the operation if it fails."""
+        attempt = 0
+        while attempt < retries:
+            try:
+                return operation()  # Attempt the operation
+            except Exception as e:
+                print(f"Attempt {attempt + 1} failed: {e}")
+                if attempt < retries - 1:
+                    time.sleep(delay)  # Wait before retrying
+                attempt += 1
+        # If all attempts fail, raise the last exception
+        raise Exception(f"Operation failed after {retries} attempts.")

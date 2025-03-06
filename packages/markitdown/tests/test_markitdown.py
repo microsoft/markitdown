@@ -2,13 +2,20 @@
 import io
 import os
 import shutil
+import openai
 
 import pytest
 import requests
 
-from warnings import catch_warnings, resetwarnings
+import warnings
 
-from markitdown import MarkItDown, UnsupportedFormatException, FileConversionException
+from markitdown import (
+    MarkItDown,
+    UnsupportedFormatException,
+    FileConversionException,
+    StreamInfo,
+)
+from markitdown._stream_info import _guess_stream_info_from_stream
 
 skip_remote = (
     True if os.environ.get("GITHUB_ACTIONS") else False
@@ -33,6 +40,13 @@ JPG_TEST_EXIFTOOL = {
     "Description": "AutoGen enables diverse LLM-based applications",
     "ImageSize": "1615x1967",
     "DateTimeOriginal": "2024:03:14 22:10:00",
+}
+
+MP3_TEST_EXIFTOOL = {
+    "Title": "f67a499e-a7d0-4ca3-a49b-358bd934ae3e",
+    "Artist": "Artist Name Test String",
+    "Album": "Album Name Test String",
+    "SampleRate": "48000",
 }
 
 PDF_TEST_URL = "https://arxiv.org/pdf/2308.08155v2.pdf"
@@ -162,6 +176,107 @@ def validate_strings(result, expected_strings, exclude_strings=None):
             assert string not in text_content
 
 
+def test_stream_info_operations() -> None:
+    """Test operations performed on StreamInfo objects."""
+
+    stream_info_original = StreamInfo(
+        mimetype="mimetype.1",
+        extension="extension.1",
+        charset="charset.1",
+        filename="filename.1",
+        local_path="local_path.1",
+        url="url.1",
+    )
+
+    # Check updating all attributes by keyword
+    keywords = ["mimetype", "extension", "charset", "filename", "local_path", "url"]
+    for keyword in keywords:
+        updated_stream_info = stream_info_original.copy_and_update(
+            **{keyword: f"{keyword}.2"}
+        )
+
+        # Make sure the targted attribute is updated
+        assert getattr(updated_stream_info, keyword) == f"{keyword}.2"
+
+        # Make sure the other attributes are unchanged
+        for k in keywords:
+            if k != keyword:
+                assert getattr(stream_info_original, k) == getattr(
+                    updated_stream_info, k
+                )
+
+    # Check updating all attributes by passing a new StreamInfo object
+    keywords = ["mimetype", "extension", "charset", "filename", "local_path", "url"]
+    for keyword in keywords:
+        updated_stream_info = stream_info_original.copy_and_update(
+            StreamInfo(**{keyword: f"{keyword}.2"})
+        )
+
+        # Make sure the targted attribute is updated
+        assert getattr(updated_stream_info, keyword) == f"{keyword}.2"
+
+        # Make sure the other attributes are unchanged
+        for k in keywords:
+            if k != keyword:
+                assert getattr(stream_info_original, k) == getattr(
+                    updated_stream_info, k
+                )
+
+    # Check mixing and matching
+    updated_stream_info = stream_info_original.copy_and_update(
+        StreamInfo(extension="extension.2", filename="filename.2"),
+        mimetype="mimetype.3",
+        charset="charset.3",
+    )
+    assert updated_stream_info.extension == "extension.2"
+    assert updated_stream_info.filename == "filename.2"
+    assert updated_stream_info.mimetype == "mimetype.3"
+    assert updated_stream_info.charset == "charset.3"
+    assert updated_stream_info.local_path == "local_path.1"
+    assert updated_stream_info.url == "url.1"
+
+    # Check multiple StreamInfo objects
+    updated_stream_info = stream_info_original.copy_and_update(
+        StreamInfo(extension="extension.4", filename="filename.5"),
+        StreamInfo(mimetype="mimetype.6", charset="charset.7"),
+    )
+    assert updated_stream_info.extension == "extension.4"
+    assert updated_stream_info.filename == "filename.5"
+    assert updated_stream_info.mimetype == "mimetype.6"
+    assert updated_stream_info.charset == "charset.7"
+    assert updated_stream_info.local_path == "local_path.1"
+    assert updated_stream_info.url == "url.1"
+
+
+def test_stream_info_guesses() -> None:
+    """Test StreamInfo guesses based on stream content."""
+
+    test_tuples = [
+        (
+            os.path.join(TEST_FILES_DIR, "test.xlsx"),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        ),
+        (
+            os.path.join(TEST_FILES_DIR, "test.docx"),
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ),
+        (
+            os.path.join(TEST_FILES_DIR, "test.pptx"),
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        ),
+        (os.path.join(TEST_FILES_DIR, "test.xls"), "application/vnd.ms-excel"),
+    ]
+
+    for file_path, expected_mimetype in test_tuples:
+        with open(file_path, "rb") as f:
+            guesses = _guess_stream_info_from_stream(
+                f, filename_hint=os.path.basename(file_path)
+            )
+            assert len(guesses) > 0
+            assert guesses[0].mimetype == expected_mimetype
+            assert guesses[0].extension == os.path.splitext(file_path)[1]
+
+
 @pytest.mark.skipif(
     skip_remote,
     reason="do not run tests that query external urls",
@@ -183,7 +298,6 @@ def test_markitdown_remote() -> None:
         assert test_string in result.text_content
 
     # Youtube
-    # TODO: This test randomly fails for some reason. Haven't been able to repro it yet. Disabling until I can debug the issue
     result = markitdown.convert(YOUTUBE_TEST_URL)
     for test_string in YOUTUBE_TEST_STRINGS:
         assert test_string in result.text_content
@@ -191,6 +305,10 @@ def test_markitdown_remote() -> None:
 
 def test_markitdown_local() -> None:
     markitdown = MarkItDown()
+
+    # Test PDF processing
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.pdf"))
+    validate_strings(result, PDF_TEST_STRINGS)
 
     # Test XLSX processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.xlsx"))
@@ -230,10 +348,6 @@ def test_markitdown_local() -> None:
     )
     validate_strings(result, BLOG_TEST_STRINGS)
 
-    # Test ZIP file processing
-    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test_files.zip"))
-    validate_strings(result, XLSX_TEST_STRINGS)
-
     # Test Wikipedia processing
     result = markitdown.convert(
         os.path.join(TEST_FILES_DIR, "test_wikipedia.html"), url=WIKIPEDIA_TEST_URL
@@ -254,22 +368,133 @@ def test_markitdown_local() -> None:
     for test_string in RSS_TEST_STRINGS:
         assert test_string in text_content
 
-    ## Test non-UTF-8 encoding
-    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test_mskanji.csv"))
-    validate_strings(result, CSV_CP932_TEST_STRINGS)
-
     # Test MSG (Outlook email) processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test_outlook_msg.msg"))
     validate_strings(result, MSG_TEST_STRINGS)
+
+    # Test non-UTF-8 encoding
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test_mskanji.csv"))
+    validate_strings(result, CSV_CP932_TEST_STRINGS)
 
     # Test JSON processing
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.json"))
     validate_strings(result, JSON_TEST_STRINGS)
 
+    # # Test ZIP file processing
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test_files.zip"))
+    validate_strings(result, DOCX_TEST_STRINGS)
+    validate_strings(result, XLSX_TEST_STRINGS)
+    validate_strings(result, BLOG_TEST_STRINGS)
+
+    # Test input from a stream
+    input_data = b"<html><body><h1>Test</h1></body></html>"
+    result = markitdown.convert_stream(io.BytesIO(input_data))
+    assert "# Test" in result.text_content
+
     # Test input with leading blank characters
     input_data = b"   \n\n\n<html><body><h1>Test</h1></body></html>"
     result = markitdown.convert_stream(io.BytesIO(input_data))
     assert "# Test" in result.text_content
+
+
+def test_markitdown_streams() -> None:
+    markitdown = MarkItDown()
+
+    # Test PDF processing
+    with open(os.path.join(TEST_FILES_DIR, "test.pdf"), "rb") as f:
+        result = markitdown.convert(f, file_extension=".pdf")
+        validate_strings(result, PDF_TEST_STRINGS)
+
+    # Test XLSX processing
+    with open(os.path.join(TEST_FILES_DIR, "test.xlsx"), "rb") as f:
+        result = markitdown.convert(f, file_extension=".xlsx")
+        validate_strings(result, XLSX_TEST_STRINGS)
+
+    # Test XLS processing
+    with open(os.path.join(TEST_FILES_DIR, "test.xls"), "rb") as f:
+        result = markitdown.convert(f, file_extension=".xls")
+        for test_string in XLS_TEST_STRINGS:
+            text_content = result.text_content.replace("\\", "")
+            assert test_string in text_content
+
+    # Test DOCX processing
+    with open(os.path.join(TEST_FILES_DIR, "test.docx"), "rb") as f:
+        result = markitdown.convert(f, file_extension=".docx")
+        validate_strings(result, DOCX_TEST_STRINGS)
+
+    # Test DOCX processing, with comments
+    with open(os.path.join(TEST_FILES_DIR, "test_with_comment.docx"), "rb") as f:
+        result = markitdown.convert(
+            f,
+            file_extension=".docx",
+            style_map="comment-reference => ",
+        )
+        validate_strings(result, DOCX_COMMENT_TEST_STRINGS)
+
+    # Test DOCX processing, with comments and setting style_map on init
+    markitdown_with_style_map = MarkItDown(style_map="comment-reference => ")
+    with open(os.path.join(TEST_FILES_DIR, "test_with_comment.docx"), "rb") as f:
+        result = markitdown_with_style_map.convert(f, file_extension=".docx")
+        validate_strings(result, DOCX_COMMENT_TEST_STRINGS)
+
+    # Test PPTX processing
+    with open(os.path.join(TEST_FILES_DIR, "test.pptx"), "rb") as f:
+        result = markitdown.convert(f, file_extension=".pptx")
+        validate_strings(result, PPTX_TEST_STRINGS)
+
+    # Test HTML processing
+    with open(os.path.join(TEST_FILES_DIR, "test_blog.html"), "rb") as f:
+        result = markitdown.convert(f, file_extension=".html", url=BLOG_TEST_URL)
+        validate_strings(result, BLOG_TEST_STRINGS)
+
+    # Test Wikipedia processing
+    with open(os.path.join(TEST_FILES_DIR, "test_wikipedia.html"), "rb") as f:
+        result = markitdown.convert(f, file_extension=".html", url=WIKIPEDIA_TEST_URL)
+        text_content = result.text_content.replace("\\", "")
+        validate_strings(result, WIKIPEDIA_TEST_STRINGS, WIKIPEDIA_TEST_EXCLUDES)
+
+    # Test Bing processing
+    with open(os.path.join(TEST_FILES_DIR, "test_serp.html"), "rb") as f:
+        result = markitdown.convert(f, file_extension=".html", url=SERP_TEST_URL)
+        text_content = result.text_content.replace("\\", "")
+        validate_strings(result, SERP_TEST_STRINGS, SERP_TEST_EXCLUDES)
+
+    # Test RSS processing
+    with open(os.path.join(TEST_FILES_DIR, "test_rss.xml"), "rb") as f:
+        result = markitdown.convert(f, file_extension=".xml")
+        text_content = result.text_content.replace("\\", "")
+        for test_string in RSS_TEST_STRINGS:
+            assert test_string in text_content
+
+    # Test MSG (Outlook email) processing
+    with open(os.path.join(TEST_FILES_DIR, "test_outlook_msg.msg"), "rb") as f:
+        result = markitdown.convert(f, file_extension=".msg")
+        validate_strings(result, MSG_TEST_STRINGS)
+
+    # Test JSON processing
+    with open(os.path.join(TEST_FILES_DIR, "test.json"), "rb") as f:
+        result = markitdown.convert(f, file_extension=".json")
+        validate_strings(result, JSON_TEST_STRINGS)
+
+
+@pytest.mark.skipif(
+    skip_remote,
+    reason="do not run remotely run speech transcription tests",
+)
+def test_speech_transcription() -> None:
+    markitdown = MarkItDown()
+
+    # Test WAV files, MP3 and M4A files
+    for file_name in ["test.wav", "test.mp3", "test.m4a"]:
+        result = markitdown.convert(os.path.join(TEST_FILES_DIR, file_name))
+        result_lower = result.text_content.lower()
+        assert (
+            ("1" in result_lower or "one" in result_lower)
+            and ("2" in result_lower or "two" in result_lower)
+            and ("3" in result_lower or "three" in result_lower)
+            and ("4" in result_lower or "four" in result_lower)
+            and ("5" in result_lower or "five" in result_lower)
+        )
 
 
 def test_exceptions() -> None:
@@ -295,17 +520,20 @@ def test_markitdown_exiftool() -> None:
     # Test the automatic discovery of exiftool throws a warning
     # and is disabled
     try:
-        with catch_warnings(record=True) as w:
+        warnings.simplefilter("default")
+        with warnings.catch_warnings(record=True) as w:
             markitdown = MarkItDown()
             result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.jpg"))
             assert len(w) == 1
             assert w[0].category is DeprecationWarning
             assert result.text_content.strip() == ""
     finally:
-        resetwarnings()
+        warnings.resetwarnings()
+
+    which_exiftool = shutil.which("exiftool")
+    assert which_exiftool is not None
 
     # Test explicitly setting the location of exiftool
-    which_exiftool = shutil.which("exiftool")
     markitdown = MarkItDown(exiftool_path=which_exiftool)
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.jpg"))
     for key in JPG_TEST_EXIFTOOL:
@@ -320,6 +548,12 @@ def test_markitdown_exiftool() -> None:
         target = f"{key}: {JPG_TEST_EXIFTOOL[key]}"
         assert target in result.text_content
 
+    # Test some other media types
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.mp3"))
+    for key in MP3_TEST_EXIFTOOL:
+        target = f"{key}: {MP3_TEST_EXIFTOOL[key]}"
+        assert target in result.text_content
+
 
 @pytest.mark.skipif(
     skip_llm,
@@ -330,7 +564,6 @@ def test_markitdown_llm() -> None:
     markitdown = MarkItDown(llm_client=client, llm_model="gpt-4o")
 
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test_llm.jpg"))
-
     for test_string in LLM_TEST_STRINGS:
         assert test_string in result.text_content
 
@@ -339,12 +572,24 @@ def test_markitdown_llm() -> None:
     for test_string in ["red", "circle", "blue", "square"]:
         assert test_string in result.text_content.lower()
 
+    # Images embedded in PPTX files
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.pptx"))
+    # LLM Captions are included
+    for test_string in LLM_TEST_STRINGS:
+        assert test_string in result.text_content
+    # Standard alt text is included
+    validate_strings(result, PPTX_TEST_STRINGS)
+
 
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
+    test_stream_info_operations()
+    test_stream_info_guesses()
     test_markitdown_remote()
     test_markitdown_local()
+    test_markitdown_streams()
+    test_speech_transcription()
     test_exceptions()
     test_markitdown_exiftool()
-    # test_markitdown_llm()
+    test_markitdown_llm()
     print("All tests passed!")

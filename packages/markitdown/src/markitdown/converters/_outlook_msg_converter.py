@@ -1,6 +1,7 @@
 import sys
-from typing import Any, Union
-from ._base import DocumentConverter, DocumentConverterResult
+from typing import Any, Union, BinaryIO
+from .._stream_info import StreamInfo
+from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 
 # Try loading optional (but in this case, required) dependencies
@@ -12,6 +13,12 @@ except ImportError:
     # Preserve the error and stack trace for later
     _dependency_exc_info = sys.exc_info()
 
+ACCEPTED_MIME_TYPE_PREFIXES = [
+    "application/vnd.ms-outlook",
+]
+
+ACCEPTED_FILE_EXTENSIONS = [".msg"]
+
 
 class OutlookMsgConverter(DocumentConverter):
     """Converts Outlook .msg files to markdown by extracting email metadata and content.
@@ -21,19 +28,52 @@ class OutlookMsgConverter(DocumentConverter):
     - Email body content
     """
 
-    def __init__(
-        self, priority: float = DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT
-    ):
-        super().__init__(priority=priority)
+    def accepts(
+        self,
+        file_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,  # Options to pass to the converter
+    ) -> bool:
+        mimetype = (stream_info.mimetype or "").lower()
+        extension = (stream_info.extension or "").lower()
+
+        # Check the extension and mimetype
+        if extension in ACCEPTED_FILE_EXTENSIONS:
+            return True
+
+        for prefix in ACCEPTED_MIME_TYPE_PREFIXES:
+            if mimetype.startswith(prefix):
+                return True
+
+        # Brute force, check if we have an OLE file
+        cur_pos = file_stream.tell()
+        try:
+            if not olefile.isOleFile(file_stream):
+                return False
+        finally:
+            file_stream.seek(cur_pos)
+
+        # Brue force, check if it's an Outlook file
+        try:
+            msg = olefile.OleFileIO(file_stream)
+            toc = "\n".join([str(stream) for stream in msg.listdir()])
+            return (
+                "__properties_version1.0" in toc
+                and "__recip_version1.0_#00000000" in toc
+            )
+        except Exception as e:
+            pass
+        finally:
+            file_stream.seek(cur_pos)
+
+        return False
 
     def convert(
-        self, local_path: str, **kwargs: Any
-    ) -> Union[None, DocumentConverterResult]:
-        # Bail if not a MSG file
-        extension = kwargs.get("file_extension", "")
-        if extension.lower() != ".msg":
-            return None
-
+        self,
+        file_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,  # Options to pass to the converter
+    ) -> DocumentConverterResult:
         # Check: the dependencies
         if _dependency_exc_info is not None:
             raise MissingDependencyException(
@@ -42,44 +82,41 @@ class OutlookMsgConverter(DocumentConverter):
                     extension=".msg",
                     feature="outlook",
                 )
-            ) from _dependency_exc_info[1].with_traceback(
+            ) from _dependency_exc_info[
+                1
+            ].with_traceback(  # type: ignore[union-attr]
                 _dependency_exc_info[2]
-            )  # Restore the original traceback
-
-        try:
-            msg = olefile.OleFileIO(local_path)
-            # Extract email metadata
-            md_content = "# Email Message\n\n"
-
-            # Get headers
-            headers = {
-                "From": self._get_stream_data(msg, "__substg1.0_0C1F001F"),
-                "To": self._get_stream_data(msg, "__substg1.0_0E04001F"),
-                "Subject": self._get_stream_data(msg, "__substg1.0_0037001F"),
-            }
-
-            # Add headers to markdown
-            for key, value in headers.items():
-                if value:
-                    md_content += f"**{key}:** {value}\n"
-
-            md_content += "\n## Content\n\n"
-
-            # Get email body
-            body = self._get_stream_data(msg, "__substg1.0_1000001F")
-            if body:
-                md_content += body
-
-            msg.close()
-
-            return DocumentConverterResult(
-                title=headers.get("Subject"), text_content=md_content.strip()
             )
 
-        except Exception as e:
-            raise FileConversionException(
-                f"Could not convert MSG file '{local_path}': {str(e)}"
-            )
+        msg = olefile.OleFileIO(file_stream)
+        # Extract email metadata
+        md_content = "# Email Message\n\n"
+
+        # Get headers
+        headers = {
+            "From": self._get_stream_data(msg, "__substg1.0_0C1F001F"),
+            "To": self._get_stream_data(msg, "__substg1.0_0E04001F"),
+            "Subject": self._get_stream_data(msg, "__substg1.0_0037001F"),
+        }
+
+        # Add headers to markdown
+        for key, value in headers.items():
+            if value:
+                md_content += f"**{key}:** {value}\n"
+
+        md_content += "\n## Content\n\n"
+
+        # Get email body
+        body = self._get_stream_data(msg, "__substg1.0_1000001F")
+        if body:
+            md_content += body
+
+        msg.close()
+
+        return DocumentConverterResult(
+            markdown=md_content.strip(),
+            title=headers.get("Subject"),
+        )
 
     def _get_stream_data(self, msg: Any, stream_path: str) -> Union[str, None]:
         """Helper to safely extract and decode stream data from the MSG file."""

@@ -1,13 +1,26 @@
-import mimetypes
+import sys
 
-from charset_normalizer import from_path
-from typing import Any, Union
+from typing import BinaryIO, Any
+from charset_normalizer import from_bytes
+from .._base_converter import DocumentConverter, DocumentConverterResult
+from .._stream_info import StreamInfo
 
-from ._base import DocumentConverter, DocumentConverterResult
+# Try loading optional (but in this case, required) dependencies
+# Save reporting of any exceptions for later
+_dependency_exc_info = None
+try:
+    import mammoth
+except ImportError:
+    # Preserve the error and stack trace for later
+    _dependency_exc_info = sys.exc_info()
 
+ACCEPTED_MIME_TYPE_PREFIXES = [
+    "text/",
+    "application/json",
+]
 
 # Mimetypes to ignore (commonly confused extensions)
-IGNORE_MIMETYPES = [
+IGNORE_MIME_TYPE_PREFIXES = [
     "text/vnd.in3d.spot",  # .spo wich is confused with xls, doc, etc.
     "text/vnd.graphviz",  # .dot which is confused with xls, doc, etc.
 ]
@@ -16,34 +29,34 @@ IGNORE_MIMETYPES = [
 class PlainTextConverter(DocumentConverter):
     """Anything with content type text/plain"""
 
-    def __init__(
-        self, priority: float = DocumentConverter.PRIORITY_GENERIC_FILE_FORMAT
-    ):
-        super().__init__(priority=priority)
+    def accepts(
+        self,
+        file_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,  # Options to pass to the converter
+    ) -> bool:
+        mimetype = (stream_info.mimetype or "").lower()
+        extension = (stream_info.extension or "").lower()
+
+        for prefix in IGNORE_MIME_TYPE_PREFIXES:
+            if mimetype.startswith(prefix):
+                return False
+
+        for prefix in ACCEPTED_MIME_TYPE_PREFIXES:
+            if mimetype.startswith(prefix):
+                return True
+
+        return False
 
     def convert(
-        self, local_path: str, **kwargs: Any
-    ) -> Union[None, DocumentConverterResult]:
-        # Guess the content type from any file extension that might be around
-        content_type, _ = mimetypes.guess_type(
-            "__placeholder" + kwargs.get("file_extension", "")
-        )
+        self,
+        file_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,  # Options to pass to the converter
+    ) -> DocumentConverterResult:
+        if stream_info.charset:
+            text_content = file_stream.read().decode(stream_info.charset)
+        else:
+            text_content = str(from_bytes(file_stream.read()).best())
 
-        # Ignore common false positives
-        if content_type in IGNORE_MIMETYPES:
-            content_type = None
-
-        # Only accept text files
-        if content_type is None:
-            return None
-        elif all(
-            not content_type.lower().startswith(type_prefix)
-            for type_prefix in ["text/", "application/json"]
-        ):
-            return None
-
-        text_content = str(from_path(local_path).best())
-        return DocumentConverterResult(
-            title=None,
-            text_content=text_content,
-        )
+        return DocumentConverterResult(markdown=text_content)

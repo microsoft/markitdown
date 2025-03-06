@@ -1,30 +1,53 @@
-from typing import Union
-from ._base import DocumentConverter, DocumentConverterResult
-from ._media_converter import MediaConverter
+from typing import BinaryIO, Any, Union
 import base64
 import mimetypes
+from ._exiftool import exiftool_metadata
+from .._base_converter import DocumentConverter, DocumentConverterResult
+from .._stream_info import StreamInfo
+
+ACCEPTED_MIME_TYPE_PREFIXES = [
+    "image/jpeg",
+    "image/png",
+]
+
+ACCEPTED_FILE_EXTENSIONS = [".jpg", ".jpeg", ".png"]
 
 
-class ImageConverter(MediaConverter):
+class ImageConverter(DocumentConverter):
     """
     Converts images to markdown via extraction of metadata (if `exiftool` is installed), and description via a multimodal LLM (if an llm_client is configured).
     """
 
-    def __init__(
-        self, priority: float = DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT
-    ):
-        super().__init__(priority=priority)
+    def accepts(
+        self,
+        file_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,
+    ) -> bool:
+        mimetype = (stream_info.mimetype or "").lower()
+        extension = (stream_info.extension or "").lower()
 
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
-        # Bail if not an image
-        extension = kwargs.get("file_extension", "")
-        if extension.lower() not in [".jpg", ".jpeg", ".png"]:
-            return None
+        if extension in ACCEPTED_FILE_EXTENSIONS:
+            return True
 
+        for prefix in ACCEPTED_MIME_TYPE_PREFIXES:
+            if mimetype.startswith(prefix):
+                return True
+
+        return False
+
+    def convert(
+        self,
+        file_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,  # Options to pass to the converter
+    ) -> DocumentConverterResult:
         md_content = ""
 
         # Add metadata
-        metadata = self._get_metadata(local_path, kwargs.get("exiftool_path"))
+        metadata = exiftool_metadata(
+            file_stream, exiftool_path=kwargs.get("exiftool_path")
+        )
 
         if metadata:
             for f in [
@@ -42,39 +65,59 @@ class ImageConverter(MediaConverter):
                 if f in metadata:
                     md_content += f"{f}: {metadata[f]}\n"
 
-        # Try describing the image with GPTV
+        # Try describing the image with GPT
         llm_client = kwargs.get("llm_client")
         llm_model = kwargs.get("llm_model")
         if llm_client is not None and llm_model is not None:
-            md_content += (
-                "\n# Description:\n"
-                + self._get_llm_description(
-                    local_path,
-                    extension,
-                    llm_client,
-                    llm_model,
-                    prompt=kwargs.get("llm_prompt"),
-                ).strip()
-                + "\n"
+            llm_description = self._get_llm_description(
+                file_stream,
+                stream_info,
+                client=llm_client,
+                model=llm_model,
+                prompt=kwargs.get("llm_prompt"),
             )
 
+            if llm_description is not None:
+                md_content += "\n# Description:\n" + llm_description.strip() + "\n"
+
         return DocumentConverterResult(
-            title=None,
-            text_content=md_content,
+            markdown=md_content,
         )
 
-    def _get_llm_description(self, local_path, extension, client, model, prompt=None):
+    def _get_llm_description(
+        self,
+        file_stream: BinaryIO,
+        stream_info: StreamInfo,
+        *,
+        client,
+        model,
+        prompt=None,
+    ) -> Union[None, str]:
         if prompt is None or prompt.strip() == "":
             prompt = "Write a detailed caption for this image."
 
-        data_uri = ""
-        with open(local_path, "rb") as image_file:
-            content_type, encoding = mimetypes.guess_type("_dummy" + extension)
-            if content_type is None:
-                content_type = "image/jpeg"
-            image_base64 = base64.b64encode(image_file.read()).decode("utf-8")
-            data_uri = f"data:{content_type};base64,{image_base64}"
+        # Get the content type
+        content_type = stream_info.mimetype
+        if not content_type:
+            content_type, _ = mimetypes.guess_type(
+                "_dummy" + (stream_info.extension or "")
+            )
+        if not content_type:
+            content_type = "application/octet-stream"
 
+        # Convert to base64
+        cur_pos = file_stream.tell()
+        try:
+            base64_image = base64.b64encode(file_stream.read()).decode("utf-8")
+        except Exception as e:
+            return None
+        finally:
+            file_stream.seek(cur_pos)
+
+        # Prepare the data-uri
+        data_uri = f"data:{content_type};base64,{base64_image}"
+
+        # Prepare the OpenAI API request
         messages = [
             {
                 "role": "user",
@@ -90,5 +133,6 @@ class ImageConverter(MediaConverter):
             }
         ]
 
+        # Call the OpenAI API
         response = client.chat.completions.create(model=model, messages=messages)
         return response.choices[0].message.content
