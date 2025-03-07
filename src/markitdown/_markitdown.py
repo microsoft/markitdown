@@ -17,7 +17,7 @@ from xml.dom import minidom
 from typing import Any, Dict, List, Optional, Union
 from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse, urlunparse
-from warnings import warn, resetwarnings, catch_warnings
+from warnings import warn, filterwarnings
 
 import mammoth
 import markdownify
@@ -51,21 +51,14 @@ mimetypes.add_type("text/csv", ".csv")
 
 # Optional Transcription support
 IS_AUDIO_TRANSCRIPTION_CAPABLE = False
+filterwarnings("ignore", message=r".*Couldn\'t find ffmpeg or avconv.*", module="pydub")
 try:
-    # Using warnings' catch_warnings to catch
-    # pydub's warning of ffmpeg or avconv missing
-    with catch_warnings(record=True) as w:
-        import pydub
-
-        if w:
-            raise ModuleNotFoundError
+    import pydub
     import speech_recognition as sr
 
     IS_AUDIO_TRANSCRIPTION_CAPABLE = True
 except ModuleNotFoundError:
     pass
-finally:
-    resetwarnings()
 
 # Optional YouTube transcription support
 try:
@@ -1088,6 +1081,14 @@ class Mp3Converter(WavConverter):
             handle, temp_path = tempfile.mkstemp(suffix=".wav")
             os.close(handle)
             try:
+                # Check if pydub defaulted to ffmpeg
+                if pydub.AudioSegment.converter == "ffmpeg" and not shutil.which(
+                    "ffmpeg"
+                ):
+                    warn(
+                        "pydub: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work",
+                        RuntimeWarning,
+                    )
                 sound = pydub.AudioSegment.from_mp3(local_path)
                 sound.export(temp_path, format="wav")
 
