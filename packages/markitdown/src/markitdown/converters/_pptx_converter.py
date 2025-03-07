@@ -6,6 +6,7 @@ import re
 import html
 
 from typing import BinaryIO, Any
+from operator import attrgetter
 
 from ._html_converter import HtmlConverter
 from ._llm_caption import llm_caption
