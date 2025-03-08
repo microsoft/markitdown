@@ -967,18 +967,6 @@ class MediaConverter(DocumentConverter):
 
     def _get_metadata(self, local_path, exiftool_path=None):
         if not exiftool_path:
-            which_exiftool = shutil.which("exiftool")
-            if which_exiftool:
-                warn(
-                    f"""Implicit discovery of 'exiftool' is disabled. If you would like to continue to use exiftool in MarkItDown, please set the exiftool_path parameter in the MarkItDown consructor. E.g., 
-
-    md = MarkItDown(exiftool_path="{which_exiftool}")
-
-This warning will be removed in future releases.
-""",
-                    DeprecationWarning,
-                )
-
             return None
         else:
             try:
@@ -1499,34 +1487,25 @@ class MarkItDown:
         if exiftool_path is None:
             exiftool_path = os.environ.get("EXIFTOOL_PATH")
 
-        # Handle deprecation notices
-        #############################
-        if mlm_client is not None:
-            if llm_client is None:
-                warn(
-                    "'mlm_client' is deprecated, and was renamed 'llm_client'.",
-                    DeprecationWarning,
-                )
-                llm_client = mlm_client
-                mlm_client = None
-            else:
-                raise ValueError(
-                    "'mlm_client' is deprecated, and was renamed 'llm_client'. Do not use both at the same time. Just use 'llm_client' instead."
-                )
-
-        if mlm_model is not None:
-            if llm_model is None:
-                warn(
-                    "'mlm_model' is deprecated, and was renamed 'llm_model'.",
-                    DeprecationWarning,
-                )
-                llm_model = mlm_model
-                mlm_model = None
-            else:
-                raise ValueError(
-                    "'mlm_model' is deprecated, and was renamed 'llm_model'. Do not use both at the same time. Just use 'llm_model' instead."
-                )
-        #############################
+        # Still none? Check well-known paths
+        if exiftool_path is None:
+            candidate = shutil.which("exiftool")
+            if candidate:
+                candidate = os.path.abspath(candidate)
+                if any(
+                    d == os.path.dirname(candidate)
+                    for d in [
+                        "/usr/bin",
+                        "/usr/local/bin",
+                        "/opt",
+                        "/opt/bin",
+                        "/opt/local/bin",
+                        "/opt/homebrew/bin" "C:\\Windows\\System32",
+                        "C:\\Program Files",
+                        "C:\\Program Files (x86)",
+                    ]
+                ):
+                    exiftool_path = candidate
 
         self._llm_client = llm_client
         self._llm_model = llm_model

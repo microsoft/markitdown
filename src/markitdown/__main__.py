@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: MIT
 import argparse
 import sys
-import shutil
 from textwrap import dedent
 from .__about__ import __version__
 from ._markitdown import MarkItDown, DocumentConverterResult
@@ -75,8 +74,6 @@ def main():
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
 
-    which_exiftool = shutil.which("exiftool")
-
     if args.use_docintel:
         if args.endpoint is None:
             raise ValueError(
@@ -84,11 +81,9 @@ def main():
             )
         elif args.filename is None:
             raise ValueError("Filename is required when using Document Intelligence.")
-        markitdown = MarkItDown(
-            exiftool_path=which_exiftool, docintel_endpoint=args.endpoint
-        )
+        markitdown = MarkItDown(docintel_endpoint=args.endpoint)
     else:
-        markitdown = MarkItDown(exiftool_path=which_exiftool)
+        markitdown = MarkItDown()
 
     if args.filename is None:
         result = markitdown.convert_stream(sys.stdin.buffer)

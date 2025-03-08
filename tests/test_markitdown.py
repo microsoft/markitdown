@@ -6,8 +6,6 @@ import shutil
 import pytest
 import requests
 
-from warnings import catch_warnings, resetwarnings
-
 from markitdown import MarkItDown
 
 skip_remote = (
@@ -277,18 +275,6 @@ def test_markitdown_local() -> None:
     reason="do not run if exiftool is not installed",
 )
 def test_markitdown_exiftool() -> None:
-    # Test the automatic discovery of exiftool throws a warning
-    # and is disabled
-    try:
-        with catch_warnings(record=True) as w:
-            markitdown = MarkItDown()
-            result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.jpg"))
-            assert len(w) == 1
-            assert w[0].category is DeprecationWarning
-            assert result.text_content.strip() == ""
-    finally:
-        resetwarnings()
-
     # Test explicitly setting the location of exiftool
     which_exiftool = shutil.which("exiftool")
     markitdown = MarkItDown(exiftool_path=which_exiftool)
@@ -304,40 +290,6 @@ def test_markitdown_exiftool() -> None:
     for key in JPG_TEST_EXIFTOOL:
         target = f"{key}: {JPG_TEST_EXIFTOOL[key]}"
         assert target in result.text_content
-
-
-def test_markitdown_deprecation() -> None:
-    try:
-        with catch_warnings(record=True) as w:
-            test_client = object()
-            markitdown = MarkItDown(mlm_client=test_client)
-            assert len(w) == 1
-            assert w[0].category is DeprecationWarning
-            assert markitdown._llm_client == test_client
-    finally:
-        resetwarnings()
-
-    try:
-        with catch_warnings(record=True) as w:
-            markitdown = MarkItDown(mlm_model="gpt-4o")
-            assert len(w) == 1
-            assert w[0].category is DeprecationWarning
-            assert markitdown._llm_model == "gpt-4o"
-    finally:
-        resetwarnings()
-
-    try:
-        test_client = object()
-        markitdown = MarkItDown(mlm_client=test_client, llm_client=test_client)
-        assert False
-    except ValueError:
-        pass
-
-    try:
-        markitdown = MarkItDown(mlm_model="gpt-4o", llm_model="gpt-4o")
-        assert False
-    except ValueError:
-        pass
 
 
 @pytest.mark.skipif(
@@ -364,5 +316,4 @@ if __name__ == "__main__":
     # test_markitdown_remote()
     # test_markitdown_local()
     test_markitdown_exiftool()
-    # test_markitdown_deprecation()
     # test_markitdown_llm()
