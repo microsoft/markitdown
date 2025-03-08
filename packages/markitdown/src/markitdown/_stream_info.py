@@ -1,14 +1,10 @@
-import puremagic
 import mimetypes
 import os
 from dataclasses import dataclass, asdict
 from typing import Optional, BinaryIO, List, TypeVar, Type
+from magika import Magika
 
-# Mimetype substitutions table
-MIMETYPE_SUBSTITUTIONS = {
-    "application/excel": "application/vnd.ms-excel",
-    "application/mspowerpoint": "application/vnd.ms-powerpoint",
-}
+magika = Magika()
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -59,6 +55,25 @@ def _guess_stream_info_from_stream(
     """
     guesses: List[StreamInfo] = []
 
+    # Call magika to guess from the stream
+    cur_pos = file_stream.tell()
+    try:
+        result = magika.identify_bytes(file_stream.read())
+        if result.status == "ok" and result.prediction.output.label != "unknown":
+            extension = None
+            if len(result.prediction.output.extensions) > 0:
+                extension = result.prediction.output.extensions[0]
+            if extension and not extension.startswith("."):
+                extension = "." + extension
+            guesses.append(
+                StreamInfo(
+                    mimetype=result.prediction.output.mime_type,
+                    extension=extension,
+                )
+            )
+    finally:
+        file_stream.seek(cur_pos)
+
     # Add a guess purely based on the filename hint
     if filename_hint:
         try:
@@ -73,50 +88,5 @@ def _guess_stream_info_from_stream(
                     mimetype=mimetype, extension=os.path.splitext(filename_hint)[1]
                 )
             )
-
-    def _puremagic(
-        file_stream, filename_hint
-    ) -> List[puremagic.main.PureMagicWithConfidence]:
-        """Wrap guesses to handle exceptions."""
-        try:
-            return puremagic.magic_stream(file_stream, filename=filename_hint)
-        except puremagic.main.PureError as e:
-            return []
-
-    cur_pos = file_stream.tell()
-    type_guesses = _puremagic(file_stream, filename_hint=filename_hint)
-    if len(type_guesses) == 0:
-        # Fix for: https://github.com/microsoft/markitdown/issues/222
-        # If there are no guesses, then try again after trimming leading ASCII whitespaces.
-        # ASCII whitespace characters are those byte values in the sequence b' \t\n\r\x0b\f'
-        # (space, tab, newline, carriage return, vertical tab, form feed).
-
-        # Eat all the leading whitespace
-        file_stream.seek(cur_pos)
-        while True:
-            char = file_stream.read(1)
-            if not char:  # End of file
-                break
-            if not char.isspace():
-                file_stream.seek(file_stream.tell() - 1)
-                break
-
-        # Try again
-        type_guesses = _puremagic(file_stream, filename_hint=filename_hint)
-    file_stream.seek(cur_pos)
-
-    # Convert and return the guesses
-    for guess in type_guesses:
-        kwargs: dict[str, str] = {}
-        if guess.extension:
-            kwargs["extension"] = guess.extension
-        if guess.mime_type:
-            kwargs["mimetype"] = MIMETYPE_SUBSTITUTIONS.get(
-                guess.mime_type, guess.mime_type
-            )
-        if len(kwargs) > 0:
-            # We don't add the filename_hint, because sometimes it's just a placeholder,
-            # and, in any case, doesn't add new information.
-            guesses.append(StreamInfo(**kwargs))
 
     return guesses
