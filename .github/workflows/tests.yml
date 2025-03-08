@@ -12,14 +12,7 @@ jobs:
             3.10
             3.11
             3.12
-      - name: Set up pip cache
-        if: runner.os == 'Linux'
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('pyproject.toml') }}
-          restore-keys: ${{ runner.os }}-pip-
       - name: Install Hatch
         run: pipx install hatch
       - name: Run tests
-        run: hatch test
+        run: cd packages/markitdown; hatch test

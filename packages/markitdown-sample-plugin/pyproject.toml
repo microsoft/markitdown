@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "markitdown"
+name = "markitdown-sample-plugin"
 dynamic = ["version"]
-description = 'Utility tool for converting various files to Markdown'
+description = 'A sample plugin for the "markitdown" library.'
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
@@ -24,26 +24,8 @@ classifiers = [
   "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dependencies = [
-  "beautifulsoup4",
-  "requests",
-  "mammoth",
-  "markdownify",
-  "numpy",
-  "python-pptx",
-  "pandas",
-  "openpyxl",
-  "xlrd",
-  "pdfminer.six",
-  "puremagic",
-  "pydub",
-  "olefile",
-  "youtube-transcript-api",
-  "SpeechRecognition",
-  "pathvalidate",
-  "charset-normalizer",
-  "openai",
-  "azure-ai-documentintelligence",
-  "azure-identity"
+  "markitdown>=0.1.0a1",
+  "striprtf",
 ]
 
 [project.urls]
@@ -52,29 +34,30 @@ Issues = "https://github.com/microsoft/markitdown/issues"
 Source = "https://github.com/microsoft/markitdown"
 
 [tool.hatch.version]
-path = "src/markitdown/__about__.py"
+path = "src/markitdown_sample_plugin/__about__.py"
 
-[project.scripts]
-markitdown = "markitdown.__main__:main"
+# IMPORTANT: MarkItDown will look for this entry point to find the plugin.
+[project.entry-points."markitdown.plugin"]
+sample_plugin = "markitdown_sample_plugin"
 
 [tool.hatch.envs.types]
 extra-dependencies = [
   "mypy>=1.0.0",
 ]
 [tool.hatch.envs.types.scripts]
-check = "mypy --install-types --non-interactive {args:src/markitdown tests}"
+check = "mypy --install-types --non-interactive {args:src/markitdown_sample_plugin tests}"
 
 [tool.coverage.run]
-source_pkgs = ["markitdown", "tests"]
+source_pkgs = ["markitdown-sample-plugin", "tests"]
 branch = true
 parallel = true
 omit = [
-  "src/markitdown/__about__.py",
+  "src/markitdown_sample_plugin/__about__.py",
 ]
 
 [tool.coverage.paths]
-markitdown = ["src/markitdown", "*/markitdown/src/markitdown"]
-tests = ["tests", "*/markitdown/tests"]
+markitdown-sample-plugin = ["src/markitdown_sample_plugin", "*/markitdown-sample-plugin/src/markitdown_sample_plugin"]
+tests = ["tests", "*/markitdown-sample-plugin/tests"]
 
 [tool.coverage.report]
 exclude_lines = [
@@ -84,4 +67,4 @@ exclude_lines = [
 ]
 
 [tool.hatch.build.targets.sdist]
-only-include = ["src/markitdown"]
+only-include = ["src/markitdown_sample_plugin"]
