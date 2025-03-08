@@ -7,8 +7,6 @@ import openai
 import pytest
 import requests
 
-import warnings
-
 from markitdown import (
     MarkItDown,
     UnsupportedFormatException,
@@ -517,19 +515,6 @@ def test_exceptions() -> None:
     reason="do not run if exiftool is not installed",
 )
 def test_markitdown_exiftool() -> None:
-    # Test the automatic discovery of exiftool throws a warning
-    # and is disabled
-    try:
-        warnings.simplefilter("default")
-        with warnings.catch_warnings(record=True) as w:
-            markitdown = MarkItDown()
-            result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.jpg"))
-            assert len(w) == 1
-            assert w[0].category is DeprecationWarning
-            assert result.text_content.strip() == ""
-    finally:
-        warnings.resetwarnings()
-
     which_exiftool = shutil.which("exiftool")
     assert which_exiftool is not None
 

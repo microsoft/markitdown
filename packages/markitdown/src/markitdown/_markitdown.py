@@ -3,6 +3,7 @@ import mimetypes
 import os
 import re
 import sys
+import shutil
 import tempfile
 import warnings
 import traceback
@@ -138,8 +139,29 @@ class MarkItDown:
             self._llm_model = kwargs.get("llm_model")
             self._exiftool_path = kwargs.get("exiftool_path")
             self._style_map = kwargs.get("style_map")
+
             if self._exiftool_path is None:
                 self._exiftool_path = os.getenv("EXIFTOOL_PATH")
+
+            # Still none? Check well-known paths
+            if self._exiftool_path is None:
+                candidate = shutil.which("exiftool")
+                if candidate:
+                    candidate = os.path.abspath(candidate)
+                    if any(
+                        d == os.path.dirname(candidate)
+                        for d in [
+                            "/usr/bin",
+                            "/usr/local/bin",
+                            "/opt",
+                            "/opt/bin",
+                            "/opt/local/bin",
+                            "/opt/homebrew/bin" "C:\\Windows\\System32",
+                            "C:\\Program Files",
+                            "C:\\Program Files (x86)",
+                        ]
+                    ):
+                        self._exiftool_path = candidate
 
             # Register converters for successful browsing operations
             # Later registrations are tried first / take higher priority than earlier registrations
