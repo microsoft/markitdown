@@ -7,6 +7,7 @@ from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 # Try loading optional (but in this case, required) dependencies
 # Save reporting of any exceptions for later
 _dependency_exc_info = None
+olefile = None
 try:
     import olefile
 except ImportError:
@@ -48,7 +49,7 @@ class OutlookMsgConverter(DocumentConverter):
         # Brute force, check if we have an OLE file
         cur_pos = file_stream.tell()
         try:
-            if not olefile.isOleFile(file_stream):
+            if olefile and not olefile.isOleFile(file_stream):
                 return False
         finally:
             file_stream.seek(cur_pos)

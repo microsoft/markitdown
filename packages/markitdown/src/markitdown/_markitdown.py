@@ -327,6 +327,17 @@ class MarkItDown:
         elif base_guess.extension is not None:
             placeholder_filename = "placeholder" + base_guess.extension
 
+        # Check if we have a seekable stream. If not, load the entire stream into memory.
+        if not stream.seekable():
+            buffer = io.BytesIO()
+            while True:
+                chunk = stream.read(4096)
+                if not chunk:
+                    break
+                buffer.write(chunk)
+            buffer.seek(0)
+            stream = buffer
+
         # Add guesses based on stream content
         for guess in _guess_stream_info_from_stream(
             file_stream=stream, filename_hint=placeholder_filename
