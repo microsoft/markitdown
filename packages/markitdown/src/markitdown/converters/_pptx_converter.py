@@ -6,6 +6,7 @@ import re
 import html
 
 from typing import BinaryIO, Any
+from operator import attrgetter
 
 from ._html_converter import HtmlConverter
 from ._llm_caption import llm_caption
@@ -160,10 +161,12 @@ class PptxConverter(DocumentConverter):
 
                 # Group Shapes
                 if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.GROUP:
-                    for subshape in shape.shapes:
+                    sorted_shapes = sorted(shape.shapes, key=attrgetter("top", "left"))
+                    for subshape in sorted_shapes:
                         get_shape_content(subshape, **kwargs)
 
-            for shape in slide.shapes:
+            sorted_shapes = sorted(slide.shapes, key=attrgetter("top", "left"))
+            for shape in sorted_shapes:
                 get_shape_content(shape, **kwargs)
 
             md_content = md_content.strip()
