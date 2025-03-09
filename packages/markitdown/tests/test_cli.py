@@ -33,7 +33,7 @@ def test_invalid_flag(shared_tmp_dir) -> None:
     assert (
         "unrecognized arguments" in result.stderr
     ), f"Expected 'unrecognized arguments' to appear in STDERR"
-    assert "SYNTAX" in result.stderr, f"Expected 'SYNTAX' to appear in STDERR"
+    assert "usage" in result.stderr, f"Expected 'usage' to appear in STDERR"
 
 
 def test_output_to_stdout(shared_tmp_dir) -> None:
