@@ -156,7 +156,8 @@ class MarkItDown:
                             "/opt",
                             "/opt/bin",
                             "/opt/local/bin",
-                            "/opt/homebrew/bin" "C:\\Windows\\System32",
+                            "/opt/homebrew/bin",
+                            "C:\\Windows\\System32",
                             "C:\\Program Files",
                             "C:\\Program Files (x86)",
                         ]
