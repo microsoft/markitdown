@@ -14,9 +14,6 @@ from typing import Any, List, Optional, Union, BinaryIO
 from pathlib import Path
 from urllib.parse import urlparse
 from warnings import warn
-
-# File-format detection
-import puremagic
 import requests
 
 from ._stream_info import StreamInfo, _guess_stream_info_from_stream
