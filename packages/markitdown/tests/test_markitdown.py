@@ -13,7 +13,6 @@ from markitdown import (
     FileConversionException,
     StreamInfo,
 )
-from markitdown._stream_info import _guess_stream_info_from_stream
 
 skip_remote = (
     True if os.environ.get("GITHUB_ACTIONS") else False
@@ -265,10 +264,16 @@ def test_stream_info_guesses() -> None:
         (os.path.join(TEST_FILES_DIR, "test.xls"), "application/vnd.ms-excel"),
     ]
 
+    markitdown = MarkItDown()
     for file_path, expected_mimetype in test_tuples:
         with open(file_path, "rb") as f:
-            guesses = _guess_stream_info_from_stream(
-                f, filename_hint=os.path.basename(file_path)
+            guesses = markitdown._get_stream_info_guesses(
+                f,
+                StreamInfo(
+                    filename=os.path.basename(file_path),
+                    local_path=file_path,
+                    extension=os.path.splitext(file_path)[1],
+                ),
             )
             assert len(guesses) > 0
             assert guesses[0].mimetype == expected_mimetype
