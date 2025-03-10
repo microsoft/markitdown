@@ -3,7 +3,9 @@ import markdownify
 
 from typing import Any, Optional
 from urllib.parse import quote, unquote, urlparse, urlunparse
+from magika import Magika
 
+magika = Magika()
 
 class _CustomMarkdownify(markdownify.MarkdownConverter):
     """
@@ -17,6 +19,22 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
 
     def __init__(self, **options: Any):
         options["heading_style"] = options.get("heading_style", markdownify.ATX)
+
+        # Add a custom code language callback to guess the language of code snippets
+        def code_language_callback(el):
+            extracted_code_snippet = el.get_text()
+            if not extracted_code_snippet:
+                return ""
+            result = magika.identify_bytes(extracted_code_snippet.encode())
+            if result.status == "ok" and result.prediction.output.group in ["text", "code"]:
+                language = result.prediction.output.label
+                return language
+            return ""
+
+        options["code_language_callback"] = options.get(
+            "code_language_callback", code_language_callback
+        )
+
         # Explicitly cast options to the expected type if necessary
         super().__init__(**options)
 
