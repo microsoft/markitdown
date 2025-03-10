@@ -7,6 +7,7 @@ from magika import Magika
 
 magika = Magika()
 
+
 class _CustomMarkdownify(markdownify.MarkdownConverter):
     """
     A custom version of markdownify's MarkdownConverter. Changes include:
@@ -26,7 +27,10 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
             if not extracted_code_snippet:
                 return ""
             result = magika.identify_bytes(extracted_code_snippet.encode())
-            if result.status == "ok" and result.prediction.output.group in ["text", "code"]:
+            if result.status == "ok" and result.prediction.output.group in [
+                "text",
+                "code",
+            ]:
                 language = result.prediction.output.label
                 return language
             return ""
