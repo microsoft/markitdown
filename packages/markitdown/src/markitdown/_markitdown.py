@@ -609,8 +609,6 @@ class MarkItDown:
                 ):
                     compatible = False
 
-                print(compatible)
-
                 if compatible:
                     # Add the compatible base guess
                     guesses.append(
