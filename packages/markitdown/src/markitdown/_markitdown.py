@@ -244,7 +244,7 @@ class MarkItDown:
                 or source.startswith("https://")
                 or source.startswith("file://")
             ):
-                return self.convert_url(source, **kwargs)
+                return self.convert_url(source, stream_info=stream_info, *kwargs)
             else:
                 return self.convert_local(source, stream_info=stream_info, **kwargs)
         # Path object
@@ -252,14 +252,14 @@ class MarkItDown:
             return self.convert_local(source, stream_info=stream_info, **kwargs)
         # Request response
         elif isinstance(source, requests.Response):
-            return self.convert_response(source, **kwargs)
+            return self.convert_response(source, stream_info=stream_info, **kwargs)
         # Binary stream
         elif (
             hasattr(source, "read")
             and callable(source.read)
             and not isinstance(source, io.TextIOBase)
         ):
-            return self.convert_stream(source, **kwargs)
+            return self.convert_stream(source, stream_info=stream_info, **kwargs)
         else:
             raise TypeError(
                 f"Invalid source type: {type(source)}. Expected str, requests.Response, BinaryIO."
