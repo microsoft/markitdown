@@ -146,6 +146,13 @@ result = md.convert("example.jpg")
 print(result.text_content)
 ```
 
+Or from the CLI:
+
+```bash
+pip install markitdown
+markitdown --llm-model gpt-4o example.jpg
+```
+
 ### Docker
 
 ```sh
