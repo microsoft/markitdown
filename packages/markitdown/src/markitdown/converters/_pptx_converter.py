@@ -220,13 +220,13 @@ class PptxConverter(DocumentConverter):
             category_names = [c.label for c in chart.plots[0].categories]
             series_names = [s.name for s in chart.series]
             data.append(["Category"] + series_names)
-    
+
             for idx, category in enumerate(category_names):
                 row = [category]
                 for series in chart.series:
                     row.append(series.values[idx])
                 data.append(row)
-    
+
             markdown_table = []
             for row in data:
                 markdown_table.append("| " + " | ".join(map(str, row)) + " |")
