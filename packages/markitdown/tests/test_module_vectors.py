@@ -99,7 +99,11 @@ def test_convert_stream_without_hints(test_vector):
     # For some limited exceptions, we can't guarantee the exact
     # mimetype or extension, so we'll special-case them here.
     if test_vector.filename in [
-        "test_mskanji.csv",  # This works locally but not on the CI. Maybe the charset is different?
+        # This appears to be a subtle bug in magika where, in some
+        # environments (like CI and Docker), this file is misclassified
+        # as random bytes, only when read from stdin. (MD5 hashses
+        # confirm byte-for-byte equality)
+        "test_mskanji.csv",
     ]:
         return
 
