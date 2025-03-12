@@ -3,7 +3,7 @@ from typing import List
 
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
-class TestVector(object):
+class FileTestVector(object):
     filename: str
     mimetype: str | None
     charset: str | None
@@ -13,7 +13,7 @@ class TestVector(object):
 
 
 GENERAL_TEST_VECTORS = [
-    TestVector(
+    FileTestVector(
         filename="test.docx",
         mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         charset=None,
@@ -28,7 +28,7 @@ GENERAL_TEST_VECTORS = [
         ],
         must_not_include=[],
     ),
-    TestVector(
+    FileTestVector(
         filename="test.xlsx",
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         charset=None,
@@ -40,7 +40,7 @@ GENERAL_TEST_VECTORS = [
         ],
         must_not_include=[],
     ),
-    TestVector(
+    FileTestVector(
         filename="test.xls",
         mimetype="application/vnd.ms-excel",
         charset=None,
@@ -52,7 +52,7 @@ GENERAL_TEST_VECTORS = [
         ],
         must_not_include=[],
     ),
-    TestVector(
+    FileTestVector(
         filename="test.pptx",
         mimetype="application/vnd.openxmlformats-officedocument.presentationml.presentation",
         charset=None,
@@ -68,7 +68,7 @@ GENERAL_TEST_VECTORS = [
         ],
         must_not_include=[],
     ),
-    TestVector(
+    FileTestVector(
         filename="test_outlook_msg.msg",
         mimetype="application/vnd.ms-outlook",
         charset=None,
@@ -83,7 +83,7 @@ GENERAL_TEST_VECTORS = [
         ],
         must_not_include=[],
     ),
-    TestVector(
+    FileTestVector(
         filename="test.pdf",
         mimetype="application/pdf",
         charset=None,
@@ -93,23 +93,7 @@ GENERAL_TEST_VECTORS = [
         ],
         must_not_include=[],
     ),
-    # TestVector(
-    #    filename='test_with_comment.docx',
-    #    mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    #    charset=None,
-    #    must_include=[
-    #        "314b0a30-5b04-470b-b9f7-eed2c2bec74a",
-    #        "49e168b7-d2ae-407f-a055-2167576f39a1",
-    #        "## d666f1f7-46cb-42bd-9a39-9a39cf2a509f",
-    #        "# Abstract",
-    #        "# Introduction",
-    #        "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation",
-    #        "This is a test comment. 12df-321a",
-    #        "Yet another comment in the doc. 55yiyi-asd09",
-    #    ],
-    #    must_not_include=[]
-    # ),
-    TestVector(
+    FileTestVector(
         filename="test_blog.html",
         mimetype="text/html",
         charset="utf-8",
@@ -120,7 +104,7 @@ GENERAL_TEST_VECTORS = [
         ],
         must_not_include=[],
     ),
-    TestVector(
+    FileTestVector(
         filename="test_wikipedia.html",
         mimetype="text/html",
         charset="utf-8",
@@ -135,7 +119,7 @@ GENERAL_TEST_VECTORS = [
             "move to sidebar",
         ],
     ),
-    TestVector(
+    FileTestVector(
         filename="test_serp.html",
         mimetype="text/html",
         charset="utf-8",
@@ -150,10 +134,10 @@ GENERAL_TEST_VECTORS = [
             "data:image/svg+xml,%3Csvg%20width%3D",
         ],
     ),
-    TestVector(
+    FileTestVector(
         filename="test_mskanji.csv",
         mimetype="text/csv",
-        charset="mskanji",
+        charset="cp932",
         url=None,
         must_include=[
             "名前,年齢,住所",
@@ -163,7 +147,7 @@ GENERAL_TEST_VECTORS = [
         ],
         must_not_include=[],
     ),
-    TestVector(
+    FileTestVector(
         filename="test.json",
         mimetype="application/json",
         charset="ascii",
@@ -174,7 +158,7 @@ GENERAL_TEST_VECTORS = [
         ],
         must_not_include=[],
     ),
-    TestVector(
+    FileTestVector(
         filename="test_rss.xml",
         mimetype="text/xml",
         charset="utf-8",
@@ -186,7 +170,7 @@ GENERAL_TEST_VECTORS = [
         ],
         must_not_include=["<rss", "<feed"],
     ),
-    TestVector(
+    FileTestVector(
         filename="test_notebook.ipynb",
         mimetype="application/json",
         charset="ascii",
@@ -203,7 +187,7 @@ GENERAL_TEST_VECTORS = [
             "nbformat_minor",
         ],
     ),
-    TestVector(
+    FileTestVector(
         filename="test_files.zip",
         mimetype="application/zip",
         charset=None,

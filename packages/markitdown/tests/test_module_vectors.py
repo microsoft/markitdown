@@ -50,9 +50,7 @@ def test_guess_stream_info(test_vector):
 
         assert guesses[0].mimetype == test_vector.mimetype
         assert guesses[0].extension == expected_extension
-        assert _normalize_charset(guesses[0].charset) == _normalize_charset(
-            test_vector.charset
-        )
+        assert guesses[0].charset == test_vector.charset
 
 
 @pytest.mark.parametrize("test_vector", GENERAL_TEST_VECTORS)
@@ -122,19 +120,6 @@ def test_convert_url(test_vector):
         assert string in result.markdown
     for string in test_vector.must_not_include:
         assert string not in result.markdown
-
-
-def _normalize_charset(charset: str | None) -> str | None:
-    """
-    Normalize a charset string to a canonical form.
-    """
-    if charset is None:
-        return None
-
-    try:
-        return codecs.lookup(charset).name
-    except LookupError:
-        return charset
 
 
 if __name__ == "__main__":

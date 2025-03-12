@@ -7,9 +7,9 @@ import locale
 from typing import List
 
 if __name__ == "__main__":
-    from _test_vectors import GENERAL_TEST_VECTORS, TestVector
+    from _test_vectors import GENERAL_TEST_VECTORS, FileTestVector
 else:
-    from ._test_vectors import GENERAL_TEST_VECTORS, TestVector
+    from ._test_vectors import GENERAL_TEST_VECTORS, FileTestVector
 
 from markitdown import (
     MarkItDown,
@@ -27,7 +27,7 @@ TEST_FILES_URL = "https://raw.githubusercontent.com/microsoft/markitdown/refs/he
 
 
 # Prepare CLI test vectors (remove vectors that require mockig the url)
-CLI_TEST_VECTORS: List[TestVector] = []
+CLI_TEST_VECTORS: List[FileTestVector] = []
 for test_vector in GENERAL_TEST_VECTORS:
     if test_vector.url is not None:
         continue
@@ -126,7 +126,7 @@ def test_input_from_stdin_without_hints(shared_tmp_dir, test_vector) -> None:
     reason="do not run tests that query external urls",
 )
 @pytest.mark.parametrize("test_vector", CLI_TEST_VECTORS)
-def test_convert_url(tmp_dir, test_vector):
+def test_convert_url(shared_tmp_dir, test_vector):
     """Test the conversion of a stream with no stream info."""
     # Note: tmp_dir is not used here, but is needed to match the signature
 
