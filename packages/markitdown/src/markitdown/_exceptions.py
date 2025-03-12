@@ -69,7 +69,7 @@ class FileConversionException(MarkItDownException):
                 message = f"File conversion failed after {len(attempts)} attempts:\n"
                 for attempt in attempts:
                     if attempt.exc_info is None:
-                        message += " -  {type(attempt.converter).__name__} provided no execution info."
+                        message += f" -  {type(attempt.converter).__name__} provided no execution info."
                     else:
                         message += f" - {type(attempt.converter).__name__} threw {attempt.exc_info[0].__name__} with message: {attempt.exc_info[1]}\n"
 
