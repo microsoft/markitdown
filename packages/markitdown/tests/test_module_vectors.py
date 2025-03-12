@@ -47,7 +47,7 @@ def test_guess_stream_info(test_vector):
         # mimetype or extension, so we'll special-case them here.
         if test_vector.filename in [
             "test_outlook_msg.msg",
-            "test_mskanji.csv",  # This works locally but not on the CI. Maybe the charset is different?
+            "test_mskanji.csv",  # See: https://github.com/google/magika/issues/983
         ]:
             return
 
@@ -99,10 +99,8 @@ def test_convert_stream_without_hints(test_vector):
     # For some limited exceptions, we can't guarantee the exact
     # mimetype or extension, so we'll special-case them here.
     if test_vector.filename in [
-        # This appears to be a subtle bug in magika where, in some
-        # environments (like CI and Docker), this file is misclassified
-        # as random bytes, only when read from stdin. (MD5 hashses
-        # confirm byte-for-byte equality)
+        # This appears to be a subtle bug in magika.
+        # See: https://github.com/google/magika/issues/983
         "test_mskanji.csv",
     ]:
         return
