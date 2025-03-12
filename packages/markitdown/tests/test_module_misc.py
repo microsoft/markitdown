@@ -12,6 +12,10 @@ from markitdown import (
     StreamInfo,
 )
 
+# This file contains module tests that are not directly tested by the FileTestVectors.
+# This includes things like helper functions and runtime conversion options
+# (e.g., LLM clients, exiftool path, transcription services, etc.)
+
 skip_remote = (
     True if os.environ.get("GITHUB_ACTIONS") else False
 )  # Don't run these tests in CI

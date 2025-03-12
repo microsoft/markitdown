@@ -3,6 +3,9 @@ import subprocess
 import pytest
 from markitdown import __version__
 
+# This file contains CLI tests that are not directly tested by the FileTestVectors.
+# This includes things like help messages, version numbers, and invalid flags.
+
 
 def test_version() -> None:
     result = subprocess.run(
