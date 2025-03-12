@@ -244,7 +244,14 @@ class MarkItDown:
                 or source.startswith("https://")
                 or source.startswith("file://")
             ):
-                return self.convert_url(source, stream_info=stream_info, *kwargs)
+                # Rename the url argument to mock_url
+                # (Deprecated -- use stream_info)
+                _kwargs = {k: v for k, v in kwargs.items()}
+                if "url" in _kwargs:
+                    _kwargs["mock_url"] = _kwargs["url"]
+                    del _kwargs["url"]
+
+                return self.convert_url(source, stream_info=stream_info, **_kwargs)
             else:
                 return self.convert_local(source, stream_info=stream_info, **kwargs)
         # Path object
@@ -350,12 +357,26 @@ class MarkItDown:
         return self._convert(file_stream=stream, stream_info_guesses=guesses, **kwargs)
 
     def convert_url(
-        self, url: str, **kwargs: Any
+        self,
+        url: str,
+        *,
+        stream_info: Optional[StreamInfo] = None,
+        file_extension: Optional[str] = None,  # Deprecated -- use stream_info
+        mock_url: Optional[
+            str
+        ] = None,  # Mock the request as if it came from a different URL
+        **kwargs: Any,
     ) -> DocumentConverterResult:  # TODO: fix kwargs type
         # Send a HTTP request to the URL
         response = self._requests_session.get(url, stream=True)
         response.raise_for_status()
-        return self.convert_response(response, **kwargs)
+        return self.convert_response(
+            response,
+            stream_info=stream_info,
+            file_extension=file_extension,
+            url=mock_url,
+            **kwargs,
+        )
 
     def convert_response(
         self,
@@ -660,10 +681,12 @@ class MarkItDown:
 
         return guesses
 
-    def _normalize_charset(self, charset: str) -> str:
+    def _normalize_charset(self, charset: str | None) -> str | None:
         """
         Normalize a charset string to a canonical form.
         """
+        if charset is None:
+            return None
         try:
             return codecs.lookup(charset).name
         except LookupError:
