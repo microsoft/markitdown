@@ -13,6 +13,11 @@ try:
     warnings.filterwarnings(
         "ignore", category=DeprecationWarning, module="speech_recognition"
     )
+    warnings.filterwarnings(
+        "ignore",
+        category=SyntaxWarning,
+        module="pydub",  # TODO: Migrate away from pydub
+    )
     import speech_recognition as sr
 
     import pydub
