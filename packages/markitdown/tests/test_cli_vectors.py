@@ -114,7 +114,9 @@ def test_input_from_stdin_without_hints(shared_tmp_dir, test_vector) -> None:
     )
 
     stdout = result.stdout.decode(locale.getpreferredencoding())
-    assert result.returncode == 0, f"CLI exited with error: {result.stderr}"
+    assert (
+        result.returncode == 0
+    ), f"CLI exited with error: {result.stderr.decode('utf-8')}"
     for test_string in test_vector.must_include:
         assert test_string in stdout
     for test_string in test_vector.must_not_include:

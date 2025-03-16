@@ -1,7 +1,7 @@
 import io
 import re
+import bs4
 from typing import Any, BinaryIO, Optional
-from bs4 import BeautifulSoup
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
@@ -57,7 +57,7 @@ class WikipediaConverter(DocumentConverter):
     ) -> DocumentConverterResult:
         # Parse the stream
         encoding = "utf-8" if stream_info.charset is None else stream_info.charset
-        soup = BeautifulSoup(file_stream, "html.parser", from_encoding=encoding)
+        soup = bs4.BeautifulSoup(file_stream, "html.parser", from_encoding=encoding)
 
         # Remove javascript and style blocks
         for script in soup(["script", "style"]):
@@ -72,9 +72,8 @@ class WikipediaConverter(DocumentConverter):
 
         if body_elm:
             # What's the title
-            if title_elm and len(title_elm) > 0:
-                main_title = title_elm.string  # type: ignore
-                assert isinstance(main_title, str)
+            if title_elm and isinstance(title_elm, bs4.Tag):
+                main_title = title_elm.string
 
             # Convert the page
             webpage_text = f"# {main_title}\n\n" + _CustomMarkdownify().convert_soup(
