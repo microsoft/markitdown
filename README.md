@@ -14,7 +14,7 @@ MarkItDown is a lightweight Python utility for converting various files to Markd
 At present, MarkItDown supports:
 
 - PDF
-- PowerPoint (reading in top-to-bottom, left-to-right order)
+- PowerPoint
 - Word
 - Excel
 - Images (EXIF metadata and OCR)
@@ -23,6 +23,7 @@ At present, MarkItDown supports:
 - Text-based formats (CSV, JSON, XML)
 - ZIP files (iterates over contents)
 - Youtube URLs
+- EPubs
 - ... and more!
 
 ## Why Markdown?
