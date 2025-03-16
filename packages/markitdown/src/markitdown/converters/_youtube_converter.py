@@ -3,9 +3,9 @@ import json
 import time
 import io
 import re
+import bs4
 from typing import Any, BinaryIO, Optional, Dict, List, Union
 from urllib.parse import parse_qs, urlparse, unquote
-from bs4 import BeautifulSoup
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
@@ -72,21 +72,31 @@ class YouTubeConverter(DocumentConverter):
     ) -> DocumentConverterResult:
         # Parse the stream
         encoding = "utf-8" if stream_info.charset is None else stream_info.charset
-        soup = BeautifulSoup(file_stream, "html.parser", from_encoding=encoding)
+        soup = bs4.BeautifulSoup(file_stream, "html.parser", from_encoding=encoding)
 
         # Read the meta tags
-        metadata: Dict[str, str] = {"title": soup.title.string}
+        metadata: Dict[str, str] = {}
+
+        if soup.title and soup.title.string:
+            metadata["title"] = soup.title.string
+
         for meta in soup(["meta"]):
+            if not isinstance(meta, bs4.Tag):
+                continue
+
             for a in meta.attrs:
                 if a in ["itemprop", "property", "name"]:
-                    content = meta.get("content", "")
-                    if content:  # Only add non-empty content
-                        metadata[meta[a]] = content
+                    key = str(meta.get(a, ""))
+                    content = str(meta.get("content", ""))
+                    if key and content:  # Only add non-empty content
+                        metadata[key] = content
                     break
 
         # Try reading the description
         try:
             for script in soup(["script"]):
+                if not isinstance(script, bs4.Tag):
+                    continue
                 if not script.string:  # Skip empty scripts
                     continue
                 content = script.string
@@ -161,7 +171,7 @@ class YouTubeConverter(DocumentConverter):
             if transcript_text:
                 webpage_text += f"\n### Transcript\n{transcript_text}\n"
 
-        title = title if title else soup.title.string
+        title = title if title else (soup.title.string if soup.title else "")
         assert isinstance(title, str)
 
         return DocumentConverterResult(

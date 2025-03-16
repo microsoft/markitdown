@@ -139,7 +139,7 @@ def main():
         else:
             charset_hint = None
 
-    stream_info: str | None = None
+    stream_info = None
     if (
         extension_hint is not None
         or mime_type_hint is not None

@@ -1,6 +1,7 @@
 import io
 import re
 import base64
+import binascii
 from urllib.parse import parse_qs, urlparse
 from typing import Any, BinaryIO, Optional
 from bs4 import BeautifulSoup
@@ -60,6 +61,8 @@ class BingSerpConverter(DocumentConverter):
         stream_info: StreamInfo,
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
+        assert stream_info.url is not None
+
         # Parse the query parameters
         parsed_params = parse_qs(urlparse(stream_info.url).query)
         query = parsed_params.get("q", [""])[0]
@@ -79,6 +82,9 @@ class BingSerpConverter(DocumentConverter):
         _markdownify = _CustomMarkdownify()
         results = list()
         for result in soup.find_all(class_="b_algo"):
+            if not hasattr(result, "find_all"):
+                continue
+
             # Rewrite redirect urls
             for a in result.find_all("a", href=True):
                 parsed_href = urlparse(a["href"])
