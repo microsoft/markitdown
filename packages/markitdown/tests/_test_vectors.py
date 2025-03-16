@@ -211,4 +211,22 @@ GENERAL_TEST_VECTORS = [
         ],
         must_not_include=[],
     ),
+    FileTestVector(
+        filename="test.epub",
+        mimetype="application/epub+zip",
+        charset=None,
+        url=None,
+        must_include=[
+            "**Authors:** Test Author",
+            "A test EPUB document for MarkItDown testing",
+            "# Chapter 1: Test Content",
+            "This is a **test** paragraph with some formatting",
+            "* A bullet point",
+            "* Another point",
+            "# Chapter 2: More Content",
+            "*different* style",
+            "> This is a blockquote for testing",
+        ],
+        must_not_include=[],
+    ),
 ]

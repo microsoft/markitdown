@@ -18,6 +18,7 @@ from ._audio_converter import AudioConverter
 from ._outlook_msg_converter import OutlookMsgConverter
 from ._zip_converter import ZipConverter
 from ._doc_intel_converter import DocumentIntelligenceConverter
+from ._epub_converter import EpubConverter
 
 __all__ = [
     "PlainTextConverter",
@@ -37,4 +38,5 @@ __all__ = [
     "OutlookMsgConverter",
     "ZipConverter",
     "DocumentIntelligenceConverter",
+    "EpubConverter",
 ]
