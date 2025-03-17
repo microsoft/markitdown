@@ -132,15 +132,6 @@ def test_convert_url(shared_tmp_dir, test_vector):
     """Test the conversion of a stream with no stream info."""
     # Note: tmp_dir is not used here, but is needed to match the signature
 
-    # For some limited exceptions, we can't guarantee the exact
-    # mimetype or extension, so we'll special-case them here.
-    if test_vector.filename in [
-        # This appears to be a subtle bug in magika.
-        # See: https://github.com/google/magika/issues/983
-        "test_mskanji.csv",
-    ]:
-        return
-
     markitdown = MarkItDown()
 
     time.sleep(1)  # Ensure we don't hit rate limits
