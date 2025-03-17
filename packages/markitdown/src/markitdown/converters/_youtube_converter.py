@@ -4,6 +4,7 @@ import time
 import io
 import re
 import bs4
+import warnings
 from typing import Any, BinaryIO, Optional, Dict, List, Union
 from urllib.parse import parse_qs, urlparse, unquote
 
@@ -13,6 +14,11 @@ from ._markdownify import _CustomMarkdownify
 
 # Optional YouTube transcription support
 try:
+    warnings.filterwarnings(
+        "ignore",
+        category=SyntaxWarning,
+        module="youtube_transcript_api",  # Patch submitted to youtube-transcript-api
+    )
     from youtube_transcript_api import YouTubeTranscriptApi
 
     IS_YOUTUBE_TRANSCRIPT_CAPABLE = True
