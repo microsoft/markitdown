@@ -47,7 +47,6 @@ def test_guess_stream_info(test_vector):
         # mimetype or extension, so we'll special-case them here.
         if test_vector.filename in [
             "test_outlook_msg.msg",
-            "test_mskanji.csv",  # See: https://github.com/google/magika/issues/983
         ]:
             return
 
@@ -95,15 +94,6 @@ def test_convert_stream_with_hints(test_vector):
 def test_convert_stream_without_hints(test_vector):
     """Test the conversion of a stream with no stream info."""
     markitdown = MarkItDown()
-
-    # For some limited exceptions, we can't guarantee the exact
-    # mimetype or extension, so we'll special-case them here.
-    if test_vector.filename in [
-        # This appears to be a subtle bug in magika.
-        # See: https://github.com/google/magika/issues/983
-        "test_mskanji.csv",
-    ]:
-        return
 
     with open(os.path.join(TEST_FILES_DIR, test_vector.filename), "rb") as stream:
         result = markitdown.convert(stream, url=test_vector.url)
