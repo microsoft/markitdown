@@ -79,7 +79,7 @@ class BingSerpConverter(DocumentConverter):
             slug.extract()
 
         # Parse the algorithmic results
-        _markdownify = _CustomMarkdownify()
+        _markdownify = _CustomMarkdownify(keep_data_uris=kwargs.get("keep_data_uris", False))
         results = list()
         for result in soup.find_all(class_="b_algo"):
             if not hasattr(result, "find_all"):

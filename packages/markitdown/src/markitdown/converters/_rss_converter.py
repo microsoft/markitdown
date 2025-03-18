@@ -28,6 +28,10 @@ CANDIDATE_FILE_EXTENSIONS = [
 class RssConverter(DocumentConverter):
     """Convert RSS / Atom type to markdown"""
 
+    def __init__(self):
+        super().__init__()
+        self._kwargs = {}
+
     def accepts(
         self,
         file_stream: BinaryIO,
@@ -82,6 +86,7 @@ class RssConverter(DocumentConverter):
         stream_info: StreamInfo,
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
+        self._kwargs = kwargs
         doc = minidom.parse(file_stream)
         feed_type = self._feed_type(doc)
 
@@ -166,7 +171,7 @@ class RssConverter(DocumentConverter):
         try:
             # using bs4 because many RSS feeds have HTML-styled content
             soup = BeautifulSoup(content, "html.parser")
-            return _CustomMarkdownify().convert_soup(soup)
+            return _CustomMarkdownify(keep_data_uris=self._kwargs.get("keep_data_uris", False)).convert_soup(soup)
         except BaseException as _:
             return content
 
