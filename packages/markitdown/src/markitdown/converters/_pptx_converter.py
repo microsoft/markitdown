@@ -78,6 +78,9 @@ class PptxConverter(DocumentConverter):
                 _dependency_exc_info[2]
             )
 
+        # Get the keep_data_uris parameter
+        keep_data_uris = kwargs.get("keep_data_uris", False)
+
         # Perform the conversion
         presentation = pptx.Presentation(file_stream)
         md_content = ""
@@ -140,9 +143,16 @@ class PptxConverter(DocumentConverter):
                     alt_text = re.sub(r"[\r\n\[\]]", " ", alt_text)
                     alt_text = re.sub(r"\s+", " ", alt_text).strip()
 
-                    # A placeholder name
-                    filename = re.sub(r"\W", "", shape.name) + ".jpg"
-                    md_content += "\n![" + alt_text + "](" + filename + ")\n"
+                    # If keep_data_uris is True, use base64 encoding for images
+                    if keep_data_uris:
+                        blob = shape.image.blob
+                        content_type = shape.image.content_type or "image/png"
+                        b64_string = base64.b64encode(blob).decode("utf-8")
+                        md_content += f"\n![{alt_text}](data:{content_type};base64,{b64_string})\n"
+                    else:
+                        # A placeholder name
+                        filename = re.sub(r"\W", "", shape.name) + ".jpg"
+                        md_content += "\n![" + alt_text + "](" + filename + ")\n"
 
                 # Tables
                 if self._is_table(shape):

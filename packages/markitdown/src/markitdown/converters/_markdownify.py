@@ -17,6 +17,7 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
 
     def __init__(self, **options: Any):
         options["heading_style"] = options.get("heading_style", markdownify.ATX)
+        self.keep_data_uris = options.pop("keep_data_uris", False)
         # Explicitly cast options to the expected type if necessary
         super().__init__(**options)
 
@@ -101,7 +102,7 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
             return alt
 
         # Remove dataURIs
-        if src.startswith("data:"):
+        if src.startswith("data:") and not self.keep_data_uris:
             src = src.split(",")[0] + "..."
 
         return "![%s](%s%s)" % (alt, src, title_part)
