@@ -17,12 +17,16 @@ except ImportError:
 ACCEPTED_MIME_TYPE_PREFIXES = [
     "text/",
     "application/json",
+    "application/markdown",
 ]
 
-# Mimetypes to ignore (commonly confused extensions)
-IGNORE_MIME_TYPE_PREFIXES = [
-    "text/vnd.in3d.spot",  # .spo wich is confused with xls, doc, etc.
-    "text/vnd.graphviz",  # .dot which is confused with xls, doc, etc.
+ACCEPTED_FILE_EXTENSIONS = [
+    ".txt",
+    ".text",
+    ".md",
+    ".markdown",
+    ".json",
+    ".jsonl",
 ]
 
 
@@ -38,9 +42,14 @@ class PlainTextConverter(DocumentConverter):
         mimetype = (stream_info.mimetype or "").lower()
         extension = (stream_info.extension or "").lower()
 
-        for prefix in IGNORE_MIME_TYPE_PREFIXES:
-            if mimetype.startswith(prefix):
-                return False
+        # If we have a charset, we can safely assume it's text
+        # With Magika in the earlier stages, this handles most cases
+        if stream_info.charset is not None:
+            return True
+
+        # Otherwise, check the mimetype and extension
+        if extension in ACCEPTED_FILE_EXTENSIONS:
+            return True
 
         for prefix in ACCEPTED_MIME_TYPE_PREFIXES:
             if mimetype.startswith(prefix):
