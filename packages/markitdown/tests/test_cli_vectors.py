@@ -7,9 +7,17 @@ import locale
 from typing import List
 
 if __name__ == "__main__":
-    from _test_vectors import GENERAL_TEST_VECTORS, FileTestVector
+    from _test_vectors import (
+        GENERAL_TEST_VECTORS,
+        DATA_URI_TEST_VECTORS,
+        FileTestVector,
+    )
 else:
-    from ._test_vectors import GENERAL_TEST_VECTORS, FileTestVector
+    from ._test_vectors import (
+        GENERAL_TEST_VECTORS,
+        DATA_URI_TEST_VECTORS,
+        FileTestVector,
+    )
 
 from markitdown import (
     MarkItDown,
@@ -149,7 +157,7 @@ def test_convert_url(shared_tmp_dir, test_vector):
         assert test_string not in stdout
 
 
-@pytest.mark.parametrize("test_vector", CLI_TEST_VECTORS)
+@pytest.mark.parametrize("test_vector", DATA_URI_TEST_VECTORS)
 def test_output_to_file_with_data_uris(shared_tmp_dir, test_vector) -> None:
     """Test CLI functionality when keep_data_uris is enabled"""
 
@@ -173,21 +181,10 @@ def test_output_to_file_with_data_uris(shared_tmp_dir, test_vector) -> None:
 
     with open(output_file, "r") as f:
         output_data = f.read()
-        for test_string in test_vector.must_include_with_data_uris:
+        for test_string in test_vector.must_include:
             assert test_string in output_data
-        for test_string in test_vector.must_not_include_with_data_uris:
+        for test_string in test_vector.must_not_include:
             assert test_string not in output_data
-        # Verify that basic test conditions are still met
-        for string in test_vector.must_include:
-            if "data:image" in string:
-                # Skip data:image related tests (originally we truncate images and don't want to include data:image; but now we want to include data:image)
-                continue
-            assert string in output_data
-        for string in test_vector.must_not_include:
-            if "data:image" in string:
-                # Skip data:image related tests (originally we truncate images and don't want to include data:image; but now we want to include data:image)
-                continue
-            assert string not in output_data
 
     os.remove(output_file)
     assert not os.path.exists(output_file), f"Output file not deleted: {output_file}"
@@ -200,12 +197,12 @@ if __name__ == "__main__":
     """Runs this file's tests from the command line."""
 
     with tempfile.TemporaryDirectory() as tmp_dir:
+        # General tests
         for test_function in [
             test_output_to_stdout,
             test_output_to_file,
             test_input_from_stdin_without_hints,
             test_convert_url,
-            test_output_to_file_with_data_uris,
         ]:
             for test_vector in CLI_TEST_VECTORS:
                 print(
@@ -214,4 +211,17 @@ if __name__ == "__main__":
                 )
                 test_function(tmp_dir, test_vector)
                 print("OK")
+
+        # Data URI tests
+        for test_function in [
+            test_output_to_file_with_data_uris,
+        ]:
+            for test_vector in DATA_URI_TEST_VECTORS:
+                print(
+                    f"Running {test_function.__name__} on {test_vector.filename}...",
+                    end="",
+                )
+                test_function(tmp_dir, test_vector)
+                print("OK")
+
     print("All tests passed!")

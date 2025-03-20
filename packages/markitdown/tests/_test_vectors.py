@@ -10,9 +10,6 @@ class FileTestVector(object):
     url: str | None
     must_include: List[str]
     must_not_include: List[str]
-    # in test keep_data_uris cases, we want to ensure that the data URIs are kept
-    must_include_with_data_uris: List[str] = dataclasses.field(default_factory=list)
-    must_not_include_with_data_uris: List[str] = dataclasses.field(default_factory=list)
 
 
 GENERAL_TEST_VECTORS = [
@@ -32,12 +29,6 @@ GENERAL_TEST_VECTORS = [
         ],
         must_not_include=[
             "data:image/png;base64,iVBORw0KGgoAAAANSU",
-        ],
-        must_include_with_data_uris=[
-            "data:image/png;base64,iVBORw0KGgoAAAANSU",
-        ],
-        must_not_include_with_data_uris=[
-            "data:image/png;base64...",
         ],
     ),
     FileTestVector(
@@ -77,17 +68,9 @@ GENERAL_TEST_VECTORS = [
             "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation",
             "a3f6004b-6f4f-4ea8-bee3-3741f4dc385f",  # chart title
             "2003",  # chart value
-            "![This phrase of the caption is Human-written.]",  # image caption
-        ],
-        must_not_include=[
-            "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQE"
-        ],
-        must_include_with_data_uris=[
-            "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQE",
-        ],
-        must_not_include_with_data_uris=[
             "![This phrase of the caption is Human-written.](Picture4.jpg)",
         ],
+        must_not_include=["data:image/jpeg;base64,/9j/4AAQSkZJRgABAQE"],
     ),
     FileTestVector(
         filename="test_outlook_msg.msg",
@@ -249,5 +232,47 @@ GENERAL_TEST_VECTORS = [
             "> This is a blockquote for testing",
         ],
         must_not_include=[],
+    ),
+]
+
+
+DATA_URI_TEST_VECTORS = [
+    FileTestVector(
+        filename="test.docx",
+        mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        charset=None,
+        url=None,
+        must_include=[
+            "314b0a30-5b04-470b-b9f7-eed2c2bec74a",
+            "49e168b7-d2ae-407f-a055-2167576f39a1",
+            "## d666f1f7-46cb-42bd-9a39-9a39cf2a509f",
+            "# Abstract",
+            "# Introduction",
+            "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation",
+            "data:image/png;base64,iVBORw0KGgoAAAANSU",
+        ],
+        must_not_include=[
+            "data:image/png;base64...",
+        ],
+    ),
+    FileTestVector(
+        filename="test.pptx",
+        mimetype="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        charset=None,
+        url=None,
+        must_include=[
+            "2cdda5c8-e50e-4db4-b5f0-9722a649f455",
+            "04191ea8-5c73-4215-a1d3-1cfb43aaaf12",
+            "44bf7d06-5e7a-4a40-a2e1-a2e42ef28c8a",
+            "1b92870d-e3b5-4e65-8153-919f4ff45592",
+            "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation",
+            "a3f6004b-6f4f-4ea8-bee3-3741f4dc385f",  # chart title
+            "2003",  # chart value
+            "![This phrase of the caption is Human-written.]",  # image caption
+            "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQE",
+        ],
+        must_not_include=[
+            "![This phrase of the caption is Human-written.](Picture4.jpg)",
+        ],
     ),
 ]

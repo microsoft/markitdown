@@ -215,7 +215,10 @@ class PptxConverter(DocumentConverter):
             first_row = False
         html_table += "</table></body></html>"
 
-        return self._html_converter.convert_string(html_table, **kwargs).markdown.strip() + "\n"
+        return (
+            self._html_converter.convert_string(html_table, **kwargs).markdown.strip()
+            + "\n"
+        )
 
     def _convert_chart_to_markdown(self, chart):
         try:

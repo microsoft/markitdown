@@ -6,9 +6,9 @@ import codecs
 
 
 if __name__ == "__main__":
-    from _test_vectors import GENERAL_TEST_VECTORS
+    from _test_vectors import GENERAL_TEST_VECTORS, DATA_URI_TEST_VECTORS
 else:
-    from ._test_vectors import GENERAL_TEST_VECTORS
+    from ._test_vectors import GENERAL_TEST_VECTORS, DATA_URI_TEST_VECTORS
 
 from markitdown import (
     MarkItDown,
@@ -124,7 +124,7 @@ def test_convert_url(test_vector):
         assert string not in result.markdown
 
 
-@pytest.mark.parametrize("test_vector", GENERAL_TEST_VECTORS)
+@pytest.mark.parametrize("test_vector", DATA_URI_TEST_VECTORS)
 def test_convert_with_data_uris(test_vector):
     """Test API functionality when keep_data_uris is enabled"""
     markitdown = MarkItDown()
@@ -133,29 +133,16 @@ def test_convert_with_data_uris(test_vector):
     result = markitdown.convert(
         os.path.join(TEST_FILES_DIR, test_vector.filename),
         keep_data_uris=True,
-        url=test_vector.url
+        url=test_vector.url,
     )
 
-    # Verify keep_data_uris related test conditions
-    for string in test_vector.must_include_with_data_uris:
-        assert string in result.markdown
-    for string in test_vector.must_not_include_with_data_uris:
-        assert string not in result.markdown
-
-    # Verify that basic test conditions are still met
     for string in test_vector.must_include:
-        if "data:image" in string:
-            # Skip data:image related tests (originally we truncate images and don't want to include data:image; but now we want to include data:image)
-            continue
         assert string in result.markdown
     for string in test_vector.must_not_include:
-        if "data:image" in string:
-            # Skip data:image related tests (originally we truncate images and don't want to include data:image; but now we want to include data:image)
-            continue
         assert string not in result.markdown
 
 
-@pytest.mark.parametrize("test_vector", GENERAL_TEST_VECTORS)
+@pytest.mark.parametrize("test_vector", DATA_URI_TEST_VECTORS)
 def test_convert_stream_with_data_uris(test_vector):
     """Test the conversion of a stream with no stream info."""
     markitdown = MarkItDown()
@@ -168,25 +155,12 @@ def test_convert_stream_with_data_uris(test_vector):
 
     with open(os.path.join(TEST_FILES_DIR, test_vector.filename), "rb") as stream:
         result = markitdown.convert(
-            stream,
-            stream_info=stream_info,
-            keep_data_uris=True,
-            url=test_vector.url
+            stream, stream_info=stream_info, keep_data_uris=True, url=test_vector.url
         )
 
-        # Verify keep_data_uris related test conditions
-        for string in test_vector.must_include_with_data_uris:
-            assert string in result.markdown
-        for string in test_vector.must_not_include_with_data_uris:
-            assert string not in result.markdown
-
-        # Verify that basic test conditions are still met
         for string in test_vector.must_include:
             assert string in result.markdown
         for string in test_vector.must_not_include:
-            # Skip data:image related tests (originally we truncate images and don't want to include data:image; but now we want to include data:image)
-            if "data:image" in string:
-                continue
             assert string not in result.markdown
 
 
@@ -194,14 +168,14 @@ if __name__ == "__main__":
     import sys
 
     """Runs this file's tests from the command line."""
+
+    # General tests
     for test_function in [
         test_guess_stream_info,
         test_convert_local,
         test_convert_stream_with_hints,
         test_convert_stream_without_hints,
         test_convert_url,
-        test_convert_with_data_uris,
-        test_convert_stream_with_data_uris,
     ]:
         for test_vector in GENERAL_TEST_VECTORS:
             print(
@@ -209,4 +183,17 @@ if __name__ == "__main__":
             )
             test_function(test_vector)
             print("OK")
+
+    # Data URI tests
+    for test_function in [
+        test_convert_with_data_uris,
+        test_convert_stream_with_data_uris,
+    ]:
+        for test_vector in DATA_URI_TEST_VECTORS:
+            print(
+                f"Running {test_function.__name__} on {test_vector.filename}...", end=""
+            )
+            test_function(test_vector)
+            print("OK")
+
     print("All tests passed!")

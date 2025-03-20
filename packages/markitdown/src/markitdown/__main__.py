@@ -187,9 +187,15 @@ def main():
         markitdown = MarkItDown(enable_plugins=args.use_plugins)
 
     if args.filename is None:
-        result = markitdown.convert_stream(sys.stdin.buffer, stream_info=stream_info, keep_data_uris=args.keep_data_uris)
+        result = markitdown.convert_stream(
+            sys.stdin.buffer,
+            stream_info=stream_info,
+            keep_data_uris=args.keep_data_uris,
+        )
     else:
-        result = markitdown.convert(args.filename, stream_info=stream_info, keep_data_uris=args.keep_data_uris)
+        result = markitdown.convert(
+            args.filename, stream_info=stream_info, keep_data_uris=args.keep_data_uris
+        )
 
     _handle_output(args, result)
 
