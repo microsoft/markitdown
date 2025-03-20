@@ -27,7 +27,7 @@ dependencies = [
   "beautifulsoup4",
   "requests",
   "markdownify",
-  "magika>=0.6.1rc3",
+  "magika~=0.6.1",
   "charset-normalizer",
 ]
 
@@ -42,7 +42,7 @@ all = [
   "olefile",
   "pydub",
   "SpeechRecognition",
-  "youtube-transcript-api",
+  "youtube-transcript-api~=1.0.0",
   "azure-ai-documentintelligence",
   "azure-identity"
 ]
