@@ -4,22 +4,21 @@ import time
 import io
 import re
 import bs4
-import warnings
 from typing import Any, BinaryIO, Optional, Dict, List, Union
 from urllib.parse import parse_qs, urlparse, unquote
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
-from ._markdownify import _CustomMarkdownify
 
 # Optional YouTube transcription support
 try:
-    warnings.filterwarnings(
-        "ignore",
-        category=SyntaxWarning,
-        module="youtube_transcript_api",  # Patch submitted to youtube-transcript-api
-    )
-    from youtube_transcript_api import YouTubeTranscriptApi
+    # Suppress some warnings on library import
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=SyntaxWarning)
+        # Patch submitted upstream to fix the SyntaxWarning
+        from youtube_transcript_api import YouTubeTranscriptApi
 
     IS_YOUTUBE_TRANSCRIPT_CAPABLE = True
 except ModuleNotFoundError:
@@ -148,6 +147,7 @@ class YouTubeConverter(DocumentConverter):
             webpage_text += f"\n### Description\n{description}\n"
 
         if IS_YOUTUBE_TRANSCRIPT_CAPABLE:
+            ytt_api = YouTubeTranscriptApi()
             transcript_text = ""
             parsed_url = urlparse(stream_info.url)  # type: ignore
             params = parse_qs(parsed_url.query)  # type: ignore
@@ -159,7 +159,7 @@ class YouTubeConverter(DocumentConverter):
                     )
                     # Retry the transcript fetching operation
                     transcript = self._retry_operation(
-                        lambda: YouTubeTranscriptApi.get_transcript(
+                        lambda: ytt_api.fetch(
                             video_id, languages=youtube_transcript_languages
                         ),
                         retries=3,  # Retry 3 times
@@ -167,11 +167,8 @@ class YouTubeConverter(DocumentConverter):
                     )
                     if transcript:
                         transcript_text = " ".join(
-                            [part["text"] for part in transcript]
+                            [part.text for part in transcript]
                         )  # type: ignore
-                    # Alternative formatting:
-                    # formatter = TextFormatter()
-                    # formatter.format_transcript(transcript)
                 except Exception as e:
                     print(f"Error fetching transcript: {e}")
             if transcript_text:
