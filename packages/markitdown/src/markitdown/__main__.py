@@ -104,6 +104,12 @@ def main():
         help="List installed 3rd-party plugins. Plugins are loaded when using the -p or --use-plugin option.",
     )
 
+    parser.add_argument(
+        "--keep-data-uris",
+        action="store_true",
+        help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
+    )
+
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
 
@@ -181,9 +187,9 @@ def main():
         markitdown = MarkItDown(enable_plugins=args.use_plugins)
 
     if args.filename is None:
-        result = markitdown.convert_stream(sys.stdin.buffer, stream_info=stream_info)
+        result = markitdown.convert_stream(sys.stdin.buffer, stream_info=stream_info, keep_data_uris=args.keep_data_uris)
     else:
-        result = markitdown.convert(args.filename, stream_info=stream_info)
+        result = markitdown.convert(args.filename, stream_info=stream_info, keep_data_uris=args.keep_data_uris)
 
     _handle_output(args, result)
 

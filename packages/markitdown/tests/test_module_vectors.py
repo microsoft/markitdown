@@ -124,6 +124,72 @@ def test_convert_url(test_vector):
         assert string not in result.markdown
 
 
+@pytest.mark.parametrize("test_vector", GENERAL_TEST_VECTORS)
+def test_convert_with_data_uris(test_vector):
+    """Test API functionality when keep_data_uris is enabled"""
+    markitdown = MarkItDown()
+
+    # Test local file conversion
+    result = markitdown.convert(
+        os.path.join(TEST_FILES_DIR, test_vector.filename),
+        keep_data_uris=True,
+        url=test_vector.url
+    )
+
+    # Verify keep_data_uris related test conditions
+    for string in test_vector.must_include_with_data_uris:
+        assert string in result.markdown
+    for string in test_vector.must_not_include_with_data_uris:
+        assert string not in result.markdown
+
+    # Verify that basic test conditions are still met
+    for string in test_vector.must_include:
+        if "data:image" in string:
+            # Skip data:image related tests (originally we truncate images and don't want to include data:image; but now we want to include data:image)
+            continue
+        assert string in result.markdown
+    for string in test_vector.must_not_include:
+        if "data:image" in string:
+            # Skip data:image related tests (originally we truncate images and don't want to include data:image; but now we want to include data:image)
+            continue
+        assert string not in result.markdown
+
+
+@pytest.mark.parametrize("test_vector", GENERAL_TEST_VECTORS)
+def test_convert_stream_with_data_uris(test_vector):
+    """Test the conversion of a stream with no stream info."""
+    markitdown = MarkItDown()
+
+    stream_info = StreamInfo(
+        extension=os.path.splitext(test_vector.filename)[1],
+        mimetype=test_vector.mimetype,
+        charset=test_vector.charset,
+    )
+
+    with open(os.path.join(TEST_FILES_DIR, test_vector.filename), "rb") as stream:
+        result = markitdown.convert(
+            stream,
+            stream_info=stream_info,
+            keep_data_uris=True,
+            url=test_vector.url
+        )
+
+        # Verify keep_data_uris related test conditions
+        for string in test_vector.must_include_with_data_uris:
+            assert string in result.markdown
+        for string in test_vector.must_not_include_with_data_uris:
+            assert string not in result.markdown
+
+        # Verify that basic test conditions are still met
+        for string in test_vector.must_include:
+            assert string in result.markdown
+        for string in test_vector.must_not_include:
+            # Skip data:image related tests (originally we truncate images and don't want to include data:image; but now we want to include data:image)
+            if "data:image" in string:
+                continue
+            assert string not in result.markdown
+
+
 if __name__ == "__main__":
     import sys
 
@@ -134,6 +200,8 @@ if __name__ == "__main__":
         test_convert_stream_with_hints,
         test_convert_stream_without_hints,
         test_convert_url,
+        test_convert_with_data_uris,
+        test_convert_stream_with_data_uris,
     ]:
         for test_vector in GENERAL_TEST_VECTORS:
             print(

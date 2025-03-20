@@ -76,13 +76,9 @@ class WikipediaConverter(DocumentConverter):
                 main_title = title_elm.string
 
             # Convert the page
-            webpage_text = f"# {main_title}\n\n" + _CustomMarkdownify(
-                keep_data_uris=kwargs.get("keep_data_uris", False)
-            ).convert_soup(body_elm)
+            webpage_text = f"# {main_title}\n\n" + _CustomMarkdownify(**kwargs).convert_soup(body_elm)
         else:
-            webpage_text = _CustomMarkdownify(
-                keep_data_uris=kwargs.get("keep_data_uris", False)
-            ).convert_soup(soup)
+            webpage_text = _CustomMarkdownify(**kwargs).convert_soup(soup)
 
         return DocumentConverterResult(
             markdown=webpage_text,

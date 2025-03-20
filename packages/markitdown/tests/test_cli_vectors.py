@@ -149,6 +149,50 @@ def test_convert_url(shared_tmp_dir, test_vector):
         assert test_string not in stdout
 
 
+@pytest.mark.parametrize("test_vector", CLI_TEST_VECTORS)
+def test_output_to_file_with_data_uris(shared_tmp_dir, test_vector) -> None:
+    """Test CLI functionality when keep_data_uris is enabled"""
+
+    output_file = os.path.join(shared_tmp_dir, test_vector.filename + ".output")
+    result = subprocess.run(
+        [
+            "python",
+            "-m",
+            "markitdown",
+            "--keep-data-uris",
+            "-o",
+            output_file,
+            os.path.join(TEST_FILES_DIR, test_vector.filename),
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, f"CLI exited with error: {result.stderr}"
+    assert os.path.exists(output_file), f"Output file not created: {output_file}"
+
+    with open(output_file, "r") as f:
+        output_data = f.read()
+        for test_string in test_vector.must_include_with_data_uris:
+            assert test_string in output_data
+        for test_string in test_vector.must_not_include_with_data_uris:
+            assert test_string not in output_data
+        # Verify that basic test conditions are still met
+        for string in test_vector.must_include:
+            if "data:image" in string:
+                # Skip data:image related tests (originally we truncate images and don't want to include data:image; but now we want to include data:image)
+                continue
+            assert string in output_data
+        for string in test_vector.must_not_include:
+            if "data:image" in string:
+                # Skip data:image related tests (originally we truncate images and don't want to include data:image; but now we want to include data:image)
+                continue
+            assert string not in output_data
+
+    os.remove(output_file)
+    assert not os.path.exists(output_file), f"Output file not deleted: {output_file}"
+
+
 if __name__ == "__main__":
     import sys
     import tempfile
@@ -161,6 +205,7 @@ if __name__ == "__main__":
             test_output_to_file,
             test_input_from_stdin_without_hints,
             test_convert_url,
+            test_output_to_file_with_data_uris,
         ]:
             for test_vector in CLI_TEST_VECTORS:
                 print(

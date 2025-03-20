@@ -10,6 +10,9 @@ class FileTestVector(object):
     url: str | None
     must_include: List[str]
     must_not_include: List[str]
+    # in test keep_data_uris cases, we want to ensure that the data URIs are kept
+    must_include_with_data_uris: List[str] = dataclasses.field(default_factory=list)
+    must_not_include_with_data_uris: List[str] = dataclasses.field(default_factory=list)
 
 
 GENERAL_TEST_VECTORS = [
@@ -25,8 +28,17 @@ GENERAL_TEST_VECTORS = [
             "# Abstract",
             "# Introduction",
             "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation",
+            "data:image/png;base64...",
         ],
-        must_not_include=[],
+        must_not_include=[
+            "data:image/png;base64,iVBORw0KGgoAAAANSU",
+        ],
+        must_include_with_data_uris=[
+            "data:image/png;base64,iVBORw0KGgoAAAANSU",
+        ],
+        must_not_include_with_data_uris=[
+            "data:image/png;base64...",
+        ],
     ),
     FileTestVector(
         filename="test.xlsx",
@@ -65,8 +77,17 @@ GENERAL_TEST_VECTORS = [
             "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation",
             "a3f6004b-6f4f-4ea8-bee3-3741f4dc385f",  # chart title
             "2003",  # chart value
+            "![This phrase of the caption is Human-written.]",  # image caption
         ],
-        must_not_include=[],
+        must_not_include=[
+            "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQE"
+        ],
+        must_include_with_data_uris=[
+            "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQE",
+        ],
+        must_not_include_with_data_uris=[
+            "![This phrase of the caption is Human-written.](Picture4.jpg)",
+        ],
     ),
     FileTestVector(
         filename="test_outlook_msg.msg",

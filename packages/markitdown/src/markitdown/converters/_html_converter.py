@@ -55,15 +55,10 @@ class HtmlConverter(DocumentConverter):
         # Print only the main content
         body_elm = soup.find("body")
         webpage_text = ""
-        keep_data_uris = kwargs.get("keep_data_uris", False)
         if body_elm:
-            webpage_text = _CustomMarkdownify(
-                keep_data_uris=keep_data_uris
-            ).convert_soup(body_elm)
+            webpage_text = _CustomMarkdownify(**kwargs).convert_soup(body_elm)
         else:
-            webpage_text = _CustomMarkdownify(
-                keep_data_uris=keep_data_uris
-            ).convert_soup(soup)
+            webpage_text = _CustomMarkdownify(**kwargs).convert_soup(soup)
 
         assert isinstance(webpage_text, str)
 

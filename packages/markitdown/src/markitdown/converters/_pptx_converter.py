@@ -78,9 +78,6 @@ class PptxConverter(DocumentConverter):
                 _dependency_exc_info[2]
             )
 
-        # Get the keep_data_uris parameter
-        keep_data_uris = kwargs.get("keep_data_uris", False)
-
         # Perform the conversion
         presentation = pptx.Presentation(file_stream)
         md_content = ""
@@ -144,7 +141,7 @@ class PptxConverter(DocumentConverter):
                     alt_text = re.sub(r"\s+", " ", alt_text).strip()
 
                     # If keep_data_uris is True, use base64 encoding for images
-                    if keep_data_uris:
+                    if kwargs.get("keep_data_uris", False):
                         blob = shape.image.blob
                         content_type = shape.image.content_type or "image/png"
                         b64_string = base64.b64encode(blob).decode("utf-8")
@@ -156,7 +153,7 @@ class PptxConverter(DocumentConverter):
 
                 # Tables
                 if self._is_table(shape):
-                    md_content += self._convert_table_to_markdown(shape.table)
+                    md_content += self._convert_table_to_markdown(shape.table, **kwargs)
 
                 # Charts
                 if shape.has_chart:
@@ -203,7 +200,7 @@ class PptxConverter(DocumentConverter):
             return True
         return False
 
-    def _convert_table_to_markdown(self, table):
+    def _convert_table_to_markdown(self, table, **kwargs):
         # Write the table as HTML, then convert it to Markdown
         html_table = "<html><body><table>"
         first_row = True
@@ -218,7 +215,7 @@ class PptxConverter(DocumentConverter):
             first_row = False
         html_table += "</table></body></html>"
 
-        return self._html_converter.convert_string(html_table).markdown.strip() + "\n"
+        return self._html_converter.convert_string(html_table, **kwargs).markdown.strip() + "\n"
 
     def _convert_chart_to_markdown(self, chart):
         try:

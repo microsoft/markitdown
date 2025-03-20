@@ -171,9 +171,7 @@ class RssConverter(DocumentConverter):
         try:
             # using bs4 because many RSS feeds have HTML-styled content
             soup = BeautifulSoup(content, "html.parser")
-            return _CustomMarkdownify(
-                keep_data_uris=self._kwargs.get("keep_data_uris", False)
-            ).convert_soup(soup)
+            return _CustomMarkdownify(**self._kwargs).convert_soup(soup)
         except BaseException as _:
             return content
 
