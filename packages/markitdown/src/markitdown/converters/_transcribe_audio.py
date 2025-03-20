@@ -7,20 +7,14 @@ from .._exceptions import MissingDependencyException
 # Save reporting of any exceptions for later
 _dependency_exc_info = None
 try:
-    # Suppress some deprecation warnings from the speech_recognition library
+    # Suppress some warnings on library import
     import warnings
 
-    warnings.filterwarnings(
-        "ignore", category=DeprecationWarning, module="speech_recognition"
-    )
-    warnings.filterwarnings(
-        "ignore",
-        category=SyntaxWarning,
-        module="pydub",  # TODO: Migrate away from pydub
-    )
-    import speech_recognition as sr
-
-    import pydub
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=DeprecationWarning)
+        warnings.filterwarnings("ignore", category=SyntaxWarning)
+        import speech_recognition as sr
+        import pydub
 except ImportError:
     # Preserve the error and stack trace for later
     _dependency_exc_info = sys.exc_info()
