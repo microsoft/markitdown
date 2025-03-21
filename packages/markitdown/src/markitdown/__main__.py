@@ -4,6 +4,7 @@
 import argparse
 import sys
 import codecs
+import locale
 from textwrap import dedent
 from importlib.metadata import entry_points
 from .__about__ import __version__
@@ -204,9 +205,14 @@ def _handle_output(args, result: DocumentConverterResult):
     """Handle output to stdout or file"""
     if args.output:
         with open(args.output, "w", encoding="utf-8") as f:
-            f.write(result.text_content)
+            f.write(result.markdown)
     else:
-        print(result.text_content)
+        # Handle stdout encoding errors more gracefully
+        print(
+            result.markdown.encode(sys.stdout.encoding, errors="replace").decode(
+                sys.stdout.encoding
+            )
+        )
 
 
 def _exit_with_error(message: str):
