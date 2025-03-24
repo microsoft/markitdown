@@ -73,7 +73,7 @@ class DocumentIntelligenceConverter(DocumentConverter):
         *,
         endpoint: str,
         api_version: str = "2024-07-31-preview",
-        credential: AzureKeyCredential | TokenCredential = None,
+        credential: AzureKeyCredential | TokenCredential | None = None,
     ):
         super().__init__()
 
