@@ -1,5 +1,6 @@
 import sys
 import re
+import os
 
 from typing import BinaryIO, Any, List
 
@@ -18,6 +19,7 @@ try:
         AnalyzeResult,
         DocumentAnalysisFeature,
     )
+    from azure.core.credentials import AzureKeyCredential, TokenCredential
     from azure.identity import DefaultAzureCredential
 except ImportError:
     # Preserve the error and stack trace for later
@@ -71,6 +73,7 @@ class DocumentIntelligenceConverter(DocumentConverter):
         *,
         endpoint: str,
         api_version: str = "2024-07-31-preview",
+        credential: AzureKeyCredential | TokenCredential = None,
     ):
         super().__init__()
 
@@ -86,12 +89,18 @@ class DocumentIntelligenceConverter(DocumentConverter):
                 _dependency_exc_info[2]
             )
 
+        if credential is None:
+            if os.environ.get("AZURE_API_KEY") is None:
+                credential = DefaultAzureCredential()
+            else:
+                credential = AzureKeyCredential(os.environ["AZURE_API_KEY"])
+
         self.endpoint = endpoint
         self.api_version = api_version
         self.doc_intel_client = DocumentIntelligenceClient(
             endpoint=self.endpoint,
             api_version=self.api_version,
-            credential=DefaultAzureCredential(),
+            credential=credential,
         )
 
     def accepts(
