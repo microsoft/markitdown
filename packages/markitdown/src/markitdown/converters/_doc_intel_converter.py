@@ -3,6 +3,7 @@ import re
 import os
 
 from typing import BinaryIO, Any, List
+from enum import Enum
 
 from ._html_converter import HtmlConverter
 from .._base_converter import DocumentConverter, DocumentConverterResult
@@ -31,38 +32,74 @@ except ImportError:
 CONTENT_FORMAT = "markdown"
 
 
-OFFICE_MIME_TYPE_PREFIXES = [
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "application/vnd.openxmlformats-officedocument.presentationml",
-    "application/xhtml",
-    "text/html",
-]
+class DocumentIntelligenceFileType(str, Enum):
+    """Enum of file types supported by the Document Intelligence Converter."""
 
-OTHER_MIME_TYPE_PREFIXES = [
-    "application/pdf",
-    "application/x-pdf",
-    "text/html",
-    "image/",
-]
+    # No OCR
+    DOCX = "docx"
+    PPTX = "pptx"
+    XLSX = "xlsx"
+    HTML = "html"
+    # OCR
+    PDF = "pdf"
+    JPEG = "jpeg"
+    PNG = "png"
+    BMP = "bmp"
+    TIFF = "tiff"
 
-OFFICE_FILE_EXTENSIONS = [
-    ".docx",
-    ".xlsx",
-    ".pptx",
-    ".html",
-    ".htm",
-]
 
-OTHER_FILE_EXTENSIONS = [
-    ".pdf",
-    ".jpeg",
-    ".jpg",
-    ".png",
-    ".bmp",
-    ".tiff",
-    ".heif",
-]
+def _get_mime_type_prefixes(types: List[DocumentIntelligenceFileType]) -> List[str]:
+    """Get the MIME type prefixes for the given file types."""
+    prefixes: List[str] = []
+    for type_ in types:
+        if type_ == DocumentIntelligenceFileType.DOCX:
+            prefixes.append(
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
+        elif type_ == DocumentIntelligenceFileType.PPTX:
+            prefixes.append(
+                "application/vnd.openxmlformats-officedocument.presentationml"
+            )
+        elif type_ == DocumentIntelligenceFileType.XLSX:
+            prefixes.append(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+        elif type_ == DocumentIntelligenceFileType.PDF:
+            prefixes.append("application/pdf")
+            prefixes.append("application/x-pdf")
+        elif type_ == DocumentIntelligenceFileType.JPEG:
+            prefixes.append("image/jpeg")
+        elif type_ == DocumentIntelligenceFileType.PNG:
+            prefixes.append("image/png")
+        elif type_ == DocumentIntelligenceFileType.BMP:
+            prefixes.append("image/bmp")
+        elif type_ == DocumentIntelligenceFileType.TIFF:
+            prefixes.append("image/tiff")
+    return prefixes
+
+
+def _get_file_extensions(types: List[DocumentIntelligenceFileType]) -> List[str]:
+    """Get the file extensions for the given file types."""
+    extensions: List[str] = []
+    for type_ in types:
+        if type_ == DocumentIntelligenceFileType.DOCX:
+            extensions.append(".docx")
+        elif type_ == DocumentIntelligenceFileType.PPTX:
+            extensions.append(".pptx")
+        elif type_ == DocumentIntelligenceFileType.XLSX:
+            extensions.append(".xlsx")
+        elif type_ == DocumentIntelligenceFileType.PDF:
+            extensions.append(".pdf")
+        elif type_ == DocumentIntelligenceFileType.JPEG:
+            extensions.append(".jpg")
+            extensions.append(".jpeg")
+        elif type_ == DocumentIntelligenceFileType.PNG:
+            extensions.append(".png")
+        elif type_ == DocumentIntelligenceFileType.BMP:
+            extensions.append(".bmp")
+        elif type_ == DocumentIntelligenceFileType.TIFF:
+            extensions.append(".tiff")
+    return extensions
 
 
 class DocumentIntelligenceConverter(DocumentConverter):
@@ -74,8 +111,29 @@ class DocumentIntelligenceConverter(DocumentConverter):
         endpoint: str,
         api_version: str = "2024-07-31-preview",
         credential: AzureKeyCredential | TokenCredential | None = None,
+        file_types: List[DocumentIntelligenceFileType] = [
+            DocumentIntelligenceFileType.DOCX,
+            DocumentIntelligenceFileType.PPTX,
+            DocumentIntelligenceFileType.XLSX,
+            DocumentIntelligenceFileType.PDF,
+            DocumentIntelligenceFileType.JPEG,
+            DocumentIntelligenceFileType.PNG,
+            DocumentIntelligenceFileType.BMP,
+            DocumentIntelligenceFileType.TIFF,
+        ],
     ):
+        """
+        Initialize the DocumentIntelligenceConverter.
+
+        Args:
+            endpoint (str): The endpoint for the Document Intelligence service.
+            api_version (str): The API version to use. Defaults to "2024-07-31-preview".
+            credential (AzureKeyCredential | TokenCredential | None): The credential to use for authentication.
+            file_types (List[DocumentIntelligenceFileType]): The file types to accept. Defaults to all supported file types.
+        """
+
         super().__init__()
+        self._file_types = file_types
 
         # Raise an error if the dependencies are not available.
         # This is different than other converters since this one isn't even instantiated
@@ -112,10 +170,10 @@ class DocumentIntelligenceConverter(DocumentConverter):
         mimetype = (stream_info.mimetype or "").lower()
         extension = (stream_info.extension or "").lower()
 
-        if extension in OFFICE_FILE_EXTENSIONS + OTHER_FILE_EXTENSIONS:
+        if extension in _get_file_extensions(self._file_types):
             return True
 
-        for prefix in OFFICE_MIME_TYPE_PREFIXES + OTHER_MIME_TYPE_PREFIXES:
+        for prefix in _get_mime_type_prefixes(self._file_types):
             if mimetype.startswith(prefix):
                 return True
 
@@ -130,10 +188,18 @@ class DocumentIntelligenceConverter(DocumentConverter):
         mimetype = (stream_info.mimetype or "").lower()
         extension = (stream_info.extension or "").lower()
 
-        if extension in OFFICE_FILE_EXTENSIONS:
+        # Types that don't support ocr
+        no_ocr_types = [
+            DocumentIntelligenceFileType.DOCX,
+            DocumentIntelligenceFileType.PPTX,
+            DocumentIntelligenceFileType.XLSX,
+            DocumentIntelligenceFileType.HTML,
+        ]
+
+        if extension in _get_file_extensions(no_ocr_types):
             return []
 
-        for prefix in OFFICE_MIME_TYPE_PREFIXES:
+        for prefix in _get_mime_type_prefixes(no_ocr_types):
             if mimetype.startswith(prefix):
                 return []
 
