@@ -10,7 +10,7 @@ import traceback
 import io
 from dataclasses import dataclass
 from importlib.metadata import entry_points
-from typing import Any, List, Optional, Union, BinaryIO
+from typing import Any, List, Dict, Optional, Union, BinaryIO
 from pathlib import Path
 from urllib.parse import urlparse
 from warnings import warn
@@ -197,8 +197,19 @@ class MarkItDown:
             # Register Document Intelligence converter at the top of the stack if endpoint is provided
             docintel_endpoint = kwargs.get("docintel_endpoint")
             if docintel_endpoint is not None:
+                docintel_args: Dict[str, Any] = {}
+                docintel_args["endpoint"] = docintel_endpoint
+
+                docintel_credential = kwargs.get("docintel_credential")
+                if docintel_credential is not None:
+                    docintel_args["credential"] = docintel_credential
+
+                docintel_types = kwargs.get("docintel_file_types")
+                if docintel_types is not None:
+                    docintel_args["file_types"] = docintel_types
+
                 self.register_converter(
-                    DocumentIntelligenceConverter(endpoint=docintel_endpoint)
+                    DocumentIntelligenceConverter(**docintel_args),
                 )
 
             self._builtins_enabled = True
