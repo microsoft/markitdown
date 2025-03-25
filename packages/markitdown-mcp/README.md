@@ -4,7 +4,7 @@
 ![PyPI - Downloads](https://img.shields.io/pypi/dd/markitdown)
 [![Built by AutoGen Team](https://img.shields.io/badge/Built%20by-AutoGen%20Team-blue)](https://github.com/microsoft/autogen)
 
-The `markitdown-mcp` package provides a lightweight SSE MCP server for calling MarkItDown.
+The `markitdown-mcp` package provides a lightweight STDIO and SSE MCP server for calling MarkItDown.
 
 It exposes one tool: `convert_to_markdown(uri)`, where uri can be any `http:`, `https:`, `file:`, or `data:` URI.
 
@@ -18,10 +18,17 @@ pip install markitdown-mcp
 
 ## Usage
 
-To run the MCP server, use the following command:
+To run the MCP server, ussing STDIO (default) use the following command:
+
 
 ```bash	
-markitdown-mcp --host 127.0.0.1 --port 3001
+markitdown-mcp
+```
+
+To run the MCP server, ussing SSE use the following command:
+
+```bash	
+markitdown-mcp --sse --host 127.0.0.1 --port 3001
 ```
 
 ## Accessing from Claude Desktop
@@ -38,7 +45,12 @@ npx @modelcontextprotocol/inspector
 
 You can then connect to the insepctor through the specified host and port (e.g., `http://localhost:5173/`).
 
-Then:
+If using STDIO:
+* select `STDIO` as the transport type,
+* input `markitdown-mcp` as the command, and
+* click `Connect`
+
+If using SSE:
 * select `SSE` as the transport type,
 * input `http://127.0.0.1:3001/sse` as the URL, and
 * click `Connect`
@@ -51,7 +63,7 @@ Finally:
 
 ## Security Considerations
 
-The server does not support authentication, and runs with the privileges of the user running it. It is recommended to run the server bound to `localhost` (default).
+The server does not support authentication, and runs with the privileges if the user running it. For this reason, when running in SSE mode, it is recommended to run the server bound to `localhost` (default).
 
 
 ## Trademarks
