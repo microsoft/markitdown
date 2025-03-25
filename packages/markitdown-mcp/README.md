@@ -1,7 +1,7 @@
 # MarkItDown-MCP
 
-[![PyPI](https://img.shields.io/pypi/v/markitdown.svg)](https://pypi.org/project/markitdown/)
-![PyPI - Downloads](https://img.shields.io/pypi/dd/markitdown)
+[![PyPI](https://img.shields.io/pypi/v/markitdown-mcp.svg)](https://pypi.org/project/markitdown-mcp/)
+![PyPI - Downloads](https://img.shields.io/pypi/dd/markitdown-mcp)
 [![Built by AutoGen Team](https://img.shields.io/badge/Built%20by-AutoGen%20Team-blue)](https://github.com/microsoft/autogen)
 
 The `markitdown-mcp` package provides a lightweight STDIO and SSE MCP server for calling MarkItDown.
