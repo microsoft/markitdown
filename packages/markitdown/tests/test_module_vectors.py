@@ -3,7 +3,9 @@ import os
 import time
 import pytest
 import codecs
+import base64
 
+from pathlib import Path
 
 if __name__ == "__main__":
     from _test_vectors import GENERAL_TEST_VECTORS, DATA_URI_TEST_VECTORS
@@ -108,8 +110,8 @@ def test_convert_stream_without_hints(test_vector):
     reason="do not run tests that query external urls",
 )
 @pytest.mark.parametrize("test_vector", GENERAL_TEST_VECTORS)
-def test_convert_url(test_vector):
-    """Test the conversion of a stream with no stream info."""
+def test_convert_http_uri(test_vector):
+    """Test the conversion of an HTTP:// or HTTPS:// URI."""
     markitdown = MarkItDown()
 
     time.sleep(1)  # Ensure we don't hit rate limits
@@ -124,8 +126,44 @@ def test_convert_url(test_vector):
         assert string not in result.markdown
 
 
+@pytest.mark.parametrize("test_vector", GENERAL_TEST_VECTORS)
+def test_convert_file_uri(test_vector):
+    """Test the conversion of a file:// URI."""
+    markitdown = MarkItDown()
+
+    result = markitdown.convert(
+        Path(os.path.join(TEST_FILES_DIR, test_vector.filename)).as_uri(),
+        url=test_vector.url,
+    )
+    for string in test_vector.must_include:
+        assert string in result.markdown
+    for string in test_vector.must_not_include:
+        assert string not in result.markdown
+
+
+@pytest.mark.parametrize("test_vector", GENERAL_TEST_VECTORS)
+def test_convert_data_uri(test_vector):
+    """Test the conversion of a data URI."""
+    markitdown = MarkItDown()
+
+    data = ""
+    with open(os.path.join(TEST_FILES_DIR, test_vector.filename), "rb") as stream:
+        data = base64.b64encode(stream.read()).decode("utf-8")
+    mimetype = test_vector.mimetype
+    data_uri = f"data:{mimetype};base64,{data}"
+
+    result = markitdown.convert(
+        data_uri,
+        url=test_vector.url,
+    )
+    for string in test_vector.must_include:
+        assert string in result.markdown
+    for string in test_vector.must_not_include:
+        assert string not in result.markdown
+
+
 @pytest.mark.parametrize("test_vector", DATA_URI_TEST_VECTORS)
-def test_convert_with_data_uris(test_vector):
+def test_convert_keep_data_uris(test_vector):
     """Test API functionality when keep_data_uris is enabled"""
     markitdown = MarkItDown()
 
@@ -143,7 +181,7 @@ def test_convert_with_data_uris(test_vector):
 
 
 @pytest.mark.parametrize("test_vector", DATA_URI_TEST_VECTORS)
-def test_convert_stream_with_data_uris(test_vector):
+def test_convert_stream_keep_data_uris(test_vector):
     """Test the conversion of a stream with no stream info."""
     markitdown = MarkItDown()
 
@@ -175,7 +213,9 @@ if __name__ == "__main__":
         test_convert_local,
         test_convert_stream_with_hints,
         test_convert_stream_without_hints,
-        test_convert_url,
+        test_convert_http_uri,
+        test_convert_file_uri,
+        test_convert_data_uri,
     ]:
         for test_vector in GENERAL_TEST_VECTORS:
             print(
@@ -186,8 +226,8 @@ if __name__ == "__main__":
 
     # Data URI tests
     for test_function in [
-        test_convert_with_data_uris,
-        test_convert_stream_with_data_uris,
+        test_convert_keep_data_uris,
+        test_convert_stream_keep_data_uris,
     ]:
         for test_vector in DATA_URI_TEST_VECTORS:
             print(
