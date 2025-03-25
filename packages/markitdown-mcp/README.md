@@ -31,9 +31,68 @@ To run the MCP server, ussing SSE use the following command:
 markitdown-mcp --sse --host 127.0.0.1 --port 3001
 ```
 
+## Running in Docker
+
+To run `markitdown-mcp` in Docker, build the Docker image using the provided Dockerfile:
+```bash
+docker build -t markitdown-mcp:latest .
+```
+
+And run it using:
+```bash
+docker run -it --rm markitdown-mcp:latest
+```
+This will be sufficient for remote URIs. To access local files, you need to mount the local directory into the container. For example, if you want to access files in `/home/user/data`, you can run:
+
+```bash
+docker run -it --rm -v /home/user/data:/workdir markitdown-mcp:latest
+```
+
+Once mounted, all files under data will be accessible under `/workdir` in the container. For example, if you have a file `example.txt` in `/home/user/data`, it will be accessible in the container at `/workdir/example.txt`.
+
 ## Accessing from Claude Desktop
 
-TODO
+It is recommended to use the Docker image when running the MCP server for Claude Desktop.
+
+Follow [these instrutions](https://modelcontextprotocol.io/quickstart/user#for-claude-desktop-users) to access Claude's `claude_desktop_config.json` file.
+
+Edit it to include the following JSON entry:
+
+```json
+{
+  "mcpServers": {
+    "markitdown": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "markitdown-mcp:latest"
+      ]
+    }
+  }
+}
+```
+
+If you want to mount a directory, adjust it accordingly:
+
+```json
+{
+  "mcpServers": {
+    "markitdown": {
+      "command": "docker",
+      "args": [
+	"run",
+	"--rm",
+	"-i",
+	"-v",
+	"/home/user/data:/workdir",
+	"markitdown-mcp:latest"
+      ]
+    }
+  }
+}
+```
 
 ## Debugging
 
