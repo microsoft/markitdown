@@ -24,7 +24,8 @@ classifiers = [
   "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dependencies = [
-  "markitdown~=0.1.0",
+  "mcp",
+  "markitdown[all]>=0.1.1,<0.2.0",
 ]
 
 [project.urls]
@@ -34,6 +35,9 @@ Source = "https://github.com/microsoft/markitdown"
 
 [tool.hatch.version]
 path = "src/markitdown_mcp/__about__.py"
+
+[project.scripts]
+markitdown-mcp = "markitdown_mcp.__main__:main"
 
 [tool.hatch.envs.types]
 extra-dependencies = [
