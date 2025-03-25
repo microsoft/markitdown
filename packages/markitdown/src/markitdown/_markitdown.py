@@ -20,6 +20,7 @@ import charset_normalizer
 import codecs
 
 from ._stream_info import StreamInfo
+from ._uri_utils import parse_data_uri, file_uri_to_path
 
 from .converters import (
     PlainTextConverter,
@@ -242,9 +243,10 @@ class MarkItDown:
         # Local path or url
         if isinstance(source, str):
             if (
-                source.startswith("http://")
-                or source.startswith("https://")
-                or source.startswith("file://")
+                source.startswith("http:")
+                or source.startswith("https:")
+                or source.startswith("file:")
+                or source.startswith("data:")
             ):
                 # Rename the url argument to mock_url
                 # (Deprecated -- use stream_info)
@@ -253,7 +255,7 @@ class MarkItDown:
                     _kwargs["mock_url"] = _kwargs["url"]
                     del _kwargs["url"]
 
-                return self.convert_url(source, stream_info=stream_info, **_kwargs)
+                return self.convert_uri(source, stream_info=stream_info, **_kwargs)
             else:
                 return self.convert_local(source, stream_info=stream_info, **kwargs)
         # Path object
@@ -363,22 +365,80 @@ class MarkItDown:
         url: str,
         *,
         stream_info: Optional[StreamInfo] = None,
+        file_extension: Optional[str] = None,
+        mock_url: Optional[str] = None,
+        **kwargs: Any,
+    ) -> DocumentConverterResult:
+        """Alias for convert_uri()"""
+        # convert_url will likely be deprecated in the future in favor of convert_uri
+        return self.convert_uri(
+            url,
+            stream_info=stream_info,
+            file_extension=file_extension,
+            mock_url=mock_url,
+            **kwargs,
+        )
+
+    def convert_uri(
+        self,
+        uri: str,
+        *,
+        stream_info: Optional[StreamInfo] = None,
         file_extension: Optional[str] = None,  # Deprecated -- use stream_info
         mock_url: Optional[
             str
         ] = None,  # Mock the request as if it came from a different URL
         **kwargs: Any,
-    ) -> DocumentConverterResult:  # TODO: fix kwargs type
-        # Send a HTTP request to the URL
-        response = self._requests_session.get(url, stream=True)
-        response.raise_for_status()
-        return self.convert_response(
-            response,
-            stream_info=stream_info,
-            file_extension=file_extension,
-            url=mock_url,
-            **kwargs,
-        )
+    ) -> DocumentConverterResult:
+        uri = uri.strip()
+
+        # File URIs
+        if uri.startswith("file:"):
+            netloc, path = file_uri_to_path(uri)
+            if netloc and netloc != "localhost":
+                raise ValueError(
+                    f"Unsupported file URI: {uri}. Netloc must be empty or localhost."
+                )
+            return self.convert_local(
+                path,
+                stream_info=stream_info,
+                file_extension=file_extension,
+                url=mock_url,
+                **kwargs,
+            )
+        # Data URIs
+        elif uri.startswith("data:"):
+            mimetype, attributes, data = parse_data_uri(uri)
+
+            base_guess = StreamInfo(
+                mimetype=mimetype,
+                charset=attributes.get("charset"),
+            )
+            if stream_info is not None:
+                base_guess = base_guess.copy_and_update(stream_info)
+
+            return self.convert_stream(
+                io.BytesIO(data),
+                stream_info=base_guess,
+                file_extension=file_extension,
+                url=mock_url,
+                **kwargs,
+            )
+        # HTTP/HTTPS URIs
+        elif uri.startswith("http:") or uri.startswith("https:"):
+            response = self._requests_session.get(uri, stream=True)
+            response.raise_for_status()
+            return self.convert_response(
+                response,
+                stream_info=stream_info,
+                file_extension=file_extension,
+                url=mock_url,
+                **kwargs,
+            )
+        else:
+            raise ValueError(
+                f"Unsupported URI scheme: {uri.split(':')[0]}. Supported schemes are: file:, data:, http:, https:"
+            )
 
     def convert_response(
         self,
