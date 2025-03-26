@@ -5,6 +5,8 @@ import shutil
 import openai
 import pytest
 
+from markitdown._uri_utils import parse_data_uri, file_uri_to_path
+
 from markitdown import (
     MarkItDown,
     UnsupportedFormatException,
@@ -176,6 +178,79 @@ def test_stream_info_operations() -> None:
     assert updated_stream_info.url == "url.1"
 
 
+def test_data_uris() -> None:
+    # Test basic parsing of data URIs
+    data_uri = "data:text/plain;base64,SGVsbG8sIFdvcmxkIQ=="
+    mime_type, attributes, data = parse_data_uri(data_uri)
+    assert mime_type == "text/plain"
+    assert len(attributes) == 0
+    assert data == b"Hello, World!"
+
+    data_uri = "data:base64,SGVsbG8sIFdvcmxkIQ=="
+    mime_type, attributes, data = parse_data_uri(data_uri)
+    assert mime_type is None
+    assert len(attributes) == 0
+    assert data == b"Hello, World!"
+
+    data_uri = "data:text/plain;charset=utf-8;base64,SGVsbG8sIFdvcmxkIQ=="
+    mime_type, attributes, data = parse_data_uri(data_uri)
+    assert mime_type == "text/plain"
+    assert len(attributes) == 1
+    assert attributes["charset"] == "utf-8"
+    assert data == b"Hello, World!"
+
+    data_uri = "data:,Hello%2C%20World%21"
+    mime_type, attributes, data = parse_data_uri(data_uri)
+    assert mime_type is None
+    assert len(attributes) == 0
+    assert data == b"Hello, World!"
+
+    data_uri = "data:text/plain,Hello%2C%20World%21"
+    mime_type, attributes, data = parse_data_uri(data_uri)
+    assert mime_type == "text/plain"
+    assert len(attributes) == 0
+    assert data == b"Hello, World!"
+
+    data_uri = "data:text/plain;charset=utf-8,Hello%2C%20World%21"
+    mime_type, attributes, data = parse_data_uri(data_uri)
+    assert mime_type == "text/plain"
+    assert len(attributes) == 1
+    assert attributes["charset"] == "utf-8"
+    assert data == b"Hello, World!"
+
+
+def test_file_uris() -> None:
+    # Test file URI with an empty host
+    file_uri = "file:///path/to/file.txt"
+    netloc, path = file_uri_to_path(file_uri)
+    assert netloc is None
+    assert path == "/path/to/file.txt"
+
+    # Test file URI with no host
+    file_uri = "file:/path/to/file.txt"
+    netloc, path = file_uri_to_path(file_uri)
+    assert netloc is None
+    assert path == "/path/to/file.txt"
+
+    # Test file URI with localhost
+    file_uri = "file://localhost/path/to/file.txt"
+    netloc, path = file_uri_to_path(file_uri)
+    assert netloc == "localhost"
+    assert path == "/path/to/file.txt"
+
+    # Test file URI with query parameters
+    file_uri = "file:///path/to/file.txt?param=value"
+    netloc, path = file_uri_to_path(file_uri)
+    assert netloc is None
+    assert path == "/path/to/file.txt"
+
+    # Test file URI with fragment
+    file_uri = "file:///path/to/file.txt#fragment"
+    netloc, path = file_uri_to_path(file_uri)
+    assert netloc is None
+    assert path == "/path/to/file.txt"
+
+
 def test_docx_comments() -> None:
     markitdown = MarkItDown()
 
@@ -314,6 +389,8 @@ if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     for test in [
         test_stream_info_operations,
+        test_data_uris,
+        test_file_uris,
         test_docx_comments,
         test_input_as_strings,
         test_markitdown_remote,
