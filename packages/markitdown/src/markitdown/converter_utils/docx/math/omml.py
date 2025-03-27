@@ -8,7 +8,7 @@ On 25/03/2025
 
 import xml.etree.ElementTree as ET
 
-from experiment.math.latex_dict import (CHARS, CHR, CHR_BO, CHR_DEFAULT, POS, POS_DEFAULT
+from .latex_dict import (CHARS, CHR, CHR_BO, CHR_DEFAULT, POS, POS_DEFAULT
 	, SUB, SUP, F, F_DEFAULT, T, FUNC, D, D_DEFAULT, RAD, RAD_DEFAULT, ARR
 	, LIM_FUNC, LIM_TO, LIM_UPP, M, BRK, BLANK, BACKSLASH, ALN, FUNC_PLACE)
 
