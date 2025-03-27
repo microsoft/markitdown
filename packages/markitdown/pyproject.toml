@@ -47,7 +47,7 @@ all = [
   "azure-identity"
 ]
 pptx = ["python-pptx"]
-docx = ["mammoth"]
+docx = ["mammoth", "lxml"]
 xlsx = ["pandas", "openpyxl"]
 xls = ["pandas", "xlrd"]
 pdf = ["pdfminer.six"]
