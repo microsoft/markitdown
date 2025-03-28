@@ -272,8 +272,9 @@ def test_docx_equations() -> None:
     assert "$m=1$" in result.text_content, "Inline equation $m=1$ not found"
 
     # Find block equations wrapped with double $$ and check if they are present
-    block_equations = re.findall(r'\$\$(.+?)\$\$', result.text_content)
+    block_equations = re.findall(r"\$\$(.+?)\$\$", result.text_content)
     assert block_equations, "No block equations found in the document."
+
 
 def test_input_as_strings() -> None:
     markitdown = MarkItDown()
