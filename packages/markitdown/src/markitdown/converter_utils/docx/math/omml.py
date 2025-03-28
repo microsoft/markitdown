@@ -73,7 +73,6 @@ def get_val(key, default=None, store=CHR):
 
 
 class Tag2Method(object):
-
     def call_method(self, elm, stag=None):
         getmethod = self.tag2meth.get
         if stag is None:
@@ -126,7 +125,6 @@ class Tag2Method(object):
 
 
 class Pr(Tag2Method):
-
     text = ""
 
     __val_tags = ("chr", "pos", "begChr", "endChr", "type")
@@ -341,7 +339,7 @@ class oMath2Latex(Tag2Method):
         """
         rows = []
         for stag, t, e in self.process_children_list(elm):
-            if stag is "mPr":
+            if stag == "mPr":
                 pass
             elif stag == "mr":
                 rows.append(t)

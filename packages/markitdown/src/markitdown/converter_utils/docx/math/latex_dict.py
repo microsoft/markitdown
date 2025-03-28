@@ -258,7 +258,7 @@ RAD = "\\sqrt[{deg}]{{{text}}}"
 
 RAD_DEFAULT = "\\sqrt{{{text}}}"
 
-ARR = "\\begin{{array}}{{c}}{text}\end{{array}}"
+ARR = "\\begin{{array}}{{c}}{text}\\end{{array}}"
 
 LIM_FUNC = {
     "lim": "\\lim_{{{lim}}}",
@@ -270,4 +270,4 @@ LIM_TO = ("\\rightarrow", "\\to")
 
 LIM_UPP = "\\overset{{{lim}}}{{{text}}}"
 
-M = "\\begin{{matrix}}{text}\end{{matrix}}"
+M = "\\begin{{matrix}}{text}\\end{{matrix}}"
