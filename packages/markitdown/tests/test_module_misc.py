@@ -1,6 +1,7 @@
 #!/usr/bin/env python3 -m pytest
 import io
 import os
+import re
 import shutil
 import openai
 import pytest
@@ -260,6 +261,19 @@ def test_docx_comments() -> None:
         os.path.join(TEST_FILES_DIR, "test_with_comment.docx")
     )
     validate_strings(result, DOCX_COMMENT_TEST_STRINGS)
+
+
+def test_docx_equations() -> None:
+    markitdown = MarkItDown()
+    docx_file = os.path.join(TEST_FILES_DIR, "equations.docx")
+    result = markitdown.convert(docx_file)
+
+    # Check for inline equation m=1 (wrapped with single $) is present
+    assert "$m=1$" in result.text_content, "Inline equation $m=1$ not found"
+
+    # Find block equations wrapped with double $$ and check if they are present
+    block_equations = re.findall(r"\$\$(.+?)\$\$", result.text_content)
+    assert block_equations, "No block equations found in the document."
 
 
 def test_input_as_strings() -> None:
