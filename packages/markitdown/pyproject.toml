@@ -1,0 +1,110 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "markitdown"
+dynamic = ["version"]
+description = 'Utility tool for converting various files to Markdown'
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+keywords = []
+authors = [
+  { name = "Adam Fourney", email = "adamfo@microsoft.com" },
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+]
+dependencies = [
+  "beautifulsoup4",
+  "requests",
+  "markdownify",
+  "magika~=0.6.1",
+  "charset-normalizer",
+]
+
+[project.optional-dependencies]
+all = [
+  "python-pptx",
+  "mammoth",
+  "pandas",
+  "openpyxl",
+  "xlrd",
+  "lxml",
+  "pdfminer.six",
+  "olefile",
+  "pydub",
+  "SpeechRecognition",
+  "youtube-transcript-api~=1.0.0",
+  "azure-ai-documentintelligence",
+  "azure-identity"
+]
+pptx = ["python-pptx"]
+docx = ["mammoth", "lxml"]
+xlsx = ["pandas", "openpyxl"]
+xls = ["pandas", "xlrd"]
+pdf = ["pdfminer.six"]
+outlook = ["olefile"]
+audio-transcription = ["pydub", "SpeechRecognition"]
+youtube-transcription = ["youtube-transcript-api"]
+az-doc-intel = ["azure-ai-documentintelligence", "azure-identity"]
+
+[project.urls]
+Documentation = "https://github.com/microsoft/markitdown#readme"
+Issues = "https://github.com/microsoft/markitdown/issues"
+Source = "https://github.com/microsoft/markitdown"
+
+[tool.hatch.version]
+path = "src/markitdown/__about__.py"
+
+[project.scripts]
+markitdown = "markitdown.__main__:main"
+
+[tool.hatch.envs.default]
+features = ["all"]
+
+[tool.hatch.envs.hatch-test]
+features = ["all"]
+extra-dependencies = [
+  "openai",
+]
+
+[tool.hatch.envs.types]
+features = ["all"]
+extra-dependencies = [
+  "openai",
+  "mypy>=1.0.0",
+]
+
+[tool.hatch.envs.types.scripts]
+check = "mypy --install-types --non-interactive --ignore-missing-imports {args:src/markitdown tests}"
+
+[tool.coverage.run]
+source_pkgs = ["markitdown", "tests"]
+branch = true
+parallel = true
+omit = [
+  "src/markitdown/__about__.py",
+]
+
+[tool.coverage.paths]
+markitdown = ["src/markitdown", "*/markitdown/src/markitdown"]
+tests = ["tests", "*/markitdown/tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+]
+
+[tool.hatch.build.targets.sdist]
+only-include = ["src/markitdown"]
