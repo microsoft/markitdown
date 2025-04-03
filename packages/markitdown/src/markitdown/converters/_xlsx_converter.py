@@ -77,9 +77,9 @@ class ExcelConverterBase(DocumentConverter):
             # Because the latter does not replace NaT's
             with pd.option_context("future.no_silent_downcasting", True):
                 sheet = sheet.fillna(na_rep, axis=1).infer_objects(copy=False)
-                sheet.columns = sheet.columns.fillna(na_rep)
+                sheet.columns = sheet.columns.fillna(na_rep).infer_objects(copy=False)
 
-            html_content = sheet.to_html(index=False, na_rep=na_rep)
+            html_content = sheet.to_html(index=False)
             md_content += (
                 self._html_converter.convert_string(
                     html_content, **kwargs
@@ -127,9 +127,7 @@ class XlsxConverter(ExcelConverterBase):
                     extension=".xlsx",
                     feature="xlsx",
                 )
-            ) from _xlsx_dependency_exc_info[
-                1
-            ].with_traceback(  # type: ignore[union-attr]
+            ) from _xlsx_dependency_exc_info[1].with_traceback(  # type: ignore[union-attr]
                 _xlsx_dependency_exc_info[2]
             )
 
@@ -178,9 +176,7 @@ class XlsConverter(ExcelConverterBase):
                     extension=".xls",
                     feature="xls",
                 )
-            ) from _xls_dependency_exc_info[
-                1
-            ].with_traceback(  # type: ignore[union-attr]
+            ) from _xls_dependency_exc_info[1].with_traceback(  # type: ignore[union-attr]
                 _xls_dependency_exc_info[2]
             )
 
