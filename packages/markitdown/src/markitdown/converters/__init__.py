@@ -12,6 +12,7 @@ from ._bing_serp_converter import BingSerpConverter
 from ._pdf_converter import PdfConverter
 from ._docx_converter import DocxConverter
 from ._xlsx_converter import XlsxConverter, XlsConverter
+from ._csv_converter import CsvConverter
 from ._pptx_converter import PptxConverter
 from ._image_converter import ImageConverter
 from ._audio_converter import AudioConverter
@@ -33,6 +34,7 @@ __all__ = [
     "BingSerpConverter",
     "PdfConverter",
     "DocxConverter",
+    "CsvConverter",
     "XlsxConverter",
     "XlsConverter",
     "PptxConverter",
