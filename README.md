@@ -1,1 +1,1 @@
-Zmiany na galezi main
+Zmiany na galezi main i w readme
