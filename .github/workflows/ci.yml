@@ -1,15 +1,15 @@
 name: ci
 
 on:
-  workflow_dispatch:
+  #workflow_dispatch:
   push:
-    branches:
-      - 'main'
-    tags:
-      - '*'
-  pull_request:
-    branches:
-      - 'main'
+  #  branches:
+  #    - 'main'
+  #  tags:
+  #    - '*'
+  #pull_request:
+  #  branches:
+  #    - 'main'
 
 jobs:
   docker:
