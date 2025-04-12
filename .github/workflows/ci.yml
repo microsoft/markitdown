@@ -3,10 +3,10 @@ name: ci
 on:
   #workflow_dispatch:
   push:
-  #  branches:
-  #    - 'main'
-  #  tags:
-  #    - '*'
+    #branches:
+    #  - 'main'
+    tags:
+      - '*'
   #pull_request:
   #  branches:
   #    - 'main'
