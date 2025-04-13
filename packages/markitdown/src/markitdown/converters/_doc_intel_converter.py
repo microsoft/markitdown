@@ -1,8 +1,7 @@
 import sys
 import re
 import os
-
-from typing import BinaryIO, Any, List
+from typing import BinaryIO, Any, List, Optional, Union
 from enum import Enum
 
 from ._html_converter import HtmlConverter
@@ -25,6 +24,28 @@ try:
 except ImportError:
     # Preserve the error and stack trace for later
     _dependency_exc_info = sys.exc_info()
+
+    # Define these types for type hinting when the package is not available
+    class AzureKeyCredential:
+        pass
+
+    class TokenCredential:
+        pass
+
+    class DocumentIntelligenceClient:
+        pass
+
+    class AnalyzeDocumentRequest:
+        pass
+
+    class AnalyzeResult:
+        pass
+
+    class DocumentAnalysisFeature:
+        pass
+
+    class DefaultAzureCredential:
+        pass
 
 
 # TODO: currently, there is a bug in the document intelligence SDK with importing the "ContentFormat" enum.

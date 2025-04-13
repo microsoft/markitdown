@@ -22,6 +22,7 @@ from ._doc_intel_converter import (
     DocumentIntelligenceFileType,
 )
 from ._epub_converter import EpubConverter
+from ._csv_converter import CsvConverter
 
 __all__ = [
     "PlainTextConverter",
@@ -43,4 +44,5 @@ __all__ = [
     "DocumentIntelligenceConverter",
     "DocumentIntelligenceFileType",
     "EpubConverter",
+    "CsvConverter",
 ]
