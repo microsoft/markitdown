@@ -25,7 +25,7 @@ To run the MCP server, ussing STDIO (default) use the following command:
 markitdown-mcp
 ```
 
-To run the MCP server, ussing SSE use the following command:
+To run the MCP server, using SSE use the following command:
 
 ```bash	
 markitdown-mcp --sse --host 127.0.0.1 --port 3001
