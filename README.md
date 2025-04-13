@@ -46,7 +46,7 @@ To install MarkItDown, use pip: `pip install 'markitdown[all]'`. Alternatively, 
 ```bash
 git clone git@github.com:microsoft/markitdown.git
 cd markitdown
-pip install -e packages/markitdown[all]
+pip install -e 'packages/markitdown[all]'
 ```
 
 ## Usage
@@ -73,7 +73,7 @@ cat path-to-file.pdf | markitdown
 MarkItDown has optional dependencies for activating various file formats. Earlier in this document, we installed all optional dependencies with the `[all]` option. However, you can also install them individually for more control. For example:
 
 ```bash
-pip install markitdown[pdf, docx, pptx]
+pip install 'markitdown[pdf, docx, pptx]'
 ```
 
 will install only the dependencies for PDF, DOCX, and PPTX files.
