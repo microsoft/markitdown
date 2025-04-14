@@ -178,10 +178,13 @@ print(result.text_content)
 
 ### Docker
 
+We recommend you to use a specific tag, just as follow :
+
 ```sh
-docker build -t markitdown:latest .
-docker run --rm -i markitdown:latest < ~/your-file.pdf > output.md
+docker run --rm -i ghcr.io/microsoft/markitdown:v0.1.2 < ~/your-file.pdf > output.md
 ```
+
+It is nevertheless possible to use the `latest` or `main` tag.
 
 ## Contributing
 
