@@ -5,7 +5,7 @@
 [![Built by AutoGen Team](https://img.shields.io/badge/Built%20by-AutoGen%20Team-blue)](https://github.com/microsoft/autogen)
 
 > [!TIP]
-> MarkItDown now offers an MCP (Model Context Protocol) server for integration with LLM applications like Claude Desktop. See [markitdown-mcp](https://github.com/microsoft/markitdown/tree/main/packages/markitdown-mcp) for more information.
+> MarkItDown now offers an MCP (Model Context Protocol) server for integration with LLM applications like Claude Desktop. See [markitdown-mcp](https://github.com/microsoft/markitdown/tree/main/packages/markitdown-mcp) for more information. [Klavis AI](https://www.klavis.ai/mcp-servers) has a hosted version of the markitdown MCP server. You can give it a try there.
 
 > [!IMPORTANT]
 > Breaking changes between 0.0.1 to 0.1.0:
