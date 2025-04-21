@@ -94,6 +94,71 @@ If you want to mount a directory, adjust it accordingly:
 }
 ```
 
+## Accessing from VS Code
+
+For quick installation, use one of the one-click install buttons below...
+
+[![Install with PyPI in VS Code](https://img.shields.io/badge/VS_Code-PyPI-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=markitdown&config=%7B%22command%22%3A%22pip%22%2C%22args%22%3A%5B%22install%22%2C%22markitdown-mcp%22%5D%7D) [![Install with PyPI in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-PyPI-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=markitdown&config=%7B%22command%22%3A%22pip%22%2C%22args%22%3A%5B%22install%22%2C%22markitdown-mcp%22%5D%7D&quality=insiders)
+
+[![Install with Docker in VS Code](https://img.shields.io/badge/VS_Code-Docker-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=markitdown&config=%7B%22command%22%3A%22docker%22%2C%22args%22%3A%5B%22run%22%2C%22-i%22%2C%22--rm%22%2C%22markitdown-mcp%3Alatest%22%5D%7D) [![Install with Docker in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Docker-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=markitdown&config=%7B%22command%22%3A%22docker%22%2C%22args%22%3A%5B%22run%22%2C%22-i%22%2C%22--rm%22%2C%22markitdown-mcp%3Alatest%22%5D%7D&quality=insiders)
+
+For manual installation, add the following JSON block to your User Settings (JSON) file in VS Code. You can do this by pressing `Ctrl + Shift + P` and typing `Preferences: Open User Settings (JSON)`.
+
+Optionally, you can add it to a file called `.vscode/mcp.json` in your workspace. This will allow you to share the configuration with others.
+
+> Note that the `mcp` key is not needed in the `.vscode/mcp.json` file.
+
+Using pip:
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "markitdown": {
+        "command": "markitdown-mcp"
+      }
+    }
+  }
+}
+```
+
+Using Docker:
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "markitdown": {
+        "command": "docker",
+        "args": ["run", "-i", "--rm", "markitdown-mcp:latest"]
+      }
+    }
+  }
+}
+```
+
+If you need to access local files, you can mount a directory using Docker:
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "markitdown": {
+        "command": "docker",
+        "args": [
+          "run",
+          "-i",
+          "--rm",
+          "-v",
+      	  "/home/user/data:/workdir",
+	        "markitdown-mcp:latest"
+        ]
+      }
+    }
+  }
+}
+```
+
 ## Debugging
 
 To debug the MCP server you can use the `mcpinspector` tool.
