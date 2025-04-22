@@ -18,7 +18,7 @@ pip install markitdown-mcp
 
 ## Usage
 
-To run the MCP server, ussing STDIO (default) use the following command:
+To run the MCP server, using STDIO (default) use the following command:
 
 
 ```bash	
