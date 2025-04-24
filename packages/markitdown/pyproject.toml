@@ -29,6 +29,8 @@ dependencies = [
   "markdownify",
   "magika~=0.6.1",
   "charset-normalizer",
+
+    "defusedxml>=0.7.1",
 ]
 
 [project.optional-dependencies]
@@ -75,6 +77,8 @@ features = ["all"]
 features = ["all"]
 extra-dependencies = [
   "openai",
+
+    "defusedxml>=0.7.1",
 ]
 
 [tool.hatch.envs.types]
@@ -82,6 +86,8 @@ features = ["all"]
 extra-dependencies = [
   "openai",
   "mypy>=1.0.0",
+
+    "defusedxml>=0.7.1",
 ]
 
 [tool.hatch.envs.types.scripts]
