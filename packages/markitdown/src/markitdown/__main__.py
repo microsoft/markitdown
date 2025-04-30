@@ -42,8 +42,8 @@ def main():
                 OR
                 
                 markitdown example.pdf > example.md
-            """
-        ).strip(),
+            """.strip(),
+        ),
     )
 
     parser.add_argument(
@@ -76,6 +76,15 @@ def main():
         "-c",
         "--charset",
         help="Provide a hint about the file's charset (e.g, UTF-8).",
+    )
+
+    # New CSS selector flag
+    parser.add_argument(
+        "-s",
+        "--selector",
+        metavar="CSS",
+        help="Only convert HTML nodes matching this CSS selector (e.g. 'article.main').",
+        default=None,
     )
 
     parser.add_argument(
@@ -187,22 +196,27 @@ def main():
     else:
         markitdown = MarkItDown(enable_plugins=args.use_plugins)
 
+    # Pass selector through to conversion
     if args.filename is None:
         result = markitdown.convert_stream(
             sys.stdin.buffer,
             stream_info=stream_info,
             keep_data_uris=args.keep_data_uris,
+            selector=args.selector,
         )
     else:
         result = markitdown.convert(
-            args.filename, stream_info=stream_info, keep_data_uris=args.keep_data_uris
+            args.filename,
+            stream_info=stream_info,
+            keep_data_uris=args.keep_data_uris,
+            selector=args.selector,
         )
 
     _handle_output(args, result)
 
+    def _handle_output(args, result: DocumentConverterResult):
+        """Handle output to stdout or file"""
 
-def _handle_output(args, result: DocumentConverterResult):
-    """Handle output to stdout or file"""
     if args.output:
         with open(args.output, "w", encoding="utf-8") as f:
             f.write(result.markdown)
