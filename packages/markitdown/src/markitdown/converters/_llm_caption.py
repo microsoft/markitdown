@@ -1,12 +1,13 @@
-from typing import BinaryIO, Any, Union
+from typing import BinaryIO, Any, Union, Awaitable
 import base64
 import mimetypes
+import asyncio
 from .._stream_info import StreamInfo
 
 
 def llm_caption(
     file_stream: BinaryIO, stream_info: StreamInfo, *, client, model, prompt=None
-) -> Union[None, str]:
+) -> Union[None, str, Awaitable[str]]:
     if prompt is None or prompt.strip() == "":
         prompt = "Write a detailed caption for this image."
 
@@ -47,4 +48,9 @@ def llm_caption(
 
     # Call the OpenAI API
     response = client.chat.completions.create(model=model, messages=messages)
+    if asyncio.iscoroutine(response):
+        async def read_content():
+            response = await response
+            return response.choices[0].message.content
+        return read_content()
     return response.choices[0].message.content
