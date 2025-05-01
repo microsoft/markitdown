@@ -1,11 +1,9 @@
-import copy
 import mimetypes
 import os
 import re
 import sys
 import shutil
-import tempfile
-import warnings
+import asyncio
 import traceback
 import io
 from dataclasses import dataclass
@@ -599,6 +597,9 @@ class MarkItDown:
                         )
                     finally:
                         file_stream.seek(cur_pos)
+
+                if asyncio.iscoroutine(res):
+                    return res
 
                 if res is not None:
                     # Normalize the content
