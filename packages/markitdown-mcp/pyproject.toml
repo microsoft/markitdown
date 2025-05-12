@@ -24,7 +24,7 @@ classifiers = [
   "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dependencies = [
-  "mcp~=1.5.0",
+  "mcp~=1.8.0",
   "markitdown[all]>=0.1.1,<0.2.0",
 ]
 
