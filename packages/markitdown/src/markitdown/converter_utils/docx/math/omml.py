@@ -6,7 +6,7 @@ Adapted from https://github.com/xiilei/dwml/blob/master/dwml/omml.py
 On 25/03/2025
 """
 
-import xml.etree.ElementTree as ET
+from defusedxml import ElementTree as ET
 
 from .latex_dict import (
     CHARS,
