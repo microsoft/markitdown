@@ -31,6 +31,7 @@ from .converters import (
     IpynbConverter,
     BingSerpConverter,
     PdfConverter,
+    DocConverter,
     DocxConverter,
     XlsxConverter,
     XlsConverter,
@@ -185,6 +186,7 @@ class MarkItDown:
             self.register_converter(WikipediaConverter())
             self.register_converter(YouTubeConverter())
             self.register_converter(BingSerpConverter())
+            self.register_converter(DocConverter())
             self.register_converter(DocxConverter())
             self.register_converter(XlsxConverter())
             self.register_converter(XlsConverter())
