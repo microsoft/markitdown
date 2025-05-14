@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/microsoft-markitdown-badge.png)](https://mseep.ai/app/microsoft-markitdown)
+
 # MarkItDown
 
 [![PyPI](https://img.shields.io/pypi/v/markitdown.svg)](https://pypi.org/project/markitdown/)
