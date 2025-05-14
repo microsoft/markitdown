@@ -46,10 +46,12 @@ To install MarkItDown, use pip: `pip install 'markitdown[all]'`. Alternatively, 
 ```bash
 git clone git@github.com:microsoft/markitdown.git
 cd markitdown
-conda create -n markitdown python=3.10 -y
+conda create -n markitdown python=3.10 -y  # Requires Python 3.10 or higher
 conda activate markitdown
 pip install -e 'packages/markitdown[all]'
 ```
+
+> **Note:** MarkItDown requires Python 3.10 or higher. Ensure your environment meets this requirement before proceeding.
 
 ## Usage
 
