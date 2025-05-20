@@ -19,10 +19,6 @@ else:
         FileTestVector,
     )
 
-from markitdown import (
-    MarkItDown,
-)
-
 skip_remote = (
     True if os.environ.get("GITHUB_ACTIONS") else False
 )  # Don't run these tests in CI
@@ -136,8 +132,6 @@ def test_input_from_stdin_without_hints(shared_tmp_dir, test_vector) -> None:
 def test_convert_url(shared_tmp_dir, test_vector):
     """Test the conversion of a stream with no stream info."""
     # Note: tmp_dir is not used here, but is needed to match the signature
-
-    markitdown = MarkItDown()
 
     time.sleep(1)  # Ensure we don't hit rate limits
     result = subprocess.run(
