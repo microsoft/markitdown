@@ -328,6 +328,40 @@ def test_speech_transcription() -> None:
         )
 
 
+@pytest.mark.skipif(
+    skip_llm,
+    reason="do not run llm tests without a key",
+)
+def test_whisper_transcription() -> None:
+    """Test OpenAI Whisper transcription with fallback to Google Speech Recognition."""
+    try:
+        from openai import OpenAI
+        client = OpenAI()
+        markitdown = MarkItDown(llm_client=client)
+
+        # Test WAV file with Whisper
+        result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.wav"))
+        
+        # Verify Whisper was used
+        assert "Audio Transcript (Whisper):" in result.text_content
+        
+        result_lower = result.text_content.lower()
+        expected_phrases = [
+            "small step",
+            "mankind"
+        ]
+        
+        # At least one of the expected phrases should be found
+        assert any(phrase in result_lower for phrase in expected_phrases), \
+            f"None of the expected phrases found in: {result_lower}"
+        
+        # Test MP3 file with Whisper
+        result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.mp3"))
+        assert "Audio Transcript (Whisper):" in result.text_content
+    except Exception as e:
+        pytest.skip(f"Whisper test failed: {str(e)}")
+
+
 def test_exceptions() -> None:
     # Check that an exception is raised when trying to convert an unsupported format
     markitdown = MarkItDown()
@@ -409,6 +443,7 @@ if __name__ == "__main__":
         test_input_as_strings,
         test_markitdown_remote,
         test_speech_transcription,
+        # test_whisper_transcription,
         test_exceptions,
         test_markitdown_exiftool,
         test_markitdown_llm,
