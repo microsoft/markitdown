@@ -182,7 +182,6 @@ def test_output_to_file_with_data_uris(shared_tmp_dir, test_vector) -> None:
 
 
 if __name__ == "__main__":
-    import sys
     import tempfile
 
     """Runs this file's tests from the command line."""

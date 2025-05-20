@@ -200,8 +200,6 @@ def test_convert_stream_keep_data_uris(test_vector):
 
 
 if __name__ == "__main__":
-    import sys
-
     """Runs this file's tests from the command line."""
 
     # General tests
