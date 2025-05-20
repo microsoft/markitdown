@@ -1,7 +1,7 @@
 # MarkItDown Sample Plugin
 
-[![PyPI](https://img.shields.io/pypi/v/markitdown.svg)](https://pypi.org/project/markitdown/)
-![PyPI - Downloads](https://img.shields.io/pypi/dd/markitdown)
+[![PyPI](https://img.shields.io/pypi/v/markitdown-sample-plugin.svg)](https://pypi.org/project/markitdown-sample-plugin/)
+![PyPI - Downloads](https://img.shields.io/pypi/dd/markitdown-sample-plugin)
 [![Built by AutoGen Team](https://img.shields.io/badge/Built%20by-AutoGen%20Team-blue)](https://github.com/microsoft/autogen)
 
 
@@ -10,23 +10,38 @@ This project shows how to create a sample plugin for MarkItDown. The most import
 Next, implement your custom DocumentConverter:
 
 ```python
-from typing import Union
-from markitdown import DocumentConverter, DocumentConverterResult
+from typing import BinaryIO, Any
+from markitdown import MarkItDown, DocumentConverter, DocumentConverterResult, StreamInfo
 
 class RtfConverter(DocumentConverter):
-    def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
-        # Bail if not an RTF file 
-        extension = kwargs.get("file_extension", "")
-        if extension.lower() != ".rtf":
-            return None
 
-	# Implement the conversion logic here ...
+    def __init__(
+        self, priority: float = DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT
+    ):
+        super().__init__(priority=priority)
 
-        # Return the result
-        return DocumentConverterResult(
-            title=title,
-            text_content=text_content,
-        )
+    def accepts(
+        self,
+        file_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,
+    ) -> bool:
+	
+	# Implement logic to check if the file stream is an RTF file
+	# ...
+	raise NotImplementedError()
+
+
+    def convert(
+        self,
+        file_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,
+    ) -> DocumentConverterResult:
+
+	# Implement logic to convert the file stream to Markdown
+	# ...
+	raise NotImplementedError()
 ```
 
 Next, make sure your package implements and exports the following:
@@ -71,10 +86,10 @@ Once the plugin package is installed, verify that it is available to MarkItDown 
 markitdown --list-plugins
 ```
 
-To use the plugin for a conversion use the `--use-plugins` flag. For example, to convert a PDF:
+To use the plugin for a conversion use the `--use-plugins` flag. For example, to convert an RTF file:
 
 ```bash
-markitdown --use-plugins path-to-file.pdf
+markitdown --use-plugins path-to-file.rtf
 ```
 
 In Python, plugins can be enabled as follows:
@@ -83,7 +98,7 @@ In Python, plugins can be enabled as follows:
 from markitdown import MarkItDown
 
 md = MarkItDown(enable_plugins=True) 
-result = md.convert("path-to-file.pdf")
+result = md.convert("path-to-file.rtf")
 print(result.text_content)
 ```
 

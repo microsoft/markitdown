@@ -2,7 +2,7 @@
 import os
 import pytest
 
-from markitdown import MarkItDown
+from markitdown import MarkItDown, StreamInfo
 from markitdown_sample_plugin import RtfConverter
 
 TEST_FILES_DIR = os.path.join(os.path.dirname(__file__), "test_files")
@@ -15,18 +15,22 @@ RTF_TEST_STRINGS = {
 
 def test_converter() -> None:
     """Tests the RTF converter dirctly."""
-    converter = RtfConverter()
-    result = converter.convert(
-        os.path.join(TEST_FILES_DIR, "test.rtf"), file_extension=".rtf"
-    )
+    with open(os.path.join(TEST_FILES_DIR, "test.rtf"), "rb") as file_stream:
+        converter = RtfConverter()
+        result = converter.convert(
+            file_stream=file_stream,
+            stream_info=StreamInfo(
+                mimetype="text/rtf", extension=".rtf", filename="test.rtf"
+            ),
+        )
 
-    for test_string in RTF_TEST_STRINGS:
-        assert test_string in result.text_content
+        for test_string in RTF_TEST_STRINGS:
+            assert test_string in result.text_content
 
 
 def test_markitdown() -> None:
     """Tests that MarkItDown correctly loads the plugin."""
-    md = MarkItDown()
+    md = MarkItDown(enable_plugins=True)
     result = md.convert(os.path.join(TEST_FILES_DIR, "test.rtf"))
 
     for test_string in RTF_TEST_STRINGS:

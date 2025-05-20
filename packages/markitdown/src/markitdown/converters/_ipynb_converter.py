@@ -1,39 +1,62 @@
+from typing import BinaryIO, Any
 import json
-from typing import Any, Union
 
-from ._base import (
-    DocumentConverter,
-    DocumentConverterResult,
-)
-
+from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._exceptions import FileConversionException
+from .._stream_info import StreamInfo
+
+CANDIDATE_MIME_TYPE_PREFIXES = [
+    "application/json",
+]
+
+ACCEPTED_FILE_EXTENSIONS = [".ipynb"]
 
 
 class IpynbConverter(DocumentConverter):
     """Converts Jupyter Notebook (.ipynb) files to Markdown."""
 
-    def __init__(
-        self, priority: float = DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT
-    ):
-        super().__init__(priority=priority)
+    def accepts(
+        self,
+        file_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,  # Options to pass to the converter
+    ) -> bool:
+        mimetype = (stream_info.mimetype or "").lower()
+        extension = (stream_info.extension or "").lower()
+
+        if extension in ACCEPTED_FILE_EXTENSIONS:
+            return True
+
+        for prefix in CANDIDATE_MIME_TYPE_PREFIXES:
+            if mimetype.startswith(prefix):
+                # Read further to see if it's a notebook
+                cur_pos = file_stream.tell()
+                try:
+                    encoding = stream_info.charset or "utf-8"
+                    notebook_content = file_stream.read().decode(encoding)
+                    return (
+                        "nbformat" in notebook_content
+                        and "nbformat_minor" in notebook_content
+                    )
+                finally:
+                    file_stream.seek(cur_pos)
+
+        return False
 
     def convert(
-        self, local_path: str, **kwargs: Any
-    ) -> Union[None, DocumentConverterResult]:
-        # Bail if not ipynb
-        extension = kwargs.get("file_extension", "")
-        if extension.lower() != ".ipynb":
-            return None
-
+        self,
+        file_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,  # Options to pass to the converter
+    ) -> DocumentConverterResult:
         # Parse and convert the notebook
         result = None
-        with open(local_path, "rt", encoding="utf-8") as fh:
-            notebook_content = json.load(fh)
-            result = self._convert(notebook_content)
 
-        return result
+        encoding = stream_info.charset or "utf-8"
+        notebook_content = file_stream.read().decode(encoding=encoding)
+        return self._convert(json.loads(notebook_content))
 
-    def _convert(self, notebook_content: dict) -> Union[None, DocumentConverterResult]:
+    def _convert(self, notebook_content: dict) -> DocumentConverterResult:
         """Helper function that converts notebook JSON content to Markdown."""
         try:
             md_output = []
@@ -65,8 +88,8 @@ class IpynbConverter(DocumentConverter):
             title = notebook_content.get("metadata", {}).get("title", title)
 
             return DocumentConverterResult(
+                markdown=md_text,
                 title=title,
-                text_content=md_text,
             )
 
         except Exception as e:

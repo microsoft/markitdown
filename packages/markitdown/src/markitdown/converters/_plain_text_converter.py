@@ -1,38 +1,71 @@
-import mimetypes
+import sys
 
-from charset_normalizer import from_path
-from typing import Any, Union
+from typing import BinaryIO, Any
+from charset_normalizer import from_bytes
+from .._base_converter import DocumentConverter, DocumentConverterResult
+from .._stream_info import StreamInfo
 
-from ._base import DocumentConverter, DocumentConverterResult
+# Try loading optional (but in this case, required) dependencies
+# Save reporting of any exceptions for later
+_dependency_exc_info = None
+try:
+    import mammoth
+except ImportError:
+    # Preserve the error and stack trace for later
+    _dependency_exc_info = sys.exc_info()
+
+ACCEPTED_MIME_TYPE_PREFIXES = [
+    "text/",
+    "application/json",
+    "application/markdown",
+]
+
+ACCEPTED_FILE_EXTENSIONS = [
+    ".txt",
+    ".text",
+    ".md",
+    ".markdown",
+    ".json",
+    ".jsonl",
+]
 
 
 class PlainTextConverter(DocumentConverter):
     """Anything with content type text/plain"""
 
-    def __init__(
-        self, priority: float = DocumentConverter.PRIORITY_GENERIC_FILE_FORMAT
-    ):
-        super().__init__(priority=priority)
+    def accepts(
+        self,
+        file_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,  # Options to pass to the converter
+    ) -> bool:
+        mimetype = (stream_info.mimetype or "").lower()
+        extension = (stream_info.extension or "").lower()
+
+        # If we have a charset, we can safely assume it's text
+        # With Magika in the earlier stages, this handles most cases
+        if stream_info.charset is not None:
+            return True
+
+        # Otherwise, check the mimetype and extension
+        if extension in ACCEPTED_FILE_EXTENSIONS:
+            return True
+
+        for prefix in ACCEPTED_MIME_TYPE_PREFIXES:
+            if mimetype.startswith(prefix):
+                return True
+
+        return False
 
     def convert(
-        self, local_path: str, **kwargs: Any
-    ) -> Union[None, DocumentConverterResult]:
-        # Guess the content type from any file extension that might be around
-        content_type, _ = mimetypes.guess_type(
-            "__placeholder" + kwargs.get("file_extension", "")
-        )
+        self,
+        file_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,  # Options to pass to the converter
+    ) -> DocumentConverterResult:
+        if stream_info.charset:
+            text_content = file_stream.read().decode(stream_info.charset)
+        else:
+            text_content = str(from_bytes(file_stream.read()).best())
 
-        # Only accept text files
-        if content_type is None:
-            return None
-        elif all(
-            not content_type.lower().startswith(type_prefix)
-            for type_prefix in ["text/", "application/json"]
-        ):
-            return None
-
-        text_content = str(from_path(local_path).best())
-        return DocumentConverterResult(
-            title=None,
-            text_content=text_content,
-        )
+        return DocumentConverterResult(markdown=text_content)

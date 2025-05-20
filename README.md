@@ -4,11 +4,19 @@
 ![PyPI - Downloads](https://img.shields.io/pypi/dd/markitdown)
 [![Built by AutoGen Team](https://img.shields.io/badge/Built%20by-AutoGen%20Team-blue)](https://github.com/microsoft/autogen)
 
-> [!IMPORTANT]
-> MarkItDown 0.0.2 alpha 1 (0.0.2a1) introduces a plugin-based architecture. As much as was possible, command-line and Python interfaces have remained the same as 0.0.1a3 to support backward compatibility. Please report any issues you encounter. Some interface changes may yet occur as we continue to refine MarkItDown to a first non-alpha release.
+> [!TIP]
+> MarkItDown now offers an MCP (Model Context Protocol) server for integration with LLM applications like Claude Desktop. See [markitdown-mcp](https://github.com/microsoft/markitdown/tree/main/packages/markitdown-mcp) for more information.
 
-MarkItDown is a utility for converting various files to Markdown (e.g., for indexing, text analysis, etc).
-It supports:
+> [!IMPORTANT]
+> Breaking changes between 0.0.1 to 0.1.0:
+> * Dependencies are now organized into optional feature-groups (further details below). Use `pip install 'markitdown[all]'` to have backward-compatible behavior. 
+> * convert\_stream() now requires a binary file-like object (e.g., a file opened in binary mode, or an io.BytesIO object). This is a breaking change from the previous version, where it previously also accepted text file-like objects, like io.StringIO.
+> * The DocumentConverter class interface has changed to read from file-like streams rather than file paths. *No temporary files are created anymore*. If you are the maintainer of a plugin, or custom DocumentConverter, you likely need to update your code. Otherwise, if only using the MarkItDown class or CLI (as in these examples), you should not need to change anything.
+
+MarkItDown is a lightweight Python utility for converting various files to Markdown for use with LLMs and related text analysis pipelines. To this end, it is most comparable to [textract](https://github.com/deanmalmgren/textract), but with a focus on preserving important document structure and content as Markdown (including: headings, lists, tables, links, etc.) While the output is often reasonably presentable and human-friendly, it is meant to be consumed by text analysis tools -- and may not be the best option for high-fidelity document conversions for human consumption.
+
+At present, MarkItDown supports:
+
 - PDF
 - PowerPoint
 - Word
@@ -18,14 +26,27 @@ It supports:
 - HTML
 - Text-based formats (CSV, JSON, XML)
 - ZIP files (iterates over contents)
+- Youtube URLs
+- EPubs
 - ... and more!
 
-To install MarkItDown, use pip: `pip install markitdown`. Alternatively, you can install it from the source: 
+## Why Markdown?
+
+Markdown is extremely close to plain text, with minimal markup or formatting, but still
+provides a way to represent important document structure. Mainstream LLMs, such as
+OpenAI's GPT-4o, natively "_speak_" Markdown, and often incorporate Markdown into their
+responses unprompted. This suggests that they have been trained on vast amounts of
+Markdown-formatted text, and understand it well. As a side benefit, Markdown conventions
+are also highly token-efficient.
+
+## Installation
+
+To install MarkItDown, use pip: `pip install 'markitdown[all]'`. Alternatively, you can install it from the source:
 
 ```bash
 git clone git@github.com:microsoft/markitdown.git
 cd markitdown
-pip install -e packages/markitdown
+pip install -e 'packages/markitdown[all]'
 ```
 
 ## Usage
@@ -47,6 +68,28 @@ You can also pipe content:
 ```bash
 cat path-to-file.pdf | markitdown
 ```
+
+### Optional Dependencies
+MarkItDown has optional dependencies for activating various file formats. Earlier in this document, we installed all optional dependencies with the `[all]` option. However, you can also install them individually for more control. For example:
+
+```bash
+pip install 'markitdown[pdf, docx, pptx]'
+```
+
+will install only the dependencies for PDF, DOCX, and PPTX files.
+
+At the moment, the following optional dependencies are available:
+
+* `[all]` Installs all optional dependencies
+* `[pptx]` Installs dependencies for PowerPoint files
+* `[docx]` Installs dependencies for Word files
+* `[xlsx]` Installs dependencies for Excel files
+* `[xls]` Installs dependencies for older Excel files
+* `[pdf]` Installs dependencies for PDF files
+* `[outlook]` Installs dependencies for Outlook messages
+* `[az-doc-intel]` Installs dependencies for Azure Document Intelligence
+* `[audio-transcription]` Installs dependencies for audio transcription of wav and mp3 files
+* `[youtube-transcription]` Installs dependencies for fetching YouTube video transcription
 
 ### Plugins
 
@@ -73,7 +116,6 @@ markitdown path-to-file.pdf -o document.md -d -e "<document_intelligence_endpoin
 ```
 
 More information about how to set up an Azure Document Intelligence Resource can be found [here](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/how-to-guides/create-document-intelligence-resource?view=doc-intel-4.0.0)
-
 
 ### Python API
 
@@ -115,10 +157,10 @@ print(result.text_content)
 docker build -t markitdown:latest .
 docker run --rm -i markitdown:latest < ~/your-file.pdf > output.md
 ```
-   
+
 ## Contributing
 
-This project welcomes contributions and suggestions.  Most contributions require you to agree to a
+This project welcomes contributions and suggestions. Most contributions require you to agree to a
 Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
 the rights to use your contribution. For details, visit https://cla.opensource.microsoft.com.
 
@@ -134,13 +176,12 @@ contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additio
 
 You can help by looking at issues or helping review PRs. Any issue or PR is welcome, but we have also marked some as 'open for contribution' and 'open for reviewing' to help facilitate community contributions. These are ofcourse just suggestions and you are welcome to contribute in any way you like.
 
-
 <div align="center">
 
-|                       | All                                      | Especially Needs Help from Community                                                                 |
-|-----------------------|------------------------------------------|------------------------------------------------------------------------------------------|
-| **Issues**            | [All Issues](https://github.com/microsoft/markitdown/issues) | [Issues open for contribution](https://github.com/microsoft/markitdown/issues?q=is%3Aissue+is%3Aopen+label%3A%22open+for+contribution%22) |
-| **PRs**               | [All PRs](https://github.com/microsoft/markitdown/pulls)     | [PRs open for reviewing](https://github.com/microsoft/markitdown/pulls?q=is%3Apr+is%3Aopen+label%3A%22open+for+reviewing%22)               |
+|            | All                                                          | Especially Needs Help from Community                                                                                                      |
+| ---------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| **Issues** | [All Issues](https://github.com/microsoft/markitdown/issues) | [Issues open for contribution](https://github.com/microsoft/markitdown/issues?q=is%3Aissue+is%3Aopen+label%3A%22open+for+contribution%22) |
+| **PRs**    | [All PRs](https://github.com/microsoft/markitdown/pulls)     | [PRs open for reviewing](https://github.com/microsoft/markitdown/pulls?q=is%3Apr+is%3Aopen+label%3A%22open+for+reviewing%22)              |
 
 </div>
 
@@ -148,29 +189,30 @@ You can help by looking at issues or helping review PRs. Any issue or PR is welc
 
 - Navigate to the MarkItDown package:
 
-    ```sh
-    cd packages/markitdown
-    ```
+  ```sh
+  cd packages/markitdown
+  ```
 
 - Install `hatch` in your environment and run tests:
-    ```sh
-    pip install hatch  # Other ways of installing hatch: https://hatch.pypa.io/dev/install/
-    hatch shell
-    hatch test
-    ```
+
+  ```sh
+  pip install hatch  # Other ways of installing hatch: https://hatch.pypa.io/dev/install/
+  hatch shell
+  hatch test
+  ```
 
   (Alternative) Use the Devcontainer which has all the dependencies installed:
-    ```sh
-    # Reopen the project in Devcontainer and run:
-    hatch test
-    ```
+
+  ```sh
+  # Reopen the project in Devcontainer and run:
+  hatch test
+  ```
 
 - Run pre-commit checks before submitting a PR: `pre-commit run --all-files`
 
 ### Contributing 3rd-party Plugins
 
 You can also contribute by creating and sharing 3rd party plugins. See `packages/markitdown-sample-plugin` for more details.
-
 
 ## Trademarks
 
