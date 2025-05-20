@@ -2,7 +2,6 @@
 import os
 import time
 import pytest
-import codecs
 import base64
 
 from pathlib import Path
@@ -14,8 +13,6 @@ else:
 
 from markitdown import (
     MarkItDown,
-    UnsupportedFormatException,
-    FileConversionException,
     StreamInfo,
 )
 

@@ -1,11 +1,8 @@
-import copy
 import mimetypes
 import os
 import re
 import sys
 import shutil
-import tempfile
-import warnings
 import traceback
 import io
 from dataclasses import dataclass

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3 -m pytest
 import subprocess
-import pytest
 from markitdown import __version__
 
 # This file contains CLI tests that are not directly tested by the FileTestVectors.

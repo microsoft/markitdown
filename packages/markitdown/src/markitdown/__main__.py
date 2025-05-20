@@ -4,7 +4,6 @@
 import argparse
 import sys
 import codecs
-import locale
 from textwrap import dedent
 from importlib.metadata import entry_points
 from .__about__ import __version__

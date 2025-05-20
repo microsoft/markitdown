@@ -3,7 +3,6 @@ import io
 import os
 import re
 import shutil
-import openai
 import pytest
 
 from markitdown._uri_utils import parse_data_uri, file_uri_to_path

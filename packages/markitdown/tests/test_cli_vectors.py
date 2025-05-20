@@ -21,9 +21,6 @@ else:
 
 from markitdown import (
     MarkItDown,
-    UnsupportedFormatException,
-    FileConversionException,
-    StreamInfo,
 )
 
 skip_remote = (
