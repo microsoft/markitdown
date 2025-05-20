@@ -33,13 +33,13 @@ def main():
                 OR
 
                 markitdown < example.pdf
-                
+
                 OR to save to a file use
-    
+
                 markitdown example.pdf -o example.md
-                
+
                 OR
-                
+
                 markitdown example.pdf > example.md
             """
         ).strip(),
