@@ -4,7 +4,7 @@ from typing import BinaryIO, Any
 
 from ._html_converter import HtmlConverter
 from ..converter_utils.docx.pre_process import pre_process_docx
-from .._base_converter import DocumentConverter, DocumentConverterResult
+from .._base_converter import DocumentConverterResult
 from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 

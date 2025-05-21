@@ -1,10 +1,8 @@
-import sys
 import json
 import time
-import io
 import re
 import bs4
-from typing import Any, BinaryIO, Optional, Dict, List, Union
+from typing import Any, BinaryIO, Dict, List, Union
 from urllib.parse import parse_qs, urlparse, unquote
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
