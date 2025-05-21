@@ -1,7 +1,6 @@
 import contextlib
 import sys
 from collections.abc import AsyncIterator
-from typing import Any
 from mcp.server.fastmcp import FastMCP
 from starlette.applications import Starlette
 from mcp.server.sse import SseServerTransport

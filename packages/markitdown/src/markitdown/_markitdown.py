@@ -1,11 +1,8 @@
-import copy
 import mimetypes
 import os
 import re
 import sys
 import shutil
-import tempfile
-import warnings
 import traceback
 import io
 from dataclasses import dataclass
@@ -547,7 +544,7 @@ class MarkItDown:
                 # Sanity check -- make sure the cur_pos is still the same
                 assert (
                     cur_pos == file_stream.tell()
-                ), f"File stream position should NOT change between guess iterations"
+                ), "File stream position should NOT change between guess iterations"
 
                 _kwargs = {k: v for k, v in kwargs.items()}
 
@@ -614,7 +611,7 @@ class MarkItDown:
 
         # Nothing can handle it!
         raise UnsupportedFormatException(
-            f"Could not convert stream to Markdown. No converter attempted a conversion, suggesting that the filetype is simply not supported."
+            "Could not convert stream to Markdown. No converter attempted a conversion, suggesting that the filetype is simply not supported."
         )
 
     def register_page_converter(self, converter: DocumentConverter) -> None:
