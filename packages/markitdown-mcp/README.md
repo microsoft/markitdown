@@ -122,7 +122,7 @@ Finally:
 
 ## Security Considerations
 
-The server does not support authentication, and runs with the privileges if the user running it. For this reason, when running in SSE mode, it is recommended to run the server bound to `localhost` (default).
+The server does not support authentication, and runs with the privileges of the user running it. For this reason, when running in SSE mode, it is recommended to run the server bound to `localhost` (default).
 
 
 ## Trademarks
