@@ -3,7 +3,6 @@ import io
 import os
 import re
 import shutil
-import openai
 import pytest
 
 from markitdown._uri_utils import parse_data_uri, file_uri_to_path
@@ -253,8 +252,6 @@ def test_file_uris() -> None:
 
 
 def test_docx_comments() -> None:
-    markitdown = MarkItDown()
-
     # Test DOCX processing, with comments and setting style_map on init
     markitdown_with_style_map = MarkItDown(style_map="comment-reference => ")
     result = markitdown_with_style_map.convert(
