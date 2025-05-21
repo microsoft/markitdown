@@ -6,7 +6,7 @@ Adapted from https://github.com/xiilei/dwml/blob/master/dwml/omml.py
 On 25/03/2025
 """
 
-import xml.etree.ElementTree as ET
+from defusedxml import ElementTree as ET
 
 from .latex_dict import (
     CHARS,
@@ -272,7 +272,7 @@ class oMath2Latex(Tag2Method):
                 if FUNC.get(t):
                     latex_chars.append(FUNC[t])
                 else:
-                    raise NotImplemented("Not support func %s" % t)
+                    raise NotImplementedError("Not support func %s" % t)
             else:
                 latex_chars.append(t)
         t = BLANK.join(latex_chars)
@@ -316,7 +316,7 @@ class oMath2Latex(Tag2Method):
         t_dict = self.process_children_dict(elm, include=("e", "lim"))
         latex_s = LIM_FUNC.get(t_dict["e"])
         if not latex_s:
-            raise NotImplemented("Not support lim %s" % t_dict["e"])
+            raise NotImplementedError("Not support lim %s" % t_dict["e"])
         else:
             return latex_s.format(lim=t_dict.get("lim"))
 

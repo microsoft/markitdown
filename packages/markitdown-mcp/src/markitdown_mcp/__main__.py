@@ -1,11 +1,14 @@
+import contextlib
 import sys
-from typing import Any
+from collections.abc import AsyncIterator
 from mcp.server.fastmcp import FastMCP
 from starlette.applications import Starlette
 from mcp.server.sse import SseServerTransport
 from starlette.requests import Request
 from starlette.routing import Mount, Route
+from starlette.types import Receive, Scope, Send
 from mcp.server import Server
+from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from markitdown import MarkItDown
 import uvicorn
 
@@ -21,6 +24,12 @@ async def convert_to_markdown(uri: str) -> str:
 
 def create_starlette_app(mcp_server: Server, *, debug: bool = False) -> Starlette:
     sse = SseServerTransport("/messages/")
+    session_manager = StreamableHTTPSessionManager(
+        app=mcp_server,
+        event_store=None,
+        json_response=True,
+        stateless=True,
+    )
 
     async def handle_sse(request: Request) -> None:
         async with sse.connect_sse(
@@ -34,12 +43,29 @@ def create_starlette_app(mcp_server: Server, *, debug: bool = False) -> Starlett
                 mcp_server.create_initialization_options(),
             )
 
+    async def handle_streamable_http(
+        scope: Scope, receive: Receive, send: Send
+    ) -> None:
+        await session_manager.handle_request(scope, receive, send)
+
+    @contextlib.asynccontextmanager
+    async def lifespan(app: Starlette) -> AsyncIterator[None]:
+        """Context manager for session manager."""
+        async with session_manager.run():
+            print("Application started with StreamableHTTP session manager!")
+            try:
+                yield
+            finally:
+                print("Application shutting down...")
+
     return Starlette(
         debug=debug,
         routes=[
             Route("/sse", endpoint=handle_sse),
+            Mount("/mcp", app=handle_streamable_http),
             Mount("/messages/", app=sse.handle_post_message),
         ],
+        lifespan=lifespan,
     )
 
 
