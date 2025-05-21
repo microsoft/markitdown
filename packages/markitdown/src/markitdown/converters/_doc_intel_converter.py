@@ -1,13 +1,12 @@
 import sys
 import re
 import os
-from typing import BinaryIO, Any, List, Optional, Union
+from typing import BinaryIO, Any, List
 from enum import Enum
 
-from ._html_converter import HtmlConverter
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
-from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+from .._exceptions import MissingDependencyException
 
 # Try loading optional (but in this case, required) dependencies
 # Save reporting of any exceptions for later
