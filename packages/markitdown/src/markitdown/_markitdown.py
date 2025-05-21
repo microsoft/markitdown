@@ -208,6 +208,10 @@ class MarkItDown:
                 if docintel_types is not None:
                     docintel_args["file_types"] = docintel_types
 
+                docintel_version = kwargs.get("docintel_api_version")
+                if docintel_version is not None:
+                    docintel_args["api_version"] = docintel_version
+
                 self.register_converter(
                     DocumentIntelligenceConverter(**docintel_args),
                 )
