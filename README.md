@@ -74,8 +74,6 @@ cd markitdown
 pip install -e 'packages/markitdown[all]'
 ```
 
-> **Note:** MarkItDown requires Python 3.10 or higher. Ensure your environment meets this requirement before proceeding.
-
 ## Usage
 
 ### Command-Line
