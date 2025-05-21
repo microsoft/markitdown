@@ -39,6 +39,31 @@ responses unprompted. This suggests that they have been trained on vast amounts 
 Markdown-formatted text, and understand it well. As a side benefit, Markdown conventions
 are also highly token-efficient.
 
+## Prerequisites
+MarkItDown requires Python 3.10 or higher. It is recommended to use a virtual environment to avoid dependency conflicts.
+
+With the standard Python installation, you can create and activate a virtual environment using the following commands:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+```
+
+If using `uv`, you can create a virtual environment with:
+
+```bash
+uv venv --python=3.12 .venv
+source .venv/bin/activate
+# NOTE: Be sure to use 'uv pip install' rather than just 'pip install' to install packages in this virtual environment
+```
+
+If you are using Anaconda, you can create a virtual environment with:
+
+```bash
+conda create -n markitdown python=3.12
+conda activate markitdown
+```
+
 ## Installation
 
 To install MarkItDown, use pip: `pip install 'markitdown[all]'`. Alternatively, you can install it from the source:
@@ -46,8 +71,6 @@ To install MarkItDown, use pip: `pip install 'markitdown[all]'`. Alternatively, 
 ```bash
 git clone git@github.com:microsoft/markitdown.git
 cd markitdown
-conda create -n markitdown python=3.10 -y  # Requires Python 3.10 or higher
-conda activate markitdown
 pip install -e 'packages/markitdown[all]'
 ```
 
