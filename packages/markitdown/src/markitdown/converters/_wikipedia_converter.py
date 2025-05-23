@@ -1,7 +1,6 @@
-import io
 import re
 import bs4
-from typing import Any, BinaryIO, Optional
+from typing import Any, BinaryIO
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo

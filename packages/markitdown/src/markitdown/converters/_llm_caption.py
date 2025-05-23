@@ -1,4 +1,4 @@
-from typing import BinaryIO, Any, Union, Awaitable
+from typing import BinaryIO, Union, Awaitable
 import base64
 import mimetypes
 import asyncio
