@@ -8,6 +8,8 @@ from textwrap import dedent
 from importlib.metadata import entry_points
 from .__about__ import __version__
 from ._markitdown import MarkItDown, StreamInfo, DocumentConverterResult
+from ._base_converter import PageInfo
+import json
 
 
 def main():
@@ -41,6 +43,14 @@ def main():
                 OR
 
                 markitdown example.pdf > example.md
+
+                OR to extract pages separately from PDF
+
+                markitdown example.pdf --extract-pages
+
+                OR to get page information as JSON
+
+                markitdown example.pdf --extract-pages --pages-json
             """
         ).strip(),
     )
@@ -108,6 +118,18 @@ def main():
         "--keep-data-uris",
         action="store_true",
         help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
+    )
+
+    parser.add_argument(
+        "--extract-pages",
+        action="store_true",
+        help="Extract pages separately for PDF files. Returns page-by-page information.",
+    )
+
+    parser.add_argument(
+        "--pages-json",
+        action="store_true",
+        help="Output page information as JSON when using --extract-pages.",
     )
 
     parser.add_argument("filename", nargs="?")
@@ -191,10 +213,14 @@ def main():
             sys.stdin.buffer,
             stream_info=stream_info,
             keep_data_uris=args.keep_data_uris,
+            extract_pages=args.extract_pages,
         )
     else:
         result = markitdown.convert(
-            args.filename, stream_info=stream_info, keep_data_uris=args.keep_data_uris
+            args.filename, 
+            stream_info=stream_info, 
+            keep_data_uris=args.keep_data_uris,
+            extract_pages=args.extract_pages,
         )
 
     _handle_output(args, result)
@@ -202,13 +228,45 @@ def main():
 
 def _handle_output(args, result: DocumentConverterResult):
     """Handle output to stdout or file"""
+    output_content = ""
+    
+    if args.extract_pages and result.pages and args.pages_json:
+        # Output as JSON with page information
+        pages_data = [
+            {
+                "page_number": page.page_number,
+                "content": page.content
+            }
+            for page in result.pages
+        ]
+        output_data = {
+            "markdown": result.markdown,
+            "title": result.title,
+            "pages": pages_data
+        }
+        output_content = json.dumps(output_data, ensure_ascii=False, indent=2)
+    elif args.extract_pages and result.pages:
+        # Output with page separators
+        output_content = result.markdown
+        output_content += "\n\n" + "=" * 50 + "\n"
+        output_content += f"EXTRACTED {len(result.pages)} PAGES:\n"
+        output_content += "=" * 50 + "\n\n"
+        
+        for page in result.pages:
+            output_content += f"--- PAGE {page.page_number} ---\n"
+            output_content += page.content
+            output_content += "\n\n"
+    else:
+        # Standard output
+        output_content = result.markdown
+    
     if args.output:
         with open(args.output, "w", encoding="utf-8") as f:
-            f.write(result.markdown)
+            f.write(output_content)
     else:
         # Handle stdout encoding errors more gracefully
         print(
-            result.markdown.encode(sys.stdout.encoding, errors="replace").decode(
+            output_content.encode(sys.stdout.encoding, errors="replace").decode(
                 sys.stdout.encoding
             )
         )

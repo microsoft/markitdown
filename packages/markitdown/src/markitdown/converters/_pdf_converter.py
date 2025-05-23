@@ -1,9 +1,9 @@
 import sys
 import io
 import re
-from typing import BinaryIO, Any
+from typing import BinaryIO, Any, List
 
-from .._base_converter import DocumentConverter, DocumentConverterResult
+from .._base_converter import DocumentConverter, DocumentConverterResult, PageInfo
 from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 
@@ -62,6 +62,10 @@ _dependency_exc_info = None
 try:
     import pdfminer
     import pdfminer.high_level
+    from pdfminer.pdfpage import PDFPage
+    from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
+    from pdfminer.converter import TextConverter
+    from pdfminer.layout import LAParams
     import pdfplumber
 except ImportError:
     _dependency_exc_info = sys.exc_info()
@@ -489,6 +493,19 @@ class PdfConverter(DocumentConverter):
 
         assert isinstance(file_stream, io.IOBase)
 
+        # Check if page-level extraction is requested
+        extract_pages = kwargs.get("extract_pages", False)
+
+        if extract_pages:
+            # Extract text page by page
+            pages = self._extract_pages(file_stream)
+            # Combine all pages for the main markdown content
+            markdown = "\n\n".join([page.content for page in pages])
+            return DocumentConverterResult(
+                markdown=markdown,
+                pages=pages,
+            )
+
         markdown_chunks: list[str] = []
 
         # Read file stream into BytesIO for compatibility with pdfplumber
@@ -538,3 +555,51 @@ class PdfConverter(DocumentConverter):
         markdown = _merge_partial_numbering_lines(markdown)
 
         return DocumentConverterResult(markdown=markdown)
+
+    def _extract_pages(self, file_stream: BinaryIO) -> List[PageInfo]:
+        """Extract text from each page separately."""
+        pages = []
+
+        try:
+            # Reset stream position
+            file_stream.seek(0)
+
+            # Create resource manager
+            rsrcmgr = PDFResourceManager()
+            laparams = LAParams()
+
+            # Get all pages
+            pdf_pages = list(PDFPage.get_pages(file_stream))
+
+            for page_num, page in enumerate(pdf_pages, 1):
+                output_string = None
+                device = None
+                try:
+                    # Create a new StringIO for each page
+                    output_string = io.StringIO()
+                    device = TextConverter(rsrcmgr, output_string, laparams=laparams)
+                    interpreter = PDFPageInterpreter(rsrcmgr, device)
+
+                    # Process the page
+                    interpreter.process_page(page)
+
+                    # Get the text content
+                    text = output_string.getvalue()
+
+                    # Add page info
+                    pages.append(PageInfo(page_number=page_num, content=text.strip()))
+
+                finally:
+                    # Clean up resources
+                    if device:
+                        device.close()
+                    if output_string:
+                        output_string.close()
+
+        except Exception:
+            # If page-by-page extraction fails, fall back to full document extraction
+            file_stream.seek(0)
+            full_text = pdfminer.high_level.extract_text(file_stream)
+            pages = [PageInfo(page_number=1, content=full_text.strip())]
+
+        return pages
