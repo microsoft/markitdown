@@ -75,12 +75,17 @@ def main():
 
     mcp_server = mcp._mcp_server
 
-    parser = argparse.ArgumentParser(description="Run MCP SSE-based MarkItDown server")
+    parser = argparse.ArgumentParser(description="Run a MarkItDown MCP server")
 
+    parser.add_argument(
+        "--http",
+        action="store_true",
+        help="Run the server with Streamable HTTP and SSE transport rather than STDIO (default: False)",
+    )
     parser.add_argument(
         "--sse",
         action="store_true",
-        help="Run the server with SSE transport rather than STDIO (default: False)",
+        help="(Deprecated) An alias for --http (default: False)",
     )
     parser.add_argument(
         "--host", default=None, help="Host to bind to (default: 127.0.0.1)"
@@ -90,11 +95,15 @@ def main():
     )
     args = parser.parse_args()
 
-    if not args.sse and (args.host or args.port):
-        parser.error("Host and port arguments are only valid when using SSE transport.")
+    use_http = args.http or args.sse
+
+    if not use_http and (args.host or args.port):
+        parser.error(
+            "Host and port arguments are only valid when using streamable HTTP or SSE transport (see: --http)."
+        )
         sys.exit(1)
 
-    if args.sse:
+    if use_http:
         starlette_app = create_starlette_app(mcp_server, debug=True)
         uvicorn.run(
             starlette_app,
