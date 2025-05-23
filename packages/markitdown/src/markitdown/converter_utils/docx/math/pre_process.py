@@ -5,8 +5,8 @@ from xml.etree import ElementTree as ET
 
 from bs4 import BeautifulSoup, Tag
 
-from .math.omml_to_latex import convert_omml_element_to_latex
 from .math.latex_symbols import OMML_NAMESPACE
+from .math.omml_to_latex import convert_omml_element_to_latex
 
 MATH_ROOT_TEMPLATE = "".join(
     (
@@ -15,7 +15,7 @@ MATH_ROOT_TEMPLATE = "".join(
         'xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" ',
         'xmlns:o="urn:schemas-microsoft-com:office:office" ',
         'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ',
-        f'xmlns:m="{OMML_NAMESPACE.strip("{").strip("}")}" ',
+        f'xmlns:m="{OMML_NAMESPACE.strip("{}")}" ',  # Use OMML_NAMESPACE here
         'xmlns:v="urn:schemas-microsoft-com:vml" ',
         'xmlns:wp14="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing" ',
         'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" ',
@@ -36,46 +36,29 @@ def _convert_omath_to_latex(tag: Tag) -> str:
     Converts an OMML (Office Math Markup Language) tag to LaTeX format.
 
     Args:
-        tag (Tag): A BeautifulSoup Tag object representing the OMML element.
+        tag (Tag): A BeautifulSoup Tag object representing the OMML element (m:oMath).
 
     Returns:
         str: The LaTeX representation of the OMML element.
     """
-    # Format the tag into a complete XML document string
-    # The input 'tag' is an <m:oMath> BeautifulSoup Tag.
-    # We need to convert its string representation to an ET.Element.
-    omath_xml_string = str(tag)
+    try:
+        # Parse the oMath tag as part of a full XML structure to ensure namespaces are handled correctly.
+        full_xml_for_omath = MATH_ROOT_TEMPLATE.format(str(tag))
+        math_root_et = ET.fromstring(full_xml_for_omath)
 
-    # We need to ensure the namespace is correctly handled by ET.fromstring.
-    # The MATH_ROOT_TEMPLATE already defines the 'm' namespace.
-    # So, we can embed the omath_xml_string within this template.
-    full_xml_string = MATH_ROOT_TEMPLATE.format(omath_xml_string)
-    math_root = ET.fromstring(full_xml_string)
+        # Locate the m:oMath element within the parsed structure.
+        omath_et_element = math_root_et.find(f".//{OMML_NAMESPACE}oMath")
 
-    # Find the 'oMath' element within the XML document
-    # The namespace for m:oMath is defined in OMML_NAMESPACE
-    math_element = math_root.find(f".//{OMML_NAMESPACE}oMath")  # Use .// to find it anywhere if structure is complex
+        if omath_et_element is None:
+            return "[Error: oMath element not found during parsing]"
 
-    if math_element is None:
-        # Fallback or error if oMath element is not found
-        # This might happen if the input 'tag' was not a standard oMath structure
-        # or if MATH_ROOT_TEMPLATE wrapping caused issues.
-        # For robustness, try parsing the tag string directly if it's a simple oMath
-        try:
-            # Attempt to parse the raw tag string, assuming it's a well-formed XML snippet
-            # with namespace declarations if needed, or that ET can infer.
-            # This is less safe if namespaces are not explicit in the tag string.
-            direct_parse_element = ET.fromstring(omath_xml_string)
-            if direct_parse_element.tag == f"{OMML_NAMESPACE}oMath":
-                math_element = direct_parse_element
-            else:
-                return "[OMML Error: oMath element not found in provided tag]"
-        except ET.ParseError:
-            return "[OMML Error: Could not parse oMath tag]"
-
-    # Convert the 'oMath' element to LaTeX using the new function
-    latex = convert_omml_element_to_latex(math_element)  # MODIFIED: Call new function
-    return latex
+        # Convert the oMath element to LaTeX.
+        latex = convert_omml_element_to_latex(omath_et_element)
+        return latex
+    except ET.ParseError:
+        return "[OMML Parse Error in pre_process]"
+    except Exception:
+        return "[OMML Conversion Error in pre_process]"
 
 
 def _get_omath_tag_replacement(tag: Tag, block: bool = False) -> Tag:
@@ -111,15 +94,11 @@ def _replace_equations(tag: Tag):
         ValueError: If the tag is not supported.
     """
     if tag.name == "oMathPara":
-        # Create a new paragraph tag
         p_tag = Tag(name="w:p")
-        # Replace each 'oMath' child tag with its LaTeX equivalent as block equations
         for child_tag in tag.find_all("oMath"):
             p_tag.append(_get_omath_tag_replacement(child_tag, block=True))
-        # Replace the original 'oMathPara' tag with the new paragraph tag
         tag.replace_with(p_tag)
     elif tag.name == "oMath":
-        # Replace the 'oMath' tag with its LaTeX equivalent as inline equation
         tag.replace_with(_get_omath_tag_replacement(tag, block=False))
     else:
         raise ValueError(f"Not supported tag: {tag.name}")
@@ -127,14 +106,7 @@ def _replace_equations(tag: Tag):
 
 def _pre_process_math(content: bytes) -> bytes:
     """
-    Pre-processes the math content in a DOCX -> XML file by converting OMML (Office Math Markup Language) elements to LaTeX.
-    This preprocessed content can be directly replaced in the DOCX file -> XMLs.
-
-    Args:
-        content (bytes): The XML content of the DOCX file as bytes.
-
-    Returns:
-        bytes: The processed content with OMML elements replaced by their LaTeX equivalents, encoded as bytes.
+    Pre-processes the math content in a DOCX -> XML file by converting OMML elements to LaTeX.
     """
     soup = BeautifulSoup(content.decode(), features="xml")
     for tag in soup.find_all("oMathPara"):
@@ -147,19 +119,8 @@ def _pre_process_math(content: bytes) -> bytes:
 def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
     """
     Pre-processes a DOCX file with provided steps.
-
-    The process works by unzipping the DOCX file in memory, transforming specific XML files
-    (such as converting OMML elements to LaTeX), and then zipping everything back into a
-    DOCX file without writing to disk.
-
-    Args:
-        input_docx (BinaryIO): A binary input stream representing the DOCX file.
-
-    Returns:
-        BinaryIO: A binary output stream representing the processed DOCX file.
     """
     output_docx = BytesIO()
-    # The files that need to be pre-processed from .docx
     pre_process_enable_files = [
         "word/document.xml",
         "word/footnotes.xml",
@@ -172,12 +133,10 @@ def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
             for name, content in files.items():
                 if name in pre_process_enable_files:
                     try:
-                        # Pre-process the content
                         updated_content = _pre_process_math(content)
-                        # In the future, if there are more pre-processing steps, they can be added here
                         zip_output.writestr(name, updated_content)
                     except Exception:
-                        # If there is an error in processing the content, write the original content
+                        # If there is an error, write the original content
                         zip_output.writestr(name, content)
                 else:
                     zip_output.writestr(name, content)
