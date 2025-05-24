@@ -77,20 +77,22 @@ class DocxConverter(HtmlConverter):
 
         # Check if page extraction is requested
         extract_pages = kwargs.get("extract_pages", False)
-        
+
         style_map = kwargs.get("style_map", None)
         pre_process_stream = pre_process_docx(file_stream)
-        
+
         # Convert to HTML
         html_result = mammoth.convert_to_html(pre_process_stream, style_map=style_map)
-        
+
         # Convert HTML to markdown
         result = self._html_converter.convert_string(html_result.value, **kwargs)
-        
+
         # Note: DOCX files don't have fixed pages like PDFs.
         # Page breaks depend on rendering settings (margins, font size, etc.)
         # For now, we'll return None for pages even if extract_pages is True
         # This maintains API compatibility while acknowledging the limitation
         pages = None
-        
-        return DocumentConverterResult(markdown=result.markdown, title=result.title, pages=pages)
+
+        return DocumentConverterResult(
+            markdown=result.markdown, title=result.title, pages=pages
+        )

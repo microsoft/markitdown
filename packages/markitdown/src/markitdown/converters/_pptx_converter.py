@@ -80,7 +80,7 @@ class PptxConverter(DocumentConverter):
 
         # Check if page extraction is requested
         extract_pages = kwargs.get("extract_pages", False)
-        
+
         # Perform the conversion
         presentation = pptx.Presentation(file_stream)
         md_content = ""
@@ -157,7 +157,9 @@ class PptxConverter(DocumentConverter):
 
                 # Tables
                 if self._is_table(shape):
-                    slide_content += self._convert_table_to_markdown(shape.table, **kwargs)
+                    slide_content += self._convert_table_to_markdown(
+                        shape.table, **kwargs
+                    )
 
                 # Charts
                 if shape.has_chart:
@@ -200,13 +202,15 @@ class PptxConverter(DocumentConverter):
                 if notes_frame is not None:
                     slide_content += notes_frame.text
                 slide_content = slide_content.strip()
-            
+
             # Add to overall content
             md_content += slide_content
-            
+
             # If extracting pages, add to pages list
             if extract_pages:
-                pages.append(PageInfo(page_number=slide_num, content=slide_content.strip()))
+                pages.append(
+                    PageInfo(page_number=slide_num, content=slide_content.strip())
+                )
 
         return DocumentConverterResult(markdown=md_content.strip(), pages=pages)
 
