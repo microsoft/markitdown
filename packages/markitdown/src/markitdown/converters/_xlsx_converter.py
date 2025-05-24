@@ -84,7 +84,7 @@ class XlsxConverter(DocumentConverter):
         md_content = ""
         for s in sheets:
             md_content += f"## {s}\n"
-            html_content = sheets[s].to_html(index=False)
+            html_content = sheets[s].to_html(index=False, na_rep="")
             md_content += (
                 self._html_converter.convert_string(
                     html_content, **kwargs
@@ -146,7 +146,7 @@ class XlsConverter(DocumentConverter):
         md_content = ""
         for s in sheets:
             md_content += f"## {s}\n"
-            html_content = sheets[s].to_html(index=False)
+            html_content = sheets[s].to_html(index=False, na_rep="")
             md_content += (
                 self._html_converter.convert_string(
                     html_content, **kwargs
