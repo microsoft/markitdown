@@ -4,11 +4,11 @@ from ._stream_info import StreamInfo
 
 class PageInfo:
     """Information about a specific page in a document."""
-    
+
     def __init__(self, page_number: int, content: str):
         """
         Initialize page information.
-        
+
         Parameters:
         - page_number: The page number (1-indexed)
         - content: The markdown content of the page

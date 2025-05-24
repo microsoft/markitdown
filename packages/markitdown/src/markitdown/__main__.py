@@ -217,8 +217,8 @@ def main():
         )
     else:
         result = markitdown.convert(
-            args.filename, 
-            stream_info=stream_info, 
+            args.filename,
+            stream_info=stream_info,
             keep_data_uris=args.keep_data_uris,
             extract_pages=args.extract_pages,
         )
@@ -229,20 +229,17 @@ def main():
 def _handle_output(args, result: DocumentConverterResult):
     """Handle output to stdout or file"""
     output_content = ""
-    
+
     if args.extract_pages and result.pages and args.pages_json:
         # Output as JSON with page information
         pages_data = [
-            {
-                "page_number": page.page_number,
-                "content": page.content
-            }
+            {"page_number": page.page_number, "content": page.content}
             for page in result.pages
         ]
         output_data = {
             "markdown": result.markdown,
             "title": result.title,
-            "pages": pages_data
+            "pages": pages_data,
         }
         output_content = json.dumps(output_data, ensure_ascii=False, indent=2)
     elif args.extract_pages and result.pages:
@@ -251,7 +248,7 @@ def _handle_output(args, result: DocumentConverterResult):
         output_content += "\n\n" + "=" * 50 + "\n"
         output_content += f"EXTRACTED {len(result.pages)} PAGES:\n"
         output_content += "=" * 50 + "\n\n"
-        
+
         for page in result.pages:
             output_content += f"--- PAGE {page.page_number} ---\n"
             output_content += page.content
@@ -259,7 +256,7 @@ def _handle_output(args, result: DocumentConverterResult):
     else:
         # Standard output
         output_content = result.markdown
-    
+
     if args.output:
         with open(args.output, "w", encoding="utf-8") as f:
             f.write(output_content)
