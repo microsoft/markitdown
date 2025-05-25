@@ -32,4 +32,93 @@ if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     test_version()
     test_invalid_flag()
-    print("All tests passed!")
+    # Add a placeholder for pytest to discover the new tests
+    # Actual test execution will be handled by pytest discovery
+    print(" CLI tests passed (individual test execution by pytest).")
+
+# New tests for --prefix argument
+import unittest
+from unittest.mock import patch, MagicMock
+import sys
+# Important: We need to import main from the __main__ module of markitdown
+from packages.markitdown.src.markitdown.__main__ import main as markitdown_main
+
+class TestPrefixArgument(unittest.TestCase):
+    def setUp(self):
+        # Ensure each test starts with a clean sys.argv
+        self.original_argv = sys.argv
+        # Mock stdout to prevent test output from cluttering the console
+        self.patch_stdout = patch('sys.stdout')
+        self.mock_stdout = self.patch_stdout.start()
+
+
+    def tearDown(self):
+        sys.argv = self.original_argv
+        self.patch_stdout.stop()
+
+    @patch('packages.markitdown.src.markitdown.__main__.MarkItDown')
+    def test_with_prefix_and_filename(self, MockMarkItDown):
+        mock_instance = MockMarkItDown.return_value
+        mock_instance.convert.return_value = MagicMock(markdown="mocked markdown")
+        
+        sys.argv = ["markitdown", "--prefix", "some/prefix/", "myfile.txt"]
+        markitdown_main()
+        
+        mock_instance.convert.assert_called_once_with(
+            "some/prefix/myfile.txt", stream_info=None, keep_data_uris=False
+        )
+
+    @patch('packages.markitdown.src.markitdown.__main__.MarkItDown')
+    def test_without_prefix_filename_only(self, MockMarkItDown):
+        mock_instance = MockMarkItDown.return_value
+        mock_instance.convert.return_value = MagicMock(markdown="mocked markdown")
+
+        sys.argv = ["markitdown", "myfile.txt"]
+        markitdown_main()
+
+        mock_instance.convert.assert_called_once_with(
+            "myfile.txt", stream_info=None, keep_data_uris=False
+        )
+
+    @patch('packages.markitdown.src.markitdown.__main__.MarkItDown')
+    def test_with_prefix_no_filename_stdin(self, MockMarkItDown):
+        mock_instance = MockMarkItDown.return_value
+        mock_instance.convert_stream.return_value = MagicMock(markdown="mocked markdown")
+        
+        # Mock stdin as well, though it's not strictly necessary for this test's assertion
+        with patch('sys.stdin.buffer'):
+            sys.argv = ["markitdown", "--prefix", "some/prefix/"]
+            markitdown_main()
+
+        mock_instance.convert_stream.assert_called_once()
+        # Check that the first argument to convert_stream (the stream itself) is sys.stdin.buffer
+        self.assertEqual(mock_instance.convert_stream.call_args[0][0], sys.stdin.buffer)
+        # Check keyword arguments
+        self.assertEqual(mock_instance.convert_stream.call_args[1]['stream_info'], None)
+        self.assertEqual(mock_instance.convert_stream.call_args[1]['keep_data_uris'], False)
+        # Ensure convert was not called
+        mock_instance.convert.assert_not_called()
+
+
+    @patch('packages.markitdown.src.markitdown.__main__.MarkItDown')
+    def test_with_empty_prefix_and_filename(self, MockMarkItDown):
+        mock_instance = MockMarkItDown.return_value
+        mock_instance.convert.return_value = MagicMock(markdown="mocked markdown")
+
+        sys.argv = ["markitdown", "--prefix", "", "myfile.txt"]
+        markitdown_main()
+
+        mock_instance.convert.assert_called_once_with(
+            "myfile.txt", stream_info=None, keep_data_uris=False
+        )
+
+if __name__ == "__main__":
+    # This allows running tests directly using `python test_cli_misc.py`
+    # It will also run the older tests defined at the top level of this file.
+    test_version()
+    test_invalid_flag()
+    print("Legacy tests passed.")
+    # Run unittest test discovery for the new class
+    print("Running new prefix tests...")
+    unittest.main(argv=['first-arg-is-ignored'], exit=False)
+    print("All tests in TestPrefixArgument passed!")

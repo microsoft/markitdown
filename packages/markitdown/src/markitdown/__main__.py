@@ -112,7 +112,18 @@ def main():
     )
 
     parser.add_argument("filename", nargs="?")
+
+    parser.add_argument(
+        "--prefix",
+        type=str,
+        help="A string to prepend to the input filename/URI.",
+    )
+
     args = parser.parse_args()
+
+    # Apply prefix if provided
+    if args.prefix and args.filename:
+        args.filename = args.prefix + args.filename
 
     # Parse the extension hint
     extension_hint = args.extension
