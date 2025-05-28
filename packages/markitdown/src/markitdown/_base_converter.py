@@ -1,5 +1,20 @@
-from typing import Any, BinaryIO, Optional
+from typing import Any, BinaryIO, Optional, List
 from ._stream_info import StreamInfo
+
+
+class PageInfo:
+    """Information about a specific page in a document."""
+
+    def __init__(self, page_number: int, content: str):
+        """
+        Initialize page information.
+
+        Parameters:
+        - page_number: The page number (1-indexed)
+        - content: The markdown content of the page
+        """
+        self.page_number = page_number
+        self.content = content
 
 
 class DocumentConverterResult:
@@ -10,19 +25,22 @@ class DocumentConverterResult:
         markdown: str,
         *,
         title: Optional[str] = None,
+        pages: Optional[List[PageInfo]] = None,
     ):
         """
         Initialize the DocumentConverterResult.
 
         The only required parameter is the converted Markdown text.
-        The title, and any other metadata that may be added in the future, are optional.
+        The title, pages, and any other metadata that may be added in the future, are optional.
 
         Parameters:
         - markdown: The converted Markdown text.
         - title: Optional title of the document.
+        - pages: Optional list of page information for documents with page structure.
         """
         self.markdown = markdown
         self.title = title
+        self.pages = pages
 
     @property
     def text_content(self) -> str:
@@ -69,7 +87,7 @@ class DocumentConverter:
         data = file_stream.read(100) # ... peek at the first 100 bytes, etc.
         file_stream.seek(cur_pos)    # Reset the position to the original position
 
-        Prameters:
+        Parameters:
         - file_stream: The file-like object to convert. Must support seek(), tell(), and read() methods.
         - stream_info: The StreamInfo object containing metadata about the file (mimetype, extension, charset, set)
         - kwargs: Additional keyword arguments for the converter.
@@ -90,7 +108,7 @@ class DocumentConverter:
         """
         Convert a document to Markdown text.
 
-        Prameters:
+        Parameters:
         - file_stream: The file-like object to convert. Must support seek(), tell(), and read() methods.
         - stream_info: The StreamInfo object containing metadata about the file (mimetype, extension, charset, set)
         - kwargs: Additional keyword arguments for the converter.
