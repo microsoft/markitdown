@@ -19,6 +19,13 @@ except ImportError:
     # Preserve the error and stack trace for later
     _dependency_exc_info = sys.exc_info()
 
+# Try to import pytesseract and pdf2image for OCR
+_ocr_dependency_exc_info = None
+try:
+    import pytesseract
+    from pdf2image import convert_from_bytes
+except ImportError:
+    _ocr_dependency_exc_info = sys.exc_info()
 
 ACCEPTED_MIME_TYPE_PREFIXES = [
     "application/pdf",
@@ -57,7 +64,7 @@ class PdfConverter(DocumentConverter):
         stream_info: StreamInfo,
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
-        # Check the dependencies
+        # Check dependencies
         if _dependency_exc_info is not None:
             raise MissingDependencyException(
                 MISSING_DEPENDENCY_MESSAGE.format(
@@ -65,13 +72,24 @@ class PdfConverter(DocumentConverter):
                     extension=".pdf",
                     feature="pdf",
                 )
-            ) from _dependency_exc_info[
-                1
-            ].with_traceback(  # type: ignore[union-attr]
-                _dependency_exc_info[2]
-            )
+            ) from _dependency_exc_info[1].with_traceback(_dependency_exc_info[2])
 
-        assert isinstance(file_stream, io.IOBase)  # for mypy
-        return DocumentConverterResult(
-            markdown=pdfminer.high_level.extract_text(file_stream),
-        )
+        # Try to extract text with pdfminer
+        file_stream.seek(0)
+        text = pdfminer.high_level.extract_text(file_stream)
+        if text and text.strip():
+            return DocumentConverterResult(markdown=text)
+
+        # If no text found, fall back to OCR
+        if _ocr_dependency_exc_info is not None:
+            raise MissingDependencyException(
+                "OCR dependencies are missing. Please install pytesseract and pdf2image for OCR support."
+            ) from _ocr_dependency_exc_info[1].with_traceback(_ocr_dependency_exc_info[2])
+
+        file_stream.seek(0)
+        images = convert_from_bytes(file_stream.read())
+        ocr_text = []
+        for img in images:
+            ocr_text.append(pytesseract.image_to_string(img))
+        ocr_output = "\n\n".join(ocr_text)
+        return DocumentConverterResult(markdown=ocr_output)
