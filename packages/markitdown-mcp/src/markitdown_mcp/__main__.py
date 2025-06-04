@@ -18,9 +18,9 @@ mcp = FastMCP("markitdown")
 
 
 @mcp.tool()
-async def convert_to_markdown(uri: str) -> str:
+async def convert_to_markdown(uri: str, keep_data_uris: bool = False) -> str:
     """Convert a resource described by an http:, https:, file: or data: URI to markdown"""
-    return MarkItDown(enable_plugins=check_plugins_enabled()).convert_uri(uri).markdown
+    return MarkItDown(enable_plugins=check_plugins_enabled()).convert_uri(uri, keep_data_uris=keep_data_uris).markdown
 
 
 def check_plugins_enabled() -> bool:
