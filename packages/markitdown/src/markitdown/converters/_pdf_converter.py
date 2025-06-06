@@ -71,19 +71,11 @@ class PdfConverter(DocumentConverter):
         markdown = pdfminer.high_level.extract_text(file_stream)
 
         if not markdown:
-            # Try describing the image with LLM
+            # Try to leverage LLM OCR capabilities when PDF is not searchable
             llm_client = kwargs.get("llm_client")
             llm_model = kwargs.get("llm_model")
             if llm_client is not None and llm_model is not None:
-                llm_prompt = """You are an expert data entry and document analysis AI. Your task is to analyze
-                                the provided image, understand its content and context, and produce a perfectly
-                                structured Markdown document from the text within it.
-                                Retain the structure of the original content, ensuring that sections, titles,
-                                and important details are clearly separated. If the image contains any tables or
-                                code snippets, format them correctly to preserve their meaning.
-                                Review your generated Markdown to ensure it is a clean, accurate, and highly readable
-                                representation of the original image's textual content.
-                                The final output should only be the formatted Markdown text."""
+                llm_prompt = "You are an expert data entry and document analysis AI. Your task is to analyze the provided image, understand its content and context, and produce a perfectly structured Markdown document from the text within it. Retain the structure of the original content, ensuring that sections, titles, and important details are clearly separated. If the image contains any tables or code snippets, format them correctly to preserve their meaning. Review your generated Markdown to ensure it is a clean, accurate, and highly readable representation of the original image's textual content. The final output should only be the formatted Markdown text."
                 markdown = llm_caption(
                     file_stream,
                     stream_info,
