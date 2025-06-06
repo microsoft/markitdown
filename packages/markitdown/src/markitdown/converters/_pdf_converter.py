@@ -1,5 +1,4 @@
 import sys
-import io
 
 from typing import BinaryIO, Any
 
@@ -7,7 +6,7 @@ from typing import BinaryIO, Any
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
-
+from ._llm_caption import llm_caption
 
 # Try loading optional (but in this case, required) dependencies
 # Save reporting of any exceptions for later
@@ -65,13 +64,32 @@ class PdfConverter(DocumentConverter):
                     extension=".pdf",
                     feature="pdf",
                 )
-            ) from _dependency_exc_info[
-                1
-            ].with_traceback(  # type: ignore[union-attr]
+            ) from _dependency_exc_info[1].with_traceback(  # type: ignore[union-attr]
                 _dependency_exc_info[2]
             )
 
-        assert isinstance(file_stream, io.IOBase)  # for mypy
-        return DocumentConverterResult(
-            markdown=pdfminer.high_level.extract_text(file_stream),
-        )
+        markdown = pdfminer.high_level.extract_text(file_stream)
+
+        if not markdown:
+            # Try describing the image with LLM
+            llm_client = kwargs.get("llm_client")
+            llm_model = kwargs.get("llm_model")
+            if llm_client is not None and llm_model is not None:
+                llm_prompt = """You are an expert data entry and document analysis AI. Your task is to analyze
+                                the provided image, understand its content and context, and produce a perfectly
+                                structured Markdown document from the text within it.
+                                Retain the structure of the original content, ensuring that sections, titles,
+                                and important details are clearly separated. If the image contains any tables or
+                                code snippets, format them correctly to preserve their meaning.
+                                Review your generated Markdown to ensure it is a clean, accurate, and highly readable
+                                representation of the original image's textual content.
+                                The final output should only be the formatted Markdown text."""
+                markdown = llm_caption(
+                    file_stream,
+                    stream_info,
+                    client=llm_client,
+                    model=llm_model,
+                    prompt=llm_prompt,
+                )
+
+        return DocumentConverterResult(markdown=str(markdown))
