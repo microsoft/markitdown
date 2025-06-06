@@ -75,7 +75,12 @@ class PdfConverter(DocumentConverter):
             llm_client = kwargs.get("llm_client")
             llm_model = kwargs.get("llm_model")
             if llm_client is not None and llm_model is not None:
-                llm_prompt = "You are an expert data entry and document analysis AI. Your task is to analyze the provided image, understand its content and context, and produce a perfectly structured Markdown document from the text within it. Retain the structure of the original content, ensuring that sections, titles, and important details are clearly separated. If the image contains any tables or code snippets, format them correctly to preserve their meaning. Review your generated Markdown to ensure it is a clean, accurate, and highly readable representation of the original image's textual content. The final output should only be the formatted Markdown text."
+                llm_prompt = """You are an advanced document extraction AI. Your task is to analyze the provided
+                document, understand its content and context, and produce a perfectly structured Markdown document
+                from the text within it. Do not translate neither generate new text. Retain the structure of the
+                original content, ensuring that sections, titles, headers and important details are clearly separated.
+                If the image contains any tables, lists and code snippets format them correctly to preserve their
+                original meaning. The output should only valid Markdown."""
                 markdown = llm_caption(
                     file_stream,
                     stream_info,
