@@ -530,7 +530,11 @@ class PdfConverter(DocumentConverter):
                     extension=".pdf",
                     feature="pdf",
                 )
+<<<<<<< HEAD
             ) from _dependency_exc_info[1].with_traceback(
+=======
+            ) from _dependency_exc_info[1].with_traceback(  # type: ignore[union-attr]
+>>>>>>> 117ffa2 (Extending LLM usage for PDFs where the extracted text was empty with pdfminer)
                 _dependency_exc_info[2]
             )  # type: ignore[union-attr]
 
