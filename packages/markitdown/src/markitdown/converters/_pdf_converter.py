@@ -584,8 +584,18 @@ class PdfConverter(DocumentConverter):
 
         # Fallback if still empty
         if not markdown:
-            pdf_bytes.seek(0)
-            markdown = pdfminer.high_level.extract_text(pdf_bytes)
+            # Try to leverage LLM OCR capabilities when PDF is not searchable
+            llm_client = kwargs.get("llm_client")
+            llm_model = kwargs.get("llm_model")
+            if llm_client is not None and llm_model is not None:
+                llm_prompt = "You are an expert data entry and document analysis AI. Your task is to analyze the provided image, understand its content and context, and produce a perfectly structured Markdown document from the text within it. Retain the structure of the original content, ensuring that sections, titles, and important details are clearly separated. If the image contains any tables or code snippets, format them correctly to preserve their meaning. Review your generated Markdown to ensure it is a clean, accurate, and highly readable representation of the original image's textual content. The final output should only be the formatted Markdown text."
+                markdown = llm_caption(
+                    file_stream,
+                    stream_info,
+                    client=llm_client,
+                    model=llm_model,
+                    prompt=llm_prompt,
+                )
 
         # Post-process to merge MasterFormat-style partial numbering with following text
         markdown = _merge_partial_numbering_lines(markdown)
