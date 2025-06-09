@@ -107,5 +107,18 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
 
         return "![%s](%s%s)" % (alt, src, title_part)
 
+    def convert_input(
+        self,
+        el: Any,
+        text: str,
+        convert_as_inline: Optional[bool] = False,
+        **kwargs,
+    ) -> str:
+        """Convert checkboxes to Markdown [x]/[ ] syntax."""
+
+        if el.get("type") == "checkbox":
+            return "[x] " if el.has_attr("checked") else "[ ] "
+        return ""
+
     def convert_soup(self, soup: Any) -> str:
         return super().convert_soup(soup)  # type: ignore
