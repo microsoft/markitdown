@@ -68,19 +68,20 @@ class PdfConverter(DocumentConverter):
                 _dependency_exc_info[2]
             )
 
+        cur_pos = file_stream.tell()
         markdown = pdfminer.high_level.extract_text(file_stream)
-
-        if not markdown:
+        if markdown.strip() == "":
             # Try to leverage LLM OCR capabilities when PDF is not searchable
             llm_client = kwargs.get("llm_client")
             llm_model = kwargs.get("llm_model")
-            if llm_client is not None and llm_model is not None:
+            if llm_client and llm_model:
+                file_stream.seek(cur_pos)
                 llm_prompt = """You are an advanced document extraction AI. Your task is to analyze the provided
                 document, understand its content and context, and produce a perfectly structured Markdown document
                 from the text within it. Do not translate neither generate new text. Retain the structure of the
                 original content, ensuring that sections, titles, headers and important details are clearly separated.
                 If the image contains any tables, lists and code snippets format them correctly to preserve their
-                original meaning. The output should only valid Markdown."""
+                original meaning. Only a valid Markdown-formatted output is allowed."""
                 markdown = llm_caption(
                     file_stream,
                     stream_info,
