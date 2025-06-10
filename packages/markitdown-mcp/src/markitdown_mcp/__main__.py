@@ -16,11 +16,14 @@ import uvicorn
 # Initialize FastMCP server for MarkItDown (SSE)
 mcp = FastMCP("markitdown")
 
+# Global variable for keep_data_uris setting
+KEEP_DATA_URIS = False
+
 
 @mcp.tool()
-async def convert_to_markdown(uri: str, keep_data_uris: bool = False) -> str:
+async def convert_to_markdown(uri: str) -> str:
     """Convert a resource described by an http:, https:, file: or data: URI to markdown"""
-    return MarkItDown(enable_plugins=check_plugins_enabled()).convert_uri(uri, keep_data_uris=keep_data_uris).markdown
+    return MarkItDown(enable_plugins=check_plugins_enabled()).convert_uri(uri, keep_data_uris=KEEP_DATA_URIS).markdown
 
 
 def check_plugins_enabled() -> bool:
@@ -81,6 +84,7 @@ def create_starlette_app(mcp_server: Server, *, debug: bool = False) -> Starlett
 # Main entry point
 def main():
     import argparse
+    global KEEP_DATA_URIS
 
     mcp_server = mcp._mcp_server
 
@@ -102,7 +106,15 @@ def main():
     parser.add_argument(
         "--port", type=int, default=None, help="Port to listen on (default: 3001)"
     )
+    parser.add_argument(
+        "--keep-data-uris",
+        action="store_true",
+        help="Keep data URIs in the converted markdown (default: False)",
+    )
     args = parser.parse_args()
+
+    # Set global variable based on command line argument
+    KEEP_DATA_URIS = args.keep_data_uris
 
     use_http = args.http or args.sse
 
