@@ -15,7 +15,7 @@
 
 MarkItDown is a lightweight Python utility for converting various files to Markdown for use with LLMs and related text analysis pipelines. To this end, it is most comparable to [textract](https://github.com/deanmalmgren/textract), but with a focus on preserving important document structure and content as Markdown (including: headings, lists, tables, links, etc.) While the output is often reasonably presentable and human-friendly, it is meant to be consumed by text analysis tools -- and may not be the best option for high-fidelity document conversions for human consumption.
 
-At present, MarkItDown supports:
+MarkItDown currently supports the conversion from:
 
 - PDF
 - PowerPoint
@@ -38,6 +38,31 @@ OpenAI's GPT-4o, natively "_speak_" Markdown, and often incorporate Markdown int
 responses unprompted. This suggests that they have been trained on vast amounts of
 Markdown-formatted text, and understand it well. As a side benefit, Markdown conventions
 are also highly token-efficient.
+
+## Prerequisites
+MarkItDown requires Python 3.10 or higher. It is recommended to use a virtual environment to avoid dependency conflicts.
+
+With the standard Python installation, you can create and activate a virtual environment using the following commands:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+```
+
+If using `uv`, you can create a virtual environment with:
+
+```bash
+uv venv --python=3.12 .venv
+source .venv/bin/activate
+# NOTE: Be sure to use 'uv pip install' rather than just 'pip install' to install packages in this virtual environment
+```
+
+If you are using Anaconda, you can create a virtual environment with:
+
+```bash
+conda create -n markitdown python=3.12
+conda activate markitdown
+```
 
 ## Installation
 
