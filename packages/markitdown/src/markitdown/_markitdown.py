@@ -12,7 +12,10 @@ from pathlib import Path
 from urllib.parse import urlparse
 from warnings import warn
 import requests
-import magika
+try:
+    import magika  # Optional dependency for file-type detection
+except Exception:  # pragma: no cover  # noqa: E722
+    magika = None  # type: ignore
 import charset_normalizer
 import codecs
 
@@ -110,7 +113,11 @@ class MarkItDown:
         else:
             self._requests_session = requests_session
 
-        self._magika = magika.Magika()
+        # Initialize Magika if available, otherwise set to None
+        if magika is not None:
+            self._magika = magika.Magika()
+        else:
+            self._magika = None
 
         # TODO - remove these (see enable_builtins)
         self._llm_client: Any = None
@@ -683,21 +690,28 @@ class MarkItDown:
             if len(_e) > 0:
                 enhanced_guess = enhanced_guess.copy_and_update(extension=_e[0])
 
-        # Call magika to guess from the stream
+        # Call magika to guess from the stream (if available)
         cur_pos = file_stream.tell()
-        try:
-            result = self._magika.identify_stream(file_stream)
-            if result.status == "ok" and result.prediction.output.label != "unknown":
-                # If it's text, also guess the charset
-                charset = None
-                if result.prediction.output.is_text:
-                    # Read the first 4k to guess the charset
-                    file_stream.seek(cur_pos)
-                    stream_page = file_stream.read(4096)
-                    charset_result = charset_normalizer.from_bytes(stream_page).best()
+        if self._magika is not None:
+            try:
+                result = self._magika.identify_stream(file_stream)
+            except Exception:
+                # If Magika fails unexpectedly, fall back to mimetype guesses only
+                result = None
+        else:
+            result = None
 
-                    if charset_result is not None:
-                        charset = self._normalize_charset(charset_result.encoding)
+        if result and result.status == "ok" and result.prediction.output.label != "unknown":
+            # If it's text, also guess the charset
+            charset = None
+            if result.prediction.output.is_text:
+                # Read the first 4k to guess the charset
+                file_stream.seek(cur_pos)
+                stream_page = file_stream.read(4096)
+                charset_result = charset_normalizer.from_bytes(stream_page).best()
+
+                if charset_result is not None:
+                    charset = self._normalize_charset(charset_result.encoding)
 
                 # Normalize the first extension listed
                 guessed_extension = None
