@@ -238,7 +238,7 @@ GENERAL_TEST_VECTORS = [
 ]
 
 EMBEDDED_IMG_TEST_VECTORS = [
-        FileTestVector(
+    FileTestVector(
         filename="test.docx",
         mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         charset=None,

@@ -9,19 +9,26 @@ from openai import AzureOpenAI
 from pathlib import Path
 
 if __name__ == "__main__":
-    from _test_vectors import GENERAL_TEST_VECTORS, DATA_URI_TEST_VECTORS, EMBEDDED_IMG_TEST_VECTORS
+    from _test_vectors import (
+        GENERAL_TEST_VECTORS,
+        DATA_URI_TEST_VECTORS,
+        EMBEDDED_IMG_TEST_VECTORS,
+    )
+
     load_dotenv()  # Load environment variables for LLM configuration
 else:
-    from ._test_vectors import GENERAL_TEST_VECTORS, DATA_URI_TEST_VECTORS, EMBEDDED_IMG_TEST_VECTORS
+    from ._test_vectors import (
+        GENERAL_TEST_VECTORS,
+        DATA_URI_TEST_VECTORS,
+        EMBEDDED_IMG_TEST_VECTORS,
+    )
 
 from markitdown import (
     MarkItDown,
     StreamInfo,
 )
 
-use_llm = (
-    True if os.environ.get("LLM_MODEL") else False
-)  # Don't run these tests in CI
+use_llm = True if os.environ.get("LLM_MODEL") else False  # Don't run these tests in CI
 
 skip_remote = (
     True if os.environ.get("GITHUB_ACTIONS") else False
@@ -82,31 +89,32 @@ def test_convert_local(test_vector):
 )
 def test_convert_local_with_embedded_images(test_vector):
     """Test the conversion of a local file with embedded images."""
-    
+
     llm_model = os.environ.get("LLM_MODEL")
     llm_prompt = os.environ.get("LLM_PROMPT", "Describe this image in detail.")
     client = AzureOpenAI(
-        api_key=os.getenv("API_KEY"),  
+        api_key=os.getenv("API_KEY"),
         api_version=os.getenv("API_VERSION"),
-        azure_endpoint=os.getenv("ENDPOINT")
+        azure_endpoint=os.getenv("ENDPOINT"),
     )
-    
+
     kwargs = {
         "llm_client": client,
         "llm_model": llm_model,
-        "llm_prompt": llm_prompt,  
+        "llm_prompt": llm_prompt,
     }
     markitdown = MarkItDown(**kwargs)
 
     result = markitdown.convert(
         os.path.join(TEST_FILES_DIR, test_vector.filename),
         url=test_vector.url,
-        **kwargs
+        **kwargs,
     )
     for string in test_vector.must_include:
         assert string in result.markdown
     for string in test_vector.must_not_include:
         assert string not in result.markdown
+
 
 @pytest.mark.parametrize("test_vector", GENERAL_TEST_VECTORS)
 def test_convert_stream_with_hints(test_vector):
@@ -246,13 +254,15 @@ if __name__ == "__main__":
     if use_llm:
         print("Running embedded image tests with LLM...")
         for test_vector in EMBEDDED_IMG_TEST_VECTORS:
-            print(f"Running test_convert_local_with_embedded_images on {test_vector.filename}...", end="")
+            print(
+                f"Running test_convert_local_with_embedded_images on {test_vector.filename}...",
+                end="",
+            )
             test_convert_local_with_embedded_images(test_vector)
             print("OK")
     else:
         print("Skipping embedded image tests - LLM_MODEL not configured")
-    
-    
+
     # General tests
     for test_function in [
         test_guess_stream_info,
@@ -281,5 +291,5 @@ if __name__ == "__main__":
             )
             test_function(test_vector)
             print("OK")
- 
+
     print("All tests passed!")
