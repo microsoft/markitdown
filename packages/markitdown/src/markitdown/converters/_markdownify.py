@@ -18,16 +18,17 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
     def __init__(self, **options: Any):
         options["heading_style"] = options.get("heading_style", markdownify.ATX)
         options["keep_data_uris"] = options.get("keep_data_uris", False)
+        options["url"] = options.get("url", None)
         # Explicitly cast options to the expected type if necessary
         super().__init__(**options)
 
     def convert_hn(
-        self,
-        n: int,
-        el: Any,
-        text: str,
-        convert_as_inline: Optional[bool] = False,
-        **kwargs,
+            self,
+            n: int,
+            el: Any,
+            text: str,
+            convert_as_inline: Optional[bool] = False,
+            **kwargs,
     ) -> str:
         """Same as usual, but be sure to start with a new line"""
         if not convert_as_inline:
@@ -37,11 +38,11 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         return super().convert_hn(n, el, text, convert_as_inline)  # type: ignore
 
     def convert_a(
-        self,
-        el: Any,
-        text: str,
-        convert_as_inline: Optional[bool] = False,
-        **kwargs,
+            self,
+            el: Any,
+            text: str,
+            convert_as_inline: Optional[bool] = False,
+            **kwargs,
     ):
         """Same as usual converter, but removes Javascript links and escapes URIs."""
         prefix, suffix, text = markdownify.chomp(text)  # type: ignore
@@ -52,6 +53,7 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
             return text
 
         href = el.get("href")
+        href = self.convert_relative_to_absolute_path(href)
         title = el.get("title")
 
         # Escape URIs and skip non-http or file schemes
@@ -66,10 +68,10 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
 
         # For the replacement see #29: text nodes underscores are escaped
         if (
-            self.options["autolinks"]
-            and text.replace(r"\_", "_") == href
-            and not title
-            and not self.options["default_title"]
+                self.options["autolinks"]
+                and text.replace(r"\_", "_") == href
+                and not title
+                and not self.options["default_title"]
         ):
             # Shortcut syntax
             return "<%s>" % href
@@ -83,11 +85,11 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         )
 
     def convert_img(
-        self,
-        el: Any,
-        text: str,
-        convert_as_inline: Optional[bool] = False,
-        **kwargs,
+            self,
+            el: Any,
+            text: str,
+            convert_as_inline: Optional[bool] = False,
+            **kwargs,
     ) -> str:
         """Same as usual converter, but removes data URIs"""
 
@@ -96,8 +98,8 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         title = el.attrs.get("title", None) or ""
         title_part = ' "%s"' % title.replace('"', r"\"") if title else ""
         if (
-            convert_as_inline
-            and el.parent.name not in self.options["keep_inline_images_in"]
+                convert_as_inline
+                and el.parent.name not in self.options["keep_inline_images_in"]
         ):
             return alt
 
@@ -105,7 +107,40 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         if src.startswith("data:") and not self.options["keep_data_uris"]:
             src = src.split(",")[0] + "..."
 
+        src = self.convert_relative_to_absolute_path(src)
+
         return "![%s](%s%s)" % (alt, src, title_part)
+
+    def convert_relative_to_absolute_path(self, path: str) -> str:
+        """
+        Convert a relative path to an absolute path based on the current URL.
+        """
+        if not path or not self.options["url"]:
+            return path
+
+        try:
+            parsed_url = urlparse(path)
+            if parsed_url.netloc:
+                return path
+
+            parsed_base = urlparse(self.options["url"])
+            if path.startswith("/"):
+                new_path = path
+            else:
+                base_path = parsed_base.path.rsplit("/", 1)[0] if parsed_base.path else ""
+                new_path = f"{base_path}/{path}"
+
+            # Handle path normalization: remove redundant slashes and dots
+            normalized_path = re.sub(r'(?<!:)/{2,}', '/', new_path.replace("\\", "/"))
+            
+            # Security note: Consider validating or sanitizing normalized_path before use
+            # in case of path traversal attempts (e.g., ../../etc/passwd)
+            
+            return parsed_base._replace(path=normalized_path).geturl()
+        except Exception as e:
+            # Improve logging with specific error type and message for easier debugging
+            # Example: logging.warning(f"Path conversion error: {type(e).__name__}: {str(e)}")
+            return path
 
     def convert_soup(self, soup: Any) -> str:
         return super().convert_soup(soup)  # type: ignore
