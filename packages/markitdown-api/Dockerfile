@@ -28,4 +28,4 @@ USER $USERID:$GROUPID
 
 EXPOSE 8000
 
-CMD ["uvicorn", "markitdown_api.__main__:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "markitdown_api.app:app", "--host", "0.0.0.0", "--port", "8000"]

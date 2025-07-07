@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 from io import BytesIO
 
 from markitdown import StreamInfo
-from markitdown_api.commons import OpenAIOptions, ConvertResponse, _build_markitdown
+from markitdown_api.commons import OpenAIOptions, ConvertResult, _build_markitdown
 
 TAG = "Convert Text"
 
@@ -20,7 +20,7 @@ router = APIRouter(
 )
 
 
-@router.post(path="/", response_model=ConvertResponse)
+@router.post(path="/", response_model=ConvertResult)
 async def convert_text(request: ConvertTextRequest):
     if not request.text or len(request.text) > 100_000:
         raise HTTPException(status_code=400, detail="Invalid input text length")

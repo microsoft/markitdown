@@ -7,7 +7,7 @@ from starlette.responses import Response
 from markitdown import MarkItDown
 
 
-class ConvertResponse(BaseModel):
+class ConvertResult(BaseModel):
     title: Optional[str]
     markdown: str
 

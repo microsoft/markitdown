@@ -5,7 +5,7 @@ from fastapi import APIRouter, UploadFile, File, Form
 from pydantic import BaseModel, Field
 
 from markitdown import StreamInfo
-from markitdown_api.commons import OpenAIOptions, ConvertResponse, _build_markitdown, MarkdownResponse
+from markitdown_api.commons import OpenAIOptions, ConvertResult, _build_markitdown, MarkdownResponse
 
 TAG = "Convert File"
 
@@ -25,16 +25,16 @@ def _convert_file(file: Annotated[UploadFile, File()],
                   openai_api_key: Annotated[str, Form()] = "",
                   openai_model: Annotated[str, Form()] = "",
                   openai_prompt: Annotated[str, Form()] = "",
-                  ) -> ConvertResponse:
+                  ) -> ConvertResult:
     stream_info = StreamInfo(mimetype=file.content_type)
     openai_options = OpenAIOptions(api_key=openai_api_key, base_url=openai_base_url, model=openai_model,
                                    prompt=openai_prompt)
     with BufferedReader(file.file) as buffered_reader:
         convert_result = _build_markitdown(openai_options).convert_stream(buffered_reader, stream_info=stream_info)
-        return ConvertResponse(title=convert_result.title, markdown=convert_result.markdown)
+        return ConvertResult(title=convert_result.title, markdown=convert_result.markdown)
 
 
-@router.post(path="/", response_model=ConvertResponse)
+@router.post(path="/", response_model=ConvertResult)
 async def convert_file(file: Annotated[UploadFile, File()],
                        openai_base_url: Annotated[str, Form()] = "",
                        openai_api_key: Annotated[str, Form()] = "",
