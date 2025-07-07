@@ -9,7 +9,8 @@ ENV MARKITDOWN_ENABLE_PLUGINS=True
 # NOTE: Add any additional MarkItDown plugins here
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
-    exiftool
+    exiftool \
+    git
 
 # Cleanup
 RUN rm -rf /var/lib/apt/lists/*
