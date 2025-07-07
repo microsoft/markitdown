@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import HTTPException, Query, Body, APIRouter
 from pydantic import BaseModel, Field
 
-from markitdown_api.commons import MarkdownResponse, OpenAIOptions, ConvertResponse, _build_markitdown
+from markitdown_api.commons import MarkdownResponse, OpenAIOptions, ConvertResult, _build_markitdown
 
 TAG = "Convert Uri"
 
@@ -28,12 +28,12 @@ router = APIRouter(
 )
 
 
-def _convert_uri(uri: str, openai: OpenAIOptions | None = None) -> ConvertResponse:
+def _convert_uri(uri: str, openai: OpenAIOptions | None = None) -> ConvertResult:
     convert_result = _build_markitdown(openai).convert_uri(uri)
-    return ConvertResponse(title=convert_result.title, markdown=convert_result.markdown)
+    return ConvertResult(title=convert_result.title, markdown=convert_result.markdown)
 
 
-@router.post(path="/", response_model=ConvertResponse)
+@router.post(path="/", response_model=ConvertResult)
 async def convert_uri(request: Annotated[ConvertUrlRequest, Body(
     examples=[
         {
@@ -44,7 +44,7 @@ async def convert_uri(request: Annotated[ConvertUrlRequest, Body(
     return _convert_uri(request.uri, request.openai)
 
 
-@router.get(path="/", response_model=ConvertResponse)
+@router.get(path="/", response_model=ConvertResult)
 async def convert_uri(uri: Annotated[str, URI_QUERY]):
     """
     The Uniform Resource Identifier (URI) to be converted.
