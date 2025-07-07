@@ -1,0 +1,72 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references=true
+
+[project]
+name = "markitdown-api"
+dynamic = ["version"]
+description = ''
+readme = "README.md"
+requires-python = ">=3.8"
+license = "MIT"
+keywords = []
+authors = [
+    { name = "Ahoo-Wang", email = "ahoowang@qq.com" },
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+]
+dependencies = [
+    #    "markitdown[all]>=0.1.1,<0.2.0",
+    "markitdown[all] @ git+https://github.com/Ahoo-Wang/markitdown.git@ahoo#subdirectory=packages/markitdown",
+    "fastapi>=0.68.0",
+    "uvicorn>=0.15.0"
+]
+
+[project.scripts]
+markitdown-api = "markitdown_api.__main__:main"
+
+[project.urls]
+Documentation = "https://github.com/Ahoo-Wang/markitdown-api#readme"
+Issues = "https://github.com/Ahoo-Wang/markitdown-api/issues"
+Source = "https://github.com/Ahoo-Wang/markitdown-api"
+
+[tool.hatch.version]
+path = "src/markitdown_api/__about__.py"
+
+[tool.hatch.envs.types]
+extra-dependencies = [
+    "mypy>=1.0.0",
+]
+[tool.hatch.envs.types.scripts]
+check = "mypy --install-types --non-interactive {args:src/markitdown_api tests}"
+
+[tool.coverage.run]
+source_pkgs = ["markitdown_api", "tests"]
+branch = true
+parallel = true
+omit = [
+    "src/markitdown_api/__about__.py",
+]
+
+[tool.coverage.paths]
+markitdown_api = ["src/markitdown_api", "*/markitdown-api/src/markitdown_api"]
+tests = ["tests", "*/markitdown-api/tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "no cov",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
