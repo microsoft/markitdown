@@ -9,7 +9,8 @@
 
 > [!IMPORTANT]
 > Breaking changes between 0.0.1 to 0.1.0:
-> * Dependencies are now organized into optional feature-groups (further details below). Use `pip install 'markitdown[all]'` to have backward-compatible behavior. 
+>
+> * Dependencies are now organized into optional feature-groups (further details below). Use `pip install 'markitdown[all]'` to have backward-compatible behavior.
 > * convert\_stream() now requires a binary file-like object (e.g., a file opened in binary mode, or an io.BytesIO object). This is a breaking change from the previous version, where it previously also accepted text file-like objects, like io.StringIO.
 > * The DocumentConverter class interface has changed to read from file-like streams rather than file paths. *No temporary files are created anymore*. If you are the maintainer of a plugin, or custom DocumentConverter, you likely need to update your code. Otherwise, if only using the MarkItDown class or CLI (as in these examples), you should not need to change anything.
 
@@ -17,29 +18,30 @@ MarkItDown is a lightweight Python utility for converting various files to Markd
 
 MarkItDown currently supports the conversion from:
 
-- PDF
-- PowerPoint
-- Word
-- Excel
-- Images (EXIF metadata and OCR)
-- Audio (EXIF metadata and speech transcription)
-- HTML
-- Text-based formats (CSV, JSON, XML)
-- ZIP files (iterates over contents)
-- Youtube URLs
-- EPubs
-- ... and more!
+* PDF
+* PowerPoint
+* Word
+* Excel
+* Images (EXIF metadata and OCR)
+* Audio (EXIF metadata and speech transcription)
+* HTML
+* Text-based formats (CSV, JSON, XML)
+* ZIP files (iterates over contents)
+* Youtube URLs
+* EPubs
+* ... and more!
 
 ## Why Markdown?
 
 Markdown is extremely close to plain text, with minimal markup or formatting, but still
 provides a way to represent important document structure. Mainstream LLMs, such as
-OpenAI's GPT-4o, natively "_speak_" Markdown, and often incorporate Markdown into their
+OpenAI's GPT-4o, natively "*speak*" Markdown, and often incorporate Markdown into their
 responses unprompted. This suggests that they have been trained on vast amounts of
 Markdown-formatted text, and understand it well. As a side benefit, Markdown conventions
 are also highly token-efficient.
 
 ## Prerequisites
+
 MarkItDown requires Python 3.10 or higher. It is recommended to use a virtual environment to avoid dependency conflicts.
 
 With the standard Python installation, you can create and activate a virtual environment using the following commands:
@@ -95,6 +97,7 @@ cat path-to-file.pdf | markitdown
 ```
 
 ### Optional Dependencies
+
 MarkItDown has optional dependencies for activating various file formats. Earlier in this document, we installed all optional dependencies with the `[all]` option. However, you can also install them individually for more control. For example:
 
 ```bash
@@ -144,7 +147,7 @@ More information about how to set up an Azure Document Intelligence Resource can
 
 ### Python API
 
-Basic usage in Python:
+Basic usage in Python. All functions are available in async and sync versions:
 
 ```python
 from markitdown import MarkItDown
@@ -164,13 +167,13 @@ result = md.convert("test.pdf")
 print(result.text_content)
 ```
 
-To use Large Language Models for image descriptions, provide `llm_client` and `llm_model`:
+To use Large Language Models for image descriptions, provide `llm_client` (AsyncOpenAI) and `llm_model` (str), and enable the `[openai]` optional dependency group:
 
 ```python
 from markitdown import MarkItDown
-from openai import OpenAI
+from openai import AsyncOpenAI
 
-client = OpenAI()
+client = AsyncOpenAI()
 md = MarkItDown(llm_client=client, llm_model="gpt-4o")
 result = md.convert("example.jpg")
 print(result.text_content)
@@ -187,7 +190,7 @@ docker run --rm -i markitdown:latest < ~/your-file.pdf > output.md
 
 This project welcomes contributions and suggestions. Most contributions require you to agree to a
 Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
-the rights to use your contribution. For details, visit https://cla.opensource.microsoft.com.
+the rights to use your contribution. For details, visit <https://cla.opensource.microsoft.com>.
 
 When you submit a pull request, a CLA bot will automatically determine whether you need to provide
 a CLA and decorate the PR appropriately (e.g., status check, comment). Simply follow the instructions
@@ -212,13 +215,13 @@ You can help by looking at issues or helping review PRs. Any issue or PR is welc
 
 ### Running Tests and Checks
 
-- Navigate to the MarkItDown package:
+* Navigate to the MarkItDown package:
 
   ```sh
   cd packages/markitdown
   ```
 
-- Install `hatch` in your environment and run tests:
+* Install `hatch` in your environment and run tests:
 
   ```sh
   pip install hatch  # Other ways of installing hatch: https://hatch.pypa.io/dev/install/
@@ -233,7 +236,7 @@ You can help by looking at issues or helping review PRs. Any issue or PR is welc
   hatch test
   ```
 
-- Run pre-commit checks before submitting a PR: `pre-commit run --all-files`
+* Run pre-commit checks before submitting a PR: `pre-commit run --all-files`
 
 ### Contributing 3rd-party Plugins
 

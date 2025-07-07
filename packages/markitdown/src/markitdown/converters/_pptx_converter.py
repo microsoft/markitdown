@@ -1,18 +1,19 @@
-import sys
 import base64
-import os
-import io
-import re
 import html
-
-from typing import BinaryIO, Any
+import io
+import os
+import re
+import sys
 from operator import attrgetter
+from typing import Any, BinaryIO, Optional, Union
 
-from ._html_converter import HtmlConverter
-from ._llm_caption import llm_caption
+from openai import AsyncOpenAI, OpenAI
+
 from .._base_converter import DocumentConverter, DocumentConverterResult
+from .._exceptions import MISSING_DEPENDENCY_MESSAGE, MissingDependencyException
 from .._stream_info import StreamInfo
-from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+from ..converter_utils.llm import llm_image_caption
+from ._html_converter import HtmlConverter
 
 # Try loading optional (but in this case, required) dependencies
 # Save reporting of any exceptions for later
@@ -40,7 +41,7 @@ class PptxConverter(DocumentConverter):
         super().__init__()
         self._html_converter = HtmlConverter()
 
-    def accepts(
+    async def accepts_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
@@ -58,7 +59,7 @@ class PptxConverter(DocumentConverter):
 
         return False
 
-    def convert(
+    async def convert_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
@@ -89,7 +90,7 @@ class PptxConverter(DocumentConverter):
 
             title = slide.shapes.title
 
-            def get_shape_content(shape, **kwargs):
+            async def get_shape_content(shape, **kwargs):
                 nonlocal md_content
                 # Pictures
                 if self._is_picture(shape):
@@ -99,8 +100,10 @@ class PptxConverter(DocumentConverter):
                     alt_text = ""
 
                     # Potentially generate a description using an LLM
-                    llm_client = kwargs.get("llm_client")
-                    llm_model = kwargs.get("llm_model")
+                    llm_client: Optional[Union[AsyncOpenAI, OpenAI]] = kwargs.get(
+                        "llm_client"
+                    )
+                    llm_model: Optional[str] = kwargs.get("llm_model")
                     if llm_client is not None and llm_model is not None:
                         # Prepare a file_stream and stream_info for the image data
                         image_filename = shape.image.filename
@@ -117,12 +120,12 @@ class PptxConverter(DocumentConverter):
 
                         # Caption the image
                         try:
-                            llm_description = llm_caption(
-                                image_stream,
-                                image_stream_info,
+                            llm_description = await llm_image_caption(
                                 client=llm_client,
+                                file_stream=image_stream,
                                 model=llm_model,
                                 prompt=kwargs.get("llm_prompt"),
+                                stream_info=image_stream_info,
                             )
                         except Exception:
                             # Unable to generate a description
@@ -153,11 +156,13 @@ class PptxConverter(DocumentConverter):
 
                 # Tables
                 if self._is_table(shape):
-                    md_content += self._convert_table_to_markdown(shape.table, **kwargs)
+                    md_content += await self._convert_table_to_markdown(
+                        shape.table, **kwargs
+                    )
 
                 # Charts
                 if shape.has_chart:
-                    md_content += self._convert_chart_to_markdown(shape.chart)
+                    md_content += await self._convert_chart_to_markdown(shape.chart)
 
                 # Text areas
                 elif shape.has_text_frame:
@@ -170,11 +175,11 @@ class PptxConverter(DocumentConverter):
                 if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.GROUP:
                     sorted_shapes = sorted(shape.shapes, key=attrgetter("top", "left"))
                     for subshape in sorted_shapes:
-                        get_shape_content(subshape, **kwargs)
+                        await get_shape_content(subshape, **kwargs)
 
             sorted_shapes = sorted(slide.shapes, key=attrgetter("top", "left"))
             for shape in sorted_shapes:
-                get_shape_content(shape, **kwargs)
+                await get_shape_content(shape, **kwargs)
 
             md_content = md_content.strip()
 
@@ -200,7 +205,7 @@ class PptxConverter(DocumentConverter):
             return True
         return False
 
-    def _convert_table_to_markdown(self, table, **kwargs):
+    async def _convert_table_to_markdown(self, table, **kwargs):
         # Write the table as HTML, then convert it to Markdown
         html_table = "<html><body><table>"
         first_row = True
@@ -216,11 +221,10 @@ class PptxConverter(DocumentConverter):
         html_table += "</table></body></html>"
 
         return (
-            self._html_converter.convert_string(html_table, **kwargs).markdown.strip()
-            + "\n"
-        )
+            await self._html_converter.convert_string(html_table, **kwargs)
+        ).markdown.strip() + "\n"
 
-    def _convert_chart_to_markdown(self, chart):
+    async def _convert_chart_to_markdown(self, chart):
         try:
             md = "\n\n### Chart"
             if chart.has_title:

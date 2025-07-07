@@ -25,7 +25,7 @@ class AudioConverter(DocumentConverter):
     Converts audio files to markdown via extraction of metadata (if `exiftool` is installed), and speech transcription (if `speech_recognition` is installed).
     """
 
-    def accepts(
+    async def accepts_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
@@ -43,7 +43,7 @@ class AudioConverter(DocumentConverter):
 
         return False
 
-    def convert(
+    async def convert_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
@@ -91,7 +91,9 @@ class AudioConverter(DocumentConverter):
         # Transcribe
         if audio_format:
             try:
-                transcript = transcribe_audio(file_stream, audio_format=audio_format)
+                transcript = await transcribe_audio(
+                    file_stream, audio_format=audio_format
+                )
                 if transcript:
                     md_content += "\n\n### Audio Transcript:\n" + transcript
             except MissingDependencyException:

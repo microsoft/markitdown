@@ -26,7 +26,7 @@ class BingSerpConverter(DocumentConverter):
     NOTE: It is better to use the Bing API
     """
 
-    def accepts(
+    async def accepts_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
@@ -54,7 +54,7 @@ class BingSerpConverter(DocumentConverter):
         # Not HTML content
         return False
 
-    def convert(
+    async def convert_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,

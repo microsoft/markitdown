@@ -1,3 +1,4 @@
+import asyncio
 import io
 import sys
 from typing import BinaryIO
@@ -13,14 +14,18 @@ try:
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=DeprecationWarning)
         warnings.filterwarnings("ignore", category=SyntaxWarning)
-        import speech_recognition as sr
         import pydub
+        import speech_recognition as sr
 except ImportError:
     # Preserve the error and stack trace for later
     _dependency_exc_info = sys.exc_info()
 
 
-def transcribe_audio(file_stream: BinaryIO, *, audio_format: str = "wav") -> str:
+async def transcribe_audio(
+    file_stream: BinaryIO,
+    *,
+    audio_format: str = "wav",
+) -> str:
     # Check for installed dependencies
     if _dependency_exc_info is not None:
         raise MissingDependencyException(
@@ -34,10 +39,13 @@ def transcribe_audio(file_stream: BinaryIO, *, audio_format: str = "wav") -> str
     if audio_format in ["wav", "aiff", "flac"]:
         audio_source = file_stream
     elif audio_format in ["mp3", "mp4"]:
-        audio_segment = pydub.AudioSegment.from_file(file_stream, format=audio_format)
+        # Run the audio conversion in a thread pool to avoid blocking
+        audio_segment = await asyncio.to_thread(
+            pydub.AudioSegment.from_file, file_stream, format=audio_format
+        )
 
         audio_source = io.BytesIO()
-        audio_segment.export(audio_source, format="wav")
+        await asyncio.to_thread(audio_segment.export, audio_source, format="wav")
         audio_source.seek(0)
     else:
         raise ValueError(f"Unsupported audio format: {audio_format}")
@@ -45,5 +53,7 @@ def transcribe_audio(file_stream: BinaryIO, *, audio_format: str = "wav") -> str
     recognizer = sr.Recognizer()
     with sr.AudioFile(audio_source) as source:
         audio = recognizer.record(source)
-        transcript = recognizer.recognize_google(audio).strip()
+        # Run the speech recognition in a thread pool to avoid blocking
+        transcript = await asyncio.to_thread(recognizer.recognize_google, audio)
+        transcript = transcript.strip()
         return "[No speech detected]" if transcript == "" else transcript

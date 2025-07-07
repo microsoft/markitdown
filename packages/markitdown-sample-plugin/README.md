@@ -20,28 +20,25 @@ class RtfConverter(DocumentConverter):
     ):
         super().__init__(priority=priority)
 
-    def accepts(
+    async def accepts_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
         **kwargs: Any,
     ) -> bool:
-	
-	# Implement logic to check if the file stream is an RTF file
-	# ...
-	raise NotImplementedError()
+        # Implement logic to check if the file stream is an RTF file
+        # ...
+        raise NotImplementedError()
 
-
-    def convert(
+    async def convert_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
         **kwargs: Any,
     ) -> DocumentConverterResult:
-
-	# Implement logic to convert the file stream to Markdown
-	# ...
-	raise NotImplementedError()
+        # Implement logic to convert the file stream to Markdown
+        # ...
+        raise NotImplementedError()
 ```
 
 Next, make sure your package implements and exports the following:
@@ -98,7 +95,7 @@ In Python, plugins can be enabled as follows:
 from markitdown import MarkItDown
 
 md = MarkItDown(enable_plugins=True) 
-result = md.convert("path-to-file.rtf")
+result = await md.convert_async("path-to-file.rtf")
 print(result.text_content)
 ```
 

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3 -m pytest
+import asyncio
 import os
 
 from markitdown import MarkItDown, StreamInfo
@@ -12,11 +13,11 @@ RTF_TEST_STRINGS = {
 }
 
 
-def test_converter() -> None:
+async def test_converter() -> None:
     """Tests the RTF converter dirctly."""
     with open(os.path.join(TEST_FILES_DIR, "test.rtf"), "rb") as file_stream:
         converter = RtfConverter()
-        result = converter.convert(
+        result = await converter.convert_async(
             file_stream=file_stream,
             stream_info=StreamInfo(
                 mimetype="text/rtf", extension=".rtf", filename="test.rtf"
@@ -38,6 +39,6 @@ def test_markitdown() -> None:
 
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
-    test_converter()
+    asyncio.run(test_converter())
     test_markitdown()
     print("All tests passed.")

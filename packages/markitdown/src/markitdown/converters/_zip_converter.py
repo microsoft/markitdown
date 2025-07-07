@@ -66,7 +66,7 @@ class ZipConverter(DocumentConverter):
         super().__init__()
         self._markitdown = markitdown
 
-    def accepts(
+    async def accepts_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
@@ -84,7 +84,7 @@ class ZipConverter(DocumentConverter):
 
         return False
 
-    def convert(
+    async def convert_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
@@ -101,7 +101,7 @@ class ZipConverter(DocumentConverter):
                         extension=os.path.splitext(name)[1],
                         filename=os.path.basename(name),
                     )
-                    result = self._markitdown.convert_stream(
+                    result = await self._markitdown.convert_stream_async(
                         stream=z_file_stream,
                         stream_info=z_file_stream_info,
                     )

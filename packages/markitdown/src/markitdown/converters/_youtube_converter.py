@@ -1,3 +1,4 @@
+import asyncio
 import json
 import time
 import re
@@ -37,7 +38,7 @@ ACCEPTED_FILE_EXTENSIONS = [
 class YouTubeConverter(DocumentConverter):
     """Handle YouTube specially, focusing on the video title, description, and transcript."""
 
-    def accepts(
+    async def accepts_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
@@ -67,7 +68,7 @@ class YouTubeConverter(DocumentConverter):
         # Not HTML content
         return False
 
-    def convert(
+    async def convert_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
@@ -151,7 +152,7 @@ class YouTubeConverter(DocumentConverter):
             params = parse_qs(parsed_url.query)  # type: ignore
             if "v" in params and params["v"][0]:
                 video_id = str(params["v"][0])
-                transcript_list = ytt_api.list(video_id)
+                transcript_list = await asyncio.to_thread(ytt_api.list, video_id)
                 languages = ["en"]
                 for transcript in transcript_list:
                     languages.append(transcript.language_code)
@@ -161,7 +162,8 @@ class YouTubeConverter(DocumentConverter):
                         "youtube_transcript_languages", languages
                     )
                     # Retry the transcript fetching operation
-                    transcript = self._retry_operation(
+                    transcript = await asyncio.to_thread(
+                        self._retry_operation,
                         lambda: ytt_api.fetch(
                             video_id, languages=youtube_transcript_languages
                         ),
@@ -170,9 +172,7 @@ class YouTubeConverter(DocumentConverter):
                     )
 
                     if transcript:
-                        transcript_text = " ".join(
-                            [part.text for part in transcript]
-                        )  # type: ignore
+                        transcript_text = " ".join([part.text for part in transcript])  # type: ignore
                 except Exception as e:
                     # No transcript available
                     if len(languages) == 1:

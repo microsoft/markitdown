@@ -33,7 +33,7 @@ class PdfConverter(DocumentConverter):
     Converts PDFs to Markdown. Most style information is ignored, so the results are essentially plain-text.
     """
 
-    def accepts(
+    async def accepts_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
@@ -51,7 +51,7 @@ class PdfConverter(DocumentConverter):
 
         return False
 
-    def convert(
+    async def convert_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,

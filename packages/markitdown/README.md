@@ -1,7 +1,7 @@
 # MarkItDown
 
 > [!IMPORTANT]
-> MarkItDown is a Python package and command-line utility for converting various files to Markdown (e.g., for indexing, text analysis, etc). 
+> MarkItDown is a Python package and command-line utility for converting various files to Markdown (e.g., for indexing, text analysis, etc).
 >
 > For more information, and full documentation, see the project [README.md](https://github.com/microsoft/markitdown) on GitHub.
 

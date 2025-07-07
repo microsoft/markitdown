@@ -10,9 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 keywords = []
-authors = [
-  { name = "Adam Fourney", email = "adamfo@microsoft.com" },
-]
+authors = [{ name = "Adam Fourney", email = "adamfo@microsoft.com" }]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Programming Language :: Python",
@@ -25,12 +23,13 @@ classifiers = [
 ]
 dependencies = [
   "beautifulsoup4",
-  "requests",
   "markdownify",
   "magika~=0.6.1",
   "charset-normalizer",
   "defusedxml",
   "onnxruntime<=1.20.1; sys_platform == 'win32'",
+  "aiohttp",
+  "openai",
 ]
 
 [project.optional-dependencies]
@@ -47,7 +46,7 @@ all = [
   "SpeechRecognition",
   "youtube-transcript-api~=1.0.0",
   "azure-ai-documentintelligence",
-  "azure-identity"
+  "azure-identity",
 ]
 pptx = ["python-pptx"]
 docx = ["mammoth", "lxml"]
@@ -75,16 +74,11 @@ features = ["all"]
 
 [tool.hatch.envs.hatch-test]
 features = ["all"]
-extra-dependencies = [
-  "openai",
-]
+parallel = true
 
 [tool.hatch.envs.types]
 features = ["all"]
-extra-dependencies = [
-  "openai",
-  "mypy>=1.0.0",
-]
+extra-dependencies = ["mypy>=1.0.0"]
 
 [tool.hatch.envs.types.scripts]
 check = "mypy --install-types --non-interactive --ignore-missing-imports {args:src/markitdown tests}"
@@ -93,20 +87,14 @@ check = "mypy --install-types --non-interactive --ignore-missing-imports {args:s
 source_pkgs = ["markitdown", "tests"]
 branch = true
 parallel = true
-omit = [
-  "src/markitdown/__about__.py",
-]
+omit = ["src/markitdown/__about__.py"]
 
 [tool.coverage.paths]
 markitdown = ["src/markitdown", "*/markitdown/src/markitdown"]
 tests = ["tests", "*/markitdown/tests"]
 
 [tool.coverage.report]
-exclude_lines = [
-  "no cov",
-  "if __name__ == .__main__.:",
-  "if TYPE_CHECKING:",
-]
+exclude_lines = ["no cov", "if __name__ == .__main__.:", "if TYPE_CHECKING:"]
 
 [tool.hatch.build.targets.sdist]
 only-include = ["src/markitdown"]

@@ -33,7 +33,7 @@ ACCEPTED_FILE_EXTENSIONS = [
 class PlainTextConverter(DocumentConverter):
     """Anything with content type text/plain"""
 
-    def accepts(
+    async def accepts_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
@@ -57,7 +57,7 @@ class PlainTextConverter(DocumentConverter):
 
         return False
 
-    def convert(
+    async def convert_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,

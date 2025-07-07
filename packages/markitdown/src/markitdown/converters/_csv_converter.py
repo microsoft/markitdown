@@ -20,7 +20,7 @@ class CsvConverter(DocumentConverter):
     def __init__(self):
         super().__init__()
 
-    def accepts(
+    async def accepts_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
@@ -35,7 +35,7 @@ class CsvConverter(DocumentConverter):
                 return True
         return False
 
-    def convert(
+    async def convert_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,

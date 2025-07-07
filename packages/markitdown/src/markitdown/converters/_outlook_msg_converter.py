@@ -29,7 +29,7 @@ class OutlookMsgConverter(DocumentConverter):
     - Email body content
     """
 
-    def accepts(
+    async def accepts_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
@@ -63,14 +63,14 @@ class OutlookMsgConverter(DocumentConverter):
                     "__properties_version1.0" in toc
                     and "__recip_version1.0_#00000000" in toc
                 )
-        except Exception as e:
+        except Exception:
             pass
         finally:
             file_stream.seek(cur_pos)
 
         return False
 
-    def convert(
+    async def convert_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
