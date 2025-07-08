@@ -29,6 +29,7 @@ from .converters import (
     BingSerpConverter,
     PdfConverter,
     DocxConverter,
+    DocConverter,
     XlsxConverter,
     XlsConverter,
     PptxConverter,
@@ -183,6 +184,7 @@ class MarkItDown:
             self.register_converter(YouTubeConverter())
             self.register_converter(BingSerpConverter())
             self.register_converter(DocxConverter())
+            self.register_converter(DocConverter())
             self.register_converter(XlsxConverter())
             self.register_converter(XlsConverter())
             self.register_converter(PptxConverter())

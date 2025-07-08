@@ -234,6 +234,20 @@ GENERAL_TEST_VECTORS = [
         ],
         must_not_include=[],
     ),
+    FileTestVector(
+        filename="test.doc",
+        mimetype="application/msword",
+        charset=None,
+        url=None,
+        must_include=[
+            # we test for basic, proper functionality rather than perfect output (i.e. app not crashing, etc.)
+        ],
+        must_not_include=[
+            "Error converting DOC file:",
+            "Unable to extract readable text",
+            "Not a valid Microsoft Word DOC file",
+        ],
+    ),
 ]
 
 
