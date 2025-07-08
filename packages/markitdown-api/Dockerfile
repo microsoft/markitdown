@@ -18,7 +18,7 @@ RUN rm -rf /var/lib/apt/lists/*
 COPY . /app
 RUN pip --no-cache-dir install /app
 
-WORKDIR /workdir
+WORKDIR /markitdown-api
 
 # Default USERID and GROUPID
 ARG USERID=nobody
