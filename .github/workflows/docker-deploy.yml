@@ -16,11 +16,13 @@ on:
   schedule:
     - cron: '0 10 * * *'
   push:
+    branches:
+      - '**'
     tags:
       - 'v*.*.*'
   pull_request:
     branches:
-      - 'dev'
+      - 'main'
   workflow_dispatch:
 jobs:
   api-docker-deploy:

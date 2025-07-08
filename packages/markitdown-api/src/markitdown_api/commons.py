@@ -1,3 +1,5 @@
+
+import os
 from typing import Optional
 
 from openai import OpenAI
@@ -38,7 +40,7 @@ def _build_markitdown(openai_options: Optional[OpenAIOptions] = None) -> MarkItD
     if openai_options:
         base_url = blank_then_none(openai_options.base_url)
         api_key = blank_then_none(openai_options.api_key)
-        llm_model = blank_then_none(openai_options.model)
+        llm_model = blank_then_none(openai_options.model) or blank_then_none(os.environ.get("OPENAI_MODEL"))
         prompt = blank_then_none(openai_options.prompt)
 
     llm_client = OpenAI(base_url=base_url, api_key=api_key)
