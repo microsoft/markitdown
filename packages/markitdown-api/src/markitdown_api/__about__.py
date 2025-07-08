@@ -2,6 +2,4 @@
 #
 # SPDX-License-Identifier: MIT
 
-from markitdown.__about__ import __version__ as markitdown_version
-
-__version__ = markitdown_version + "-0.0.1"
+__version__ = "0.1.2-0.0.1"
