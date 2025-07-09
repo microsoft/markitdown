@@ -42,7 +42,7 @@ class XlsxConverter(DocumentConverter):
         super().__init__()
         self._html_converter = HtmlConverter()
 
-    def accepts(
+    async def accepts_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
@@ -60,7 +60,7 @@ class XlsxConverter(DocumentConverter):
 
         return False
 
-    def convert(
+    async def convert_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
@@ -86,11 +86,8 @@ class XlsxConverter(DocumentConverter):
             md_content += f"## {s}\n"
             html_content = sheets[s].to_html(index=False)
             md_content += (
-                self._html_converter.convert_string(
-                    html_content, **kwargs
-                ).markdown.strip()
-                + "\n\n"
-            )
+                await self._html_converter.convert_string(html_content, **kwargs)
+            ).markdown.strip() + "\n\n"
 
         return DocumentConverterResult(markdown=md_content.strip())
 
@@ -104,7 +101,7 @@ class XlsConverter(DocumentConverter):
         super().__init__()
         self._html_converter = HtmlConverter()
 
-    def accepts(
+    async def accepts_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
@@ -122,7 +119,7 @@ class XlsConverter(DocumentConverter):
 
         return False
 
-    def convert(
+    async def convert_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
@@ -148,10 +145,7 @@ class XlsConverter(DocumentConverter):
             md_content += f"## {s}\n"
             html_content = sheets[s].to_html(index=False)
             md_content += (
-                self._html_converter.convert_string(
-                    html_content, **kwargs
-                ).markdown.strip()
-                + "\n\n"
-            )
+                await self._html_converter.convert_string(html_content, **kwargs)
+            ).markdown.strip() + "\n\n"
 
         return DocumentConverterResult(markdown=md_content.strip())

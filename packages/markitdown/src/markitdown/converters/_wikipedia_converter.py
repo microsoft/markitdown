@@ -20,7 +20,7 @@ ACCEPTED_FILE_EXTENSIONS = [
 class WikipediaConverter(DocumentConverter):
     """Handle Wikipedia pages separately, focusing only on the main document content."""
 
-    def accepts(
+    async def accepts_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
@@ -48,7 +48,7 @@ class WikipediaConverter(DocumentConverter):
         # Not HTML content
         return False
 
-    def convert(
+    async def convert_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,

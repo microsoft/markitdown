@@ -33,7 +33,7 @@ class RssConverter(DocumentConverter):
         super().__init__()
         self._kwargs = {}
 
-    def accepts(
+    async def accepts_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
@@ -81,7 +81,7 @@ class RssConverter(DocumentConverter):
                 return "atom"
         return None
 
-    def convert(
+    async def convert_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,

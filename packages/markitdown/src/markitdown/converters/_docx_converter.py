@@ -34,7 +34,7 @@ class DocxConverter(HtmlConverter):
         super().__init__()
         self._html_converter = HtmlConverter()
 
-    def accepts(
+    async def accepts_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
@@ -52,7 +52,7 @@ class DocxConverter(HtmlConverter):
 
         return False
 
-    def convert(
+    async def convert_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
@@ -74,7 +74,7 @@ class DocxConverter(HtmlConverter):
 
         style_map = kwargs.get("style_map", None)
         pre_process_stream = pre_process_docx(file_stream)
-        return self._html_converter.convert_string(
+        return await self._html_converter.convert_string(
             mammoth.convert_to_html(pre_process_stream, style_map=style_map).value,
             **kwargs,
         )

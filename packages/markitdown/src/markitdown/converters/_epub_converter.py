@@ -32,7 +32,7 @@ class EpubConverter(HtmlConverter):
         super().__init__()
         self._html_converter = HtmlConverter()
 
-    def accepts(
+    async def accepts_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
@@ -50,7 +50,7 @@ class EpubConverter(HtmlConverter):
 
         return False
 
-    def convert(
+    async def convert_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
@@ -105,7 +105,7 @@ class EpubConverter(HtmlConverter):
                         filename = os.path.basename(file)
                         extension = os.path.splitext(filename)[1].lower()
                         mimetype = MIME_TYPE_MAPPING.get(extension)
-                        converted_content = self._html_converter.convert(
+                        converted_content = await self._html_converter.convert_async(
                             f,
                             StreamInfo(
                                 mimetype=mimetype,

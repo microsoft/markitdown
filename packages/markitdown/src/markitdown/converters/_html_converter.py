@@ -20,7 +20,7 @@ ACCEPTED_FILE_EXTENSIONS = [
 class HtmlConverter(DocumentConverter):
     """Anything with content type text/html"""
 
-    def accepts(
+    async def accepts_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
@@ -38,7 +38,7 @@ class HtmlConverter(DocumentConverter):
 
         return False
 
-    def convert(
+    async def convert_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
@@ -70,7 +70,7 @@ class HtmlConverter(DocumentConverter):
             title=None if soup.title is None else soup.title.string,
         )
 
-    def convert_string(
+    async def convert_string(
         self, html_content: str, *, url: Optional[str] = None, **kwargs
     ) -> DocumentConverterResult:
         """
@@ -78,7 +78,7 @@ class HtmlConverter(DocumentConverter):
         Given that many converters produce HTML as intermediate output, this
         allows for easy conversion of HTML to markdown.
         """
-        return self.convert(
+        return await self.convert_async(
             file_stream=io.BytesIO(html_content.encode("utf-8")),
             stream_info=StreamInfo(
                 mimetype="text/html",

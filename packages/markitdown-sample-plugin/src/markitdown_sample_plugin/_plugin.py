@@ -36,7 +36,7 @@ class RtfConverter(DocumentConverter):
     Converts an RTF file to in the simplest possible way.
     """
 
-    def accepts(
+    async def accepts_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
@@ -54,7 +54,7 @@ class RtfConverter(DocumentConverter):
 
         return False
 
-    def convert(
+    async def convert_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,

@@ -1,54 +1,62 @@
+import asyncio
+import codecs
+import concurrent.futures
+import io
 import mimetypes
 import os
 import re
-import sys
 import shutil
+import sys
 import traceback
-import io
 from dataclasses import dataclass
 from importlib.metadata import entry_points
-from typing import Any, List, Dict, Optional, Union, BinaryIO
 from pathlib import Path
-from urllib.parse import urlparse
-from warnings import warn
-import requests
-import magika
-import charset_normalizer
-import codecs
-
-from ._stream_info import StreamInfo
-from ._uri_utils import parse_data_uri, file_uri_to_path
-
-from .converters import (
-    PlainTextConverter,
-    HtmlConverter,
-    RssConverter,
-    WikipediaConverter,
-    YouTubeConverter,
-    IpynbConverter,
-    BingSerpConverter,
-    PdfConverter,
-    DocxConverter,
-    XlsxConverter,
-    XlsConverter,
-    PptxConverter,
-    ImageConverter,
-    AudioConverter,
-    OutlookMsgConverter,
-    ZipConverter,
-    EpubConverter,
-    DocumentIntelligenceConverter,
-    CsvConverter,
+from typing import (
+    Any,
+    Awaitable,
+    BinaryIO,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    TypeVar,
+    Union,
 )
+from warnings import warn
+
+import aiohttp
+import charset_normalizer
+import magika
 
 from ._base_converter import DocumentConverter, DocumentConverterResult
-
 from ._exceptions import (
+    FailedConversionAttempt,
     FileConversionException,
     UnsupportedFormatException,
-    FailedConversionAttempt,
 )
-
+from ._stream_info import StreamInfo
+from ._uri_utils import file_uri_to_path, parse_data_uri
+from .converters import (
+    AudioConverter,
+    BingSerpConverter,
+    CsvConverter,
+    DocumentIntelligenceConverter,
+    DocxConverter,
+    EpubConverter,
+    HtmlConverter,
+    ImageConverter,
+    IpynbConverter,
+    OutlookMsgConverter,
+    PdfConverter,
+    PlainTextConverter,
+    PptxConverter,
+    RssConverter,
+    WikipediaConverter,
+    XlsConverter,
+    XlsxConverter,
+    YouTubeConverter,
+    ZipConverter,
+)
 
 # Lower priority values are tried first.
 PRIORITY_SPECIFIC_FILE_FORMAT = (
@@ -58,7 +66,7 @@ PRIORITY_GENERIC_FILE_FORMAT = (
     10.0  # Near catch-all converters for mimetypes like text/*, etc.
 )
 
-
+T = TypeVar("T")
 _plugins: Union[None, List[Any]] = None  # If None, plugins have not been loaded yet.
 
 
@@ -90,6 +98,37 @@ class ConverterRegistration:
     priority: float
 
 
+def _wrap_async(
+    func: Callable[..., Awaitable[T]],
+    *args: Any,
+    **kwargs: Any,
+) -> T:
+    """
+    Wrap an async function to run it in a synchronous context.
+
+    This ensures backwards compatibility with existing synchronous code that calls async functions, without duplicating the codebase.
+    """
+    try:
+        # Check if we're already in an event loop
+        asyncio.get_running_loop()
+        # If we are, we need to run in a thread to avoid blocking
+
+        warn(
+            f"Running async function '{func.__name__}' in a thread pool because we're already in an event loop. "
+            f"Consider using the async version directly (e.g., '{func.__name__.replace('_async', '')}_async()') instead for better performance.",
+            RuntimeWarning,
+            stacklevel=3,
+        )
+
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(asyncio.run, func(*args, **kwargs))
+            return future.result()
+
+    except RuntimeError:
+        # No running loop, safe to use asyncio.run()
+        return asyncio.run(func(*args, **kwargs))
+
+
 class MarkItDown:
     """(In preview) An extremely simple text-based document reader, suitable for LLM use.
     This reader will convert common file-types or webpages to Markdown."""
@@ -103,13 +142,6 @@ class MarkItDown:
     ):
         self._builtins_enabled = False
         self._plugins_enabled = False
-
-        requests_session = kwargs.get("requests_session")
-        if requests_session is None:
-            self._requests_session = requests.Session()
-        else:
-            self._requests_session = requests_session
-
         self._magika = magika.Magika()
 
         # TODO - remove these (see enable_builtins)
@@ -242,14 +274,44 @@ class MarkItDown:
 
     def convert(
         self,
-        source: Union[str, requests.Response, Path, BinaryIO],
+        source: Union[
+            str,
+            aiohttp.ClientResponse,
+            Path,
+            BinaryIO,
+        ],
         *,
         stream_info: Optional[StreamInfo] = None,
         **kwargs: Any,
     ) -> DocumentConverterResult:  # TODO: deal with kwargs
         """
         Args:
-            - source: can be a path (str or Path), url, or a requests.response object
+            - source: can be a path (str or Path), url, or a aiohttp.ClientResponse object
+            - stream_info: optional stream info to use for the conversion. If None, infer from source
+            - kwargs: additional arguments to pass to the converter
+        """
+        return _wrap_async(
+            self.convert_async,
+            source,
+            stream_info=stream_info,
+            **kwargs,
+        )
+
+    async def convert_async(
+        self,
+        source: Union[
+            str,
+            aiohttp.ClientResponse,
+            Path,
+            BinaryIO,
+        ],
+        *,
+        stream_info: Optional[StreamInfo] = None,
+        **kwargs: Any,
+    ) -> DocumentConverterResult:  # TODO: deal with kwargs
+        """
+        Args:
+            - source: can be a path (str or Path), url, or a aiohttp.ClientResponse object
             - stream_info: optional stream info to use for the conversion. If None, infer from source
             - kwargs: additional arguments to pass to the converter
         """
@@ -269,22 +331,38 @@ class MarkItDown:
                     _kwargs["mock_url"] = _kwargs["url"]
                     del _kwargs["url"]
 
-                return self.convert_uri(source, stream_info=stream_info, **_kwargs)
+                return await self.convert_uri_async(
+                    source,
+                    stream_info=stream_info,
+                    **_kwargs,
+                )
             else:
-                return self.convert_local(source, stream_info=stream_info, **kwargs)
+                return await self.convert_local_async(
+                    source,
+                    stream_info=stream_info,
+                    **kwargs,
+                )
         # Path object
         elif isinstance(source, Path):
-            return self.convert_local(source, stream_info=stream_info, **kwargs)
+            return await self.convert_local_async(
+                source, stream_info=stream_info, **kwargs
+            )
         # Request response
-        elif isinstance(source, requests.Response):
-            return self.convert_response(source, stream_info=stream_info, **kwargs)
+        elif isinstance(source, aiohttp.ClientResponse):
+            return await self.convert_response_async(
+                source, stream_info=stream_info, **kwargs
+            )
         # Binary stream
         elif (
             hasattr(source, "read")
             and callable(source.read)
             and not isinstance(source, io.TextIOBase)
         ):
-            return self.convert_stream(source, stream_info=stream_info, **kwargs)
+            return await self.convert_stream_async(
+                source,
+                stream_info=stream_info,
+                **kwargs,
+            )
         else:
             raise TypeError(
                 f"Invalid source type: {type(source)}. Expected str, requests.Response, BinaryIO."
@@ -299,14 +377,32 @@ class MarkItDown:
         url: Optional[str] = None,  # Deprecated -- use stream_info
         **kwargs: Any,
     ) -> DocumentConverterResult:
+        return _wrap_async(
+            self.convert_local_async,
+            path,
+            stream_info=stream_info,
+            file_extension=file_extension,
+            url=url,
+            **kwargs,
+        )
+
+    async def convert_local_async(
+        self,
+        path: Union[str, Path],
+        *,
+        stream_info: Optional[StreamInfo] = None,
+        file_extension: Optional[str] = None,  # Deprecated -- use stream_info
+        url: Optional[str] = None,  # Deprecated -- use stream_info
+        **kwargs: Any,
+    ) -> DocumentConverterResult:
         if isinstance(path, Path):
             path = str(path)
 
         # Build a base StreamInfo object from which to start guesses
         base_guess = StreamInfo(
-            local_path=path,
             extension=os.path.splitext(path)[1],
             filename=os.path.basename(path),
+            local_path=path,
         )
 
         # Extend the base_guess with any additional info from the arguments
@@ -323,11 +419,34 @@ class MarkItDown:
 
         with open(path, "rb") as fh:
             guesses = self._get_stream_info_guesses(
-                file_stream=fh, base_guess=base_guess
+                base_guess=base_guess,
+                file_stream=fh,
             )
-            return self._convert(file_stream=fh, stream_info_guesses=guesses, **kwargs)
+            return await self._convert(
+                file_stream=fh,
+                stream_info_guesses=guesses,
+                **kwargs,
+            )
 
     def convert_stream(
+        self,
+        stream: BinaryIO,
+        *,
+        stream_info: Optional[StreamInfo] = None,
+        file_extension: Optional[str] = None,  # Deprecated -- use stream_info
+        url: Optional[str] = None,  # Deprecated -- use stream_info
+        **kwargs: Any,
+    ) -> DocumentConverterResult:
+        return _wrap_async(
+            self.convert_stream_async,
+            stream,
+            stream_info=stream_info,
+            file_extension=file_extension,
+            url=url,
+            **kwargs,
+        )
+
+    async def convert_stream_async(
         self,
         stream: BinaryIO,
         *,
@@ -370,9 +489,12 @@ class MarkItDown:
 
         # Add guesses based on stream content
         guesses = self._get_stream_info_guesses(
-            file_stream=stream, base_guess=base_guess or StreamInfo()
+            base_guess=base_guess or StreamInfo(),
+            file_stream=stream,
         )
-        return self._convert(file_stream=stream, stream_info_guesses=guesses, **kwargs)
+        return await self._convert(
+            file_stream=stream, stream_info_guesses=guesses, **kwargs
+        )
 
     def convert_url(
         self,
@@ -383,9 +505,32 @@ class MarkItDown:
         mock_url: Optional[str] = None,
         **kwargs: Any,
     ) -> DocumentConverterResult:
-        """Alias for convert_uri()"""
+        """
+        Alias for convert_uri().
+        """
+        return _wrap_async(
+            self.convert_uri_async,
+            url,
+            stream_info=stream_info,
+            file_extension=file_extension,
+            mock_url=mock_url,
+            **kwargs,
+        )
+
+    async def convert_url_async(
+        self,
+        url: str,
+        *,
+        stream_info: Optional[StreamInfo] = None,
+        file_extension: Optional[str] = None,
+        mock_url: Optional[str] = None,
+        **kwargs: Any,
+    ) -> DocumentConverterResult:
+        """
+        Alias for convert_uri().
+        """
         # convert_url will likely be deprecated in the future in favor of convert_uri
-        return self.convert_uri(
+        return await self.convert_uri_async(
             url,
             stream_info=stream_info,
             file_extension=file_extension,
@@ -394,6 +539,26 @@ class MarkItDown:
         )
 
     def convert_uri(
+        self,
+        uri: str,
+        *,
+        stream_info: Optional[StreamInfo] = None,
+        file_extension: Optional[str] = None,  # Deprecated -- use stream_info
+        mock_url: Optional[
+            str
+        ] = None,  # Mock the request as if it came from a different URL
+        **kwargs: Any,
+    ) -> DocumentConverterResult:
+        return _wrap_async(
+            self.convert_uri_async,
+            uri,
+            stream_info=stream_info,
+            file_extension=file_extension,
+            mock_url=mock_url,
+            **kwargs,
+        )
+
+    async def convert_uri_async(
         self,
         uri: str,
         *,
@@ -413,7 +578,7 @@ class MarkItDown:
                 raise ValueError(
                     f"Unsupported file URI: {uri}. Netloc must be empty or localhost."
                 )
-            return self.convert_local(
+            return await self.convert_local_async(
                 path,
                 stream_info=stream_info,
                 file_extension=file_extension,
@@ -425,13 +590,13 @@ class MarkItDown:
             mimetype, attributes, data = parse_data_uri(uri)
 
             base_guess = StreamInfo(
-                mimetype=mimetype,
                 charset=attributes.get("charset"),
+                mimetype=mimetype,
             )
             if stream_info is not None:
                 base_guess = base_guess.copy_and_update(stream_info)
 
-            return self.convert_stream(
+            return await self.convert_stream_async(
                 io.BytesIO(data),
                 stream_info=base_guess,
                 file_extension=file_extension,
@@ -440,15 +605,16 @@ class MarkItDown:
             )
         # HTTP/HTTPS URIs
         elif uri.startswith("http:") or uri.startswith("https:"):
-            response = self._requests_session.get(uri, stream=True)
-            response.raise_for_status()
-            return self.convert_response(
-                response,
-                stream_info=stream_info,
-                file_extension=file_extension,
-                url=mock_url,
-                **kwargs,
-            )
+            async with aiohttp.ClientSession() as session:
+                async with session.get(uri) as response:
+                    response.raise_for_status()
+                    return await self.convert_response_async(
+                        response,
+                        stream_info=stream_info,
+                        file_extension=file_extension,
+                        url=mock_url,
+                        **kwargs,
+                    )
         else:
             raise ValueError(
                 f"Unsupported URI scheme: {uri.split(':')[0]}. Supported schemes are: file:, data:, http:, https:"
@@ -456,7 +622,25 @@ class MarkItDown:
 
     def convert_response(
         self,
-        response: requests.Response,
+        response: aiohttp.ClientResponse,
+        *,
+        stream_info: Optional[StreamInfo] = None,
+        file_extension: Optional[str] = None,  # Deprecated -- use stream_info
+        url: Optional[str] = None,  # Deprecated -- use stream_info
+        **kwargs: Any,
+    ) -> DocumentConverterResult:
+        return _wrap_async(
+            self.convert_response_async,
+            response,
+            stream_info=stream_info,
+            file_extension=file_extension,
+            url=url,
+            **kwargs,
+        )
+
+    async def convert_response_async(
+        self,
+        response: aiohttp.ClientResponse,
         *,
         stream_info: Optional[StreamInfo] = None,
         file_extension: Optional[str] = None,  # Deprecated -- use stream_info
@@ -489,19 +673,18 @@ class MarkItDown:
 
         # If there is still no filename, try to read it from the url
         if filename is None:
-            parsed_url = urlparse(response.url)
-            _, _extension = os.path.splitext(parsed_url.path)
+            _, _extension = os.path.splitext(response.url.path)
             if len(_extension) > 0:  # Looks like this might be a file!
-                filename = os.path.basename(parsed_url.path)
+                filename = os.path.basename(response.url.path)
                 extension = _extension
 
         # Create an initial guess from all this information
         base_guess = StreamInfo(
-            mimetype=mimetype,
             charset=charset,
-            filename=filename,
             extension=extension,
-            url=response.url,
+            filename=filename,
+            mimetype=mimetype,
+            url=str(response.url),
         )
 
         # Update with any additional info from the arguments
@@ -514,9 +697,10 @@ class MarkItDown:
             # Deprecated -- use stream_info
             base_guess = base_guess.copy_and_update(url=url)
 
-        # Read into BytesIO
+        # Read into BytesIO, 8k chunks should be fine for most use cases
+        # TODO: Stream the response instead of consuming the memory (temp file?), can't use async iterator because lib handles both async and sync converters
         buffer = io.BytesIO()
-        for chunk in response.iter_content(chunk_size=512):
+        async for chunk in response.content.iter_chunked(8192):
             buffer.write(chunk)
         buffer.seek(0)
 
@@ -524,10 +708,18 @@ class MarkItDown:
         guesses = self._get_stream_info_guesses(
             file_stream=buffer, base_guess=base_guess
         )
-        return self._convert(file_stream=buffer, stream_info_guesses=guesses, **kwargs)
+        return await self._convert(
+            file_stream=buffer,
+            stream_info_guesses=guesses,
+            **kwargs,
+        )
 
-    def _convert(
-        self, *, file_stream: BinaryIO, stream_info_guesses: List[StreamInfo], **kwargs
+    async def _convert(
+        self,
+        *,
+        file_stream: BinaryIO,
+        stream_info_guesses: List[StreamInfo],
+        **kwargs,
     ) -> DocumentConverterResult:
         res: Union[None, DocumentConverterResult] = None
 
@@ -579,9 +771,22 @@ class MarkItDown:
                 # Check if the converter will accept the file, and if so, try to convert it
                 _accepts = False
                 try:
-                    _accepts = converter.accepts(file_stream, stream_info, **_kwargs)
+                    # First, try the async version
+                    _accepts = await converter.accepts_async(
+                        file_stream=file_stream,
+                        stream_info=stream_info,
+                        **_kwargs,
+                    )
                 except NotImplementedError:
-                    pass
+                    try:
+                        # In backwards compatibility mode, use the sync version
+                        _accepts = converter.accepts(
+                            file_stream=file_stream,
+                            stream_info=stream_info,
+                            **_kwargs,
+                        )
+                    except NotImplementedError:
+                        pass
 
                 # accept() should not have changed the file stream position
                 assert (
@@ -591,7 +796,20 @@ class MarkItDown:
                 # Attempt the conversion
                 if _accepts:
                     try:
-                        res = converter.convert(file_stream, stream_info, **_kwargs)
+                        try:
+                            # First, try the async version
+                            res = await converter.convert_async(
+                                file_stream=file_stream,
+                                stream_info=stream_info,
+                                **_kwargs,
+                            )
+                        except NotImplementedError:
+                            # In backwards compatibility mode, use the sync version
+                            res = converter.convert(
+                                file_stream=file_stream,
+                                stream_info=stream_info,
+                                **_kwargs,
+                            )
                     except Exception:
                         failed_attempts.append(
                             FailedConversionAttempt(
@@ -659,7 +877,9 @@ class MarkItDown:
         )
 
     def _get_stream_info_guesses(
-        self, file_stream: BinaryIO, base_guess: StreamInfo
+        self,
+        file_stream: BinaryIO,
+        base_guess: StreamInfo,
     ) -> List[StreamInfo]:
         """
         Given a base guess, attempt to guess or expand on the stream info using the stream content (via magika).

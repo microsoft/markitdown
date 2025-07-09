@@ -1,5 +1,28 @@
+import functools
+import warnings
 from typing import Any, BinaryIO, Optional
+
 from ._stream_info import StreamInfo
+
+
+def deprecated(reason):
+    """
+    Indicate that a class, function or overload is deprecated.
+    """
+
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            warnings.warn(
+                f"{func.__name__} is deprecated: {reason}",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
 
 
 class DocumentConverterResult:
@@ -40,9 +63,54 @@ class DocumentConverterResult:
 
 
 class DocumentConverter:
-    """Abstract superclass of all DocumentConverters."""
+    """
+    Abstract superclass of all DocumentConverters.
+    """
 
+    @deprecated("Use accepts_async() instead.")
     def accepts(
+        self,
+        file_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,  # Options to pass to the converter
+    ) -> bool:
+        """
+        Return a quick determination on if the converter should attempt converting the document.
+        This is primarily based `stream_info` (typically, `stream_info.mimetype`, `stream_info.extension`).
+        In cases where the data is retrieved via HTTP, the `steam_info.url` might also be referenced to
+        make a determination (e.g., special converters for Wikipedia, YouTube etc).
+        Finally, it is conceivable that the `stream_info.filename` might be used to in cases
+        where the filename is well-known (e.g., `Dockerfile`, `Makefile`, etc)
+
+        PERFORMANCE: This method is kept for backward compatibility with existing code that uses the synchronous interfaces. Prefer to use the async version. Async code will be used in priorities over synchronous code.
+
+        NOTE: The method signature is designed to match that of the convert() method. This provides some
+        assurance that, if accepts() returns True, the convert() method will also be able to handle the document.
+
+        IMPORTANT: In rare cases, (e.g., OutlookMsgConverter) we need to read more from the stream to make a final
+        determination. Read operations inevitably advances the position in file_stream. In these case, the position
+        MUST be reset it MUST be reset before returning. This is because the convert() method may be called immediately
+        after accepts(), and will expect the file_stream to be at the original position.
+
+        E.g.,
+        cur_pos = file_stream.tell() # Save the current position
+        data = file_stream.read(100) # ... peek at the first 100 bytes, etc.
+        file_stream.seek(cur_pos)    # Reset the position to the original position
+
+        Prameters:
+        - file_stream: The file-like object to convert. Must support seek(), tell(), and read() methods.
+        - stream_info: The StreamInfo object containing metadata about the file (mimetype, extension, charset, set)
+        - kwargs: Additional keyword arguments for the converter.
+
+        Returns:
+        - bool: True if the converter can handle the document, False otherwise.
+        """
+
+        raise NotImplementedError(
+            f"The subclass, {type(self).__name__}, must implement the accepts() method to determine if they can handle the document."
+        )
+
+    async def accepts_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
@@ -78,10 +146,38 @@ class DocumentConverter:
         - bool: True if the converter can handle the document, False otherwise.
         """
         raise NotImplementedError(
-            f"The subclass, {type(self).__name__}, must implement the accepts() method to determine if they can handle the document."
+            f"The subclass, {type(self).__name__}, must implement the accepts_async() method to determine if they can handle the document."
         )
 
+    @deprecated("Use convert_async() instead.")
     def convert(
+        self,
+        file_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,  # Options to pass to the converter
+    ) -> DocumentConverterResult:
+        """
+        Convert a document to Markdown text.
+
+        PERFORMANCE: This method is kept for backward compatibility with existing code that uses the synchronous interfaces. Prefer to use the async version. Async code will be used in priorities over synchronous code.
+
+        Prameters:
+        - file_stream: The file-like object to convert. Must support seek(), tell(), and read() methods.
+        - stream_info: The StreamInfo object containing metadata about the file (mimetype, extension, charset, set)
+        - kwargs: Additional keyword arguments for the converter.
+
+        Returns:
+        - DocumentConverterResult: The result of the conversion, which includes the title and markdown content.
+
+        Raises:
+        - FileConversionException: If the mimetype is recognized, but the conversion fails for some other reason.
+        - MissingDependencyException: If the converter requires a dependency that is not installed.
+        """
+        raise NotImplementedError(
+            f"The subclass, {type(self).__name__}, must implement the convert() method to convert the document to Markdown."
+        )
+
+    async def convert_async(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
@@ -102,4 +198,6 @@ class DocumentConverter:
         - FileConversionException: If the mimetype is recognized, but the conversion fails for some other reason.
         - MissingDependencyException: If the converter requires a dependency that is not installed.
         """
-        raise NotImplementedError("Subclasses must implement this method")
+        raise NotImplementedError(
+            f"The subclass, {type(self).__name__}, must implement the convert_async() method to convert the document to Markdown."
+        )
