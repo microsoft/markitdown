@@ -107,5 +107,15 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
 
         return "![%s](%s%s)" % (alt, src, title_part)
 
+    def convert_sup(
+        self,
+        el: Any,
+        text: str,
+        convert_as_inline: Optional[bool] = False,
+        **kwargs,
+    ) -> str:
+        """Converts <sup> tags to their HTML equivalent."""
+        return f"^{text}^"
+
     def convert_soup(self, soup: Any) -> str:
         return super().convert_soup(soup)  # type: ignore
