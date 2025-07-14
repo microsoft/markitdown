@@ -1,19 +1,24 @@
 import sys
-import struct
-from typing import BinaryIO, Any
+import os
+import subprocess
+import tempfile
+import shutil
+from typing import BinaryIO, Any, Optional
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 
-# Try loading optional (but in this case, required) dependencies
-# Save reporting of any exceptions for later
-_dependency_exc_info = None
 try:
     import olefile
+except ImportError as e:
+    olefile = None
+    _olefile_exc_info = sys.exc_info()
+
+try:
+    from ._docx_converter import DocxConverter
 except ImportError:
-    # Preserve the error and stack trace for later
-    _dependency_exc_info = sys.exc_info()
+    DocxConverter = None
 
 ACCEPTED_MIME_TYPE_PREFIXES = [
     "application/msword",
@@ -25,18 +30,19 @@ ACCEPTED_FILE_EXTENSIONS = [".doc"]
 
 class DocConverter(DocumentConverter):
     """
-    Converts legacy DOC files to Markdown. This converter handles the older Microsoft Word binary format (.doc)
-    as opposed to the newer XML-based format (.docx).
+    Converts legacy DOC files to Markdown by first converting them to DOCX.
     
-    This converter uses pure Python libraries to extract text from DOC files without requiring
-    external system dependencies like LibreOffice or antiword.
+    This converter uses an OS-specific approach:
+    - On Windows, it uses the Word Application COM interface.
+    - On other platforms (Linux, macOS), it uses LibreOffice/Soffice.
+    
     """
 
     def accepts(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
-        **kwargs: Any,  # Options to pass to the converter
+        **kwargs: Any,
     ) -> bool:
         mimetype = (stream_info.mimetype or "").lower()
         extension = (stream_info.extension or "").lower()
@@ -54,192 +60,136 @@ class DocConverter(DocumentConverter):
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
-        **kwargs: Any,  # Options to pass to the converter
+        **kwargs: Any,
     ) -> DocumentConverterResult:
-        # Check the dependencies
-        if _dependency_exc_info is not None:
+        if olefile is None:
             raise MissingDependencyException(
                 MISSING_DEPENDENCY_MESSAGE.format(
                     converter=type(self).__name__,
                     extension=".doc",
-                    feature="doc",
+                    feature="doc (olefile)",
                 )
-            ) from _dependency_exc_info[
-                1
-            ].with_traceback(  # type: ignore[union-attr]
-                _dependency_exc_info[2]
-            )
-
-        # Extract text from the DOC file
-        try:
-            # check if this is actually a DOC file using olefile
-            if not olefile.isOleFile(file_stream):
-                return DocumentConverterResult(
-                    markdown="Error: Not a valid Microsoft Word DOC file"
-                )
+            ) from _olefile_exc_info[1].with_traceback(_olefile_exc_info[2])
             
-            text_content = self._extract_doc_text(file_stream)
-            
-            # Clean up the extracted text
-            if text_content:
-                markdown_content = self._clean_text(text_content)
-            else:
-                markdown_content = "Unable to extract readable text from this DOC file."
-
-            return DocumentConverterResult(markdown=markdown_content)
-            
-        except Exception as e:
+        if DocxConverter is None:
             return DocumentConverterResult(
-                markdown=f"Error converting DOC file: {str(e)}"
+                markdown="Error: The DocxConverter is not available. Please ensure it is installed."
             )
 
-    def _extract_doc_text(self, file_stream: BinaryIO) -> str:
-        """Extract text from DOC file using olefile to parse the OLE structure."""
+        file_stream.seek(0)
+        if not olefile.isOleFile(file_stream):
+            return DocumentConverterResult(
+                markdown="Error: Not a valid Microsoft Word DOC file."
+            )
+        file_stream.seek(0)
+        
+        tmp_dir = tempfile.mkdtemp()
+        doc_path = os.path.join(tmp_dir, "input.doc")
+        
+        with open(doc_path, "wb") as f:
+            shutil.copyfileobj(file_stream, f)
+            
+        docx_path = ""
         try:
-            # Reset stream position
-            file_stream.seek(0)
-            
-            ole = olefile.OleFileIO(file_stream)
-            
-            try:
-                if ole.exists('WordDocument'):
-                    word_stream = ole.openstream('WordDocument')
-                    data = word_stream.read()
-                    
-                    text = self._extract_text_from_word_stream(data)
-                    
-                    return text
-                else:
-                    return self._extract_readable_strings(file_stream)
-                    
-            finally:
-                ole.close()
+            if sys.platform == "win32":
+                docx_path = self._convert_to_docx_windows(doc_path)
+            else:
+                docx_path = self._convert_to_docx_unix(doc_path)
                 
-        except Exception:
-            # Fallback to basic string extraction
-            return self._extract_readable_strings(file_stream)
+            if not docx_path or not os.path.exists(docx_path):
+                return DocumentConverterResult(markdown="Error: Failed to convert DOC to DOCX.")
+                
+            docx_converter = DocxConverter()
+            with open(docx_path, "rb") as docx_file:
+                docx_stream_info = StreamInfo(
+                    mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    extension=".docx",
+                )
+                return docx_converter.convert(docx_file, docx_stream_info, **kwargs)
 
-    def _extract_text_from_word_stream(self, data: bytes) -> str:
-        """Extract text from the WordDocument stream using pattern matching."""
+        except Exception as e:
+            return DocumentConverterResult(markdown=f"Error converting DOC file: {str(e)}")
+            
+        finally:
+            shutil.rmtree(tmp_dir)
+
+    def _convert_to_docx_windows(self, doc_path: str) -> str:
+        """
+        Converts DOC to DOCX using the Word COM interface on Windows.
+        """
         try:
-            # Convert to string and filter out non-printable characters
-            text_parts = []
-            current_word = ""
-            
-            i = 0
-            while i < len(data):
-                byte = data[i]
-                
-                # Look for printable ASCII characters
-                if 32 <= byte <= 126:  # Printable ASCII
-                    current_word += chr(byte)
-                elif byte == 0:  # Null terminator often separates words
-                    if len(current_word) > 2:  # Only keep words longer than 2 chars
-                        text_parts.append(current_word)
-                    current_word = ""
-                else:
-                    # Check for Unicode characters (UTF-16)
-                    if i + 1 < len(data) and data[i + 1] == 0:
-                        # Potential UTF-16 little endian character
-                        if 32 <= byte <= 126:
-                            current_word += chr(byte)
-                        i += 1  # Skip the null byte
-                    else:
-                        # End current word
-                        if len(current_word) > 2:
-                            text_parts.append(current_word)
-                        current_word = ""
-                
-                i += 1
-            
-            # Add the last word
-            if len(current_word) > 2:
-                text_parts.append(current_word)
-            
-            return " ".join(text_parts)
-            
-        except Exception:
-            return ""
-
-    def _extract_readable_strings(self, file_stream: BinaryIO) -> str:
-        """Fallback method to extract readable strings from the file."""
+            # This comment tells the linter to ignore the "unresolved import" error.
+            import win32com.client  # type: ignore 
+        except ImportError as e:
+            raise MissingDependencyException(
+                MISSING_DEPENDENCY_MESSAGE.format(
+                    converter=type(self).__name__,
+                    extension=".doc",
+                    feature="doc (pywin32)",
+                )
+            ) from e
+        
+        word = None
         try:
-            file_stream.seek(0)
-            data = file_stream.read()
+            word = win32com.client.Dispatch("Word.Application")
+            word.visible = 0
             
-            text_parts = []
-            current_string = ""
+            in_file = os.path.abspath(doc_path)
+            doc = word.Documents.Open(in_file)
             
-            for byte in data:
-                # Look for printable characters
-                if 32 <= byte <= 126:
-                    current_string += chr(byte)
-                else:
-                    if len(current_string) > 4:  # Only keep strings longer than 4 characters
-                        # Filter out common binary patterns
-                        if not self._is_likely_binary_string(current_string):
-                            text_parts.append(current_string)
-                    current_string = ""
+            out_file = os.path.splitext(in_file)[0] + ".docx"
+            doc.SaveAs2(out_file, FileFormat=16)
+            doc.Close()
             
-            # Add the last string
-            if len(current_string) > 4:
-                if not self._is_likely_binary_string(current_string):
-                    text_parts.append(current_string)
+            return out_file
+        finally:
+            if word:
+                word.Quit()
+    
+    def _convert_to_docx_unix(self, doc_path: str) -> str:
+        """
+        Converts DOC to DOCX using LibreOffice/Soffice on Unix-like systems.
+        """
+        soffice_path = self._find_soffice()
+        if not soffice_path:
+            raise MissingDependencyException(
+                "LibreOffice/Soffice is not installed or not in the system's PATH. "
+                "Please install it to convert .doc files."
+            )
             
-            return " ".join(text_parts)
-            
-        except Exception:
-            return ""
+        output_dir = os.path.dirname(doc_path)
+        
+        try:
+            subprocess.run(
+                [
+                    soffice_path,
+                    "--headless",
+                    "--convert-to",
+                    "docx",
+                    "--outdir",
+                    output_dir,
+                    doc_path,
+                ],
+                check=True,
+                capture_output=True,
+                timeout=60, 
+            )
+        except subprocess.CalledProcessError as e:
+            error_message = e.stderr.decode(errors="ignore") if e.stderr else "Unknown error."
+            raise RuntimeError(f"LibreOffice conversion failed: {error_message}") from e
+        except subprocess.TimeoutExpired as e:
+            raise RuntimeError("LibreOffice conversion timed out after 60 seconds.") from e
 
-    def _is_likely_binary_string(self, s: str) -> bool:
-        """Check if a string is likely binary data rather than readable text."""
-        # Filter out strings that are likely binary data
-        binary_indicators = [
-            # Common file format signatures
-            'Microsoft', 'Word', 'MSWordDoc',
-            # Common binary patterns
-            'Root Entry', 'SummaryInformation', 'DocumentSummaryInformation',
-            # Strings with too many special characters
-        ]
         
-        # Skip strings that are mostly special characters
-        special_char_count = sum(1 for c in s if not c.isalnum() and c != ' ')
-        if len(s) > 0 and special_char_count / len(s) > 0.7:
-            return True
+        docx_path = os.path.splitext(doc_path)[0] + ".docx"
+        return docx_path
         
-        # Skip known binary indicators
-        for indicator in binary_indicators:
-            if indicator in s:
-                return True
-        
-        return False
-
-    def _clean_text(self, text: str) -> str:
-        """Clean and format the extracted text."""
-        if not text:
-            return ""
-        
-        # Split into words and reconstruct sentences
-        words = text.split()
-        if not words:
-            return ""
-        
-        # Basic sentence reconstruction
-        sentences = []
-        current_sentence = []
-        
-        for word in words:
-            current_sentence.append(word)
-            
-            # Simple sentence boundary detection
-            if word.endswith(('.', '!', '?')) or len(current_sentence) > 20:
-                if current_sentence:
-                    sentences.append(' '.join(current_sentence))
-                current_sentence = []
-        
-        # Add remaining words as a sentence
-        if current_sentence:
-            sentences.append(' '.join(current_sentence))
-        
-        # Join sentences with proper spacing
-        return '\n\n'.join(sentences) if sentences else text.strip()
+    def _find_soffice(self) -> Optional[str]:
+        """
+        Finds the path to the soffice or libreoffice executable.
+        """
+        for cmd in ["soffice", "libreoffice"]:
+            path = shutil.which(cmd)
+            if path:
+                return path
+        return None

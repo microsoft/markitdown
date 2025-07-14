@@ -234,20 +234,6 @@ GENERAL_TEST_VECTORS = [
         ],
         must_not_include=[],
     ),
-    FileTestVector(
-        filename="test.doc",
-        mimetype="application/msword",
-        charset=None,
-        url=None,
-        must_include=[
-            # we test for basic, proper functionality rather than perfect output (i.e. app not crashing, etc.)
-        ],
-        must_not_include=[
-            "Error converting DOC file:",
-            "Unable to extract readable text",
-            "Not a valid Microsoft Word DOC file",
-        ],
-    ),
 ]
 
 
@@ -270,6 +256,27 @@ DATA_URI_TEST_VECTORS = [
             "data:image/png;base64...",
         ],
     ),
+    
+    FileTestVector(
+        filename="test.doc",
+        mimetype="application/msword",
+        charset=None,
+        url=None,
+        must_include=[
+            "314b0a30-5b04-470b-b9f7-eed2c2bec74a",
+            "49e168b7-d2ae-407f-a055-2167576f39a1",
+            "## d666f1f7-46cb-42bd-9a39-9a39cf2a509f",
+            "# Abstract",
+            "# Introduction",
+            "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation",
+        ],
+        must_not_include=[
+            "Error converting DOC file:",
+            "Unable to extract readable text",
+            "Not a valid Microsoft Word DOC file",
+        ],
+    ),
+
     FileTestVector(
         filename="test.pptx",
         mimetype="application/vnd.openxmlformats-officedocument.presentationml.presentation",
