@@ -1,4 +1,4 @@
-from typing import BinaryIO, Any, Union
+from typing import BinaryIO, Union
 import base64
 import mimetypes
 from .._stream_info import StreamInfo

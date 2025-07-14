@@ -10,14 +10,14 @@ from .._stream_info import StreamInfo
 _xlsx_dependency_exc_info = None
 try:
     import pandas as pd
-    import openpyxl
+    import openpyxl  # noqa: F401
 except ImportError:
     _xlsx_dependency_exc_info = sys.exc_info()
 
 _xls_dependency_exc_info = None
 try:
-    import pandas as pd
-    import xlrd
+    import pandas as pd  # noqa: F811
+    import xlrd  # noqa: F401
 except ImportError:
     _xls_dependency_exc_info = sys.exc_info()
 

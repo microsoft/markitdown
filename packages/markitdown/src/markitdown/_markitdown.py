@@ -1,11 +1,8 @@
-import copy
 import mimetypes
 import os
 import re
 import sys
 import shutil
-import tempfile
-import warnings
 import traceback
 import io
 from dataclasses import dataclass
@@ -41,6 +38,7 @@ from .converters import (
     ZipConverter,
     EpubConverter,
     DocumentIntelligenceConverter,
+    CsvConverter,
 )
 
 from ._base_converter import DocumentConverter, DocumentConverterResult
@@ -194,6 +192,7 @@ class MarkItDown:
             self.register_converter(PdfConverter())
             self.register_converter(OutlookMsgConverter())
             self.register_converter(EpubConverter())
+            self.register_converter(CsvConverter())
 
             # Register Document Intelligence converter at the top of the stack if endpoint is provided
             docintel_endpoint = kwargs.get("docintel_endpoint")
@@ -208,6 +207,10 @@ class MarkItDown:
                 docintel_types = kwargs.get("docintel_file_types")
                 if docintel_types is not None:
                     docintel_args["file_types"] = docintel_types
+
+                docintel_version = kwargs.get("docintel_api_version")
+                if docintel_version is not None:
+                    docintel_args["api_version"] = docintel_version
 
                 self.register_converter(
                     DocumentIntelligenceConverter(**docintel_args),
@@ -545,7 +548,7 @@ class MarkItDown:
                 # Sanity check -- make sure the cur_pos is still the same
                 assert (
                     cur_pos == file_stream.tell()
-                ), f"File stream position should NOT change between guess iterations"
+                ), "File stream position should NOT change between guess iterations"
 
                 _kwargs = {k: v for k, v in kwargs.items()}
 
@@ -612,7 +615,7 @@ class MarkItDown:
 
         # Nothing can handle it!
         raise UnsupportedFormatException(
-            f"Could not convert stream to Markdown. No converter attempted a conversion, suggesting that the filetype is simply not supported."
+            "Could not convert stream to Markdown. No converter attempted a conversion, suggesting that the filetype is simply not supported."
         )
 
     def register_page_converter(self, converter: DocumentConverter) -> None:

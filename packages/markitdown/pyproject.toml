@@ -29,6 +29,8 @@ dependencies = [
   "markdownify",
   "magika~=0.6.1",
   "charset-normalizer",
+  "defusedxml",
+  "onnxruntime<=1.20.1; sys_platform == 'win32'",
 ]
 
 [project.optional-dependencies]
