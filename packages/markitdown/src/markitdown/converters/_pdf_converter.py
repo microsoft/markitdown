@@ -3,6 +3,7 @@ import io
 
 from typing import BinaryIO, Any
 
+import pymupdf4llm
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
@@ -58,6 +59,7 @@ class PdfConverter(DocumentConverter):
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
         # Check the dependencies
+        
         if _dependency_exc_info is not None:
             raise MissingDependencyException(
                 MISSING_DEPENDENCY_MESSAGE.format(
@@ -72,6 +74,16 @@ class PdfConverter(DocumentConverter):
             )
 
         assert isinstance(file_stream, io.IOBase)  # for mypy
+        
+        use_pdf4llm = kwargs.get("use_pdf4llm", False)
+        
+        if use_pdf4llm:
+            args_pdf4llm = kwargs.get("args_pdf4llm", {})
+            
+            return DocumentConverterResult(
+                markdown=pymupdf4llm.to_markdown(file_stream, **args_pdf4llm)
+            )
+        
         return DocumentConverterResult(
             markdown=pdfminer.high_level.extract_text(file_stream),
         )
