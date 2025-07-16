@@ -28,7 +28,9 @@ MarkItDown currently supports the conversion from:
 - ZIP files (iterates over contents)
 - Youtube URLs
 - EPubs
-- ... and more!
+- ... and more
+
+to **Markdown**!
 
 ## Why Markdown?
 
