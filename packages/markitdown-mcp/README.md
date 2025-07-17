@@ -102,7 +102,7 @@ To debug the MCP server you can use the `mcpinspector` tool.
 npx @modelcontextprotocol/inspector
 ```
 
-You can then connect to the insepctor through the specified host and port (e.g., `http://localhost:5173/`).
+You can then connect to the inspector through the specified host and port (e.g., `http://localhost:5173/`).
 
 If using STDIO:
 * select `STDIO` as the transport type,
