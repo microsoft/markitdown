@@ -93,7 +93,9 @@ PPTX_TEST_STRINGS = [
     "a3f6004b-6f4f-4ea8-bee3-3741f4dc385f",  # chart title
     "2003",  # chart value
 ]
-
+PPTX_NEWLINES_TEST_STRINGS = [
+    "First line  \nSecond line"
+]
 
 # --- Helper Functions ---
 def validate_strings(result, expected_strings, exclude_strings=None):
@@ -271,6 +273,16 @@ def test_docx_equations() -> None:
     # Find block equations wrapped with double $$ and check if they are present
     block_equations = re.findall(r"\$\$(.+?)\$\$", result.text_content)
     assert block_equations, "No block equations found in the document."
+
+
+def test_pptx_newlines() -> None:
+    """Test that newlines in PPTX files are correctly converted to hard line breaks."""
+    markitdown = MarkItDown()
+    test_file = os.path.join(TEST_FILES_DIR, "test_pptx_newlines.pptx")
+    result = markitdown.convert(test_file)
+
+    for test_string in PPTX_NEWLINES_TEST_STRINGS:
+        assert test_string in result.markdown
 
 
 def test_input_as_strings() -> None:
