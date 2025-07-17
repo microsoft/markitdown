@@ -12,7 +12,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 from warnings import warn
 import requests
-import magika
+
 import charset_normalizer
 import codecs
 
@@ -110,7 +110,13 @@ class MarkItDown:
         else:
             self._requests_session = requests_session
 
-        self._magika = magika.Magika()
+        try:
+            import magika
+
+            self._magika = magika.Magika()
+        except ImportError:
+            warn("Magika not found. Install with `pip install markitdown[magika]`", ImportWarning)
+            self._magika = None
 
         # TODO - remove these (see enable_builtins)
         self._llm_client: Any = None
@@ -685,77 +691,80 @@ class MarkItDown:
 
         # Call magika to guess from the stream
         cur_pos = file_stream.tell()
-        try:
-            result = self._magika.identify_stream(file_stream)
-            if result.status == "ok" and result.prediction.output.label != "unknown":
-                # If it's text, also guess the charset
-                charset = None
-                if result.prediction.output.is_text:
-                    # Read the first 4k to guess the charset
-                    file_stream.seek(cur_pos)
-                    stream_page = file_stream.read(4096)
-                    charset_result = charset_normalizer.from_bytes(stream_page).best()
+        if self._magika is not None:
+            try:
+                result = self._magika.identify_stream(file_stream)
+                if result.status == "ok" and result.prediction.output.label != "unknown":
+                    # If it's text, also guess the charset
+                    charset = None
+                    if result.prediction.output.is_text:
+                        # Read the first 4k to guess the charset
+                        file_stream.seek(cur_pos)
+                        stream_page = file_stream.read(4096)
+                        charset_result = charset_normalizer.from_bytes(stream_page).best()
 
-                    if charset_result is not None:
-                        charset = self._normalize_charset(charset_result.encoding)
+                        if charset_result is not None:
+                            charset = self._normalize_charset(charset_result.encoding)
 
-                # Normalize the first extension listed
-                guessed_extension = None
-                if len(result.prediction.output.extensions) > 0:
-                    guessed_extension = "." + result.prediction.output.extensions[0]
+                    # Normalize the first extension listed
+                    guessed_extension = None
+                    if len(result.prediction.output.extensions) > 0:
+                        guessed_extension = "." + result.prediction.output.extensions[0]
 
-                # Determine if the guess is compatible with the base guess
-                compatible = True
-                if (
-                    base_guess.mimetype is not None
-                    and base_guess.mimetype != result.prediction.output.mime_type
-                ):
-                    compatible = False
+                    # Determine if the guess is compatible with the base guess
+                    compatible = True
+                    if (
+                        base_guess.mimetype is not None
+                        and base_guess.mimetype != result.prediction.output.mime_type
+                    ):
+                        compatible = False
 
-                if (
-                    base_guess.extension is not None
-                    and base_guess.extension.lstrip(".")
-                    not in result.prediction.output.extensions
-                ):
-                    compatible = False
+                    if (
+                        base_guess.extension is not None
+                        and base_guess.extension.lstrip(".")
+                        not in result.prediction.output.extensions
+                    ):
+                        compatible = False
 
-                if (
-                    base_guess.charset is not None
-                    and self._normalize_charset(base_guess.charset) != charset
-                ):
-                    compatible = False
+                    if (
+                        base_guess.charset is not None
+                        and self._normalize_charset(base_guess.charset) != charset
+                    ):
+                        compatible = False
 
-                if compatible:
-                    # Add the compatible base guess
-                    guesses.append(
-                        StreamInfo(
-                            mimetype=base_guess.mimetype
-                            or result.prediction.output.mime_type,
-                            extension=base_guess.extension or guessed_extension,
-                            charset=base_guess.charset or charset,
-                            filename=base_guess.filename,
-                            local_path=base_guess.local_path,
-                            url=base_guess.url,
+                    if compatible:
+                        # Add the compatible base guess
+                        guesses.append(
+                            StreamInfo(
+                                mimetype=base_guess.mimetype
+                                or result.prediction.output.mime_type,
+                                extension=base_guess.extension or guessed_extension,
+                                charset=base_guess.charset or charset,
+                                filename=base_guess.filename,
+                                local_path=base_guess.local_path,
+                                url=base_guess.url,
+                            )
                         )
-                    )
+                    else:
+                        # The magika guess was incompatible with the base guess, so add both guesses
+                        guesses.append(enhanced_guess)
+                        guesses.append(
+                            StreamInfo(
+                                mimetype=result.prediction.output.mime_type,
+                                extension=guessed_extension,
+                                charset=charset,
+                                filename=base_guess.filename,
+                                local_path=base_guess.local_path,
+                                url=base_guess.url,
+                            )
+                        )
                 else:
-                    # The magika guess was incompatible with the base guess, so add both guesses
+                    # There were no other guesses, so just add the base guess
                     guesses.append(enhanced_guess)
-                    guesses.append(
-                        StreamInfo(
-                            mimetype=result.prediction.output.mime_type,
-                            extension=guessed_extension,
-                            charset=charset,
-                            filename=base_guess.filename,
-                            local_path=base_guess.local_path,
-                            url=base_guess.url,
-                        )
-                    )
-            else:
-                # There were no other guesses, so just add the base guess
-                guesses.append(enhanced_guess)
-        finally:
-            file_stream.seek(cur_pos)
+            finally:
+                file_stream.seek(cur_pos)
+        else:
+            guesses.append(enhanced_guess)
 
         return guesses
 

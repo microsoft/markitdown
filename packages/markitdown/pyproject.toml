@@ -30,6 +30,10 @@ dependencies = [
   "magika~=0.6.1",
   "charset-normalizer",
   "defusedxml",
+]
+
+[project.optional-dependencies]
+magika = [
   "onnxruntime<=1.20.1; sys_platform == 'win32'",
 ]
 
