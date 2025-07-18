@@ -109,6 +109,21 @@ GENERAL_TEST_VECTORS = [
         must_not_include=[],
     ),
     FileTestVector(
+    filename="PowerCollections.chm",
+    mimetype="application/vnd.ms-htmlhelp",
+    charset=None,
+    url="https://submain.com/ghostdoc/samples/themes/FlatGray/html/T-Wintellect.PowerCollections.Algorithms.htm",
+    must_include=[
+        "Algorithms contains a number of static methods that implement",
+        "Inheritance Hierarchy",
+        "Algorithms Class",
+    ],
+    must_not_include=[
+        "<script>",
+        "<style>"
+    ],
+    ),
+    FileTestVector(
         filename="test_wikipedia.html",
         mimetype="text/html",
         charset="utf-8",
