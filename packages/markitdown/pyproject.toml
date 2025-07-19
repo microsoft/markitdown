@@ -74,6 +74,9 @@ markitdown = "markitdown.__main__:main"
 [tool.hatch.envs.default]
 features = ["all"]
 
+[tool.pytest.ini_options]
+pythonpath = "src"
+
 [tool.hatch.envs.hatch-test]
 features = ["all"]
 extra-dependencies = [

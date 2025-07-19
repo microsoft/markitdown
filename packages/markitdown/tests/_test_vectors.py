@@ -109,7 +109,7 @@ GENERAL_TEST_VECTORS = [
         must_not_include=[],
     ),
     FileTestVector(
-        filename="PowerCollections.chm",
+        filename="test.chm",
         mimetype="application/vnd.ms-htmlhelp",
         charset=None,
         url="https://submain.com/ghostdoc/samples/themes/FlatGray/html/T-Wintellect.PowerCollections.Algorithms.htm",
