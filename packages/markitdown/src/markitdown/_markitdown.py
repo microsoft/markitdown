@@ -195,7 +195,7 @@ class MarkItDown:
             self.register_converter(EpubConverter())
             self.register_converter(CsvConverter())
             self.register_converter(ChmConverter())
-            
+
             # Register Document Intelligence converter at the top of the stack if endpoint is provided
             docintel_endpoint = kwargs.get("docintel_endpoint")
             if docintel_endpoint is not None:

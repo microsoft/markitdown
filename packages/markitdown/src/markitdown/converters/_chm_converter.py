@@ -23,6 +23,7 @@ ACCEPTED_FILE_EXTENSIONS = [
     ".chm",
 ]
 
+
 class ChmConverter(DocumentConverter):
     def accepts(
         self,
@@ -80,7 +81,9 @@ class ChmConverter(DocumentConverter):
 
         # Get all file paths and sort them for consistent output.
         # The API for listing files might differ (e.g., chm_file.files).
-        object_paths = sorted([path.decode(errors='ignore') for path in chm_file.get_objects()])
+        object_paths = sorted(
+            [path.decode(errors="ignore") for path in chm_file.get_objects()]
+        )
 
         for path in object_paths:
             if not path.lower().endswith((".html", ".htm")):
