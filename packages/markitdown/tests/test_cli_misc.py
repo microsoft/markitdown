@@ -8,7 +8,7 @@ from markitdown import __version__
 
 def test_version() -> None:
     result = subprocess.run(
-        ["python3", "-m", "markitdown", "--version"], capture_output=True, text=True
+        ["python", "-m", "markitdown", "--version"], capture_output=True, text=True
     )
 
     assert result.returncode == 0, f"CLI exited with error: {result.stderr}"
@@ -17,7 +17,7 @@ def test_version() -> None:
 
 def test_invalid_flag() -> None:
     result = subprocess.run(
-        ["python3", "-m", "markitdown", "--foobar"], capture_output=True, text=True
+        ["python", "-m", "markitdown", "--foobar"], capture_output=True, text=True
     )
 
     assert result.returncode != 0, f"CLI exited with error: {result.stderr}"
@@ -30,7 +30,7 @@ def test_invalid_flag() -> None:
 def test_batch_help() -> None:
     """Test that batch options are available in help"""
     result = subprocess.run(
-        ["python3", "-m", "markitdown", "--help"], capture_output=True, text=True
+        ["python", "-m", "markitdown", "--help"], capture_output=True, text=True
     )
 
     assert result.returncode == 0, f"CLI exited with error: {result.stderr}"
@@ -42,7 +42,7 @@ def test_batch_help() -> None:
 def test_batch_missing_directory() -> None:
     """Test that batch mode requires a directory"""
     result = subprocess.run(
-        ["python3", "-m", "markitdown", "--batch"], capture_output=True, text=True
+        ["python", "-m", "markitdown", "--batch"], capture_output=True, text=True
     )
 
     assert result.returncode != 0, f"CLI exited with error: {result.stderr}"
@@ -52,7 +52,7 @@ def test_batch_missing_directory() -> None:
 def test_batch_nonexistent_directory() -> None:
     """Test that batch mode handles nonexistent directory"""
     result = subprocess.run(
-        ["python3", "-m", "markitdown", "--batch", "/nonexistent/directory"], 
+        ["python", "-m", "markitdown", "--batch", "/nonexistent/directory"], 
         capture_output=True, text=True
     )
 
