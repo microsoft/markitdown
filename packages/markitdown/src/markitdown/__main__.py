@@ -8,6 +8,7 @@ from textwrap import dedent
 from importlib.metadata import entry_points
 from .__about__ import __version__
 from ._markitdown import MarkItDown, StreamInfo, DocumentConverterResult
+from ._exceptions import UnsupportedFormatException, FileConversionException
 
 
 def main():
@@ -245,8 +246,8 @@ def _exit_with_error(message: str):
 
 def _handle_batch_processing(args, markitdown: MarkItDown, stream_info):
     """Handle batch processing of files in a directory"""
-    import os
     from pathlib import Path
+    from ._exceptions import UnsupportedFormatException, FileConversionException
     
     input_dir = Path(args.filename)
     if not input_dir.exists():
@@ -258,46 +259,33 @@ def _handle_batch_processing(args, markitdown: MarkItDown, stream_info):
     output_dir = Path(args.output) if args.output else input_dir / "converted"
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Get supported file types
-    supported_extensions = {
-        'pdf', 'docx', 'pptx', 'xlsx', 'xls', 'csv', 'txt', 'html', 'htm',
-        'json', 'xml', 'rss', 'msg', 'zip', 'epub', 'jpg', 'jpeg', 'png',
-        'gif', 'bmp', 'tiff', 'wav', 'mp3', 'm4a', 'mp4'
-    }
-    
-    # Parse user-specified types
-    if args.types:
-        user_types = {ext.strip().lower().lstrip('.') for ext in args.types.split(',')}
-        supported_extensions = supported_extensions.intersection(user_types)
-    
-    # Find files to process
+    # Find all files to process
     pattern = "**/*" if args.recursive else "*"
-    files_to_process = []
+    all_files = []
     
     for file_path in input_dir.glob(pattern):
         if file_path.is_file():
-            extension = file_path.suffix.lower().lstrip('.')
-            if extension in supported_extensions:
-                files_to_process.append(file_path)
+            all_files.append(file_path)
     
-    if not files_to_process:
-        print(f"No supported files found in {input_dir}")
+    if not all_files:
+        print(f"No files found in {input_dir}")
         return
     
-    print(f"Found {len(files_to_process)} files to process")
+    print(f"Found {len(all_files)} files to process")
     
     # Process files
     processed = 0
     failed = 0
+    unsupported = 0
     
-    for i, file_path in enumerate(files_to_process, 1):
+    for i, file_path in enumerate(all_files, 1):
         try:
             # Calculate relative path and output path
             rel_path = file_path.relative_to(input_dir)
             output_file = output_dir / rel_path.with_suffix('.md')
             output_file.parent.mkdir(parents=True, exist_ok=True)
             
-            print(f"[{i}/{len(files_to_process)}] Processing: {rel_path}")
+            print(f"[{i}/{len(all_files)}] Processing: {rel_path}")
             
             # Convert file
             result = markitdown.convert(
@@ -313,13 +301,20 @@ def _handle_batch_processing(args, markitdown: MarkItDown, stream_info):
             print(f"✓ Success: {rel_path}")
             processed += 1
             
+        except UnsupportedFormatException:
+            print(f"⚠ Skipped (unsupported): {rel_path}")
+            unsupported += 1
+        except FileConversionException as e:
+            print(f"✗ Failed (conversion error): {rel_path} - {e}")
+            failed += 1
         except Exception as e:
-            print(f"✗ Failed: {rel_path} - {e}")
+            print(f"✗ Failed (unexpected error): {rel_path} - {e}")
             failed += 1
     
     print(f"\nBatch processing complete!")
     print(f"Success: {processed} files")
     print(f"Failed: {failed} files")
+    print(f"Unsupported: {unsupported} files")
     print(f"Output directory: {output_dir}")
 
 
