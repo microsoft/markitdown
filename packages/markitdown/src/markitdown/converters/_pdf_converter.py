@@ -75,3 +75,26 @@ class PdfConverter(DocumentConverter):
         return DocumentConverterResult(
             markdown=pdfminer.high_level.extract_text(file_stream),
         )
+
+        # ========== Custom Addition: Pagewise Markdown Output (Non-invasive) ==========
+
+def convert_pagewise(file_stream: BinaryIO) -> list[str]:
+    """
+    Converts each page of a PDF to a separate Markdown string using pdfminer.
+    This function is non-invasive and does not modify the original PdfConverter class.
+    """
+    from pdfminer.pdfpage import PDFPage
+    from pdfminer.high_level import extract_text_to_fp
+    from pdfminer.layout import LAParams
+
+    output_pages = []
+    laparams = LAParams()
+    for page in PDFPage.get_pages(file_stream):
+        buffer = io.StringIO()
+        extract_text_to_fp(io.BytesIO(page.__self__.read(page.length)), buffer, laparams=laparams, page_numbers=[page.pageid])
+        markdown_text = buffer.getvalue().strip()
+        output_pages.append(f"<!-- Page {page.pageid} -->\n\n{markdown_text}")
+        buffer.close()
+
+    return output_pages
+
