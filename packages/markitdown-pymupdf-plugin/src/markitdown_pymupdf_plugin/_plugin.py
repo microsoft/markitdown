@@ -1,6 +1,8 @@
 import io
 import sys
-from typing import BinaryIO, Any
+import os
+from pathlib import Path
+from typing import BinaryIO, Any, Optional
 
 from markitdown import (
     MarkItDown,
@@ -71,6 +73,7 @@ class PyMuPdfConverter(DocumentConverter):
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
+        images_output_dir: Optional[str] = None,
         **kwargs: Any,
     ) -> DocumentConverterResult:
         # Check the dependencies
@@ -91,10 +94,46 @@ class PyMuPdfConverter(DocumentConverter):
 
         doc = pymupdf.open(stream=file_stream.read(), filetype="pdf")
         text = ""
-        for page in doc:
+        extracted_image_paths = []
+
+        # Determine output directory for images
+        output_dir = None
+        if images_output_dir:
+            output_dir = Path(images_output_dir)
+        elif stream_info.local_path:
+            source_path = Path(stream_info.local_path)
+            output_dir = source_path.parent / "img"
+
+        if output_dir:
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+        for page_num, page in enumerate(doc):
             text += page.get_text()
+            extracted_image_paths.extend(self._extract_images_from_page(doc, page, page_num, output_dir))
+
         doc.close()
 
-        return DocumentConverterResult(
-            markdown=text,
-        )
+        result = DocumentConverterResult(markdown=text)
+        result.extracted_image_paths = extracted_image_paths
+        return result
+
+    def _extract_images_from_page(self, doc: pymupdf.Document, page: pymupdf.Page, page_num: int, output_dir: Optional[Path]) -> list[str]:
+        """
+        Extracts images from a single PyMuPDF page and saves them to the specified output directory.
+        Returns a list of paths to the extracted images.
+        """
+        extracted_paths = []
+        image_list = page.get_images(full=True)
+        for img_index, img in enumerate(image_list):
+            xref = img[0]
+            base_image = doc.extract_image(xref)
+            image_bytes = base_image["image"]
+            image_ext = base_image["ext"]
+
+            if output_dir:
+                image_filename = f"page_{page_num + 1}_image_{img_index + 1}.{image_ext}"
+                image_path = output_dir / image_filename
+                with open(image_path, "wb") as img_file:
+                    img_file.write(image_bytes)
+                extracted_paths.append(str(image_path))
+        return extracted_paths

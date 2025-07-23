@@ -40,6 +40,11 @@ path = "src/markitdown_pymupdf_plugin/__about__.py"
 [project.entry-points."markitdown.plugin"]
 pymupdf_plugin = "markitdown_pymupdf_plugin"
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+]
+
 [tool.hatch.envs.types]
 extra-dependencies = [
   "mypy>=1.0.0",
