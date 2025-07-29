@@ -39,6 +39,8 @@ from .converters import (
     EpubConverter,
     DocumentIntelligenceConverter,
     CsvConverter,
+    EnhancedDocumentConverterResult,
+    ExcelFormulaInfo,
 )
 
 from ._base_converter import DocumentConverter, DocumentConverterResult
@@ -99,10 +101,23 @@ class MarkItDown:
         *,
         enable_builtins: Union[None, bool] = None,
         enable_plugins: Union[None, bool] = None,
+        extract_formulas: bool = False,  # Simple parameter name
+        excel_include_formulas: bool = None,  # Deprecated, for backward compatibility
+        excel_include_formula_summary: bool = False,
         **kwargs,
     ):
         self._builtins_enabled = False
         self._plugins_enabled = False
+
+        # Handle formula extraction configuration (with backward compatibility)
+        if excel_include_formulas is not None:
+            # Backward compatibility: if old parameter is used, prefer it
+            self._excel_include_formulas = excel_include_formulas
+        else:
+            # Use new simple parameter
+            self._excel_include_formulas = extract_formulas
+            
+        self._excel_include_formula_summary = excel_include_formula_summary
 
         requests_session = kwargs.get("requests_session")
         if requests_session is None:
@@ -183,8 +198,14 @@ class MarkItDown:
             self.register_converter(YouTubeConverter())
             self.register_converter(BingSerpConverter())
             self.register_converter(DocxConverter())
-            self.register_converter(XlsxConverter())
-            self.register_converter(XlsConverter())
+            self.register_converter(XlsxConverter(
+                include_formulas=self._excel_include_formulas,
+                include_formula_summary=self._excel_include_formula_summary
+            ))
+            self.register_converter(XlsConverter(
+                include_formulas=self._excel_include_formulas,
+                include_formula_summary=self._excel_include_formula_summary
+            ))
             self.register_converter(PptxConverter())
             self.register_converter(AudioConverter())
             self.register_converter(ImageConverter())

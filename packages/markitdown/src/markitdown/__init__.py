@@ -10,6 +10,7 @@ from ._markitdown import (
 )
 from ._base_converter import DocumentConverterResult, DocumentConverter
 from ._stream_info import StreamInfo
+from .converters import EnhancedDocumentConverterResult, ExcelFormulaInfo
 from ._exceptions import (
     MarkItDownException,
     MissingDependencyException,
@@ -23,6 +24,8 @@ __all__ = [
     "MarkItDown",
     "DocumentConverter",
     "DocumentConverterResult",
+    "EnhancedDocumentConverterResult",
+    "ExcelFormulaInfo",
     "MarkItDownException",
     "MissingDependencyException",
     "FailedConversionAttempt",
