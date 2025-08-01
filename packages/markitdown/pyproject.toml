@@ -51,7 +51,7 @@ all = [
 ]
 pptx = ["python-pptx"]
 docx = ["mammoth", "lxml"]
-doc = ["olefile"]
+doc = ["olefile", "pywin32; sys_platform == 'win32'"]
 xlsx = ["pandas", "openpyxl"]
 xls = ["pandas", "xlrd"]
 pdf = ["pdfminer.six"]
