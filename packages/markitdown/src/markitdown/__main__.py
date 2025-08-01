@@ -282,7 +282,7 @@ def _handle_batch_processing(args, markitdown: MarkItDown, stream_info):
         try:
             # Calculate relative path and output path
             rel_path = file_path.relative_to(input_dir)
-            output_file = output_dir / rel_path.with_suffix('.md')
+            output_file = output_dir / Path(str(rel_path) + '.md')
             output_file.parent.mkdir(parents=True, exist_ok=True)
             
             print(f"[{i}/{len(all_files)}] Processing: {rel_path}")
