@@ -124,6 +124,40 @@ Across the 12 supported documents, MarkItDown's Markdown differed from the Docli
 with bounding box coordinates deviating by about **18%**. Right-to-left pages and scanned forms contributed most of the
 discrepancies.
 
+### Docling Test Data Timing
+
+The following table reports the time required by `markitdown` to convert each PDF, TIFF, and PNG file from the [Docling test dataset](https://github.com/docling-project/docling/tree/main/tests/data) into Markdown and to generate bounding boxes (`--emit-bbox`). The TIFF sample was first converted to PNG for processing.
+
+| File | Type | MD Time (s) | BBox Time (s) |
+| --- | --- | --- | --- |
+| 2305.03393v1-pg9-img.png | png | 2.51 | 5.56 |
+| 2203.01017v2.pdf | pdf | 4.59 | 9.30 |
+| 2206.01062.pdf | pdf | 4.94 | 11.21 |
+| 2305.03393v1-pg9.pdf | pdf | 2.69 | 2.88 |
+| 2305.03393v1.pdf | pdf | 3.71 | 6.70 |
+| amt_handbook_sample.pdf | pdf | 3.14 | 3.99 |
+| code_and_formula.pdf | pdf | 2.80 | 3.24 |
+| multi_page.pdf | pdf | 2.89 | 3.93 |
+| picture_classification.pdf | pdf | 2.68 | 2.92 |
+| redp5110_sampled.pdf | pdf | 3.71 | 8.67 |
+| right_to_left_01.pdf | pdf | 2.83 | 2.87 |
+| right_to_left_02.pdf | pdf | 2.70 | 3.01 |
+| right_to_left_03.pdf | pdf | 2.81 | 2.93 |
+| 2206.01062.tif | tiff | 2.57 | 4.19 |
+
+#### Average Times by Type
+
+| Type | Avg MD Time (s) | Avg BBox Time (s) |
+| --- | --- | --- |
+| png | 2.51 | 5.56 |
+| pdf | 3.29 | 5.14 |
+| tiff | 2.57 | 4.19 |
+
+#### Overall Average Times
+
+* Average MD Time: 3.18 s
+* Average BBox Time: 5.10 s
+
 ### Optional Dependencies
 MarkItDown has optional dependencies for activating various file formats. Earlier in this document, we installed all optional dependencies with the `[all]` option. However, you can also install them individually for more control. For example:
 
