@@ -118,6 +118,8 @@ This writes `sample.bbox.json` alongside the Markdown output. The structure of t
 
 For scanned PDFs or images without embedded text, MarkItDown falls back to Tesseract OCR when `--emit-bbox` is supplied. Set `MARKITDOWN_OCR_LANG` (or use `--ocr-lang`) to control OCR languages. Use `TESSDATA_PREFIX` if custom language packs are installed.
 
+For an example comparison with Docling outputs, see [docling_comparison.md](docling_comparison.md).
+
 ### Optional Dependencies
 MarkItDown has optional dependencies for activating various file formats. Earlier in this document, we installed all optional dependencies with the `[all]` option. However, you can also install them individually for more control. For example:
 
