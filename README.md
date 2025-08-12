@@ -94,6 +94,30 @@ You can also pipe content:
 cat path-to-file.pdf | markitdown
 ```
 
+### Bounding Boxes
+
+Use `--emit-bbox` to generate a sidecar JSON file with page, line, and word bounding boxes for PDF and image inputs:
+
+```bash
+markitdown sample.pdf --emit-bbox
+```
+
+This writes `sample.bbox.json` alongside the Markdown output. The structure of the JSON file is:
+
+```json
+{
+  "version": "1.0",
+  "source": "sample.pdf",
+  "pages": [{ "page": 1, "width": 612, "height": 792 }],
+  "lines": [{ "page": 1, "text": "Hello", "bbox_norm": [0,0,0,0], "bbox_abs": [0,0,0,0], "confidence": null, "md_span": {"start": null, "end": null} }],
+  "words": [{ "page": 1, "text": "Hello", "bbox_norm": [0,0,0,0], "bbox_abs": [0,0,0,0], "confidence": null, "line_id": 0 }]
+}
+```
+
+`bbox_abs` values are in pixel units of the page or image, with a top-left origin. `bbox_norm` values are normalized to the range `[0,1]`.
+
+For scanned PDFs or images without embedded text, MarkItDown falls back to Tesseract OCR when `--emit-bbox` is supplied. Set `MARKITDOWN_OCR_LANG` (or use `--ocr-lang`) to control OCR languages. Use `TESSDATA_PREFIX` if custom language packs are installed.
+
 ### Optional Dependencies
 MarkItDown has optional dependencies for activating various file formats. Earlier in this document, we installed all optional dependencies with the `[all]` option. However, you can also install them individually for more control. For example:
 

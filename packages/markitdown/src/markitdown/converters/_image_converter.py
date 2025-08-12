@@ -1,9 +1,13 @@
-from typing import BinaryIO, Any, Union
+from typing import BinaryIO, Any, Union, Optional, Dict
 import base64
 import mimetypes
+import io
+import os
+from warnings import warn
 from ._exiftool import exiftool_metadata
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
+from ..bbox import BBoxDoc, BBoxPage, BBoxLine, BBoxWord
 
 ACCEPTED_MIME_TYPE_PREFIXES = [
     "image/jpeg",
@@ -40,6 +44,9 @@ class ImageConverter(DocumentConverter):
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
+        *,
+        emit_bbox: bool = False,
+        ocr_lang: Optional[str] = None,
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
         md_content = ""
@@ -80,9 +87,83 @@ class ImageConverter(DocumentConverter):
             if llm_description is not None:
                 md_content += "\n# Description:\n" + llm_description.strip() + "\n"
 
-        return DocumentConverterResult(
-            markdown=md_content,
-        )
+        bbox_doc: Optional[BBoxDoc] = None
+        if emit_bbox:
+            try:
+                from PIL import Image
+                import pytesseract
+                from pytesseract import Output
+            except Exception:
+                warn("emit_bbox requested but pytesseract/Pillow not installed; skipping bbox output")
+            else:
+                cur_pos = file_stream.tell()
+                file_stream.seek(0)
+                img = Image.open(file_stream)
+                file_stream.seek(cur_pos)
+                width, height = img.size
+                lang = ocr_lang or os.getenv("MARKITDOWN_OCR_LANG", "eng")
+                df = pytesseract.image_to_data(img, output_type=Output.DATAFRAME, lang=lang)
+                line_map: Dict[int, int] = {}
+                tmp: Dict[int, Dict[str, Any]] = {}
+                words: list[BBoxWord] = []
+                for _, row in df[df.level == 5].iterrows():
+                    text = str(row["text"]).strip()
+                    if not text:
+                        continue
+                    left, top, w, h = int(row.left), int(row.top), int(row.width), int(row.height)
+                    x1, y1, x2, y2 = left, top, left + w, top + h
+                    conf = float(row.conf) if row.conf != -1 else None
+                    bbox_abs = [x1, y1, x2, y2]
+                    bbox_norm = [x1 / width, y1 / height, w / width, h / height]
+                    key = int(row.line_num)
+                    line_id = line_map.setdefault(key, len(line_map))
+                    t = tmp.setdefault(
+                        key,
+                        {"page": 1, "words": [], "minx": x1, "miny": y1, "maxx": x2, "maxy": y2},
+                    )
+                    t["minx"] = min(t["minx"], x1)
+                    t["miny"] = min(t["miny"], y1)
+                    t["maxx"] = max(t["maxx"], x2)
+                    t["maxy"] = max(t["maxy"], y2)
+                    t["words"].append(text)
+                    words.append(
+                        BBoxWord(
+                            page=1,
+                            text=text,
+                            bbox_norm=bbox_norm,
+                            bbox_abs=bbox_abs,
+                            confidence=conf,
+                            line_id=line_id,
+                        )
+                    )
+                line_list = [None] * len(line_map)
+                for key, idx in line_map.items():
+                    t = tmp[key]
+                    x1, y1, x2, y2 = t["minx"], t["miny"], t["maxx"], t["maxy"]
+                    bbox_abs = [x1, y1, x2, y2]
+                    bbox_norm = [
+                        x1 / width,
+                        y1 / height,
+                        (x2 - x1) / width,
+                        (y2 - y1) / height,
+                    ]
+                    text_line = " ".join(t["words"]).strip()
+                    line_list[idx] = BBoxLine(
+                        page=1,
+                        text=text_line,
+                        bbox_norm=bbox_norm,
+                        bbox_abs=bbox_abs,
+                        confidence=None,
+                        md_span={"start": None, "end": None},
+                    )
+                bbox_doc = BBoxDoc(
+                    source=stream_info.filename or "",
+                    pages=[BBoxPage(page=1, width=width, height=height)],
+                    lines=line_list,
+                    words=words,
+                )
+
+        return DocumentConverterResult(markdown=md_content, bbox=bbox_doc)
 
     def _get_llm_description(
         self,

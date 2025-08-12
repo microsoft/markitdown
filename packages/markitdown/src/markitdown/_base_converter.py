@@ -1,5 +1,6 @@
 from typing import Any, BinaryIO, Optional
 from ._stream_info import StreamInfo
+from .bbox import BBoxDoc
 
 
 class DocumentConverterResult:
@@ -10,6 +11,7 @@ class DocumentConverterResult:
         markdown: str,
         *,
         title: Optional[str] = None,
+        bbox: "BBoxDoc | None" = None,
     ):
         """
         Initialize the DocumentConverterResult.
@@ -23,6 +25,7 @@ class DocumentConverterResult:
         """
         self.markdown = markdown
         self.title = title
+        self.bbox = bbox
 
     @property
     def text_content(self) -> str:

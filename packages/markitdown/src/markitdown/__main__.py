@@ -4,6 +4,7 @@
 import argparse
 import sys
 import codecs
+import os
 from textwrap import dedent
 from importlib.metadata import entry_points
 from .__about__ import __version__
@@ -110,6 +111,16 @@ def main():
         help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
     )
 
+    parser.add_argument(
+        "--emit-bbox",
+        action="store_true",
+        help="Emit sidecar JSON with page/line/word bounding boxes for PDFs and images.",
+    )
+    parser.add_argument(
+        "--ocr-lang",
+        help="Override MARKITDOWN_OCR_LANG for OCR (default 'eng').",
+    )
+
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
 
@@ -191,10 +202,16 @@ def main():
             sys.stdin.buffer,
             stream_info=stream_info,
             keep_data_uris=args.keep_data_uris,
+            emit_bbox=args.emit_bbox,
+            ocr_lang=args.ocr_lang,
         )
     else:
         result = markitdown.convert(
-            args.filename, stream_info=stream_info, keep_data_uris=args.keep_data_uris
+            args.filename,
+            stream_info=stream_info,
+            keep_data_uris=args.keep_data_uris,
+            emit_bbox=args.emit_bbox,
+            ocr_lang=args.ocr_lang,
         )
 
     _handle_output(args, result)
@@ -205,6 +222,18 @@ def _handle_output(args, result: DocumentConverterResult):
     if args.output:
         with open(args.output, "w", encoding="utf-8") as f:
             f.write(result.markdown)
+        if result.bbox is not None:
+            base = os.path.splitext(args.output)[0]
+            with open(base + ".bbox.json", "w", encoding="utf-8") as bf:
+                bf.write(result.bbox.to_json())
+    elif args.emit_bbox and args.filename:
+        base = os.path.splitext(args.filename)[0]
+        md_path = base + ".md"
+        with open(md_path, "w", encoding="utf-8") as f:
+            f.write(result.markdown)
+        if result.bbox is not None:
+            with open(base + ".bbox.json", "w", encoding="utf-8") as bf:
+                bf.write(result.bbox.to_json())
     else:
         # Handle stdout encoding errors more gracefully
         print(

@@ -47,7 +47,11 @@ all = [
   "SpeechRecognition",
   "youtube-transcript-api~=1.0.0",
   "azure-ai-documentintelligence",
-  "azure-identity"
+  "azure-identity",
+  "pdfplumber",
+  "pytesseract",
+  "Pillow",
+  "jsonschema",
 ]
 pptx = ["python-pptx"]
 docx = ["mammoth", "lxml"]
@@ -58,6 +62,7 @@ outlook = ["olefile"]
 audio-transcription = ["pydub", "SpeechRecognition"]
 youtube-transcription = ["youtube-transcript-api"]
 az-doc-intel = ["azure-ai-documentintelligence", "azure-identity"]
+bbox = ["pdfplumber", "pytesseract", "Pillow", "jsonschema"]
 
 [project.urls]
 Documentation = "https://github.com/microsoft/markitdown#readme"
