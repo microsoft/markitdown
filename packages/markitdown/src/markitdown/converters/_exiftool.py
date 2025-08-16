@@ -1,7 +1,11 @@
 import json
-import subprocess
 import locale
-from typing import BinaryIO, Any, Union
+import subprocess
+from typing import Any, BinaryIO, Union
+
+
+def _parse_version(version: str) -> tuple:
+    return tuple(map(int, (version.split("."))))
 
 
 def exiftool_metadata(
@@ -21,10 +25,11 @@ def exiftool_metadata(
             text=True,
             check=True,
         ).stdout.strip()
-        version = float(version_output)
-        if version < 12.24:
+        version = _parse_version(version_output)
+        min_version = (12, 24)
+        if version < min_version:
             raise RuntimeError(
-                f"ExifTool version {version} is vulnerable to CVE-2021-22204. "
+                f"ExifTool version {version_output} is vulnerable to CVE-2021-22204. "
                 "Please upgrade to version 12.24 or later."
             )
     except (subprocess.CalledProcessError, ValueError) as e:
