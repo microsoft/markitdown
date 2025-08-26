@@ -4,7 +4,7 @@
 ![PyPI - Downloads](https://img.shields.io/pypi/dd/markitdown-mcp)
 [![Built by AutoGen Team](https://img.shields.io/badge/Built%20by-AutoGen%20Team-blue)](https://github.com/microsoft/autogen)
 
-The `markitdown-mcp` package provides a lightweight STDIO and SSE MCP server for calling MarkItDown.
+The `markitdown-mcp` package provides a lightweight STDIO, Streamable HTTP, and SSE MCP server for calling MarkItDown.
 
 It exposes one tool: `convert_to_markdown(uri)`, where uri can be any `http:`, `https:`, `file:`, or `data:` URI.
 
@@ -18,17 +18,17 @@ pip install markitdown-mcp
 
 ## Usage
 
-To run the MCP server, ussing STDIO (default) use the following command:
+To run the MCP server, using STDIO (default) use the following command:
 
 
 ```bash	
 markitdown-mcp
 ```
 
-To run the MCP server, using SSE use the following command:
+To run the MCP server, using Streamable HTTP and SSE use the following command:
 
 ```bash	
-markitdown-mcp --sse --host 127.0.0.1 --port 3001
+markitdown-mcp --http --host 127.0.0.1 --port 3001
 ```
 
 ## Running in Docker
@@ -54,7 +54,7 @@ Once mounted, all files under data will be accessible under `/workdir` in the co
 
 It is recommended to use the Docker image when running the MCP server for Claude Desktop.
 
-Follow [these instrutions](https://modelcontextprotocol.io/quickstart/user#for-claude-desktop-users) to access Claude's `claude_desktop_config.json` file.
+Follow [these instructions](https://modelcontextprotocol.io/quickstart/user#for-claude-desktop-users) to access Claude's `claude_desktop_config.json` file.
 
 Edit it to include the following JSON entry:
 
@@ -102,11 +102,16 @@ To debug the MCP server you can use the `mcpinspector` tool.
 npx @modelcontextprotocol/inspector
 ```
 
-You can then connect to the insepctor through the specified host and port (e.g., `http://localhost:5173/`).
+You can then connect to the inspector through the specified host and port (e.g., `http://localhost:5173/`).
 
 If using STDIO:
 * select `STDIO` as the transport type,
 * input `markitdown-mcp` as the command, and
+* click `Connect`
+
+If using Streamable HTTP:
+* select `Streamable HTTP` as the transport type,
+* input `http://127.0.0.1:3001/mcp` as the URL, and
 * click `Connect`
 
 If using SSE:
@@ -122,8 +127,7 @@ Finally:
 
 ## Security Considerations
 
-The server does not support authentication, and runs with the privileges if the user running it. For this reason, when running in SSE mode, it is recommended to run the server bound to `localhost` (default).
-
+The server does not support authentication, and runs with the privileges of the user running it. For this reason, when running in SSE or Streamable HTTP mode, it is recommended to run the server bound to `localhost` (default).
 
 ## Trademarks
 

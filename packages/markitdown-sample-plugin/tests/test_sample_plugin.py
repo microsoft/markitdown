@@ -1,6 +1,5 @@
 #!/usr/bin/env python3 -m pytest
 import os
-import pytest
 
 from markitdown import MarkItDown, StreamInfo
 from markitdown_sample_plugin import RtfConverter
