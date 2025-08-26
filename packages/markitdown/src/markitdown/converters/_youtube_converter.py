@@ -1,10 +1,8 @@
-import sys
 import json
 import time
-import io
 import re
 import bs4
-from typing import Any, BinaryIO, Optional, Dict, List, Union
+from typing import Any, BinaryIO, Dict, List, Union
 from urllib.parse import parse_qs, urlparse, unquote
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
@@ -153,9 +151,14 @@ class YouTubeConverter(DocumentConverter):
             params = parse_qs(parsed_url.query)  # type: ignore
             if "v" in params and params["v"][0]:
                 video_id = str(params["v"][0])
+                transcript_list = ytt_api.list(video_id)
+                languages = ["en"]
+                for transcript in transcript_list:
+                    languages.append(transcript.language_code)
+                    break
                 try:
                     youtube_transcript_languages = kwargs.get(
-                        "youtube_transcript_languages", ("en",)
+                        "youtube_transcript_languages", languages
                     )
                     # Retry the transcript fetching operation
                     transcript = self._retry_operation(
@@ -165,12 +168,23 @@ class YouTubeConverter(DocumentConverter):
                         retries=3,  # Retry 3 times
                         delay=2,  # 2 seconds delay between retries
                     )
+
                     if transcript:
                         transcript_text = " ".join(
                             [part.text for part in transcript]
                         )  # type: ignore
                 except Exception as e:
-                    print(f"Error fetching transcript: {e}")
+                    # No transcript available
+                    if len(languages) == 1:
+                        print(f"Error fetching transcript: {e}")
+                    else:
+                        # Translate transcript into first kwarg
+                        transcript = (
+                            transcript_list.find_transcript(languages)
+                            .translate(youtube_transcript_languages[0])
+                            .fetch()
+                        )
+                        transcript_text = " ".join([part.text for part in transcript])
             if transcript_text:
                 webpage_text += f"\n### Transcript\n{transcript_text}\n"
 

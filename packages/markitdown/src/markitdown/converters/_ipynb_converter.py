@@ -50,8 +50,6 @@ class IpynbConverter(DocumentConverter):
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
         # Parse and convert the notebook
-        result = None
-
         encoding = stream_info.charset or "utf-8"
         notebook_content = file_stream.read().decode(encoding=encoding)
         return self._convert(json.loads(notebook_content))

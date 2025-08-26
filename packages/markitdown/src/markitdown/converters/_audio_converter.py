@@ -1,5 +1,4 @@
-import io
-from typing import Any, BinaryIO, Optional
+from typing import Any, BinaryIO
 
 from ._exiftool import exiftool_metadata
 from ._transcribe_audio import transcribe_audio
