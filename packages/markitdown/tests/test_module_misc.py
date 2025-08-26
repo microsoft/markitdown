@@ -375,13 +375,19 @@ def test_markitdown_llm_parameters() -> None:
     """Test that LLM parameters are correctly passed to the client."""
     mock_client = MagicMock()
     mock_response = MagicMock()
-    mock_response.choices = [MagicMock(message=MagicMock(
-        content="Test caption with red circle and blue square 5bda1dd6"))]
+    mock_response.choices = [
+        MagicMock(
+            message=MagicMock(
+                content="Test caption with red circle and blue square 5bda1dd6"
+            )
+        )
+    ]
     mock_client.chat.completions.create.return_value = mock_response
 
     test_prompt = "You are a professional test prompt."
-    markitdown = MarkItDown(llm_client=mock_client, llm_model="gpt-4o",
-                            llm_prompt=test_prompt)
+    markitdown = MarkItDown(
+        llm_client=mock_client, llm_model="gpt-4o", llm_prompt=test_prompt
+    )
 
     # Test image file
     markitdown.convert(os.path.join(TEST_FILES_DIR, "test_llm.jpg"))
@@ -389,9 +395,9 @@ def test_markitdown_llm_parameters() -> None:
     # Verify the prompt was passed to the OpenAI API
     assert mock_client.chat.completions.create.called
     call_args = mock_client.chat.completions.create.call_args
-    messages = call_args[1]['messages']
+    messages = call_args[1]["messages"]
     assert len(messages) == 1
-    assert messages[0]['content'][0]['text'] == test_prompt
+    assert messages[0]["content"][0]["text"] == test_prompt
 
     # Reset the mock for the next test
     mock_client.chat.completions.create.reset_mock()
@@ -404,9 +410,9 @@ def test_markitdown_llm_parameters() -> None:
     # Verify the prompt was passed to the OpenAI API for PPTX images too
     assert mock_client.chat.completions.create.called
     call_args = mock_client.chat.completions.create.call_args
-    messages = call_args[1]['messages']
+    messages = call_args[1]["messages"]
     assert len(messages) == 1
-    assert messages[0]['content'][0]['text'] == test_prompt
+    assert messages[0]["content"][0]["text"] == test_prompt
 
 
 @pytest.mark.skipif(
