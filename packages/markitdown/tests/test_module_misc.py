@@ -4,6 +4,7 @@ import os
 import re
 import shutil
 import pytest
+from unittest.mock import MagicMock
 
 from markitdown._uri_utils import parse_data_uri, file_uri_to_path
 
@@ -370,6 +371,50 @@ def test_markitdown_exiftool() -> None:
         assert target in result.text_content
 
 
+def test_markitdown_llm_parameters() -> None:
+    """Test that LLM parameters are correctly passed to the client."""
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.choices = [
+        MagicMock(
+            message=MagicMock(
+                content="Test caption with red circle and blue square 5bda1dd6"
+            )
+        )
+    ]
+    mock_client.chat.completions.create.return_value = mock_response
+
+    test_prompt = "You are a professional test prompt."
+    markitdown = MarkItDown(
+        llm_client=mock_client, llm_model="gpt-4o", llm_prompt=test_prompt
+    )
+
+    # Test image file
+    markitdown.convert(os.path.join(TEST_FILES_DIR, "test_llm.jpg"))
+
+    # Verify the prompt was passed to the OpenAI API
+    assert mock_client.chat.completions.create.called
+    call_args = mock_client.chat.completions.create.call_args
+    messages = call_args[1]["messages"]
+    assert len(messages) == 1
+    assert messages[0]["content"][0]["text"] == test_prompt
+
+    # Reset the mock for the next test
+    mock_client.chat.completions.create.reset_mock()
+
+    # TODO: may only use one test after the llm caption method duplicate has been removed:
+    # https://github.com/microsoft/markitdown/pull/1254
+    # Test PPTX file
+    markitdown.convert(os.path.join(TEST_FILES_DIR, "test.pptx"))
+
+    # Verify the prompt was passed to the OpenAI API for PPTX images too
+    assert mock_client.chat.completions.create.called
+    call_args = mock_client.chat.completions.create.call_args
+    messages = call_args[1]["messages"]
+    assert len(messages) == 1
+    assert messages[0]["content"][0]["text"] == test_prompt
+
+
 @pytest.mark.skipif(
     skip_llm,
     reason="do not run llm tests without a key",
@@ -408,6 +453,7 @@ if __name__ == "__main__":
         test_speech_transcription,
         test_exceptions,
         test_markitdown_exiftool,
+        test_markitdown_llm_parameters,
         test_markitdown_llm,
     ]:
         print(f"Running {test.__name__}...", end="")
