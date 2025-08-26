@@ -19,13 +19,6 @@ else:
         FileTestVector,
     )
 
-from markitdown import (
-    MarkItDown,
-    UnsupportedFormatException,
-    FileConversionException,
-    StreamInfo,
-)
-
 skip_remote = (
     True if os.environ.get("GITHUB_ACTIONS") else False
 )  # Don't run these tests in CI
@@ -140,8 +133,6 @@ def test_convert_url(shared_tmp_dir, test_vector):
     """Test the conversion of a stream with no stream info."""
     # Note: tmp_dir is not used here, but is needed to match the signature
 
-    markitdown = MarkItDown()
-
     time.sleep(1)  # Ensure we don't hit rate limits
     result = subprocess.run(
         ["python", "-m", "markitdown", TEST_FILES_URL + "/" + test_vector.filename],
@@ -191,7 +182,6 @@ def test_output_to_file_with_data_uris(shared_tmp_dir, test_vector) -> None:
 
 
 if __name__ == "__main__":
-    import sys
     import tempfile
 
     """Runs this file's tests from the command line."""

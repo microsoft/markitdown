@@ -1,9 +1,8 @@
-import io
 import re
 import base64
 import binascii
 from urllib.parse import parse_qs, urlparse
-from typing import Any, BinaryIO, Optional
+from typing import Any, BinaryIO
 from bs4 import BeautifulSoup
 
 from .._base_converter import DocumentConverter, DocumentConverterResult

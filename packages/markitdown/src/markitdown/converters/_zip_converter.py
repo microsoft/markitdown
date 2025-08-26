@@ -1,4 +1,3 @@
-import sys
 import zipfile
 import io
 import os

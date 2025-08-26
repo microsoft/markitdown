@@ -92,9 +92,11 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         """Same as usual converter, but removes data URIs"""
 
         alt = el.attrs.get("alt", None) or ""
-        src = el.attrs.get("src", None) or ""
+        src = el.attrs.get("src", None) or el.attrs.get("data-src", None) or ""
         title = el.attrs.get("title", None) or ""
         title_part = ' "%s"' % title.replace('"', r"\"") if title else ""
+        # Remove all line breaks from alt
+        alt = alt.replace("\n", " ")
         if (
             convert_as_inline
             and el.parent.name not in self.options["keep_inline_images_in"]
