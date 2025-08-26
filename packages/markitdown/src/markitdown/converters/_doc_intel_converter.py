@@ -1,14 +1,12 @@
 import sys
 import re
 import os
-
 from typing import BinaryIO, Any, List
 from enum import Enum
 
-from ._html_converter import HtmlConverter
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
-from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+from .._exceptions import MissingDependencyException
 
 # Try loading optional (but in this case, required) dependencies
 # Save reporting of any exceptions for later
@@ -25,6 +23,28 @@ try:
 except ImportError:
     # Preserve the error and stack trace for later
     _dependency_exc_info = sys.exc_info()
+
+    # Define these types for type hinting when the package is not available
+    class AzureKeyCredential:
+        pass
+
+    class TokenCredential:
+        pass
+
+    class DocumentIntelligenceClient:
+        pass
+
+    class AnalyzeDocumentRequest:
+        pass
+
+    class AnalyzeResult:
+        pass
+
+    class DocumentAnalysisFeature:
+        pass
+
+    class DefaultAzureCredential:
+        pass
 
 
 # TODO: currently, there is a bug in the document intelligence SDK with importing the "ContentFormat" enum.
@@ -64,6 +84,9 @@ def _get_mime_type_prefixes(types: List[DocumentIntelligenceFileType]) -> List[s
             prefixes.append(
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
+        elif type_ == DocumentIntelligenceFileType.HTML:
+            prefixes.append("text/html")
+            prefixes.append("application/xhtml+xml")
         elif type_ == DocumentIntelligenceFileType.PDF:
             prefixes.append("application/pdf")
             prefixes.append("application/x-pdf")
@@ -99,6 +122,8 @@ def _get_file_extensions(types: List[DocumentIntelligenceFileType]) -> List[str]
             extensions.append(".bmp")
         elif type_ == DocumentIntelligenceFileType.TIFF:
             extensions.append(".tiff")
+        elif type_ == DocumentIntelligenceFileType.HTML:
+            extensions.append(".html")
     return extensions
 
 

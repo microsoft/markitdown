@@ -9,7 +9,7 @@ from .._stream_info import StreamInfo
 # Save reporting of any exceptions for later
 _dependency_exc_info = None
 try:
-    import mammoth
+    import mammoth  # noqa: F401
 except ImportError:
     # Preserve the error and stack trace for later
     _dependency_exc_info = sys.exc_info()
