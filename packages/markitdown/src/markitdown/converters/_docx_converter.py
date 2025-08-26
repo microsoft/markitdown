@@ -1,10 +1,12 @@
 import sys
+import io
+from warnings import warn
 
 from typing import BinaryIO, Any
 
 from ._html_converter import HtmlConverter
 from ..converter_utils.docx.pre_process import pre_process_docx
-from .._base_converter import DocumentConverter, DocumentConverterResult
+from .._base_converter import DocumentConverterResult
 from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 
@@ -13,6 +15,14 @@ from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 _dependency_exc_info = None
 try:
     import mammoth
+    import mammoth.docx.files
+
+    def mammoth_files_open(self, uri):
+        warn("DOCX: processing of r:link resources (e.g., linked images) is disabled.")
+        return io.BytesIO(b"")
+
+    mammoth.docx.files.Files.open = mammoth_files_open
+
 except ImportError:
     # Preserve the error and stack trace for later
     _dependency_exc_info = sys.exc_info()
