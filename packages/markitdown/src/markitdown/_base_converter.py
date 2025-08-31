@@ -69,7 +69,7 @@ class DocumentConverter:
         data = file_stream.read(100) # ... peek at the first 100 bytes, etc.
         file_stream.seek(cur_pos)    # Reset the position to the original position
 
-        Prameters:
+        Parameters:
         - file_stream: The file-like object to convert. Must support seek(), tell(), and read() methods.
         - stream_info: The StreamInfo object containing metadata about the file (mimetype, extension, charset, set)
         - kwargs: Additional keyword arguments for the converter.
@@ -90,7 +90,7 @@ class DocumentConverter:
         """
         Convert a document to Markdown text.
 
-        Prameters:
+        Parameters:
         - file_stream: The file-like object to convert. Must support seek(), tell(), and read() methods.
         - stream_info: The StreamInfo object containing metadata about the file (mimetype, extension, charset, set)
         - kwargs: Additional keyword arguments for the converter.
