@@ -607,6 +607,25 @@ class MarkItDown:
                         file_stream.seek(cur_pos)
 
                 if res is not None:
+                    # Check for Office Open XML error string and raise if found
+                    if (
+                        res.text_content.strip()
+                        == "This is not a valid Office Open XML file."
+                    ):
+                        failed_attempts.append(
+                            FailedConversionAttempt(
+                                converter=converter,
+                                exc_info=(
+                                    FileConversionException,
+                                    FileConversionException(
+                                        "Invalid Office Open XML file detected."
+                                    ),
+                                    None,
+                                ),
+                            )
+                        )
+                        continue  # Try next converter
+
                     # Normalize the content
                     res.text_content = "\n".join(
                         [line.rstrip() for line in re.split(r"\r?\n", res.text_content)]
