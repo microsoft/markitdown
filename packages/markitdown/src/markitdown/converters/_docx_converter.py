@@ -84,7 +84,15 @@ class DocxConverter(HtmlConverter):
 
         style_map = kwargs.get("style_map", None)
         pre_process_stream = pre_process_docx(file_stream)
-        return self._html_converter.convert_string(
-            mammoth.convert_to_html(pre_process_stream, style_map=style_map).value,
-            **kwargs,
-        )
+
+        # Patch: handle missing styleId safely
+        try:
+            html = mammoth.convert_to_html(pre_process_stream, style_map=style_map).value
+        except KeyError as e:
+            if str(e) == "'w:styleId'":
+                # Ignore missing style IDs and convert anyway
+                html = mammoth.convert_to_html(pre_process_stream, style_map=style_map, ignore_empty_styles=True).value
+            else:
+                raise
+
+        return self._html_converter.convert_string(html, **kwargs)
