@@ -29,6 +29,34 @@ pip install -e packages/markitdown[all]
 markitdown path-to-file.pdf > document.md
 ```
 
+#### PDF Table Extraction
+
+By default, PDF conversion outputs plain text (table structure is not preserved). You can enable experimental
+table detection with the `--pdf-tables` flag:
+
+```bash
+markitdown --pdf-tables plumber invoice.pdf
+markitdown --pdf-tables auto report.pdf
+```
+
+Modes:
+
+* `none` (default): plain text via pdfminer.
+* `plumber`: use `pdfplumber` if installed (general-purpose detection).
+* `camelot`: use `camelot` if installed (works best on ruled tables; requires a real file path, not stdin).
+* `auto`: try plumber first, then camelot; fall back to plain text.
+
+Install optional dependencies:
+
+```bash
+pip install "markitdown[pdf-tables]"
+```
+
+Notes:
+* Camelot may need Ghostscript for lattice mode (`apt-get install ghostscript` on Debian/Ubuntu).
+* If dependencies are missing, MarkItDown silently falls back to plain text.
+* Output is best-effort; complex/merged cells may degrade gracefully.
+
 ### Python API
 
 ```python
@@ -37,6 +65,13 @@ from markitdown import MarkItDown
 md = MarkItDown()
 result = md.convert("test.xlsx")
 print(result.text_content)
+```
+
+Enable PDF tables in code:
+
+```python
+result = md.convert("sample.pdf", pdf_tables="auto")
+print(result.markdown)
 ```
 
 ### More Information

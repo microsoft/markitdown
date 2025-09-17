@@ -553,6 +553,8 @@ class MarkItDown:
                 ), "File stream position should NOT change between guess iterations"
 
                 _kwargs = {k: v for k, v in kwargs.items()}
+                # Note: CLI-supplied options like 'pdf_tables' are passed through transparently
+                # to converters via **kwargs. Converters should document any custom keys they use.
 
                 # Copy any additional global options
                 if "llm_client" not in _kwargs and self._llm_client is not None:
