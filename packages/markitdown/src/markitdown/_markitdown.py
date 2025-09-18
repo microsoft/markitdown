@@ -115,6 +115,7 @@ class MarkItDown:
         # TODO - remove these (see enable_builtins)
         self._llm_client: Any = None
         self._llm_model: Union[str | None] = None
+        self._llm_prompt: Union[str | None] = None
         self._exiftool_path: Union[str | None] = None
         self._style_map: Union[str | None] = None
 
@@ -139,6 +140,7 @@ class MarkItDown:
             # TODO: Move these into converter constructors
             self._llm_client = kwargs.get("llm_client")
             self._llm_model = kwargs.get("llm_model")
+            self._llm_prompt = kwargs.get("llm_prompt")
             self._exiftool_path = kwargs.get("exiftool_path")
             self._style_map = kwargs.get("style_map")
 
@@ -558,6 +560,9 @@ class MarkItDown:
 
                 if "llm_model" not in _kwargs and self._llm_model is not None:
                     _kwargs["llm_model"] = self._llm_model
+
+                if "llm_prompt" not in _kwargs and self._llm_prompt is not None:
+                    _kwargs["llm_prompt"] = self._llm_prompt
 
                 if "style_map" not in _kwargs and self._style_map is not None:
                     _kwargs["style_map"] = self._style_map

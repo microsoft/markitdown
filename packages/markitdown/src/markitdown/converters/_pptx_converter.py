@@ -168,11 +168,23 @@ class PptxConverter(DocumentConverter):
 
                 # Group Shapes
                 if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.GROUP:
-                    sorted_shapes = sorted(shape.shapes, key=attrgetter("top", "left"))
+                    sorted_shapes = sorted(
+                        shape.shapes,
+                        key=lambda x: (
+                            float("-inf") if not x.top else x.top,
+                            float("-inf") if not x.left else x.left,
+                        ),
+                    )
                     for subshape in sorted_shapes:
                         get_shape_content(subshape, **kwargs)
 
-            sorted_shapes = sorted(slide.shapes, key=attrgetter("top", "left"))
+            sorted_shapes = sorted(
+                slide.shapes,
+                key=lambda x: (
+                    float("-inf") if not x.top else x.top,
+                    float("-inf") if not x.left else x.left,
+                ),
+            )
             for shape in sorted_shapes:
                 get_shape_content(shape, **kwargs)
 
