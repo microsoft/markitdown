@@ -57,6 +57,7 @@ async def health_check():
     return {
         "status": "ok",
         "metrics": stats,
+        "version": "0.1.0",
     }
 
 
