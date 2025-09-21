@@ -84,6 +84,9 @@ def _get_mime_type_prefixes(types: List[DocumentIntelligenceFileType]) -> List[s
             prefixes.append(
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
+        elif type_ == DocumentIntelligenceFileType.HTML:
+            prefixes.append("text/html")
+            prefixes.append("application/xhtml+xml")
         elif type_ == DocumentIntelligenceFileType.PDF:
             prefixes.append("application/pdf")
             prefixes.append("application/x-pdf")
@@ -119,6 +122,8 @@ def _get_file_extensions(types: List[DocumentIntelligenceFileType]) -> List[str]
             extensions.append(".bmp")
         elif type_ == DocumentIntelligenceFileType.TIFF:
             extensions.append(".tiff")
+        elif type_ == DocumentIntelligenceFileType.HTML:
+            extensions.append(".html")
     return extensions
 
 
