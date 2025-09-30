@@ -1,5 +1,5 @@
 .vscode
-
+.idea
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -19,6 +19,8 @@ eggs/
 lib/
 lib64/
 parts/
+packages/markitdown/docx_test.py
+packages/markitdown/tests/test_files/docx_with_image.docx
 sdist/
 var/
 wheels/

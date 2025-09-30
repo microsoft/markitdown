@@ -17,16 +17,17 @@ try:
     import mammoth
     import mammoth.docx.files
 
+
     def mammoth_files_open(self, uri):
         warn("DOCX: processing of r:link resources (e.g., linked images) is disabled.")
         return io.BytesIO(b"")
+
 
     mammoth.docx.files.Files.open = mammoth_files_open
 
 except ImportError:
     # Preserve the error and stack trace for later
     _dependency_exc_info = sys.exc_info()
-
 
 ACCEPTED_MIME_TYPE_PREFIXES = [
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -45,10 +46,10 @@ class DocxConverter(HtmlConverter):
         self._html_converter = HtmlConverter()
 
     def accepts(
-        self,
-        file_stream: BinaryIO,
-        stream_info: StreamInfo,
-        **kwargs: Any,  # Options to pass to the converter
+            self,
+            file_stream: BinaryIO,
+            stream_info: StreamInfo,
+            **kwargs: Any,  # Options to pass to the converter
     ) -> bool:
         mimetype = (stream_info.mimetype or "").lower()
         extension = (stream_info.extension or "").lower()
@@ -63,10 +64,10 @@ class DocxConverter(HtmlConverter):
         return False
 
     def convert(
-        self,
-        file_stream: BinaryIO,
-        stream_info: StreamInfo,
-        **kwargs: Any,  # Options to pass to the converter
+            self,
+            file_stream: BinaryIO,
+            stream_info: StreamInfo,
+            **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
         # Check: the dependencies
         if _dependency_exc_info is not None:
@@ -83,7 +84,11 @@ class DocxConverter(HtmlConverter):
             )
 
         style_map = kwargs.get("style_map", None)
-        pre_process_stream = pre_process_docx(file_stream)
+
+        llm_client = kwargs.get("llm_client")
+        llm_model = kwargs.get("llm_model")
+        llm_prompt = kwargs.get("llm_prompt")
+        pre_process_stream = pre_process_docx(file_stream, llm_client, llm_model, llm_prompt)
         return self._html_converter.convert_string(
             mammoth.convert_to_html(pre_process_stream, style_map=style_map).value,
             **kwargs,
