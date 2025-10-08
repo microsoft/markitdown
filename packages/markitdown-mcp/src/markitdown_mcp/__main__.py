@@ -21,6 +21,13 @@ from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from markitdown import MarkItDown
 import uvicorn
 
+# Try importing OpenAI for LLM-based image descriptions
+try:
+    from openai import OpenAI
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+
 # Initialize FastMCP server for MarkItDown (SSE)
 mcp = FastMCP("markitdown")
 
@@ -38,7 +45,29 @@ _server_port = 3001
 @mcp.tool()
 async def convert_to_markdown(uri: str) -> str:
     """Convert a resource described by an http:, https:, file: or data: URI to markdown"""
-    return MarkItDown(enable_plugins=check_plugins_enabled()).convert_uri(uri).markdown
+    # Check if this is a request to our own temp endpoint to avoid deadlock
+    # If it is, convert to file:// URI to read directly from disk
+    if uri.startswith(("http://", "https://")):
+        # Parse the URL to check if it's pointing to our temp endpoint
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(uri)
+
+            # Check if this is our temp endpoint: /temp/{file_id}
+            if parsed.path.startswith("/temp/"):
+                file_id = parsed.path.split("/")[-1]
+
+                # Check if this file exists in our temp storage
+                if file_id in _temp_files:
+                    # Convert to file:// URI to avoid HTTP request to ourselves (deadlock)
+                    from pathlib import Path
+                    file_path = Path(_temp_files[file_id]["path"])
+                    uri = file_path.as_uri()
+        except Exception:
+            # If parsing fails, continue with original URI
+            pass
+
+    return create_markitdown().convert_uri(uri).markdown
 
 
 @mcp.tool()
@@ -200,7 +229,7 @@ async def convert_file_to_markdown(
 
     # Use the existing convert_uri with the data URI
     # Pass filename as extension hint if provided
-    md = MarkItDown(enable_plugins=check_plugins_enabled())
+    md = create_markitdown()
 
     # Extract extension from filename if provided
     stream_info = None
@@ -335,6 +364,42 @@ def check_plugins_enabled() -> bool:
         "1",
         "yes",
     )
+
+
+def create_markitdown() -> MarkItDown:
+    """
+    Create MarkItDown instance with optional LLM support for image descriptions.
+
+    If OPENAI_API_KEY environment variable is set, enables LLM-based image descriptions.
+    Otherwise, falls back to metadata-only extraction.
+
+    Environment variables:
+        OPENAI_API_KEY: OpenAI API key for image descriptions
+        OPENAI_MODEL: Model to use (default: gpt-4o)
+        MARKITDOWN_ENABLE_PLUGINS: Enable third-party plugins (default: false)
+
+    Returns:
+        Configured MarkItDown instance
+    """
+    enable_plugins = check_plugins_enabled()
+
+    # Check for OpenAI API key
+    api_key = os.getenv("OPENAI_API_KEY")
+    if api_key and OPENAI_AVAILABLE:
+        try:
+            client = OpenAI(api_key=api_key)
+            model = os.getenv("OPENAI_MODEL", "gpt-4o")
+            return MarkItDown(
+                enable_plugins=enable_plugins,
+                llm_client=client,
+                llm_model=model
+            )
+        except Exception as e:
+            # Fall back to non-LLM version if OpenAI setup fails
+            print(f"Warning: Failed to initialize OpenAI client: {e}", file=sys.stderr)
+            print("Falling back to metadata-only image conversion", file=sys.stderr)
+
+    return MarkItDown(enable_plugins=enable_plugins)
 
 
 async def cleanup_temp_files():

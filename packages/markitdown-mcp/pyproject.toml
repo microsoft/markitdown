@@ -26,6 +26,7 @@ classifiers = [
 dependencies = [
   "mcp~=1.8.0",
   "markitdown[all]>=0.1.1,<0.2.0",
+  "openai>=1.0.0",
 ]
 
 [project.urls]

@@ -272,14 +272,30 @@ For production use or persistent access from Claude Code, run markitdown-mcp as 
 cd packages/markitdown-mcp
 
 # 2. Build the Docker image (if not already built)
-docker build -f Dockerfile -t markitdown-mcp:latest ../..
+# Option A: Use the helper script (recommended - handles cache-busting)
+./build.sh          # Linux/Mac
+# or
+build.bat           # Windows
 
-# 3. Start the service
+# Option B: Manual build with cache-busting (picks up code changes)
+docker build -f Dockerfile --build-arg CACHE_BUST=$(date +%s) -t markitdown-mcp:latest ../..
+
+# Option C: Force complete rebuild (slower, but guarantees fresh build)
+docker build --no-cache -f Dockerfile -t markitdown-mcp:latest ../..
+
+# 3. (Optional) Configure environment variables
+cp .env.example .env
+# Edit .env to set your OPENAI_API_KEY for image descriptions
+
+# 4. Start the service
 docker compose up -d
 
-# 4. Verify it's running
+# 5. Verify it's running
 curl http://localhost:3001/upload
 ```
+
+**Why cache-busting matters:**
+Docker caches build layers. When you modify Python code in `__main__.py`, Docker might not detect the change and reuse old cached layers. The `--build-arg CACHE_BUST=$(date +%s)` ensures Docker rebuilds the Python package installation layer.
 
 The service will:
 - ✅ Run persistently in the background
@@ -344,15 +360,120 @@ pip install markitdown-mcp
 To run the MCP server, using STDIO (default) use the following command:
 
 
-```bash	
+```bash
 markitdown-mcp
 ```
 
 To run the MCP server, using Streamable HTTP and SSE use the following command:
 
-```bash	
+```bash
 markitdown-mcp --http --host 127.0.0.1 --port 3001
 ```
+
+## LLM-Enhanced Image Descriptions
+
+By default, image conversions extract only metadata (dimensions, EXIF data). To enable LLM-powered content descriptions for images, configure OpenAI credentials:
+
+### Environment Variables
+
+- `OPENAI_API_KEY` (required): Your OpenAI API key
+- `OPENAI_MODEL` (optional): Model to use for descriptions (default: `gpt-4o`)
+
+### Example Usage
+
+**STDIO mode:**
+```bash
+export OPENAI_API_KEY="sk-..."
+export OPENAI_MODEL="gpt-4o"  # optional
+markitdown-mcp
+```
+
+**HTTP mode:**
+```bash
+export OPENAI_API_KEY="sk-..."
+markitdown-mcp --http --host 127.0.0.1 --port 3001
+```
+
+**Docker:**
+```bash
+docker run --rm -p 3001:3001 \
+  -e OPENAI_API_KEY="sk-..." \
+  -e OPENAI_MODEL="gpt-4o" \
+  markitdown-mcp:latest --http --host 0.0.0.0 --port 3001
+```
+
+**Docker Compose:**
+
+Copy `.env.example` to `.env` and configure your API key:
+```bash
+cp .env.example .env
+# Edit .env and set your OPENAI_API_KEY
+```
+
+The docker-compose.yml automatically uses the `.env` file:
+```yaml
+services:
+  markitdown-mcp:
+    image: markitdown-mcp:latest
+    ports:
+      - "3001:3001"
+    environment:
+      - MARKITDOWN_ENABLE_PLUGINS=${MARKITDOWN_ENABLE_PLUGINS:-false}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
+    command: ["--http", "--host", "0.0.0.0", "--port", "3001"]
+```
+
+**Claude Desktop (`claude_desktop_config.json`):**
+```json
+{
+  "mcpServers": {
+    "markitdown": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "-p",
+        "3001:3001",
+        "-e",
+        "OPENAI_API_KEY=sk-...",
+        "-e",
+        "OPENAI_MODEL=gpt-4o",
+        "markitdown-mcp:latest",
+        "--http",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "3001"
+      ]
+    }
+  }
+}
+```
+
+### What This Enables
+
+**Without LLM (default):**
+```markdown
+ImageSize: 1109x1373
+```
+
+**With LLM enabled:**
+```markdown
+ImageSize: 1109x1373
+
+# Description:
+The image shows a detailed technical diagram of a distributed system architecture...
+[Full AI-generated description of image content]
+```
+
+### Notes
+
+- LLM descriptions work for: `.jpg`, `.jpeg`, `.png` images
+- The `openai` Python package must be installed (included by default)
+- Only affects image conversions; other formats work without OpenAI
+- If `OPENAI_API_KEY` is not set, images fall back to metadata-only conversion
 
 ## Running in Docker
 

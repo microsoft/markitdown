@@ -13,7 +13,9 @@ services:
       - "--port"
       - "3001"
     environment:
-      - MARKITDOWN_ENABLE_PLUGINS=false
+      - MARKITDOWN_ENABLE_PLUGINS=${MARKITDOWN_ENABLE_PLUGINS:-false}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3001/mcp"]
