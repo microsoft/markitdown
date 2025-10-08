@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "markitdown": {
+      "url": "http://localhost:3001/mcp",
+      "type": "http",
+      "description": "MarkItDown file conversion service"
+    }
+  }
+}

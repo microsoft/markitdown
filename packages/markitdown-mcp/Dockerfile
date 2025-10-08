@@ -9,13 +9,20 @@ ENV MARKITDOWN_ENABLE_PLUGINS=True
 # NOTE: Add any additional MarkItDown plugins here
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
-    exiftool
+    exiftool \
+    curl
 
 # Cleanup
 RUN rm -rf /var/lib/apt/lists/*
 
-COPY . /app
-RUN pip --no-cache-dir install /app
+# Copy both packages to ensure we use latest local source for both
+COPY packages/markitdown /app/packages/markitdown
+COPY packages/markitdown-mcp /app/packages/markitdown-mcp
+
+# Install markitdown from local source first, then markitdown-mcp
+# This ensures we use the latest local code for both packages
+RUN pip --no-cache-dir install /app/packages/markitdown[all] && \
+    pip --no-cache-dir install /app/packages/markitdown-mcp
 
 WORKDIR /workdir
 

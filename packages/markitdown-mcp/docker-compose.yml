@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  markitdown-mcp:
+    image: markitdown-mcp:latest
+    container_name: markitdown-mcp-server
+    ports:
+      - "3001:3001"
+    command:
+      - "--http"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "3001"
+    environment:
+      - MARKITDOWN_ENABLE_PLUGINS=false
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/mcp"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    # Optional: Uncomment to persist temp files between restarts
+    # volumes:
+    #   - markitdown-temp:/tmp/markitdown_temp
+
+# Optional: Uncomment to use persistent volume
+# volumes:
+#   markitdown-temp:
+#     driver: local
