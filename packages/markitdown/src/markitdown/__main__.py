@@ -113,8 +113,6 @@ def main():
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
 
-    print(f"Parsed command line options: {args}")
-
     # Parse the extension hint
     extension_hint = args.extension
     if extension_hint is not None:
@@ -182,7 +180,6 @@ def main():
         elif args.filename is None:
             _exit_with_error("Filename is required when using Document Intelligence.")
 
-        print(f"Start to use Azure Document Intelligence: enable_plugins={args.use_plugins}, docintel_endpoint={args.endpoint}")
         markitdown = MarkItDown(
             enable_plugins=args.use_plugins, docintel_endpoint=args.endpoint
         )

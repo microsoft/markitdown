@@ -32,5 +32,3 @@ __all__ = [
     "PRIORITY_SPECIFIC_FILE_FORMAT",
     "PRIORITY_GENERIC_FILE_FORMAT",
 ]
-
-print(f"MarkItDown from source code is imported")
