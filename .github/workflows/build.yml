@@ -1,0 +1,31 @@
+name: Build MarkitdownGUI for Windows
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Run build script
+      shell: bash
+      run: |
+        chmod +x build.sh
+        ./build.sh
+
+    - name: Upload executable
+      uses: actions/upload-artifact@v3
+      with:
+        name: MarkitdownGUI-windows
+        path: dist/MarkitdownGUI.exe
