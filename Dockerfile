@@ -1,33 +1,20 @@
-FROM python:3.13-slim-bullseye
+# imagem Debian (não Alpine) — suporta onnxruntime e magika
+FROM python:3.11-slim
+WORKDIR /work
 
-ENV DEBIAN_FRONTEND=noninteractive
-ENV EXIFTOOL_PATH=/usr/bin/exiftool
-ENV FFMPEG_PATH=/usr/bin/ffmpeg
+# instala compiladores e dependências do sistema
+RUN apt-get update && apt-get install -y \
+    build-essential git ffmpeg libxml2 libxslt1-dev \
+    libffi-dev libssl-dev python3-dev \
+ && rm -rf /var/lib/apt/lists/*
 
-# Runtime dependency
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg \
-    exiftool
+# copia o código do repositório
+COPY . .
 
-ARG INSTALL_GIT=false
-RUN if [ "$INSTALL_GIT" = "true" ]; then \
-    apt-get install -y --no-install-recommends \
-    git; \
-    fi
+# instala o markitdown e pytest
+RUN pip install --no-cache-dir -U pip \
+ && pip install --no-cache-dir -e 'packages/markitdown[all]' pytest
 
-# Cleanup
-RUN rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-COPY . /app
-RUN pip --no-cache-dir install \
-    /app/packages/markitdown[all] \
-    /app/packages/markitdown-sample-plugin
-
-# Default USERID and GROUPID
-ARG USERID=nobody
-ARG GROUPID=nogroup
-
-USER $USERID:$GROUPID
-
-ENTRYPOINT [ "markitdown" ]
+# define o diretório do pacote e roda os testes
+WORKDIR /work/packages/markitdown
+CMD ["pytest", "-q"]
