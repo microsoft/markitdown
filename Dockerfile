@@ -16,5 +16,11 @@ RUN pip install --no-cache-dir -U pip \
  && pip install --no-cache-dir -e 'packages/markitdown[all]' pytest
 
 # define o diretório do pacote e roda os testes
-WORKDIR /work/packages/markitdown
+WORKDIR /work
 CMD ["pytest", "-q"]
+
+# garante que a variável pode vir de fora sem estourar o entrypoint
+ENV PYTEST_ADDOPTS=""
+
+# executa os testes do pacote principal; caminho relativo exige WORKDIR=/work
+ENTRYPOINT ["pytest", "-q", "packages/markitdown/tests"]
