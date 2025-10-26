@@ -260,3 +260,25 @@ docker run --rm -it -v "$(pwd):/work" \
   -e PYTEST_ADDOPTS='-k "not convert_url and not convert_http_uri"' \
   markitdown-tests
 ```
+
+## Installation and how to run tests (without Docker)
+
+Requirements:
+- Python 3.11 (recommended)
+- pip
+- gcc / build-essential (for compiled deps)
+- ffmpeg and exiftool available on PATH (some tests rely on them)
+
+Setup:
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -U pip
+pip install -e 'packages/markitdown[all]'
+pip install -e 'packages/markitdown-sample-plugin'
+```
+
+Run tests:
+```bash
+pytest -q packages/markitdown/tests -k "not convert_url and not convert_http_uri"
+```
