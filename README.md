@@ -1,3 +1,14 @@
+# Status do Build
+![Build Status](https://github.com/roberto-fgv/markitdown/actions/workflows/ci.yml/badge.svg)
+
+# Cobertura de Código
+![Coverage](https://img.shields.io/badge/coverage-unknown-lightgrey.svg)
+
+# Licença
+![License](https://img.shields.io/github/license/roberto-fgv/markitdown.svg)
+
+---
+
 # Markitdown
 
 Markitdown é um projeto open source desenvolvido para o processamento, transformação e automação de documentos em Markdown, com foco em ambientes acadêmicos e de pesquisa. Ele oferece ferramentas para automatizar relatórios, formatar tabelas complexas e integrar fluxos de dados externos (como CSV e JSON), facilitando a produção científica e administrativa.
