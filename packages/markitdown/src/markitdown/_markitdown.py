@@ -1,11 +1,8 @@
-import copy
 import mimetypes
 import os
 import re
 import sys
 import shutil
-import tempfile
-import warnings
 import traceback
 import io
 from dataclasses import dataclass
@@ -118,6 +115,7 @@ class MarkItDown:
         # TODO - remove these (see enable_builtins)
         self._llm_client: Any = None
         self._llm_model: Union[str | None] = None
+        self._llm_prompt: Union[str | None] = None
         self._exiftool_path: Union[str | None] = None
         self._style_map: Union[str | None] = None
 
@@ -142,6 +140,7 @@ class MarkItDown:
             # TODO: Move these into converter constructors
             self._llm_client = kwargs.get("llm_client")
             self._llm_model = kwargs.get("llm_model")
+            self._llm_prompt = kwargs.get("llm_prompt")
             self._exiftool_path = kwargs.get("exiftool_path")
             self._style_map = kwargs.get("style_map")
 
@@ -210,6 +209,10 @@ class MarkItDown:
                 docintel_types = kwargs.get("docintel_file_types")
                 if docintel_types is not None:
                     docintel_args["file_types"] = docintel_types
+
+                docintel_version = kwargs.get("docintel_api_version")
+                if docintel_version is not None:
+                    docintel_args["api_version"] = docintel_version
 
                 self.register_converter(
                     DocumentIntelligenceConverter(**docintel_args),
@@ -547,7 +550,7 @@ class MarkItDown:
                 # Sanity check -- make sure the cur_pos is still the same
                 assert (
                     cur_pos == file_stream.tell()
-                ), f"File stream position should NOT change between guess iterations"
+                ), "File stream position should NOT change between guess iterations"
 
                 _kwargs = {k: v for k, v in kwargs.items()}
 
@@ -557,6 +560,9 @@ class MarkItDown:
 
                 if "llm_model" not in _kwargs and self._llm_model is not None:
                     _kwargs["llm_model"] = self._llm_model
+
+                if "llm_prompt" not in _kwargs and self._llm_prompt is not None:
+                    _kwargs["llm_prompt"] = self._llm_prompt
 
                 if "style_map" not in _kwargs and self._style_map is not None:
                     _kwargs["style_map"] = self._style_map
@@ -614,7 +620,7 @@ class MarkItDown:
 
         # Nothing can handle it!
         raise UnsupportedFormatException(
-            f"Could not convert stream to Markdown. No converter attempted a conversion, suggesting that the filetype is simply not supported."
+            "Could not convert stream to Markdown. No converter attempted a conversion, suggesting that the filetype is simply not supported."
         )
 
     def register_page_converter(self, converter: DocumentConverter) -> None:

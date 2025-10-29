@@ -4,7 +4,6 @@
 import argparse
 import sys
 import codecs
-import locale
 from textwrap import dedent
 from importlib.metadata import entry_points
 from .__about__ import __version__
@@ -34,13 +33,13 @@ def main():
                 OR
 
                 markitdown < example.pdf
-                
+
                 OR to save to a file use
-    
+
                 markitdown example.pdf -o example.md
-                
+
                 OR
-                
+
                 markitdown example.pdf > example.md
             """
         ).strip(),
