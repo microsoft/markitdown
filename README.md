@@ -164,14 +164,14 @@ result = md.convert("test.pdf")
 print(result.text_content)
 ```
 
-To use Large Language Models for image descriptions, provide `llm_client` and `llm_model`:
+To use Large Language Models for image descriptions (currently only for pptx and image files), provide `llm_client` and `llm_model`:
 
 ```python
 from markitdown import MarkItDown
 from openai import OpenAI
 
 client = OpenAI()
-md = MarkItDown(llm_client=client, llm_model="gpt-4o")
+md = MarkItDown(llm_client=client, llm_model="gpt-4o", llm_prompt="optional custom prompt")
 result = md.convert("example.jpg")
 print(result.text_content)
 ```
@@ -199,7 +199,7 @@ contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additio
 
 ### How to Contribute
 
-You can help by looking at issues or helping review PRs. Any issue or PR is welcome, but we have also marked some as 'open for contribution' and 'open for reviewing' to help facilitate community contributions. These are ofcourse just suggestions and you are welcome to contribute in any way you like.
+You can help by looking at issues or helping review PRs. Any issue or PR is welcome, but we have also marked some as 'open for contribution' and 'open for reviewing' to help facilitate community contributions. These are of course just suggestions and you are welcome to contribute in any way you like.
 
 <div align="center">
 
