@@ -55,10 +55,9 @@ def auto_detect_ollama(prefer_vision: bool = True) -> Optional[str]:
     """
     try:
         import subprocess
-        import json
         
         result = subprocess.run(
-            ["ollama", "list", "--json"],
+            ["ollama", "list"],
             capture_output=True,
             text=True,
             timeout=5
@@ -66,8 +65,17 @@ def auto_detect_ollama(prefer_vision: bool = True) -> Optional[str]:
         
         if result.returncode != 0:
             return None
-            
-        models = json.loads(result.stdout)
+        
+        # Parse the text output (not JSON)
+        lines = result.stdout.strip().split('\n')
+        if len(lines) < 2:  # Need at least header + one model
+            return None
+        
+        models = []
+        for line in lines[1:]:  # Skip header
+            if line.strip():
+                model_name = line.split()[0]  # First column is model name
+                models.append(model_name)
         
         if not models:
             return None
@@ -75,14 +83,14 @@ def auto_detect_ollama(prefer_vision: bool = True) -> Optional[str]:
         # Prefer vision models if requested
         if prefer_vision:
             vision_models = [
-                m["name"] for m in models 
-                if "vision" in m["name"].lower() or "llava" in m["name"].lower()
+                m for m in models 
+                if "vision" in m.lower() or "llava" in m.lower()
             ]
             if vision_models:
                 return vision_models[0]
         
         # Return first available model
-        return models[0]["name"]
+        return models[0]
         
     except Exception:
         return None
