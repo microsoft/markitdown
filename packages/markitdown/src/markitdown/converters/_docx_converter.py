@@ -15,13 +15,6 @@ from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 _dependency_exc_info = None
 try:
     import mammoth
-    import mammoth.docx.files
-
-    def mammoth_files_open(self, uri):
-        warn("DOCX: processing of r:link resources (e.g., linked images) is disabled.")
-        return io.BytesIO(b"")
-
-    mammoth.docx.files.Files.open = mammoth_files_open
 
 except ImportError:
     # Preserve the error and stack trace for later
