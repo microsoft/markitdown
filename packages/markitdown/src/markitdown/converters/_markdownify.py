@@ -92,9 +92,11 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         """Same as usual converter, but removes data URIs"""
 
         alt = el.attrs.get("alt", None) or ""
-        src = el.attrs.get("src", None) or ""
+        src = el.attrs.get("src", None) or el.attrs.get("data-src", None) or ""
         title = el.attrs.get("title", None) or ""
         title_part = ' "%s"' % title.replace('"', r"\"") if title else ""
+        # Remove all line breaks from alt
+        alt = alt.replace("\n", " ")
         if (
             convert_as_inline
             and el.parent.name not in self.options["keep_inline_images_in"]
@@ -106,6 +108,19 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
             src = src.split(",")[0] + "..."
 
         return "![%s](%s%s)" % (alt, src, title_part)
+
+    def convert_input(
+        self,
+        el: Any,
+        text: str,
+        convert_as_inline: Optional[bool] = False,
+        **kwargs,
+    ) -> str:
+        """Convert checkboxes to Markdown [x]/[ ] syntax."""
+
+        if el.get("type") == "checkbox":
+            return "[x] " if el.has_attr("checked") else "[ ] "
+        return ""
 
     def convert_soup(self, soup: Any) -> str:
         return super().convert_soup(soup)  # type: ignore
