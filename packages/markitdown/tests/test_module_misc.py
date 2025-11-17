@@ -126,7 +126,7 @@ def test_stream_info_operations() -> None:
             **{keyword: f"{keyword}.2"}
         )
 
-        # Make sure the targted attribute is updated
+        # Make sure the targeted attribute is updated
         assert getattr(updated_stream_info, keyword) == f"{keyword}.2"
 
         # Make sure the other attributes are unchanged
@@ -143,7 +143,7 @@ def test_stream_info_operations() -> None:
             StreamInfo(**{keyword: f"{keyword}.2"})
         )
 
-        # Make sure the targted attribute is updated
+        # Make sure the targeted attribute is updated
         assert getattr(updated_stream_info, keyword) == f"{keyword}.2"
 
         # Make sure the other attributes are unchanged

@@ -207,7 +207,7 @@ class DocumentIntelligenceConverter(DocumentConverter):
     def _analysis_features(self, stream_info: StreamInfo) -> List[str]:
         """
         Helper needed to determine which analysis features to use.
-        Certain document analysis features are not availiable for
+        Certain document analysis features are not available for
         office filetypes (.xlsx, .pptx, .html, .docx)
         """
         mimetype = (stream_info.mimetype or "").lower()
