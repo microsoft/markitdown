@@ -27,13 +27,13 @@ dependencies = [
   "beautifulsoup4",
   "requests",
   "markdownify",
-  "magika~=0.6.1",
   "charset-normalizer",
   "defusedxml",
 ]
 
 [project.optional-dependencies]
 magika = [
+  "magika~=0.6.1",
   "onnxruntime<=1.20.1; sys_platform == 'win32'",
 ]
 
