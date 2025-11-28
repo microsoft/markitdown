@@ -1,82 +1,140 @@
-from typing import Any
-from .._base_converter import DocumentConverter, DocumentConverterResult
+from typing import Any, BinaryIO, List, Tuple
+
 from email import policy
-from email.parser import Parser
-from email.utils import parseaddr
+from email.parser import BytesParser
+from email.utils import getaddresses
+
+from .._base_converter import DocumentConverter, DocumentConverterResult
+from .._stream_info import StreamInfo
+
+
+ACCEPTED_MIME_TYPE_PREFIXES = [
+    "message/",
+]
+
+ACCEPTED_FILE_EXTENSIONS = [
+    ".eml",
+]
+
 
 class EmlConverter(DocumentConverter):
     """Converts EML (email) files to Markdown. Preserves headers, body, and attachments info."""
 
-    def convert(self, local_path: str, **kwargs: Any) -> DocumentConverterResult:
-        """Convert an EML file to markdown.
-        Args:
-            local_path: Path to the EML file
-            **kwargs: Additional arguments (unused)
-        Returns:
-            DocumentConverterResult containing the converted markdown
-        """
-        # Check if this is an EML file
-        file_ext = kwargs.get("file_extension", "").lower()
-        if not file_ext.endswith(".eml"):
-            return None
+    def accepts(
+        self,
+        file_stream: BinaryIO,  # noqa: ARG002 - required by interface
+        stream_info: StreamInfo,
+        **kwargs: Any,  # Options to pass to the converter
+    ) -> bool:
+        mimetype = (stream_info.mimetype or "").lower()
+        extension = (stream_info.extension or "").lower()
 
-        with open(local_path, "r", encoding="utf-8") as fp:
-            # Use policy=default to handle RFC compliant emails
-            msg = Parser(policy=policy.default).parse(fp)
+        # Check the extension and mimetype
+        if extension in ACCEPTED_FILE_EXTENSIONS:
+            return True
 
-        # Initialize result with email subject as title
-        result = DocumentConverterResult(title=msg.get("subject", "Untitled Email"))
+        for prefix in ACCEPTED_MIME_TYPE_PREFIXES:
+            if mimetype.startswith(prefix):
+                return True
+
+        return False
+
+    def convert(
+        self,
+        file_stream: BinaryIO,
+        stream_info: StreamInfo,  # noqa: ARG002 - kept for interface compatibility
+        **kwargs: Any,  # Options to pass to the converter
+    ) -> DocumentConverterResult:
+        """Convert an EML message to markdown."""
+        _ = kwargs  # Currently unused
+
+        # Read the full message from the binary stream and parse it
+        raw_bytes = file_stream.read()
+        msg = BytesParser(policy=policy.default).parsebytes(raw_bytes)
 
         # Build markdown content
-        md_parts = []
+        md_parts: List[str] = []
 
         # Add email headers
         md_parts.append("## Email Headers\n")
 
-        # From and To in a more readable format
-        from_name, from_email = parseaddr(msg.get("from", ""))
-        to_name, to_email = parseaddr(msg.get("to", ""))
+        # Helper to format address headers that can contain multiple addresses
+        def _format_address_header(header_name: str) -> Tuple[str, str]:
+            raw_values = msg.get_all(header_name, [])
+            if not raw_values:
+                return header_name, ""
 
-        md_parts.append(
-            f"**From:** {from_name} <{from_email}>"
-            if from_name
-            else f"**From:** {from_email}"
-        )
-        md_parts.append(
-            f"**To:** {to_name} <{to_email}>" if to_name else f"**To:** {to_email}"
-        )
-        md_parts.append(f"**Subject:** {msg.get('subject', '')}")
-        md_parts.append(f"**Date:** {msg.get('date', '')}")
+            addresses = getaddresses(raw_values)
+            formatted = []
+            for name, addr in addresses:
+                if name and addr:
+                    formatted.append(f"{name} <{addr}>")
+                elif addr:
+                    formatted.append(addr)
+            return header_name, ", ".join(formatted)
 
-        # Add CC if present
-        if msg.get("cc"):
-            md_parts.append(f"**CC:** {msg.get('cc')}")
+        # From, To, Cc, Bcc in a readable format
+        for header in ["From", "To", "Cc", "Bcc"]:
+            key, value = _format_address_header(header)
+            if value:
+                md_parts.append(f"**{key}:** {value}")
+
+        # Other common headers
+        subject = msg.get("Subject", "")
+        if subject:
+            md_parts.append(f"**Subject:** {subject}")
+
+        date = msg.get("Date", "")
+        if date:
+            md_parts.append(f"**Date:** {date}")
 
         md_parts.append("\n## Email Content\n")
 
-        # Handle the email body
+        # Prefer plain text body; fall back to HTML if no plain text part exists
+        body_text: List[str] = []
+        has_text_plain = False
+
         if msg.is_multipart():
+            # First pass: check if there is any text/plain part
             for part in msg.walk():
                 if part.get_content_type() == "text/plain":
-                    md_parts.append(part.get_content())
-                elif part.get_content_type() == "text/html":
-                    # If we have HTML content but no plain text, we could convert HTML to markdown here
-                    # For now, we'll just note it's HTML content
-                    if not any(
-                        p.get_content_type() == "text/plain" for p in msg.walk()
-                    ):
-                        md_parts.append(part.get_content())
-        else:
-            md_parts.append(msg.get_content())
+                    has_text_plain = True
+                    break
 
-        # List attachments if any
-        attachments = []
+            for part in msg.walk():
+                content_type = part.get_content_type()
+                disposition = part.get_content_disposition()
+
+                # Skip attachments when extracting the main body
+                if disposition == "attachment":
+                    continue
+
+                if content_type == "text/plain":
+                    body_text.append(part.get_content())
+                elif content_type == "text/html" and not has_text_plain:
+                    # If we have HTML content but no plain text, fall back to HTML
+                    body_text.append(part.get_content())
+        else:
+            # Single-part message
+            content_type = msg.get_content_type()
+            if content_type in ("text/plain", "text/html", "text/rfc822-headers"):
+                body_text.append(msg.get_content())
+
+        if body_text:
+            md_parts.append("\n".join(body_text))
+
+        # List attachments, if any
+        attachments: List[str] = []
         if msg.is_multipart():
             for part in msg.walk():
                 if part.get_content_disposition() == "attachment":
                     filename = part.get_filename()
                     if filename:
-                        size = len(part.get_content())
+                        try:
+                            payload = part.get_content()
+                            size = len(payload) if isinstance(payload, (bytes, str)) else 0
+                        except Exception:
+                            size = 0
                         mime_type = part.get_content_type()
                         attachments.append(
                             f"- {filename} ({mime_type}, {size:,} bytes)"
@@ -86,7 +144,9 @@ class EmlConverter(DocumentConverter):
             md_parts.append("\n## Attachments\n")
             md_parts.extend(attachments)
 
-        # Combine all parts
-        result.text_content = "\n".join(md_parts)
+        markdown = "\n".join(md_parts).strip()
 
-        return result
+        return DocumentConverterResult(
+            markdown=markdown,
+            title=subject or None,
+        )
