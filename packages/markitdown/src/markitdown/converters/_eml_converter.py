@@ -1,5 +1,5 @@
 from typing import Any
-from ._base import DocumentConverter, DocumentConverterResult
+from .._base_converter import DocumentConverter, DocumentConverterResult
 from email import policy
 from email.parser import Parser
 from email.utils import parseaddr
