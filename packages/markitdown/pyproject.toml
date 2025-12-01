@@ -41,7 +41,7 @@ all = [
   "openpyxl",
   "xlrd",
   "lxml",
-  "pdfminer.six",
+  "pdfminer.six>=20251107",
   "olefile",
   "pydub",
   "SpeechRecognition",
