@@ -94,6 +94,70 @@ You can also pipe content:
 cat path-to-file.pdf | markitdown
 ```
 
+### Bounding Boxes
+
+Use `--emit-bbox` to generate a sidecar JSON file with page, line, and word bounding boxes for PDF and image inputs:
+
+```bash
+markitdown sample.pdf --emit-bbox
+```
+
+This writes `sample.bbox.json` alongside the Markdown output. The structure of the JSON file is:
+
+```json
+{
+  "version": "1.0",
+  "source": "sample.pdf",
+  "pages": [{ "page": 1, "width": 612, "height": 792 }],
+  "lines": [{ "page": 1, "text": "Hello", "bbox_norm": [0,0,0,0], "bbox_abs": [0,0,0,0], "confidence": null, "md_span": {"start": null, "end": null} }],
+  "words": [{ "page": 1, "text": "Hello", "bbox_norm": [0,0,0,0], "bbox_abs": [0,0,0,0], "confidence": null, "line_id": 0 }]
+}
+```
+
+`bbox_abs` values are in pixel units of the page or image, with a top-left origin. `bbox_norm` values are normalized to the range `[0,1]`.
+
+For scanned PDFs or images without embedded text, MarkItDown falls back to Tesseract OCR when `--emit-bbox` is supplied. Set `MARKITDOWN_OCR_LANG` (or use `--ocr-lang`) to control OCR languages. Use `TESSDATA_PREFIX` if custom language packs are installed.
+
+For an example comparison with Docling outputs, see [docling_comparison.md](docling_comparison.md).
+For a comprehensive evaluation on the Docling test dataset, see [docling_dataset_comparison.md](docling_dataset_comparison.md).
+Across the 12 supported documents, MarkItDown's Markdown differed from the Docling ground truth by roughly **45%** on average,
+with bounding box coordinates deviating by about **18%**. Right-to-left pages and scanned forms contributed most of the
+discrepancies.
+
+### Docling Test Data Timing
+
+The following table reports the time required by `markitdown` to convert each PDF, TIFF, and PNG file from the [Docling test dataset](https://github.com/docling-project/docling/tree/main/tests/data) into Markdown and to generate bounding boxes (`--emit-bbox`). The TIFF sample was first converted to PNG for processing.
+
+| File | Type | MD Time (s) | BBox Time (s) |
+| --- | --- | --- | --- |
+| 2305.03393v1-pg9-img.png | png | 2.51 | 5.56 |
+| 2203.01017v2.pdf | pdf | 4.59 | 9.30 |
+| 2206.01062.pdf | pdf | 4.94 | 11.21 |
+| 2305.03393v1-pg9.pdf | pdf | 2.69 | 2.88 |
+| 2305.03393v1.pdf | pdf | 3.71 | 6.70 |
+| amt_handbook_sample.pdf | pdf | 3.14 | 3.99 |
+| code_and_formula.pdf | pdf | 2.80 | 3.24 |
+| multi_page.pdf | pdf | 2.89 | 3.93 |
+| picture_classification.pdf | pdf | 2.68 | 2.92 |
+| redp5110_sampled.pdf | pdf | 3.71 | 8.67 |
+| right_to_left_01.pdf | pdf | 2.83 | 2.87 |
+| right_to_left_02.pdf | pdf | 2.70 | 3.01 |
+| right_to_left_03.pdf | pdf | 2.81 | 2.93 |
+| 2206.01062.tif | tiff | 2.57 | 4.19 |
+
+#### Average Times by Type
+
+| Type | Avg MD Time (s) | Avg BBox Time (s) |
+| --- | --- | --- |
+| png | 2.51 | 5.56 |
+| pdf | 3.29 | 5.14 |
+| tiff | 2.57 | 4.19 |
+
+#### Overall Average Times
+
+* Average MD Time: 3.18 s
+* Average BBox Time: 5.10 s
+
 ### Optional Dependencies
 MarkItDown has optional dependencies for activating various file formats. Earlier in this document, we installed all optional dependencies with the `[all]` option. However, you can also install them individually for more control. For example:
 

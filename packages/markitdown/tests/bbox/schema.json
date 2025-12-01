@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["version", "source", "pages", "lines", "words"],
+  "properties": {
+    "version": {"type": "string"},
+    "source": {"type": "string"},
+    "pages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["page", "width", "height"],
+        "properties": {
+          "page": {"type": "integer"},
+          "width": {"type": "number"},
+          "height": {"type": "number"}
+        }
+      }
+    },
+    "lines": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["page", "text", "bbox_norm", "bbox_abs", "confidence", "md_span"],
+        "properties": {
+          "page": {"type": "integer"},
+          "text": {"type": "string"},
+          "bbox_norm": {"type": "array", "items": {"type": "number"}, "minItems": 4, "maxItems": 4},
+          "bbox_abs": {"type": "array", "items": {"type": "number"}, "minItems": 4, "maxItems": 4},
+          "confidence": {"type": ["number", "null"]},
+          "md_span": {
+            "type": ["object"],
+            "required": ["start", "end"],
+            "properties": {
+              "start": {"type": ["integer", "null"]},
+              "end": {"type": ["integer", "null"]}
+            }
+          }
+        }
+      }
+    },
+    "words": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["page", "text", "bbox_norm", "bbox_abs", "confidence", "line_id"],
+        "properties": {
+          "page": {"type": "integer"},
+          "text": {"type": "string"},
+          "bbox_norm": {"type": "array", "items": {"type": "number"}, "minItems": 4, "maxItems": 4},
+          "bbox_abs": {"type": "array", "items": {"type": "number"}, "minItems": 4, "maxItems": 4},
+          "confidence": {"type": ["number", "null"]},
+          "line_id": {"type": "integer"}
+        }
+      }
+    }
+  }
+}

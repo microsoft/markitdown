@@ -247,6 +247,8 @@ class MarkItDown:
         source: Union[str, requests.Response, Path, BinaryIO],
         *,
         stream_info: Optional[StreamInfo] = None,
+        emit_bbox: bool = False,
+        ocr_lang: Optional[str] = None,
         **kwargs: Any,
     ) -> DocumentConverterResult:  # TODO: deal with kwargs
         """
@@ -271,22 +273,52 @@ class MarkItDown:
                     _kwargs["mock_url"] = _kwargs["url"]
                     del _kwargs["url"]
 
-                return self.convert_uri(source, stream_info=stream_info, **_kwargs)
+                return self.convert_uri(
+                    source,
+                    stream_info=stream_info,
+                    emit_bbox=emit_bbox,
+                    ocr_lang=ocr_lang,
+                    **_kwargs,
+                )
             else:
-                return self.convert_local(source, stream_info=stream_info, **kwargs)
+                return self.convert_local(
+                    source,
+                    stream_info=stream_info,
+                    emit_bbox=emit_bbox,
+                    ocr_lang=ocr_lang,
+                    **kwargs,
+                )
         # Path object
         elif isinstance(source, Path):
-            return self.convert_local(source, stream_info=stream_info, **kwargs)
+            return self.convert_local(
+                source,
+                stream_info=stream_info,
+                emit_bbox=emit_bbox,
+                ocr_lang=ocr_lang,
+                **kwargs,
+            )
         # Request response
         elif isinstance(source, requests.Response):
-            return self.convert_response(source, stream_info=stream_info, **kwargs)
+            return self.convert_response(
+                source,
+                stream_info=stream_info,
+                emit_bbox=emit_bbox,
+                ocr_lang=ocr_lang,
+                **kwargs,
+            )
         # Binary stream
         elif (
             hasattr(source, "read")
             and callable(source.read)
             and not isinstance(source, io.TextIOBase)
         ):
-            return self.convert_stream(source, stream_info=stream_info, **kwargs)
+            return self.convert_stream(
+                source,
+                stream_info=stream_info,
+                emit_bbox=emit_bbox,
+                ocr_lang=ocr_lang,
+                **kwargs,
+            )
         else:
             raise TypeError(
                 f"Invalid source type: {type(source)}. Expected str, requests.Response, BinaryIO."
@@ -299,6 +331,8 @@ class MarkItDown:
         stream_info: Optional[StreamInfo] = None,
         file_extension: Optional[str] = None,  # Deprecated -- use stream_info
         url: Optional[str] = None,  # Deprecated -- use stream_info
+        emit_bbox: bool = False,
+        ocr_lang: Optional[str] = None,
         **kwargs: Any,
     ) -> DocumentConverterResult:
         if isinstance(path, Path):
@@ -327,7 +361,13 @@ class MarkItDown:
             guesses = self._get_stream_info_guesses(
                 file_stream=fh, base_guess=base_guess
             )
-            return self._convert(file_stream=fh, stream_info_guesses=guesses, **kwargs)
+            return self._convert(
+                file_stream=fh,
+                stream_info_guesses=guesses,
+                emit_bbox=emit_bbox,
+                ocr_lang=ocr_lang,
+                **kwargs,
+            )
 
     def convert_stream(
         self,
@@ -336,6 +376,8 @@ class MarkItDown:
         stream_info: Optional[StreamInfo] = None,
         file_extension: Optional[str] = None,  # Deprecated -- use stream_info
         url: Optional[str] = None,  # Deprecated -- use stream_info
+        emit_bbox: bool = False,
+        ocr_lang: Optional[str] = None,
         **kwargs: Any,
     ) -> DocumentConverterResult:
         guesses: List[StreamInfo] = []
@@ -374,7 +416,13 @@ class MarkItDown:
         guesses = self._get_stream_info_guesses(
             file_stream=stream, base_guess=base_guess or StreamInfo()
         )
-        return self._convert(file_stream=stream, stream_info_guesses=guesses, **kwargs)
+        return self._convert(
+            file_stream=stream,
+            stream_info_guesses=guesses,
+            emit_bbox=emit_bbox,
+            ocr_lang=ocr_lang,
+            **kwargs,
+        )
 
     def convert_url(
         self,
@@ -383,6 +431,8 @@ class MarkItDown:
         stream_info: Optional[StreamInfo] = None,
         file_extension: Optional[str] = None,
         mock_url: Optional[str] = None,
+        emit_bbox: bool = False,
+        ocr_lang: Optional[str] = None,
         **kwargs: Any,
     ) -> DocumentConverterResult:
         """Alias for convert_uri()"""
@@ -392,6 +442,8 @@ class MarkItDown:
             stream_info=stream_info,
             file_extension=file_extension,
             mock_url=mock_url,
+            emit_bbox=emit_bbox,
+            ocr_lang=ocr_lang,
             **kwargs,
         )
 
@@ -404,6 +456,8 @@ class MarkItDown:
         mock_url: Optional[
             str
         ] = None,  # Mock the request as if it came from a different URL
+        emit_bbox: bool = False,
+        ocr_lang: Optional[str] = None,
         **kwargs: Any,
     ) -> DocumentConverterResult:
         uri = uri.strip()
@@ -420,6 +474,8 @@ class MarkItDown:
                 stream_info=stream_info,
                 file_extension=file_extension,
                 url=mock_url,
+                emit_bbox=emit_bbox,
+                ocr_lang=ocr_lang,
                 **kwargs,
             )
         # Data URIs
@@ -438,6 +494,8 @@ class MarkItDown:
                 stream_info=base_guess,
                 file_extension=file_extension,
                 url=mock_url,
+                emit_bbox=emit_bbox,
+                ocr_lang=ocr_lang,
                 **kwargs,
             )
         # HTTP/HTTPS URIs
@@ -463,6 +521,8 @@ class MarkItDown:
         stream_info: Optional[StreamInfo] = None,
         file_extension: Optional[str] = None,  # Deprecated -- use stream_info
         url: Optional[str] = None,  # Deprecated -- use stream_info
+        emit_bbox: bool = False,
+        ocr_lang: Optional[str] = None,
         **kwargs: Any,
     ) -> DocumentConverterResult:
         # If there is a content-type header, get the mimetype and charset (if present)
@@ -526,7 +586,13 @@ class MarkItDown:
         guesses = self._get_stream_info_guesses(
             file_stream=buffer, base_guess=base_guess
         )
-        return self._convert(file_stream=buffer, stream_info_guesses=guesses, **kwargs)
+        return self._convert(
+            file_stream=buffer,
+            stream_info_guesses=guesses,
+            emit_bbox=emit_bbox,
+            ocr_lang=ocr_lang,
+            **kwargs,
+        )
 
     def _convert(
         self, *, file_stream: BinaryIO, stream_info_guesses: List[StreamInfo], **kwargs

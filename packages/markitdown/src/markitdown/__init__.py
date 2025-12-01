@@ -9,6 +9,7 @@ from ._markitdown import (
     PRIORITY_GENERIC_FILE_FORMAT,
 )
 from ._base_converter import DocumentConverterResult, DocumentConverter
+from .bbox import BBoxDoc
 from ._stream_info import StreamInfo
 from ._exceptions import (
     MarkItDownException,
@@ -23,6 +24,7 @@ __all__ = [
     "MarkItDown",
     "DocumentConverter",
     "DocumentConverterResult",
+    "BBoxDoc",
     "MarkItDownException",
     "MissingDependencyException",
     "FailedConversionAttempt",
