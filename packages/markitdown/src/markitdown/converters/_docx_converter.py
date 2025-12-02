@@ -81,3 +81,31 @@ class DocxConverter(HtmlConverter):
             mammoth.convert_to_html(pre_process_stream, style_map=style_map).value,
             **kwargs,
         )
+
+    # ========== Custom Addition: Pagewise Markdown Output for DOCX ==========
+
+def convert_pagewise_docx(file_path: str) -> list[str]:
+    """
+    Converts each paragraph or page-break-separated section of a DOCX file to separate markdown chunks.
+    Since python-docx doesn't support actual pagination, this will split on paragraph breaks as a proxy.
+    """
+    from docx import Document
+
+    doc = Document(file_path)
+    chunks = []
+    current_chunk = []
+
+    for para in doc.paragraphs:
+        if para.text.strip() == "":
+            if current_chunk:
+                chunks.append("\n".join(current_chunk))
+                current_chunk = []
+        else:
+            current_chunk.append(para.text.strip())
+
+    # Add remaining
+    if current_chunk:
+        chunks.append("\n".join(current_chunk))
+
+    return [f"<!-- Section {i+1} -->\n\n{chunk}" for i, chunk in enumerate(chunks)]
+    

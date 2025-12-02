@@ -262,3 +262,27 @@ class PptxConverter(DocumentConverter):
         except Exception:
             # Catch any other exceptions that might occur
             return "\n\n[unsupported chart]\n\n"
+
+
+    # ========== Custom Addition: Pagewise Markdown Output for PPTX ==========
+
+def convert_pagewise_pptx(file_path: str) -> list[str]:
+    """
+    Converts each slide in a PowerPoint file to a markdown chunk.
+    """
+    from pptx import Presentation
+
+    prs = Presentation(file_path)
+    slides_md = []
+
+    for i, slide in enumerate(prs.slides, start=1):
+        slide_text = []
+        for shape in slide.shapes:
+            if hasattr(shape, "text"):
+                slide_text.append(shape.text.strip())
+
+        text = "\n".join(slide_text).strip()
+        if text:
+            slides_md.append(f"<!-- Slide {i} -->\n\n{text}")
+
+    return slides_md
