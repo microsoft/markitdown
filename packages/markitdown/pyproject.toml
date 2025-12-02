@@ -45,7 +45,7 @@ all = [
   "olefile",
   "pydub",
   "SpeechRecognition",
-  "youtube-transcript-api~=1.0.0",
+  "youtube-transcript-api~=1.1.0",
   "azure-ai-documentintelligence",
   "azure-identity"
 ]
