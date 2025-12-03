@@ -110,6 +110,17 @@ def main():
         help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
     )
 
+    parser.add_argument(
+        "--pdf-tables",
+        dest="pdf_tables",
+        choices=["none", "auto", "plumber", "camelot"],
+        default="none",
+        help=(
+            "PDF table extraction mode: 'none' (default, plain text), 'plumber' (use pdfplumber if installed), "
+            "'camelot' (use camelot if installed), or 'auto' (try plumber then camelot)."
+        ),
+    )
+
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
 
@@ -191,10 +202,14 @@ def main():
             sys.stdin.buffer,
             stream_info=stream_info,
             keep_data_uris=args.keep_data_uris,
+            pdf_tables=args.pdf_tables,
         )
     else:
         result = markitdown.convert(
-            args.filename, stream_info=stream_info, keep_data_uris=args.keep_data_uris
+            args.filename,
+            stream_info=stream_info,
+            keep_data_uris=args.keep_data_uris,
+            pdf_tables=args.pdf_tables,
         )
 
     _handle_output(args, result)
