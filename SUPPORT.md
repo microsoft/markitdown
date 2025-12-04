@@ -18,7 +18,7 @@ feature request as a new Issue.
 
 For help and questions about using this project, please **REPO MAINTAINER: INSERT INSTRUCTIONS HERE 
 FOR HOW TO ENGAGE REPO OWNERS OR COMMUNITY FOR HELP. COULD BE A STACK OVERFLOW TAG OR OTHER
-CHANNEL. WHERE WILL YOU HELP PEOPLE?**.
+CHANNEL. WHERE WILL YOU HELP PEOPLE?**
 
 ## Microsoft Support Policy  
 
