@@ -246,3 +246,39 @@ trademarks or logos is subject to and must follow
 [Microsoft's Trademark & Brand Guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks/usage/general).
 Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship.
 Any use of third-party trademarks or logos are subject to those third-party's policies.
+
+## Local test setup (Docker + WSL)
+
+Build:
+```bash
+docker build -t markitdown-tests .
+```
+
+Run (skip remote URL tests to avoid 429):
+```bash
+docker run --rm -it -v "$(pwd):/work" \
+  -e PYTEST_ADDOPTS='-k "not convert_url and not convert_http_uri"' \
+  markitdown-tests
+```
+
+## Installation and how to run tests (without Docker)
+
+Requirements:
+- Python 3.11 (recommended)
+- pip
+- gcc / build-essential (for compiled deps)
+- ffmpeg and exiftool available on PATH (some tests rely on them)
+
+Setup:
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -U pip
+pip install -e 'packages/markitdown[all]'
+pip install -e 'packages/markitdown-sample-plugin'
+```
+
+Run tests:
+```bash
+pytest -q packages/markitdown/tests -k "not convert_url and not convert_http_uri"
+```
