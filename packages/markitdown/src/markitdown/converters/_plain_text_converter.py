@@ -5,15 +5,6 @@ from charset_normalizer import from_bytes
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
 
-# Try loading optional (but in this case, required) dependencies
-# Save reporting of any exceptions for later
-_dependency_exc_info = None
-try:
-    import mammoth  # noqa: F401
-except ImportError:
-    # Preserve the error and stack trace for later
-    _dependency_exc_info = sys.exc_info()
-
 ACCEPTED_MIME_TYPE_PREFIXES = [
     "text/",
     "application/json",
