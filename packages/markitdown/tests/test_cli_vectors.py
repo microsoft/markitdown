@@ -83,7 +83,7 @@ def test_output_to_file(shared_tmp_dir, test_vector) -> None:
     assert result.returncode == 0, f"CLI exited with error: {result.stderr}"
     assert os.path.exists(output_file), f"Output file not created: {output_file}"
 
-    with open(output_file, "r") as f:
+    with open(output_file, "r", encoding="utf8") as f:
         output_data = f.read()
         for test_string in test_vector.must_include:
             assert test_string in output_data
