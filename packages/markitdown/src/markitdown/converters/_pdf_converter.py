@@ -48,9 +48,11 @@ def _to_markdown_table(table: list[list[str]], include_separator: bool = True) -
     col_widths = [max(len(str(cell)) for cell in col) for col in zip(*table)]
 
     def fmt_row(row: list[str]) -> str:
-        return "|" + "|".join(
-            str(cell).ljust(width) for cell, width in zip(row, col_widths)
-        ) + "|"
+        return (
+            "|"
+            + "|".join(str(cell).ljust(width) for cell, width in zip(row, col_widths))
+            + "|"
+        )
 
     if include_separator:
         header, *rows = table
@@ -84,55 +86,54 @@ def _extract_form_content_from_words(page: Any) -> str | None:
     y_tolerance = 5
     rows_by_y: dict[float, list[dict]] = {}
     for word in words:
-        y_key = round(word['top'] / y_tolerance) * y_tolerance
+        y_key = round(word["top"] / y_tolerance) * y_tolerance
         if y_key not in rows_by_y:
             rows_by_y[y_key] = []
         rows_by_y[y_key].append(word)
 
     # Sort rows by Y position
     sorted_y_keys = sorted(rows_by_y.keys())
-    page_width = page.width if hasattr(page, 'width') else 612
+    page_width = page.width if hasattr(page, "width") else 612
 
     # First pass: analyze each row
     row_info: list[dict] = []
     for y_key in sorted_y_keys:
-        row_words = sorted(rows_by_y[y_key], key=lambda w: w['x0'])
+        row_words = sorted(rows_by_y[y_key], key=lambda w: w["x0"])
         if not row_words:
             continue
 
-        first_x0 = row_words[0]['x0']
-        last_x1 = row_words[-1]['x1']
+        first_x0 = row_words[0]["x0"]
+        last_x1 = row_words[-1]["x1"]
         line_width = last_x1 - first_x0
-        combined_text = ' '.join(w['text'] for w in row_words)
+        combined_text = " ".join(w["text"] for w in row_words)
 
         # Count distinct x-position groups (columns)
-        x_positions = [w['x0'] for w in row_words]
+        x_positions = [w["x0"] for w in row_words]
         x_groups: list[float] = []
         for x in sorted(x_positions):
             if not x_groups or x - x_groups[-1] > 50:
                 x_groups.append(x)
 
         # Determine row type
-        is_paragraph = (
-            line_width > page_width * 0.55 and
-            len(combined_text) > 60
-        )
+        is_paragraph = line_width > page_width * 0.55 and len(combined_text) > 60
 
-        row_info.append({
-            'y_key': y_key,
-            'words': row_words,
-            'text': combined_text,
-            'x_groups': x_groups,
-            'is_paragraph': is_paragraph,
-            'num_columns': len(x_groups),
-        })
+        row_info.append(
+            {
+                "y_key": y_key,
+                "words": row_words,
+                "text": combined_text,
+                "x_groups": x_groups,
+                "is_paragraph": is_paragraph,
+                "num_columns": len(x_groups),
+            }
+        )
 
     # Collect ALL x-positions from rows with 3+ columns (table-like rows)
     # This gives us the global column structure
     all_table_x_positions: list[float] = []
     for info in row_info:
-        if info['num_columns'] >= 3 and not info['is_paragraph']:
-            all_table_x_positions.extend(info['x_groups'])
+        if info["num_columns"] >= 3 and not info["is_paragraph"]:
+            all_table_x_positions.extend(info["x_groups"])
 
     if not all_table_x_positions:
         return None
@@ -151,29 +152,29 @@ def _extract_form_content_from_words(page: Any) -> str | None:
     # Now classify each row as table row or not
     # A row is a table row if it has words that align with 2+ of the global columns
     for info in row_info:
-        if info['is_paragraph']:
-            info['is_table_row'] = False
+        if info["is_paragraph"]:
+            info["is_table_row"] = False
             continue
 
         # Count how many global columns this row's words align with
         aligned_columns: set[int] = set()
-        for word in info['words']:
-            word_x = word['x0']
+        for word in info["words"]:
+            word_x = word["x0"]
             for col_idx, col_x in enumerate(global_columns):
                 if abs(word_x - col_x) < 40:
                     aligned_columns.add(col_idx)
                     break
 
         # If row uses 2+ of the established columns, it's a table row
-        info['is_table_row'] = len(aligned_columns) >= 2
+        info["is_table_row"] = len(aligned_columns) >= 2
 
     # Find table regions (consecutive table rows)
     table_regions: list[tuple[int, int]] = []  # (start_idx, end_idx)
     i = 0
     while i < len(row_info):
-        if row_info[i]['is_table_row']:
+        if row_info[i]["is_table_row"]:
             start_idx = i
-            while i < len(row_info) and row_info[i]['is_table_row']:
+            while i < len(row_info) and row_info[i]["is_table_row"]:
                 i += 1
             end_idx = i
             table_regions.append((start_idx, end_idx))
@@ -191,9 +192,9 @@ def _extract_form_content_from_words(page: Any) -> str | None:
 
     # Helper function to extract cells from a row
     def extract_cells(info: dict) -> list[str]:
-        cells: list[str] = ['' for _ in range(num_cols)]
-        for word in info['words']:
-            word_x = word['x0']
+        cells: list[str] = ["" for _ in range(num_cols)]
+        for word in info["words"]:
+            word_x = word["x0"]
             # Find the correct column using boundary ranges
             assigned_col = num_cols - 1  # Default to last column
             for col_idx in range(num_cols - 1):
@@ -202,9 +203,9 @@ def _extract_form_content_from_words(page: Any) -> str | None:
                     assigned_col = col_idx
                     break
             if cells[assigned_col]:
-                cells[assigned_col] += ' ' + word['text']
+                cells[assigned_col] += " " + word["text"]
             else:
-                cells[assigned_col] = word['text']
+                cells[assigned_col] = word["text"]
         return cells
 
     # Process rows, collecting table data for proper formatting
@@ -230,30 +231,39 @@ def _extract_form_content_from_words(page: Any) -> str | None:
             # Calculate column widths for this table
             if table_data:
                 col_widths = [
-                    max(len(row[col]) for row in table_data)
-                    for col in range(num_cols)
+                    max(len(row[col]) for row in table_data) for col in range(num_cols)
                 ]
                 # Ensure minimum width of 3 for separator dashes
                 col_widths = [max(w, 3) for w in col_widths]
 
                 # Format header row
                 header = table_data[0]
-                header_str = '| ' + ' | '.join(
-                    cell.ljust(col_widths[i]) for i, cell in enumerate(header)
-                ) + ' |'
+                header_str = (
+                    "| "
+                    + " | ".join(
+                        cell.ljust(col_widths[i]) for i, cell in enumerate(header)
+                    )
+                    + " |"
+                )
                 result_lines.append(header_str)
 
                 # Format separator row
-                separator = '| ' + ' | '.join(
-                    '-' * col_widths[i] for i in range(num_cols)
-                ) + ' |'
+                separator = (
+                    "| "
+                    + " | ".join("-" * col_widths[i] for i in range(num_cols))
+                    + " |"
+                )
                 result_lines.append(separator)
 
                 # Format data rows
                 for row in table_data[1:]:
-                    row_str = '| ' + ' | '.join(
-                        cell.ljust(col_widths[i]) for i, cell in enumerate(row)
-                    ) + ' |'
+                    row_str = (
+                        "| "
+                        + " | ".join(
+                            cell.ljust(col_widths[i]) for i, cell in enumerate(row)
+                        )
+                        + " |"
+                    )
                     result_lines.append(row_str)
 
             idx = end  # Skip to end of table region
@@ -267,10 +277,10 @@ def _extract_form_content_from_words(page: Any) -> str | None:
 
             if not in_table:
                 # Non-table content
-                result_lines.append(info['text'])
+                result_lines.append(info["text"])
             idx += 1
 
-    return '\n'.join(result_lines)
+    return "\n".join(result_lines)
 
 
 def _extract_tables_from_words(page: Any) -> list[list[list[str]]]:
@@ -289,7 +299,7 @@ def _extract_tables_from_words(page: Any) -> list[list[list[str]]]:
     y_tolerance = 5
     rows_by_y: dict[float, list[dict]] = {}
     for word in words:
-        y_key = round(word['top'] / y_tolerance) * y_tolerance
+        y_key = round(word["top"] / y_tolerance) * y_tolerance
         if y_key not in rows_by_y:
             rows_by_y[y_key] = []
         rows_by_y[y_key].append(word)
@@ -301,7 +311,7 @@ def _extract_tables_from_words(page: Any) -> list[list[list[str]]]:
     all_x_positions = []
     for words_in_row in rows_by_y.values():
         for word in words_in_row:
-            all_x_positions.append(word['x0'])
+            all_x_positions.append(word["x0"])
 
     if not all_x_positions:
         return []
@@ -321,24 +331,24 @@ def _extract_tables_from_words(page: Any) -> list[list[list[str]]]:
     # Find rows that span multiple columns (potential table rows)
     table_rows = []
     for y_key in sorted_y_keys:
-        words_in_row = sorted(rows_by_y[y_key], key=lambda w: w['x0'])
+        words_in_row = sorted(rows_by_y[y_key], key=lambda w: w["x0"])
 
         # Assign words to columns
-        row_data = [''] * len(column_starts)
+        row_data = [""] * len(column_starts)
         for word in words_in_row:
             # Find the closest column
             best_col = 0
-            min_dist = float('inf')
+            min_dist = float("inf")
             for i, col_x in enumerate(column_starts):
-                dist = abs(word['x0'] - col_x)
+                dist = abs(word["x0"] - col_x)
                 if dist < min_dist:
                     min_dist = dist
                     best_col = i
 
             if row_data[best_col]:
-                row_data[best_col] += ' ' + word['text']
+                row_data[best_col] += " " + word["text"]
             else:
-                row_data[best_col] = word['text']
+                row_data[best_col] = word["text"]
 
         # Only include rows that have content in multiple columns
         non_empty = sum(1 for cell in row_data if cell.strip())
@@ -408,7 +418,9 @@ class PdfConverter(DocumentConverter):
                     extension=".pdf",
                     feature="pdf",
                 )
-            ) from _dependency_exc_info[1].with_traceback(_dependency_exc_info[2])  # type: ignore[union-attr]
+            ) from _dependency_exc_info[1].with_traceback(
+                _dependency_exc_info[2]
+            )  # type: ignore[union-attr]
 
         assert isinstance(file_stream, io.IOBase)
 

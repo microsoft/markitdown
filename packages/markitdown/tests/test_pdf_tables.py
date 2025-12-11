@@ -46,18 +46,18 @@ def extract_markdown_tables(text_content):
     and each row is a list of cell values.
     """
     tables = []
-    lines = text_content.split('\n')
+    lines = text_content.split("\n")
     current_table = []
     in_table = False
 
     for line in lines:
         line = line.strip()
-        if line.startswith('|') and line.endswith('|'):
+        if line.startswith("|") and line.endswith("|"):
             # Skip separator rows (contain only dashes and pipes)
-            if re.match(r'^\|[\s\-|]+\|$', line):
+            if re.match(r"^\|[\s\-|]+\|$", line):
                 continue
             # Parse cells from the row
-            cells = [cell.strip() for cell in line.split('|')[1:-1]]
+            cells = [cell.strip() for cell in line.split("|")[1:-1]]
             current_table.append(cells)
             in_table = True
         else:
@@ -114,7 +114,9 @@ class TestPdfTableExtraction:
         - More pipe-separated rows with extended inventory review
         - Footer: Recommendations section
         """
-        pdf_path = os.path.join(TEST_FILES_DIR, "SPARSE-2024-INV-1234_borderless_table.pdf")
+        pdf_path = os.path.join(
+            TEST_FILES_DIR, "SPARSE-2024-INV-1234_borderless_table.pdf"
+        )
 
         if not os.path.exists(pdf_path):
             pytest.skip(f"Test file not found: {pdf_path}")
@@ -137,7 +139,14 @@ class TestPdfTableExtraction:
 
         # --- Validate First Table Data (Inventory Variance) ---
         # Validate table headers are present
-        first_table_headers = ["Product Code", "Location", "Expected", "Actual", "Variance", "Status"]
+        first_table_headers = [
+            "Product Code",
+            "Location",
+            "Expected",
+            "Actual",
+            "Variance",
+            "Status",
+        ]
         for header in first_table_headers:
             assert header in text_content, f"Should contain header '{header}'"
 
@@ -158,13 +167,29 @@ class TestPdfTableExtraction:
 
         # --- Validate Second Table Data (Extended Inventory Review) ---
         # Validate second table headers
-        second_table_headers = ["Category", "Unit Cost", "Total Value", "Last Audit", "Notes"]
+        second_table_headers = [
+            "Category",
+            "Unit Cost",
+            "Total Value",
+            "Last Audit",
+            "Notes",
+        ]
         for header in second_table_headers:
             assert header in text_content, f"Should contain header '{header}'"
 
         # Validate second table has all expected SKUs (10 products)
-        second_table_skus = ["SKU-8847", "SKU-9201", "SKU-4563", "SKU-7728", "SKU-3345",
-                            "SKU-5512", "SKU-6678", "SKU-7789", "SKU-2234", "SKU-1123"]
+        second_table_skus = [
+            "SKU-8847",
+            "SKU-9201",
+            "SKU-4563",
+            "SKU-7728",
+            "SKU-3345",
+            "SKU-5512",
+            "SKU-6678",
+            "SKU-7789",
+            "SKU-2234",
+            "SKU-1123",
+        ]
         for sku in second_table_skus:
             assert sku in text_content, f"Should contain {sku}"
 
@@ -201,7 +226,7 @@ class TestPdfTableExtraction:
 
         header_pos = text_content.find("INVENTORY RECONCILIATION REPORT")
         # Look for Product Code header - may be in same column as Location or separate
-        first_table_match = re.search(r'\|\s*Product Code', text_content)
+        first_table_match = re.search(r"\|\s*Product Code", text_content)
         variance_pos = text_content.find("Variance Analysis:")
         extended_review_pos = text_content.find("Extended Inventory Review:")
         # Second table - look for SKU entries after extended review section
@@ -209,7 +234,9 @@ class TestPdfTableExtraction:
         second_table_pos = -1
         if extended_review_pos != -1:
             # Look for either "| Product Code" or "Product Code" as table header
-            second_table_match = re.search(r'Product Code.*Category', text_content[extended_review_pos:])
+            second_table_match = re.search(
+                r"Product Code.*Category", text_content[extended_review_pos:]
+            )
             if second_table_match:
                 # Adjust position to be relative to full text
                 second_table_pos = extended_review_pos + second_table_match.start()
@@ -229,15 +256,27 @@ class TestPdfTableExtraction:
             assert pos != -1, f"Section '{name}' not found in output"
 
         # Verify correct order
-        assert positions["header"] < positions["first_table"], "Header should come before first table"
-        assert positions["first_table"] < positions["variance_analysis"], "First table should come before Variance Analysis"
-        assert positions["variance_analysis"] < positions["extended_review"], "Variance Analysis should come before Extended Review"
-        assert positions["extended_review"] < positions["second_table"], "Extended Review should come before second table"
-        assert positions["second_table"] < positions["recommendations"], "Second table should come before Recommendations"
+        assert (
+            positions["header"] < positions["first_table"]
+        ), "Header should come before first table"
+        assert (
+            positions["first_table"] < positions["variance_analysis"]
+        ), "First table should come before Variance Analysis"
+        assert (
+            positions["variance_analysis"] < positions["extended_review"]
+        ), "Variance Analysis should come before Extended Review"
+        assert (
+            positions["extended_review"] < positions["second_table"]
+        ), "Extended Review should come before second table"
+        assert (
+            positions["second_table"] < positions["recommendations"]
+        ), "Second table should come before Recommendations"
 
     def test_borderless_table_no_duplication(self, markitdown):
         """Test that borderless table content is not duplicated excessively."""
-        pdf_path = os.path.join(TEST_FILES_DIR, "SPARSE-2024-INV-1234_borderless_table.pdf")
+        pdf_path = os.path.join(
+            TEST_FILES_DIR, "SPARSE-2024-INV-1234_borderless_table.pdf"
+        )
 
         if not os.path.exists(pdf_path):
             pytest.skip(f"Test file not found: {pdf_path}")
@@ -249,11 +288,15 @@ class TestPdfTableExtraction:
         # SKU-8847 appears in both tables, plus possibly once in summary text
         sku_count = text_content.count("SKU-8847")
         # Should appear at most 4 times (2 tables + minor text references), not more
-        assert sku_count <= 4, f"SKU-8847 appears too many times ({sku_count}), suggests duplication issue"
+        assert (
+            sku_count <= 4
+        ), f"SKU-8847 appears too many times ({sku_count}), suggests duplication issue"
 
     def test_borderless_table_correct_position(self, markitdown):
         """Test that tables appear in correct positions relative to text."""
-        pdf_path = os.path.join(TEST_FILES_DIR, "SPARSE-2024-INV-1234_borderless_table.pdf")
+        pdf_path = os.path.join(
+            TEST_FILES_DIR, "SPARSE-2024-INV-1234_borderless_table.pdf"
+        )
 
         if not os.path.exists(pdf_path):
             pytest.skip(f"Test file not found: {pdf_path}")
@@ -271,8 +314,9 @@ class TestPdfTableExtraction:
         assert product_code_pos != -1, "Product Code should be found"
         assert variance_pos != -1, "Variance Analysis should be found"
 
-        assert header_pos < product_code_pos < variance_pos, \
-            "Product data should appear between header and Variance Analysis"
+        assert (
+            header_pos < product_code_pos < variance_pos
+        ), "Product data should appear between header and Variance Analysis"
 
         # Second table content should appear after "Extended Inventory Review"
         extended_review_pos = text_content.find("Extended Inventory Review:")
@@ -280,12 +324,17 @@ class TestPdfTableExtraction:
         category_pos = text_content.find("Category")
         recommendations_pos = text_content.find("Recommendations:")
 
-        if extended_review_pos != -1 and category_pos != -1 and recommendations_pos != -1:
+        if (
+            extended_review_pos != -1
+            and category_pos != -1
+            and recommendations_pos != -1
+        ):
             # Find Category position after Extended Inventory Review
             category_after_review = text_content.find("Category", extended_review_pos)
             if category_after_review != -1:
-                assert extended_review_pos < category_after_review < recommendations_pos, \
-                    "Extended review table should appear between Extended Inventory Review and Recommendations"
+                assert (
+                    extended_review_pos < category_after_review < recommendations_pos
+                ), "Extended review table should appear between Extended Inventory Review and Recommendations"
 
     def test_receipt_pdf_extraction(self, markitdown):
         """Test extraction of receipt PDF (no tables, formatted text).
@@ -299,7 +348,9 @@ class TestPdfTableExtraction:
         - Rewards member info: Name, ID, Points
         - Return policy and footer
         """
-        pdf_path = os.path.join(TEST_FILES_DIR, "RECEIPT-2024-TXN-98765_retail_purchase.pdf")
+        pdf_path = os.path.join(
+            TEST_FILES_DIR, "RECEIPT-2024-TXN-98765_retail_purchase.pdf"
+        )
 
         if not os.path.exists(pdf_path):
             pytest.skip(f"Test file not found: {pdf_path}")
@@ -421,13 +472,27 @@ class TestPdfTableExtraction:
             assert pos != -1, f"Section '{name}' not found in output"
 
         # Verify correct order
-        assert positions["store_header"] < positions["transaction"], "Store header should come before transaction"
-        assert positions["transaction"] < positions["first_item"], "Transaction should come before items"
-        assert positions["first_item"] < positions["subtotal"], "Items should come before subtotal"
-        assert positions["subtotal"] < positions["total"], "Subtotal should come before total"
-        assert positions["total"] < positions["payment"], "Total should come before payment"
-        assert positions["payment"] < positions["rewards"], "Payment should come before rewards"
-        assert positions["rewards"] < positions["return_policy"], "Rewards should come before return policy"
+        assert (
+            positions["store_header"] < positions["transaction"]
+        ), "Store header should come before transaction"
+        assert (
+            positions["transaction"] < positions["first_item"]
+        ), "Transaction should come before items"
+        assert (
+            positions["first_item"] < positions["subtotal"]
+        ), "Items should come before subtotal"
+        assert (
+            positions["subtotal"] < positions["total"]
+        ), "Subtotal should come before total"
+        assert (
+            positions["total"] < positions["payment"]
+        ), "Total should come before payment"
+        assert (
+            positions["payment"] < positions["rewards"]
+        ), "Payment should come before rewards"
+        assert (
+            positions["rewards"] < positions["return_policy"]
+        ), "Rewards should come before return policy"
 
     def test_multipage_invoice_extraction(self, markitdown):
         """Test extraction of multipage invoice PDF with form-style layout.
@@ -469,22 +534,30 @@ class TestPdfTableExtraction:
         # These patterns check that label and value are in separate cells
         # Note: cells may have padding spaces for column alignment
         import re
-        assert re.search(r'\| Insured name\s*\|', text_content), \
-            "Insured name should be in its own cell"
-        assert re.search(r'\| Gabriel Diaz\s*\|', text_content), \
-            "Gabriel Diaz should be in its own cell"
-        assert re.search(r'\| Year\s*\|', text_content), \
-            "Year label should be in its own cell"
-        assert re.search(r'\| 2022\s*\|', text_content), \
-            "Year value should be in its own cell"
+
+        assert re.search(
+            r"\| Insured name\s*\|", text_content
+        ), "Insured name should be in its own cell"
+        assert re.search(
+            r"\| Gabriel Diaz\s*\|", text_content
+        ), "Gabriel Diaz should be in its own cell"
+        assert re.search(
+            r"\| Year\s*\|", text_content
+        ), "Year label should be in its own cell"
+        assert re.search(
+            r"\| 2022\s*\|", text_content
+        ), "Year value should be in its own cell"
 
         # Validate table structure for estimate totals
-        assert re.search(r'\| Hours\s*\|', text_content) or "Hours |" in text_content, \
-            "Hours column header should be present"
-        assert re.search(r'\| Rate\s*\|', text_content) or "Rate |" in text_content, \
-            "Rate column header should be present"
-        assert re.search(r'\| Cost\s*\|', text_content) or "Cost |" in text_content, \
-            "Cost column header should be present"
+        assert (
+            re.search(r"\| Hours\s*\|", text_content) or "Hours |" in text_content
+        ), "Hours column header should be present"
+        assert (
+            re.search(r"\| Rate\s*\|", text_content) or "Rate |" in text_content
+        ), "Rate column header should be present"
+        assert (
+            re.search(r"\| Cost\s*\|", text_content) or "Cost |" in text_content
+        ), "Cost column header should be present"
 
         # Validate numeric values are extracted
         assert "2,100" in text_content, "Parts cost should be extracted"
@@ -499,8 +572,9 @@ class TestPdfTableExtraction:
 
         # Validate disclaimer text is NOT in table format (long paragraph)
         # The disclaimer should be extracted as plain text, not pipe-separated
-        assert "preliminary estimate" in text_content.lower(), \
-            "Disclaimer text should be present"
+        assert (
+            "preliminary estimate" in text_content.lower()
+        ), "Disclaimer text should be present"
 
     def test_academic_pdf_extraction(self, markitdown):
         """Test extraction of academic paper PDF (scientific document).
@@ -535,27 +609,33 @@ class TestPdfTableExtraction:
         assert len(text_content) > 1000, "Academic PDF should have substantial content"
 
         # Scientific documents should NOT have tables or pipe characters
-        assert "|" not in text_content, \
-            "Scientific document should not contain pipe characters (no tables)"
+        assert (
+            "|" not in text_content
+        ), "Scientific document should not contain pipe characters (no tables)"
 
         # Verify no markdown tables were extracted
         tables = extract_markdown_tables(text_content)
-        assert len(tables) == 0, \
-            f"Scientific document should have no tables, found {len(tables)}"
+        assert (
+            len(tables) == 0
+        ), f"Scientific document should have no tables, found {len(tables)}"
 
         # Verify text is properly formatted with spaces between words
         # Check that common phrases are NOT joined together (which would indicate bad extraction)
-        assert "Largelanguagemodels" not in text_content, \
-            "Text should have proper spacing, not joined words"
-        assert "multiagentconversations" not in text_content.lower(), \
-            "Text should have proper spacing between words"
+        assert (
+            "Largelanguagemodels" not in text_content
+        ), "Text should have proper spacing, not joined words"
+        assert (
+            "multiagentconversations" not in text_content.lower()
+        ), "Text should have proper spacing between words"
 
     def test_scanned_pdf_handling(self, markitdown):
         """Test handling of scanned/image-based PDF (no text layer).
 
         Expected output: Empty - scanned PDFs without OCR have no text layer.
         """
-        pdf_path = os.path.join(TEST_FILES_DIR, "MEDRPT-2024-PAT-3847_medical_report_scan.pdf")
+        pdf_path = os.path.join(
+            TEST_FILES_DIR, "MEDRPT-2024-PAT-3847_medical_report_scan.pdf"
+        )
 
         if not os.path.exists(pdf_path):
             pytest.skip(f"Test file not found: {pdf_path}")
@@ -563,12 +643,15 @@ class TestPdfTableExtraction:
         result = markitdown.convert(pdf_path)
 
         # Scanned PDFs without OCR have no text layer, so extraction should be empty
-        assert result is not None, "Converter should return a result even for scanned PDFs"
+        assert (
+            result is not None
+        ), "Converter should return a result even for scanned PDFs"
         assert result.text_content is not None, "text_content should not be None"
 
         # Verify extraction is empty (no text layer in scanned PDF)
-        assert result.text_content.strip() == "", \
-            f"Scanned PDF should have empty extraction, got: '{result.text_content[:100]}...'"
+        assert (
+            result.text_content.strip() == ""
+        ), f"Scanned PDF should have empty extraction, got: '{result.text_content[:100]}...'"
 
 
 class TestPdfTableMarkdownFormat:
@@ -581,7 +664,9 @@ class TestPdfTableMarkdownFormat:
 
     def test_markdown_table_has_pipe_format(self, markitdown):
         """Test that form-style PDFs have pipe-separated format."""
-        pdf_path = os.path.join(TEST_FILES_DIR, "SPARSE-2024-INV-1234_borderless_table.pdf")
+        pdf_path = os.path.join(
+            TEST_FILES_DIR, "SPARSE-2024-INV-1234_borderless_table.pdf"
+        )
 
         if not os.path.exists(pdf_path):
             pytest.skip(f"Test file not found: {pdf_path}")
@@ -590,18 +675,22 @@ class TestPdfTableMarkdownFormat:
         text_content = result.text_content
 
         # Find rows with pipes
-        lines = text_content.split('\n')
-        pipe_rows = [line for line in lines if line.startswith('|') and line.endswith('|')]
+        lines = text_content.split("\n")
+        pipe_rows = [
+            line for line in lines if line.startswith("|") and line.endswith("|")
+        ]
 
         assert len(pipe_rows) > 0, "Should have pipe-separated rows"
 
         # Check that Product Code appears in a pipe-separated row
-        product_code_found = any('Product Code' in row for row in pipe_rows)
+        product_code_found = any("Product Code" in row for row in pipe_rows)
         assert product_code_found, "Product Code should be in pipe-separated format"
 
     def test_markdown_table_columns_have_pipes(self, markitdown):
         """Test that form-style PDF columns are separated with pipes."""
-        pdf_path = os.path.join(TEST_FILES_DIR, "SPARSE-2024-INV-1234_borderless_table.pdf")
+        pdf_path = os.path.join(
+            TEST_FILES_DIR, "SPARSE-2024-INV-1234_borderless_table.pdf"
+        )
 
         if not os.path.exists(pdf_path):
             pytest.skip(f"Test file not found: {pdf_path}")
@@ -610,14 +699,18 @@ class TestPdfTableMarkdownFormat:
         text_content = result.text_content
 
         # Find table rows and verify column structure
-        lines = text_content.split('\n')
-        table_rows = [line for line in lines if line.startswith('|') and line.endswith('|')]
+        lines = text_content.split("\n")
+        table_rows = [
+            line for line in lines if line.startswith("|") and line.endswith("|")
+        ]
 
         assert len(table_rows) > 0, "Should have markdown table rows"
 
         # Check that at least some rows have multiple columns (pipes)
-        multi_col_rows = [row for row in table_rows if row.count('|') >= 3]
-        assert len(multi_col_rows) > 5, f"Should have rows with multiple columns, found {len(multi_col_rows)}"
+        multi_col_rows = [row for row in table_rows if row.count("|") >= 3]
+        assert (
+            len(multi_col_rows) > 5
+        ), f"Should have rows with multiple columns, found {len(multi_col_rows)}"
 
 
 class TestPdfTableStructureConsistency:
@@ -630,7 +723,9 @@ class TestPdfTableStructureConsistency:
 
     def test_borderless_table_structure(self, markitdown):
         """Test that borderless table PDF has pipe-separated structure."""
-        pdf_path = os.path.join(TEST_FILES_DIR, "SPARSE-2024-INV-1234_borderless_table.pdf")
+        pdf_path = os.path.join(
+            TEST_FILES_DIR, "SPARSE-2024-INV-1234_borderless_table.pdf"
+        )
 
         if not os.path.exists(pdf_path):
             pytest.skip(f"Test file not found: {pdf_path}")
@@ -660,18 +755,24 @@ class TestPdfTableStructureConsistency:
         assert "|" in text_content, "Invoice PDF should have pipe separators"
 
         # Find rows with pipes
-        lines = text_content.split('\n')
-        pipe_rows = [line for line in lines if line.startswith('|') and line.endswith('|')]
+        lines = text_content.split("\n")
+        pipe_rows = [
+            line for line in lines if line.startswith("|") and line.endswith("|")
+        ]
 
-        assert len(pipe_rows) > 10, f"Should have multiple pipe-separated rows, found {len(pipe_rows)}"
+        assert (
+            len(pipe_rows) > 10
+        ), f"Should have multiple pipe-separated rows, found {len(pipe_rows)}"
 
         # Check that some rows have multiple columns
-        multi_col_rows = [row for row in pipe_rows if row.count('|') >= 4]
+        multi_col_rows = [row for row in pipe_rows if row.count("|") >= 4]
         assert len(multi_col_rows) > 5, "Should have rows with 3+ columns"
 
     def test_receipt_has_no_tables(self, markitdown):
         """Test that receipt PDF doesn't incorrectly extract tables from formatted text."""
-        pdf_path = os.path.join(TEST_FILES_DIR, "RECEIPT-2024-TXN-98765_retail_purchase.pdf")
+        pdf_path = os.path.join(
+            TEST_FILES_DIR, "RECEIPT-2024-TXN-98765_retail_purchase.pdf"
+        )
 
         if not os.path.exists(pdf_path):
             pytest.skip(f"Test file not found: {pdf_path}")
@@ -683,12 +784,15 @@ class TestPdfTableStructureConsistency:
         # (it's formatted text, not tabular data)
         # If tables are extracted, they should be minimal/empty
         total_table_rows = sum(len(t) for t in tables)
-        assert total_table_rows < 5, \
-            f"Receipt should not have significant tables, found {total_table_rows} rows"
+        assert (
+            total_table_rows < 5
+        ), f"Receipt should not have significant tables, found {total_table_rows} rows"
 
     def test_scanned_pdf_no_tables(self, markitdown):
         """Test that scanned PDF has empty extraction and no tables."""
-        pdf_path = os.path.join(TEST_FILES_DIR, "MEDRPT-2024-PAT-3847_medical_report_scan.pdf")
+        pdf_path = os.path.join(
+            TEST_FILES_DIR, "MEDRPT-2024-PAT-3847_medical_report_scan.pdf"
+        )
 
         if not os.path.exists(pdf_path):
             pytest.skip(f"Test file not found: {pdf_path}")
@@ -696,8 +800,9 @@ class TestPdfTableStructureConsistency:
         result = markitdown.convert(pdf_path)
 
         # Scanned PDF with no text layer should have empty extraction
-        assert result.text_content.strip() == "", \
-            "Scanned PDF should have empty extraction"
+        assert (
+            result.text_content.strip() == ""
+        ), "Scanned PDF should have empty extraction"
 
         tables = extract_markdown_tables(result.text_content)
 
@@ -732,17 +837,21 @@ class TestPdfTableStructureConsistency:
 
                 # Verify each row has at least one column (pipe-separated content)
                 for row_idx, row in enumerate(table):
-                    assert len(row) >= 1, \
-                        f"{pdf_file}: Table {table_idx}, row {row_idx} has no columns"
+                    assert (
+                        len(row) >= 1
+                    ), f"{pdf_file}: Table {table_idx}, row {row_idx} has no columns"
 
                     # Verify the row has non-empty content
                     row_content = " ".join(cell.strip() for cell in row)
-                    assert len(row_content.strip()) > 0, \
-                        f"{pdf_file}: Table {table_idx}, row {row_idx} is empty"
+                    assert (
+                        len(row_content.strip()) > 0
+                    ), f"{pdf_file}: Table {table_idx}, row {row_idx} is empty"
 
     def test_borderless_table_data_integrity(self, markitdown):
         """Test that borderless table extraction preserves data integrity."""
-        pdf_path = os.path.join(TEST_FILES_DIR, "SPARSE-2024-INV-1234_borderless_table.pdf")
+        pdf_path = os.path.join(
+            TEST_FILES_DIR, "SPARSE-2024-INV-1234_borderless_table.pdf"
+        )
 
         if not os.path.exists(pdf_path):
             pytest.skip(f"Test file not found: {pdf_path}")
