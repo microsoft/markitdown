@@ -3,7 +3,19 @@ on: [pull_request]
 
 jobs:
   tests:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os.runs-on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: 
+          - runs-on: windows-latest
+            arch: win-x64
+          - runs-on: windows-11-arm
+            arch: win-arm64
+          - runs-on: ubuntu-latest
+            arch: linux-x64
+          - runs-on: ubuntu-24.04-arm
+            arch: linux-arm64
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v5
@@ -12,6 +24,8 @@ jobs:
             3.10
             3.11
             3.12
+      - name: Show OS encoding
+        run: "python -c \"import locale;print('System encoding: ', locale.getpreferredencoding())\""
       - name: Install Hatch
         run: pipx install hatch
       - name: Run tests
