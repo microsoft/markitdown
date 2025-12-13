@@ -27,7 +27,9 @@ jobs:
         run: python --version
       - name: Show OS encoding
         run: "python -c \"import locale;print('System encoding: ', locale.getpreferredencoding())\""
+      - name: Install pipx
+        run: python -m pip install --user pipx
       - name: Install Hatch
         run: pipx install hatch
       - name: Run tests
-        run: cd packages/markitdown; hatch test -py 3.12
+        run: cd packages/markitdown; python -m hatch test
