@@ -32,7 +32,7 @@ jobs:
       - name: Install Hatch
         run: pipx install hatch
       - name: Install markitdown in editable mode
-        run: pip install -e .
+        run: pip install -e .[all]
         working-directory: packages/markitdown
       - name: Run tests
         run: cd packages/markitdown; hatch test
