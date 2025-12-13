@@ -23,6 +23,8 @@ jobs:
           python-version: |
             3.11
             3.12
+      - name: Show default python version
+        run: python --version
       - name: Show OS encoding
         run: "python -c \"import locale;print('System encoding: ', locale.getpreferredencoding())\""
       - name: Install Hatch
