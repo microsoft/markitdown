@@ -28,4 +28,4 @@ jobs:
       - name: Install Hatch
         run: pipx install hatch
       - name: Run tests
-        run: cd packages/markitdown; hatch run test.py3.12
+        run: cd packages/markitdown; hatch test -py 3.12
