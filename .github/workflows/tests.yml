@@ -34,9 +34,9 @@ jobs:
       - name: Install pipx
         run: python -m pip install --user pipx
       - name: Install Hatch
-        run: pipx install hatch
+        run: python -m pipx install hatch
       - name: Install markitdown in editable mode
-        run: pip install -e .[all]
+        run: python -m pip install -e .[all]
         working-directory: packages/markitdown
       - name: Run tests
         run: cd packages/markitdown; hatch test
