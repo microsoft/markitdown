@@ -39,9 +39,6 @@ responses unprompted. This suggests that they have been trained on vast amounts 
 Markdown-formatted text, and understand it well. As a side benefit, Markdown conventions
 are also highly token-efficient.
 
-## Technical Documentation
-For detailed API documentation, command-line reference, and advanced usage including custom plugins, please refer to the [Technical Reference](docs/REFERENCE.md).
-
 ## Prerequisites
 MarkItDown requires Python 3.10 or higher. It is recommended to use a virtual environment to avoid dependency conflicts.
 
