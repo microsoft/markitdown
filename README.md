@@ -39,6 +39,9 @@ responses unprompted. This suggests that they have been trained on vast amounts 
 Markdown-formatted text, and understand it well. As a side benefit, Markdown conventions
 are also highly token-efficient.
 
+## Technical Documentation
+For detailed API documentation, command-line reference, and advanced usage including custom plugins, please refer to the [Technical Reference](docs/REFERENCE.md).
+
 ## Prerequisites
 MarkItDown requires Python 3.10 or higher. It is recommended to use a virtual environment to avoid dependency conflicts.
 
@@ -73,6 +76,9 @@ git clone git@github.com:microsoft/markitdown.git
 cd markitdown
 pip install -e 'packages/markitdown[all]'
 ```
+
+> [!NOTE]
+> On some shells (like zsh), you must quote the package name (e.g. `'markitdown[all]'`) to prevent the shell from interpreting the square brackets as a glob pattern.
 
 ## Usage
 
@@ -182,6 +188,9 @@ print(result.text_content)
 docker build -t markitdown:latest .
 docker run --rm -i markitdown:latest < ~/your-file.pdf > output.md
 ```
+
+## Technical Documentation
+For detailed information about the technical implementation, architecture, and advanced usage of MarkItDown, please refer to the
 
 ## Contributing
 
