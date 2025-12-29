@@ -31,6 +31,9 @@ dependencies = [
   "charset-normalizer",
   "defusedxml",
   "onnxruntime<=1.20.1; sys_platform == 'win32'",
+  "fastapi",
+  "uvicorn[standard]",
+  "python-multipart",
 ]
 
 [project.optional-dependencies]
