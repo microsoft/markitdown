@@ -1,5 +1,6 @@
 
 import io
+import uvicorn
 from fastapi import FastAPI, UploadFile, File, Response
 from fastapi.responses import StreamingResponse
 from ._markitdown import MarkItDown
@@ -28,22 +29,17 @@ async def convert_file(file: UploadFile = File(...)):
         # Create a MarkItDown instance
         md = MarkItDown()
 
-        # Get file content as a stream-like object
+        # Get file content
         file_content = await file.read()
-        file_stream = io.BytesIO(file_content)
-
-        # Create StreamInfo
-        stream_info = StreamInfo(
-            stream_name=file.filename,
-            input_stream=file_stream
-        )
+        
+        # Create StreamInfo from the uploaded file
+        stream_info = StreamInfo.from_bytes(file_content, source_filename=file.filename)
 
         # Perform the conversion
-        # The convert method returns a generator that yields markdown content chunks
-        markdown_generator = md.convert(stream_info)
+        result = md.convert(stream_info=stream_info)
 
-        # Return as a streaming response
-        return StreamingResponse(markdown_generator, media_type="text/markdown")
+        # Return the markdown content
+        return Response(content=result.markdown, media_type="text/markdown")
 
     except Exception as e:
         # Basic error handling
@@ -53,7 +49,11 @@ async def convert_file(file: UploadFile = File(...)):
             media_type="text/plain"
         )
 
+def serve(host="0.0.0.0", port=8000):
+    """
+    Starts the uvicorn server for the FastAPI application.
+    """
+    uvicorn.run(app, host=host, port=port)
+
 if __name__ == "__main__":
-    import uvicorn
-    # This part is for local debugging and won't be used by Zeabur with Docker
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    serve()

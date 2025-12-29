@@ -11,6 +11,15 @@ from ._markitdown import MarkItDown, StreamInfo, DocumentConverterResult
 
 
 def main():
+    # We are pulling out the serve command handling to avoid circular imports
+    if len(sys.argv) > 1 and sys.argv[1].lower() == "serve":
+        from .api_server import serve as run_server
+
+        print("Starting Markitdown API server...")
+        # TODO: Add host/port arguments
+        run_server()
+        sys.exit(0)
+
     parser = argparse.ArgumentParser(
         description="Convert various file formats to markdown.",
         prog="markitdown",
