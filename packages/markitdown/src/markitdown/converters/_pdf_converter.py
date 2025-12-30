@@ -1,5 +1,6 @@
 import sys
 import io
+import re
 
 from typing import BinaryIO, Any
 
@@ -72,6 +73,14 @@ class PdfConverter(DocumentConverter):
             )
 
         assert isinstance(file_stream, io.IOBase)  # for mypy
+        text = pdfminer.high_level.extract_text(file_stream)
+        
+        # Simple heuristic to handle "partially numbered lists" often found in 
+        # MasterFormat docs (e.g. .1, .2, etc) by converting them into 
+        # bulleted lists.
+        # See: https://github.com/microsoft/markitdown/issues/68
+        text = re.sub(r"(?m)^(\s*)(\.\d+)", r"\1- \2", text)
+
         return DocumentConverterResult(
-            markdown=pdfminer.high_level.extract_text(file_stream),
+            markdown=text,
         )
