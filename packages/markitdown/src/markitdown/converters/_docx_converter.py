@@ -1,4 +1,6 @@
 import sys
+import io
+from warnings import warn
 
 from typing import BinaryIO, Any
 
@@ -13,6 +15,7 @@ from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 _dependency_exc_info = None
 try:
     import mammoth
+
 except ImportError:
     # Preserve the error and stack trace for later
     _dependency_exc_info = sys.exc_info()
