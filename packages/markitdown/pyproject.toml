@@ -41,7 +41,7 @@ all = [
   "openpyxl",
   "xlrd",
   "lxml",
-  "pdfminer.six>=20251107",
+  "pdfminer.six>=20251230",
   "pdfplumber",
   "olefile",
   "pydub",
@@ -54,7 +54,7 @@ pptx = ["python-pptx"]
 docx = ["mammoth~=1.11.0", "lxml"]
 xlsx = ["pandas", "openpyxl"]
 xls = ["pandas", "xlrd"]
-pdf = ["pdfminer.six", "pdfplumber"]
+pdf = ["pdfminer.six>=20251230", "pdfplumber"]
 outlook = ["olefile"]
 audio-transcription = ["pydub", "SpeechRecognition"]
 youtube-transcription = ["youtube-transcript-api"]
