@@ -66,9 +66,9 @@ class TestMasterFormatPartialNumbering:
         # Verify that partial numberings appear WITH following text on the same line
         # Look for patterns like ".1 The intent" or ".1  Some text"
         partial_with_text = re.findall(r"\.\d+\s+\w+", text_content)
-        assert len(partial_with_text) > 0, (
-            "Expected to find partial numberings followed by text on the same line"
-        )
+        assert (
+            len(partial_with_text) > 0
+        ), "Expected to find partial numberings followed by text on the same line"
 
     def test_masterformat_content_preserved(self):
         """Test that MasterFormat document content is fully preserved."""
@@ -92,25 +92,25 @@ class TestMasterFormatPartialNumbering:
         ]
 
         for content in expected_content:
-            assert content in text_content, (
-                f"Expected content '{content}' not found in extracted text"
-            )
+            assert (
+                content in text_content
+            ), f"Expected content '{content}' not found in extracted text"
 
         # Verify partial numbering is followed by text on the same line
         # .1 should be followed by "The intent" on the same line
-        assert re.search(r"\.1\s+The intent", text_content), (
-            "Partial numbering .1 should be followed by 'The intent' text"
-        )
+        assert re.search(
+            r"\.1\s+The intent", text_content
+        ), "Partial numbering .1 should be followed by 'The intent' text"
 
         # .2 should be followed by "Available information" on the same line
-        assert re.search(r"\.2\s+Available information", text_content), (
-            "Partial numbering .2 should be followed by 'Available information' text"
-        )
+        assert re.search(
+            r"\.2\s+Available information", text_content
+        ), "Partial numbering .2 should be followed by 'Available information' text"
 
         # Ensure text content is not empty and has reasonable length
-        assert len(text_content.strip()) > 100, (
-            "MasterFormat document should have substantial text content"
-        )
+        assert (
+            len(text_content.strip()) > 100
+        ), "MasterFormat document should have substantial text content"
 
     def test_merge_partial_numbering_with_empty_lines_between(self):
         """Test that partial numberings merge correctly even with empty lines between.
@@ -163,10 +163,9 @@ class TestMasterFormatPartialNumbering:
             if re.match(r"^\.\d+$", stripped):
                 isolated_count += 1
 
-        assert merged_count >= 2, (
-            f"Expected at least 2 merged partial numberings, found {merged_count}"
-        )
-        assert isolated_count == 0, (
-            f"Found {isolated_count} isolated partial numberings that weren't merged"
-        )
-
+        assert (
+            merged_count >= 2
+        ), f"Expected at least 2 merged partial numberings, found {merged_count}"
+        assert (
+            isolated_count == 0
+        ), f"Found {isolated_count} isolated partial numberings that weren't merged"
