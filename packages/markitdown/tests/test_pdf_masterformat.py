@@ -6,6 +6,7 @@ import re
 import pytest
 
 from markitdown import MarkItDown
+from markitdown.converters._pdf_converter import PARTIAL_NUMBERING_PATTERN
 
 TEST_FILES_DIR = os.path.join(os.path.dirname(__file__), "test_files")
 
@@ -15,7 +16,6 @@ class TestMasterFormatPartialNumbering:
 
     def test_partial_numbering_pattern_regex(self):
         """Test that the partial numbering regex pattern correctly matches."""
-        from markitdown.converters._pdf_converter import PARTIAL_NUMBERING_PATTERN
 
         # Should match partial numbering patterns
         assert PARTIAL_NUMBERING_PATTERN.match(".1") is not None
