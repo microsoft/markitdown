@@ -239,6 +239,15 @@ You can help by looking at issues or helping review PRs. Any issue or PR is welc
 
 You can also contribute by creating and sharing 3rd party plugins. See `packages/markitdown-sample-plugin` for more details.
 
+
+## ⚡ Performance Tips
+
+- For large PDFs, install optional dependencies with `pip install 'markitdown[pdf]'` to enable optimized parsing.
+- Use `--no-ocr` flag (coming soon) or disable plugins if OCR slows down processing.
+- Keep conversions local (not in Docker) if you need GPU acceleration for LLM-based image captioning.
+- Check `markitdown --debug` for detailed logs on failed conversions.
+
+
 ## Trademarks
 
 This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft
