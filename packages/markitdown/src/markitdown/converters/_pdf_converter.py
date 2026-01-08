@@ -1,10 +1,61 @@
 import sys
 import io
+import re
 from typing import BinaryIO, Any
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+
+# Pattern for MasterFormat-style partial numbering (e.g., ".1", ".2", ".10")
+PARTIAL_NUMBERING_PATTERN = re.compile(r"^\.\d+$")
+
+
+def _merge_partial_numbering_lines(text: str) -> str:
+    """
+    Post-process extracted text to merge MasterFormat-style partial numbering
+    with the following text line.
+
+    MasterFormat documents use partial numbering like:
+        .1  The intent of this Request for Proposal...
+        .2  Available information relative to...
+
+    Some PDF extractors split these into separate lines:
+        .1
+        The intent of this Request for Proposal...
+
+    This function merges them back together.
+    """
+    lines = text.split("\n")
+    result_lines: list[str] = []
+    i = 0
+
+    while i < len(lines):
+        line = lines[i]
+        stripped = line.strip()
+
+        # Check if this line is ONLY a partial numbering
+        if PARTIAL_NUMBERING_PATTERN.match(stripped):
+            # Look for the next non-empty line to merge with
+            j = i + 1
+            while j < len(lines) and not lines[j].strip():
+                j += 1
+
+            if j < len(lines):
+                # Merge the partial numbering with the next line
+                next_line = lines[j].strip()
+                result_lines.append(f"{stripped} {next_line}")
+                i = j + 1  # Skip past the merged line
+            else:
+                # No next line to merge with, keep as is
+                result_lines.append(line)
+                i += 1
+        else:
+            result_lines.append(line)
+            i += 1
+
+    return "\n".join(result_lines)
+
 
 # Load dependencies
 _dependency_exc_info = None
@@ -117,6 +168,14 @@ def _extract_form_content_from_words(page: Any) -> str | None:
         # Determine row type
         is_paragraph = line_width > page_width * 0.55 and len(combined_text) > 60
 
+        # Check for MasterFormat-style partial numbering (e.g., ".1", ".2")
+        # These should be treated as list items, not table rows
+        has_partial_numbering = False
+        if row_words:
+            first_word = row_words[0]["text"].strip()
+            if PARTIAL_NUMBERING_PATTERN.match(first_word):
+                has_partial_numbering = True
+
         row_info.append(
             {
                 "y_key": y_key,
@@ -125,6 +184,7 @@ def _extract_form_content_from_words(page: Any) -> str | None:
                 "x_groups": x_groups,
                 "is_paragraph": is_paragraph,
                 "num_columns": len(x_groups),
+                "has_partial_numbering": has_partial_numbering,
             }
         )
 
@@ -153,6 +213,11 @@ def _extract_form_content_from_words(page: Any) -> str | None:
     # A row is a table row if it has words that align with 2+ of the global columns
     for info in row_info:
         if info["is_paragraph"]:
+            info["is_table_row"] = False
+            continue
+
+        # Rows with partial numbering (e.g., ".1", ".2") are list items, not table rows
+        if info["has_partial_numbering"]:
             info["is_table_row"] = False
             continue
 
@@ -468,5 +533,8 @@ class PdfConverter(DocumentConverter):
         if not markdown:
             pdf_bytes.seek(0)
             markdown = pdfminer.high_level.extract_text(pdf_bytes)
+
+        # Post-process to merge MasterFormat-style partial numbering with following text
+        markdown = _merge_partial_numbering_lines(markdown)
 
         return DocumentConverterResult(markdown=markdown)
