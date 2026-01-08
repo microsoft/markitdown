@@ -8,6 +8,7 @@ from markitdown import MarkItDown
 
 TEST_FILES_DIR = os.path.join(os.path.dirname(__file__), "test_files")
 
+
 # --- Helper Functions ---
 def validate_strings(result, expected_strings, exclude_strings=None):
     """Validate presence or absence of specific strings."""
