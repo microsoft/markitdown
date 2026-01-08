@@ -118,6 +118,8 @@ class MarkItDown:
         self._llm_prompt: Union[str | None] = None
         self._exiftool_path: Union[str | None] = None
         self._style_map: Union[str | None] = None
+        self._transcription_engine: Union[str | None] = None
+        self._transcription_kwargs: dict = {}
 
         # Register the converters
         self._converters: List[ConverterRegistration] = []
@@ -143,6 +145,11 @@ class MarkItDown:
             self._llm_prompt = kwargs.get("llm_prompt")
             self._exiftool_path = kwargs.get("exiftool_path")
             self._style_map = kwargs.get("style_map")
+            self._transcription_engine = kwargs.get("transcription_engine")
+            self._transcription_kwargs = {
+                k: v for k, v in kwargs.items() 
+                if k.startswith("transcription_")
+            }
 
             if self._exiftool_path is None:
                 self._exiftool_path = os.getenv("EXIFTOOL_PATH")
@@ -569,6 +576,11 @@ class MarkItDown:
 
                 if "exiftool_path" not in _kwargs and self._exiftool_path is not None:
                     _kwargs["exiftool_path"] = self._exiftool_path
+                
+                # Copy transcription parameters
+                for key, value in self._transcription_kwargs.items():
+                    if key not in _kwargs:
+                        _kwargs[key] = value
 
                 # Add the list of converters for nested processing
                 _kwargs["_parent_converters"] = self._converters
