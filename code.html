@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>MarkItDown Batch Converter</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&amp;family=Open+Sans:wght@400;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#4A90E2",
+                        "background-light": "#F8F8F8",
+                        "background-dark": "#111921",
+                        "text-light": "#333333",
+                        "text-dark": "#F8F8F8"
+                    },
+                    fontFamily: {
+                        "display": ["Roboto", "sans-serif"],
+                        "body": ["Open Sans", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Open Sans', sans-serif;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            font-family: 'Roboto', sans-serif;
+        }
+        .dragging {
+            border-color: #4A90E2 !important;
+            background-color: rgba(74, 144, 226, 0.05);
+        }
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            min-width: 300px;
+            padding: 16px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 1000;
+            animation: slideIn 0.3s ease-out;
+            background: white;
+            color: #333;
+        }
+        .toast.success { background: #10B981; color: white; }
+        .toast.error { background: #EF4444; color: white; }
+        .toast.info { background: #3B82F6; color: white; }
+        @keyframes slideIn {
+            from { transform: translateX(400px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .converting-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-text-light dark:text-text-dark">
+<input type="file" id="fileInput" multiple style="display: none;" accept="*/*">
+<div class="relative flex h-screen w-full flex-col group/design-root overflow-hidden">
+<div class="flex h-full grow flex-row">
+<!-- Left Column -->
+<div class="w-1/3 flex flex-col p-6 bg-white dark:bg-zinc-800 border-r border-gray-200 dark:border-gray-700">
+<div class="flex items-center gap-3 mb-8">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-12" data-alt="MarkItDown app icon" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCvX1mClU9YoAmz0B7dd798Bd2SS-qkP36DbWsqiZekO603f63ZA_m234I4qjuE6CWFVy2zzlukzFBgrJT1Fw8A8zQSg-nxef4kR3C-3uC3k5QkMirNJntop5xbP-ZmrFJy842r5yb69f_xyC4AGkdD_D2CHVZb_dA09M7RfVRLYA4pw1eV9-Dy6ohex52Ay3oQK5vRbcBp2cctJ2Pf4K6WbKg2rpkcTGUSyBXDRqvbcp6VnOljO39B3wdDX4zYn5Qj6gXYy3MJzmA");'></div>
+<div class="flex flex-col">
+<h1 class="text-xl font-bold font-display">MarkItDown</h1>
+<p class="text-sm text-gray-500 dark:text-gray-400 font-body">Batch Converter</p>
+</div>
+</div>
+<button id="addFilesBtn" class="flex items-center justify-center gap-2 w-full cursor-pointer rounded-lg h-12 px-5 bg-primary text-white text-base font-bold font-body leading-normal tracking-[0.015em] mb-6">
+<span class="material-symbols-outlined">add</span>
+<span class="truncate">Add Files</span>
+</button>
+<div id="dropZone" class="flex flex-col items-center justify-center flex-grow gap-4 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 px-6 py-14 transition-all">
+<span class="material-symbols-outlined text-4xl text-gray-400 dark:text-gray-500">upload_file</span>
+<p class="text-center text-sm text-gray-500 dark:text-gray-400 font-body">Drag and drop files here to add them to the queue.</p>
+</div>
+</div>
+<!-- Right Column -->
+<div class="w-2/3 flex flex-col p-6">
+<div class="flex items-center justify-between mb-4">
+<h2 class="text-2xl font-bold font-display">Conversion Queue</h2>
+<div id="liveIndicator" class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400" style="display: none;">
+<div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+<span>Live updates</span>
+</div>
+</div>
+<div class="flex-grow overflow-y-auto mb-4">
+<div id="fileQueue" class="space-y-4 pr-2">
+<!-- Files will be dynamically added here -->
+<div id="emptyState" class="flex flex-col items-center justify-center text-center py-20">
+<span class="material-symbols-outlined text-6xl text-gray-300 dark:text-gray-600">inbox</span>
+<p class="mt-4 text-lg font-semibold font-display">Your queue is empty</p>
+<p class="text-sm text-gray-500 dark:text-gray-400 font-body">Add files to get started.</p>
+</div>
+</div>
+</div>
+<!-- Bottom Section -->
+<div id="bottomSection" class="flex-shrink-0 pt-6 border-t border-gray-200 dark:border-gray-700" style="display: none;">
+<div class="flex flex-col gap-3 mb-4">
+<div class="flex gap-6 justify-between">
+<p class="text-base font-medium font-body">Overall Progress</p>
+<p id="progressPercentage" class="text-sm font-normal font-body">0%</p>
+</div>
+<div class="rounded-full bg-gray-200 dark:bg-gray-700 h-2.5">
+<div id="progressBar" class="h-2.5 rounded-full bg-primary transition-all" style="width: 0%;"></div>
+</div>
+</div>
+<button id="convertBtn" class="w-full flex min-w-[84px] max-w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-5 bg-primary text-white text-base font-bold leading-normal tracking-[0.015em] font-body">
+<span id="convertBtnText" class="truncate">Convert Files</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+
+<script>
+// Configuration
+const API_BASE = 'http://localhost:5000';
+
+// State
+let files = {};
+let eventSource = null;
+
+// DOM Elements
+const fileInput = document.getElementById('fileInput');
+const addFilesBtn = document.getElementById('addFilesBtn');
+const dropZone = document.getElementById('dropZone');
+const fileQueue = document.getElementById('fileQueue');
+const emptyState = document.getElementById('emptyState');
+const bottomSection = document.getElementById('bottomSection');
+const progressBar = document.getElementById('progressBar');
+const progressPercentage = document.getElementById('progressPercentage');
+const convertBtn = document.getElementById('convertBtn');
+const convertBtnText = document.getElementById('convertBtnText');
+const liveIndicator = document.getElementById('liveIndicator');
+
+// Utility Functions
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+}
+
+function showToast(message, type = 'info') {
+    console.log(`[${type.toUpperCase()}] ${message}`);
+    
+    // Create toast element
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    
+    // Add icon based on type
+    let icon = 'info';
+    if (type === 'success') icon = 'check_circle';
+    else if (type === 'error') icon = 'error';
+    
+    toast.innerHTML = `
+        <span class="material-symbols-outlined">${icon}</span>
+        <span>${message}</span>
+    `;
+    
+    document.body.appendChild(toast);
+    
+    // Auto-remove after 3 seconds
+    setTimeout(() => {
+        toast.style.animation = 'slideIn 0.3s ease-out reverse';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+// UI Update Functions
+function updateUI() {
+    const fileCount = Object.keys(files).length;
+    
+    // Show/hide empty state
+    emptyState.style.display = fileCount === 0 ? 'flex' : 'none';
+    
+    // Show/hide bottom section
+    bottomSection.style.display = fileCount > 0 ? 'block' : 'none';
+    
+    // Update convert button text
+    const waitingCount = Object.values(files).filter(f => f.status === 'waiting').length;
+    const convertingCount = Object.values(files).filter(f => f.status === 'converting').length;
+    const completedCount = Object.values(files).filter(f => f.status === 'completed').length;
+    
+    if (convertingCount > 0) {
+        convertBtnText.textContent = `Converting ${convertingCount} File${convertingCount !== 1 ? 's' : ''}...`;
+        convertBtn.disabled = true;
+        convertBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    } else if (waitingCount > 0) {
+        convertBtnText.textContent = `Convert ${waitingCount} File${waitingCount !== 1 ? 's' : ''}`;
+        convertBtn.disabled = false;
+        convertBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+    } else if (completedCount > 0 && fileCount === completedCount) {
+        convertBtnText.textContent = 'All Files Converted';
+        convertBtn.disabled = true;
+        convertBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    } else {
+        convertBtnText.textContent = 'No Files to Convert';
+        convertBtn.disabled = true;
+        convertBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    }
+    
+    // Update progress bar
+    if (fileCount > 0) {
+        const completed = Object.values(files).filter(f => f.status === 'completed').length;
+        const progress = Math.round((completed / fileCount) * 100);
+        progressBar.style.width = progress + '%';
+        progressPercentage.textContent = progress + '%';
+    }
+}
+
+function renderFileCard(file) {
+    const card = document.createElement('div');
+    card.id = `file-${file.file_id}`;
+    card.className = 'flex items-center justify-between p-4 rounded-lg bg-white dark:bg-zinc-800 border transition-all';
+    
+    let icon = 'draft';
+    let iconClass = 'text-gray-400 dark:text-gray-500';
+    let statusText = 'Waiting';
+    let statusClass = 'text-gray-500 dark:text-gray-400';
+    let borderClass = 'border-gray-200 dark:border-gray-700';
+    let spinClass = '';
+    
+    if (file.status === 'converting') {
+        icon = 'autorenew';
+        iconClass = 'text-primary';
+        statusText = 'Converting...';
+        statusClass = 'text-primary';
+        borderClass = 'border-primary converting-pulse';
+        spinClass = 'animate-spin';
+    } else if (file.status === 'completed') {
+        icon = 'check_circle';
+        iconClass = 'text-green-500';
+        statusText = 'Completed';
+        statusClass = 'text-green-500';
+    } else if (file.status === 'failed') {
+        icon = 'error';
+        iconClass = 'text-red-500';
+        statusText = 'Failed';
+        statusClass = 'text-red-500';
+        borderClass = 'border-red-500';
+    }
+    
+    card.className += ' ' + borderClass;
+    
+    card.innerHTML = `
+        <div class="flex items-center gap-4">
+            <span class="material-symbols-outlined ${iconClass} ${spinClass}">${icon}</span>
+            <div>
+                <p class="font-semibold font-body">${file.filename}</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400 font-body">${formatFileSize(file.filesize)}</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <span class="text-sm ${statusClass} font-body">${statusText}</span>
+            ${file.status === 'completed' ? 
+                `<button onclick="downloadFile('${file.file_id}')" class="text-primary hover:text-blue-600" title="Download">
+                    <span class="material-symbols-outlined">download</span>
+                </button>` : ''}
+            <button onclick="deleteFile('${file.file_id}')" class="text-gray-400 dark:text-gray-500 hover:text-red-500" title="Delete">
+                <span class="material-symbols-outlined">delete</span>
+            </button>
+        </div>
+    `;
+    
+    return card;
+}
+
+function renderFiles() {
+    // Clear existing cards (except empty state)
+    Array.from(fileQueue.children).forEach(child => {
+        if (child.id !== 'emptyState') {
+            child.remove();
+        }
+    });
+    
+    // Render file cards
+    Object.values(files).forEach(file => {
+        const card = renderFileCard(file);
+        fileQueue.appendChild(card);
+    });
+    
+    updateUI();
+}
+
+// API Functions
+async function uploadFiles(fileList) {
+    const formData = new FormData();
+    Array.from(fileList).forEach(file => {
+        formData.append('files', file);
+    });
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/upload`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) throw new Error('Upload failed');
+        
+        const data = await response.json();
+        
+        // Add files to state
+        data.files.forEach(file => {
+            files[file.file_id] = file;
+        });
+        
+        renderFiles();
+        showToast(`${data.files.length} file(s) added to queue`, 'success');
+        
+        // Start SSE connection
+        startSSE();
+    } catch (error) {
+        showToast('Failed to upload files: ' + error.message, 'error');
+    }
+}
+
+async function startConversion() {
+    try {
+        // Disable convert button immediately
+        convertBtn.disabled = true;
+        convertBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        convertBtnText.textContent = 'Starting...';
+        
+        // Immediately update UI to show converting state for waiting files
+        Object.values(files).forEach(file => {
+            if (file.status === 'waiting') {
+                file.status = 'converting';
+            }
+        });
+        renderFiles(); // Immediate UI update
+        
+        // Ensure SSE connection is active
+        startSSE();
+        
+        const response = await fetch(`${API_BASE}/api/convert`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+        
+        if (!response.ok) throw new Error('Conversion failed to start');
+        
+        const data = await response.json();
+        showToast(data.message, 'success');
+        
+    } catch (error) {
+        showToast('Failed to start conversion: ' + error.message, 'error');
+        // Revert status on error
+        Object.values(files).forEach(file => {
+            if (file.status === 'converting') {
+                file.status = 'waiting';
+            }
+        });
+        renderFiles();
+    }
+}
+
+
+function handleStatusUpdate(data) {
+    // Store previous state to detect changes
+    const previousFile = files[data.file_id];
+    
+    // Update file status
+    files[data.file_id] = {
+        file_id: data.file_id,
+        filename: data.filename,
+        status: data.status,
+        progress: data.progress || 0,
+        error: data.error,
+        output_file: data.output_file,
+        filesize: files[data.file_id]?.filesize || 0
+    };
+    
+    // Show notifications for status changes
+    if (previousFile && previousFile.status !== data.status) {
+        if (data.status === 'completed') {
+            showToast(`${data.filename} converted successfully!`, 'success');
+        } else if (data.status === 'failed') {
+            showToast(`Failed to convert ${data.filename}: ${data.error}`, 'error');
+        } else if (data.status === 'converting') {
+            showToast(`Converting ${data.filename}...`, 'info');
+        }
+    }
+    
+    // Update UI immediately
+    renderFiles();
+    
+    // Check if all conversions are complete
+    const allFiles = Object.values(files);
+    const allCompleted = allFiles.length > 0 && allFiles.every(f => 
+        f.status === 'completed' || f.status === 'failed'
+    );
+    
+    // Show completion summary if all files are done
+    if (allCompleted && allFiles.some(f => f.status === 'completed' || f.status === 'failed')) {
+        const completedCount = allFiles.filter(f => f.status === 'completed').length;
+        const failedCount = allFiles.filter(f => f.status === 'failed').length;
+        
+        // Only show if we just completed the last file
+        const justCompleted = data.status === 'completed' || data.status === 'failed';
+        if (justCompleted && completedCount > 0) {
+            setTimeout(() => {
+                showToast(`All conversions complete! ${completedCount} successful${failedCount > 0 ? `, ${failedCount} failed` : ''}`, 'success');
+            }, 100);
+        }
+    }
+}
+
+async function deleteFile(fileId) {
+    try {
+        const response = await fetch(`${API_BASE}/api/delete/${fileId}`, {
+            method: 'DELETE'
+        });
+        
+        if (!response.ok) throw new Error('Delete failed');
+        
+        delete files[fileId];
+        renderFiles();
+        showToast('File removed from queue', 'success');
+    } catch (error) {
+        showToast('Failed to delete file: ' + error.message, 'error');
+    }
+}
+
+function downloadFile(fileId) {
+    window.open(`${API_BASE}/api/download/${fileId}`, '_blank');
+}
+
+// Real-time SSE connection
+function startSSE() {
+    if (eventSource) return;
+    
+    // Show live indicator
+    liveIndicator.style.display = 'flex';
+    liveIndicator.querySelector('span').textContent = 'Connecting...';
+    
+    // Create EventSource connection
+    eventSource = new EventSource(`${API_BASE}/api/events`);
+    
+    eventSource.onopen = function() {
+        console.log('SSE connection opened');
+        liveIndicator.querySelector('span').textContent = 'Connected';
+    };
+    
+    eventSource.addEventListener('connected', function(e) {
+        console.log('SSE connected:', JSON.parse(e.data));
+        liveIndicator.querySelector('span').textContent = 'Live updates';
+    });
+    
+    eventSource.addEventListener('status_update', function(e) {
+        const data = JSON.parse(e.data);
+        console.log('Status update received:', data);
+        handleStatusUpdate(data);
+    });
+    
+    eventSource.addEventListener('heartbeat', function(e) {
+        // Keep connection alive
+        console.log('Heartbeat received');
+    });
+    
+    eventSource.onerror = function(e) {
+        console.error('SSE error:', e);
+        liveIndicator.querySelector('span').textContent = 'Connection error';
+        
+        // Reconnect after a delay
+        setTimeout(() => {
+            if (eventSource && eventSource.readyState === EventSource.CLOSED) {
+                stopSSE();
+                startSSE();
+            }
+        }, 5000);
+    };
+}
+
+function stopSSE() {
+    if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+        
+        // Hide live indicator
+        liveIndicator.style.display = 'none';
+    }
+}
+
+// Event Handlers
+addFilesBtn.addEventListener('click', () => {
+    fileInput.click();
+});
+
+fileInput.addEventListener('change', (e) => {
+    if (e.target.files.length > 0) {
+        uploadFiles(e.target.files);
+        e.target.value = ''; // Reset input
+    }
+});
+
+// Drag and Drop
+dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('dragging');
+});
+
+dropZone.addEventListener('dragleave', () => {
+    dropZone.classList.remove('dragging');
+});
+
+dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('dragging');
+    
+    if (e.dataTransfer.files.length > 0) {
+        uploadFiles(e.dataTransfer.files);
+    }
+});
+
+convertBtn.addEventListener('click', () => {
+    if (!convertBtn.disabled) {
+        startConversion();
+    }
+});
+
+// Initialize
+updateUI();
+startSSE(); // Start SSE connection to get real-time updates
+</script>
+
+</body></html>
