@@ -107,6 +107,7 @@ class MarkItDown:
         requests_session = kwargs.get("requests_session")
         if requests_session is None:
             self._requests_session = requests.Session()
+            self._requests_session.headers.update({'User-Agent': 'MarkItDown'})
         else:
             self._requests_session = requests_session
 
