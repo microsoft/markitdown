@@ -41,7 +41,7 @@ GENERAL_TEST_VECTORS = [
             "6ff4173b-42a5-4784-9b19-f49caff4d93d",
             "affc7dad-52dc-4b98-9b5d-51e65d8a8ad0",
         ],
-        must_not_include=[],
+        must_not_include=["Unnamed:", "NaN"],
     ),
     FileTestVector(
         filename="test.xls",
@@ -53,7 +53,7 @@ GENERAL_TEST_VECTORS = [
             "6ff4173b-42a5-4784-9b19-f49caff4d93d",
             "affc7dad-52dc-4b98-9b5d-51e65d8a8ad0",
         ],
-        must_not_include=[],
+        must_not_include=["Unnamed:", "NaN"],
     ),
     FileTestVector(
         filename="test.pptx",
