@@ -41,19 +41,20 @@ all = [
   "openpyxl",
   "xlrd",
   "lxml",
-  "pdfminer.six>=20251107",
+  "pdfminer.six>=20251230",
+  "pdfplumber>=0.11.9",
   "olefile",
   "pydub",
   "SpeechRecognition",
   "youtube-transcript-api~=1.0.0",
   "azure-ai-documentintelligence",
-  "azure-identity"
+  "azure-identity",
 ]
 pptx = ["python-pptx"]
 docx = ["mammoth~=1.11.0", "lxml"]
 xlsx = ["pandas", "openpyxl"]
 xls = ["pandas", "xlrd"]
-pdf = ["pdfminer.six"]
+pdf = ["pdfminer.six>=20251230", "pdfplumber>=0.11.9"]
 outlook = ["olefile"]
 audio-transcription = ["pydub", "SpeechRecognition"]
 youtube-transcription = ["youtube-transcript-api"]
