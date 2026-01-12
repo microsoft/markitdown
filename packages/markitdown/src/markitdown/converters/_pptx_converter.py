@@ -161,10 +161,12 @@ class PptxConverter(DocumentConverter):
 
                 # Text areas
                 elif shape.has_text_frame:
+                    # Replace pptx new lines with markdown compatible breaks
+                    text_with_breaks = shape.text.replace("\n", "  \n")
                     if shape == title:
-                        md_content += "# " + shape.text.lstrip() + "\n"
+                        md_content += "# " + text_with_breaks.lstrip() + "\n"
                     else:
-                        md_content += shape.text + "\n"
+                        md_content += text_with_breaks + "\n"
 
                 # Group Shapes
                 if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.GROUP:
@@ -194,7 +196,9 @@ class PptxConverter(DocumentConverter):
                 md_content += "\n\n### Notes:\n"
                 notes_frame = slide.notes_slide.notes_text_frame
                 if notes_frame is not None:
-                    md_content += notes_frame.text
+                    # Replace pptx new lines with markdown compatible breaks
+                    notes_with_breaks = notes_frame.text.replace("\n", "  \n")
+                    md_content += notes_with_breaks
                 md_content = md_content.strip()
 
         return DocumentConverterResult(markdown=md_content.strip())
