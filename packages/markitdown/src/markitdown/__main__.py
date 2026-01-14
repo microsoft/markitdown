@@ -8,6 +8,7 @@ from textwrap import dedent
 from importlib.metadata import entry_points
 from .__about__ import __version__
 from ._markitdown import MarkItDown, StreamInfo, DocumentConverterResult
+from ._exceptions import UnsupportedFormatException, FileConversionException
 
 
 def main():
@@ -110,6 +111,25 @@ def main():
         help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
     )
 
+    parser.add_argument(
+        "-b",
+        "--batch",
+        action="store_true",
+        help="Process all supported files in a directory. If specified, filename should be a directory path.",
+    )
+
+    parser.add_argument(
+        "-r",
+        "--recursive",
+        action="store_true",
+        help="Process subdirectories recursively when using batch mode.",
+    )
+
+    parser.add_argument(
+        "--types",
+        help="Comma-separated list of file extensions to process in batch mode (e.g., pdf,docx,pptx). If not specified, all supported types are processed.",
+    )
+
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
 
@@ -186,18 +206,23 @@ def main():
     else:
         markitdown = MarkItDown(enable_plugins=args.use_plugins)
 
-    if args.filename is None:
+    if args.batch:
+        if args.filename is None:
+            _exit_with_error("Directory path is required when using batch mode.")
+        
+        _handle_batch_processing(args, markitdown, stream_info)
+    elif args.filename is None:
         result = markitdown.convert_stream(
             sys.stdin.buffer,
             stream_info=stream_info,
             keep_data_uris=args.keep_data_uris,
         )
+        _handle_output(args, result)
     else:
         result = markitdown.convert(
             args.filename, stream_info=stream_info, keep_data_uris=args.keep_data_uris
         )
-
-    _handle_output(args, result)
+        _handle_output(args, result)
 
 
 def _handle_output(args, result: DocumentConverterResult):
@@ -217,6 +242,80 @@ def _handle_output(args, result: DocumentConverterResult):
 def _exit_with_error(message: str):
     print(message)
     sys.exit(1)
+
+
+def _handle_batch_processing(args, markitdown: MarkItDown, stream_info):
+    """Handle batch processing of files in a directory"""
+    from pathlib import Path
+    from ._exceptions import UnsupportedFormatException, FileConversionException
+    
+    input_dir = Path(args.filename)
+    if not input_dir.exists():
+        _exit_with_error(f"Directory does not exist: {input_dir}")
+    if not input_dir.is_dir():
+        _exit_with_error(f"Path is not a directory: {input_dir}")
+    
+    # Determine output directory
+    output_dir = Path(args.output) if args.output else input_dir / "converted"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Find all files to process
+    pattern = "**/*" if args.recursive else "*"
+    all_files = []
+    
+    for file_path in input_dir.glob(pattern):
+        if file_path.is_file():
+            all_files.append(file_path)
+    
+    if not all_files:
+        print(f"No files found in {input_dir}")
+        return
+    
+    print(f"Found {len(all_files)} files to process")
+    
+    # Process files
+    processed = 0
+    failed = 0
+    unsupported = 0
+    
+    for i, file_path in enumerate(all_files, 1):
+        try:
+            # Calculate relative path and output path
+            rel_path = file_path.relative_to(input_dir)
+            output_file = output_dir / Path(str(rel_path) + '.md')
+            output_file.parent.mkdir(parents=True, exist_ok=True)
+            
+            print(f"[{i}/{len(all_files)}] Processing: {rel_path}")
+            
+            # Convert file
+            result = markitdown.convert(
+                str(file_path), 
+                stream_info=stream_info, 
+                keep_data_uris=args.keep_data_uris
+            )
+            
+            # Write output
+            with open(output_file, 'w', encoding='utf-8') as f:
+                f.write(result.markdown)
+            
+            print(f"✓ Success: {rel_path}")
+            processed += 1
+            
+        except UnsupportedFormatException:
+            print(f"⚠ Skipped (unsupported): {rel_path}")
+            unsupported += 1
+        except FileConversionException as e:
+            print(f"✗ Failed (conversion error): {rel_path} - {e}")
+            failed += 1
+        except Exception as e:
+            print(f"✗ Failed (unexpected error): {rel_path} - {e}")
+            failed += 1
+    
+    print(f"\nBatch processing complete!")
+    print(f"Success: {processed} files")
+    print(f"Failed: {failed} files")
+    print(f"Unsupported: {unsupported} files")
+    print(f"Output directory: {output_dir}")
 
 
 if __name__ == "__main__":
