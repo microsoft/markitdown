@@ -6,7 +6,12 @@
 
 The `markitdown-mcp` package provides a lightweight STDIO, Streamable HTTP, and SSE MCP server for calling MarkItDown.
 
-It exposes one tool: `convert_to_markdown(uri)`, where uri can be any `http:`, `https:`, `file:`, or `data:` URI.
+It exposes three tools:
+- `convert_to_markdown(uri)`: Convert a resource to markdown and return the content
+- `convert_and_save(uri, output_path, return_content=False)`: Convert and save to file, optionally returning content
+- `convert_to_markdown_with_options(uri, return_content=True, save_to=None)`: Flexible conversion with multiple output options
+
+All tools accept `http:`, `https:`, `file:`, or `data:` URIs.
 
 ## Installation
 
@@ -124,6 +129,60 @@ Finally:
 * click `List Tools`,
 * click `convert_to_markdown`, and
 * run the tool on any valid URI.
+
+## Available Tools
+
+### `convert_to_markdown(uri)`
+Convert a resource to markdown and return the full content.
+
+**Parameters:**
+- `uri`: URI to convert (http, https, file, or data URI)
+
+**Returns:** String with the markdown content
+
+**Use case:** When you need the converted content in the agent's context for further processing.
+
+### `convert_and_save(uri, output_path, return_content=False)`
+Convert a resource to markdown and save to file, with optional content return.
+
+**Parameters:**
+- `uri`: URI to convert (http, https, file, or data URI)
+- `output_path`: Path where to save the markdown file
+- `return_content`: Whether to return the markdown content (default: False)
+
+**Returns:** Dictionary with metadata:
+```json
+{
+  "success": true,
+  "saved_to": "/path/to/file.md",
+  "size": 150000,
+  "title": "Document Title",
+  "content": "markdown content..." // only if return_content=True
+}
+```
+
+**Use case:** Convert large documents without consuming agent context. Good for processing PDFs and other large files.
+
+### `convert_to_markdown_with_options(uri, return_content=True, save_to=None)`
+Flexible conversion with multiple output options.
+
+**Parameters:**
+- `uri`: URI to convert (http, https, file, or data URI)
+- `return_content`: Whether to return the markdown content (default: True)
+- `save_to`: Optional path to save the markdown file
+
+**Returns:** Dictionary with results and metadata:
+```json
+{
+  "success": true,
+  "title": "Document Title",
+  "saved_to": "/path/to/file.md", // if save_to was provided
+  "size": 150000,
+  "content": "markdown content..." // if return_content=True
+}
+```
+
+**Use case:** Flexible option - can return content, save to file, or both.
 
 ## Security Considerations
 
