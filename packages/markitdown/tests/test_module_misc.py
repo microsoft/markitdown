@@ -540,6 +540,7 @@ if __name__ == "__main__":
         test_exceptions,
         test_doc_rlink,
         test_markitdown_exiftool,
+        test_plaintext_charset_fallback,
         test_markitdown_llm_parameters,
         test_markitdown_llm,
     ]:
