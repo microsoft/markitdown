@@ -95,6 +95,7 @@ PPTX_TEST_STRINGS = [
     "2003",  # chart value
 ]
 
+
 # --- Helper Functions ---
 def validate_strings(result, expected_strings, exclude_strings=None):
     """Validate presence or absence of specific strings."""
@@ -468,7 +469,11 @@ def test_plaintext_charset_fallback() -> None:
     markitdown = MarkItDown()
 
     test_cases = [
-        ("Spanish", "Hola, señor! ¿Cómo está? Año nuevo, vida nueva.", ["señor", "¿Cómo está?", "Año"]),
+        (
+            "Spanish",
+            "Hola, señor! ¿Cómo está? Año nuevo, vida nueva.",
+            ["señor", "¿Cómo está?", "Año"],
+        ),
         ("Korean", "안녕하세요! 한글 테스트입니다. 가나다라마바사", ["안녕하세요", "한글", "가나다라마바사"]),
         ("Japanese", "こんにちは！日本語テストです。あいうえお", ["こんにちは", "日本語", "あいうえお"]),
         ("Chinese", "你好！中文测试。这是一个测试文件。", ["你好", "中文测试", "测试文件"]),
@@ -491,9 +496,9 @@ def test_plaintext_charset_fallback() -> None:
 
         # Verify that the conversion succeeded and contains the UTF-8 characters
         for expected in expected_substrings:
-            assert expected in result.text_content, (
-                f"{lang}: Expected '{expected}' not found in result"
-            )
+            assert (
+                expected in result.text_content
+            ), f"{lang}: Expected '{expected}' not found in result"
 
 
 @pytest.mark.skipif(
