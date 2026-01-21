@@ -456,6 +456,51 @@ def test_markitdown_llm_parameters() -> None:
     assert messages[0]["content"][0]["text"] == test_prompt
 
 
+def test_plaintext_charset_fallback() -> None:
+    """
+    Test for GitHub issue #1505: PlainTextConverter throws UnicodeDecodeError
+    when charset detection from partial file content is inaccurate.
+
+    When the first 4096 bytes are ASCII-only but later bytes contain UTF-8
+    characters (e.g., accented or CJK characters), the charset may be incorrectly
+    detected as 'ascii'. The converter should fall back to charset_normalizer
+    when decoding fails.
+    """
+    markitdown = MarkItDown()
+
+    test_cases = [
+        (
+            "Spanish",
+            "Hola, señor! ¿Cómo está? Año nuevo, vida nueva.",
+            ["señor", "¿Cómo está?", "Año"],
+        ),
+        ("Korean", "안녕하세요! 한글 테스트입니다. 가나다라마바사", ["안녕하세요", "한글", "가나다라마바사"]),
+        ("Japanese", "こんにちは！日本語テストです。あいうえお", ["こんにちは", "日本語", "あいうえお"]),
+        ("Chinese", "你好！中文测试。这是一个测试文件。", ["你好", "中文测试", "测试文件"]),
+    ]
+
+    for lang, utf8_text, expected_substrings in test_cases:
+        # Create a test file where:
+        # - First 4100 bytes are ASCII (exceeds the 4096 byte sample for charset detection)
+        # - Followed by UTF-8 encoded non-ASCII characters
+        ascii_part = "A" * 4100
+        test_content = ascii_part + utf8_text
+
+        # Use BytesIO to simulate a file stream
+        file_stream = io.BytesIO(test_content.encode("utf-8"))
+
+        # Convert using stream with incorrect charset hint (simulating the bug)
+        result = markitdown.convert_stream(
+            file_stream, stream_info=StreamInfo(charset="ascii", extension=".txt")
+        )
+
+        # Verify that the conversion succeeded and contains the UTF-8 characters
+        for expected in expected_substrings:
+            assert (
+                expected in result.text_content
+            ), f"{lang}: Expected '{expected}' not found in result"
+
+
 @pytest.mark.skipif(
     skip_llm,
     reason="do not run llm tests without a key",
@@ -495,6 +540,7 @@ if __name__ == "__main__":
         test_exceptions,
         test_doc_rlink,
         test_markitdown_exiftool,
+        test_plaintext_charset_fallback,
         test_markitdown_llm_parameters,
         test_markitdown_llm,
     ]:
