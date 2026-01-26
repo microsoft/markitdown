@@ -176,6 +176,56 @@ result = md.convert("example.jpg")
 print(result.text_content)
 ```
 
+To extract text from images embedded in documents using OCR (requires Tesseract):
+
+```python
+from markitdown.converters._ocr_service import MultiBackendOCRService, OCRBackend
+from markitdown.converters._pdf_converter_with_ocr import PdfConverterWithOCR
+
+# Create OCR service with Tesseract
+ocr_service = MultiBackendOCRService(backends=[OCRBackend.TESSERACT])
+
+# Convert PDF with OCR
+converter = PdfConverterWithOCR()
+with open("document.pdf", "rb") as f:
+    result = converter.convert(f, ocr_service=ocr_service)
+    print(result.text_content)
+```
+
+To use LLM (GPT-4o, Gemini, etc.) for OCR instead of Tesseract:
+
+```python
+from markitdown.converters._ocr_service import MultiBackendOCRService, OCRBackend
+from markitdown.converters._pdf_converter_with_ocr import PdfConverterWithOCR
+from openai import OpenAI
+
+# Create OCR service with LLM Vision backend
+client = OpenAI()
+ocr_service = MultiBackendOCRService(
+    backends=[OCRBackend.LLM_VISION],
+    llm_client=client,
+    llm_model="gpt-4o"
+)
+
+# Convert PDF with LLM-based OCR
+converter = PdfConverterWithOCR()
+with open("document.pdf", "rb") as f:
+    result = converter.convert(f, ocr_service=ocr_service)
+    print(result.text_content)
+```
+
+Multi-backend fallback (tries Tesseract first, falls back to LLM if Tesseract fails):
+
+```python
+ocr_service = MultiBackendOCRService(
+    backends=[OCRBackend.TESSERACT, OCRBackend.LLM_VISION],
+    llm_client=client,
+    llm_model="gpt-4o"
+)
+```
+
+OCR converters are available for PDF, DOCX, XLSX (multi-sheet), and PPTX formats. Images are extracted with context preservation (page numbers, cell references, relationship IDs).
+
 ### Docker
 
 ```sh
