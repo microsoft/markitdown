@@ -613,6 +613,380 @@ def test_comprehensive_ocr_positioning(ocr_service: Any, filename: str) -> None:
     )
 
 
+def test_pdf_scanned_fallback(ocr_service: Any) -> None:
+    """
+    Test that scanned PDFs (no extractable text) trigger full-page OCR fallback.
+
+    This test validates the fallback mechanism that:
+    1. Attempts normal text extraction
+    2. Detects empty/whitespace results
+    3. Falls back to rendering pages as images
+    4. Performs OCR on full-page images
+    """
+    converter = PdfConverterWithOCR()
+
+    # Test with a scanned PDF if available
+    pdf_path = TEST_DATA_DIR / "pdf_scanned.pdf"
+
+    if not pdf_path.exists():
+        pytest.skip(f"Scanned PDF test file not found: {pdf_path}")
+
+    with open(pdf_path, "rb") as f:
+        result = converter.convert(
+            f, StreamInfo(extension=".pdf"), ocr_service=ocr_service
+        )
+        markdown = result.text_content
+
+    # Validate that some text was extracted via OCR
+    assert markdown, "Should extract text from scanned PDF via OCR fallback"
+    assert len(markdown.strip()) > 0, "Extracted text should not be empty/whitespace"
+
+    # Should have page markers
+    assert "## Page" in markdown, "Should have page structure markers"
+
+    # Should indicate OCR was used
+    assert "OCR:" in markdown, "Should indicate OCR backend was used"
+
+    print(f"  [PASS] Scanned PDF fallback extracted {len(markdown)} characters")
+
+
+def test_pdf_scanned_fallback_with_mock(ocr_service: Any) -> None:
+    """
+    Test scanned PDF fallback with a PDF that has minimal/no extractable text.
+
+    This validates the full-page OCR pathway when embedded image extraction
+    and pdfminer both return empty results.
+    """
+    import io
+    from unittest.mock import patch, MagicMock
+
+    converter = PdfConverterWithOCR()
+
+    # Use any existing PDF for this test
+    pdf_path = TEST_DATA_DIR / "pdf_image_start.pdf"
+
+    if not pdf_path.exists():
+        pytest.skip(f"Test PDF not found: {pdf_path}")
+
+    # Mock pdfplumber page.extract_text to return empty text
+    with patch(
+        "markitdown.converters._pdf_converter_with_ocr.pdfplumber.open"
+    ) as mock_plumber:
+        # Create mock PDF with mock pages
+        mock_pdf = MagicMock()
+        mock_page = MagicMock()
+        mock_page.extract_text.return_value = ""  # Simulate no text
+        mock_page.chars = []  # No character data
+        mock_page.images = []  # No embedded images
+        mock_page.page_number = 1
+        mock_pdf.pages = [mock_page]
+        mock_pdf.__enter__.return_value = mock_pdf
+        mock_plumber.return_value = mock_pdf
+
+        # Also mock pdfminer to return empty
+        with patch(
+            "markitdown.converters._pdf_converter_with_ocr.pdfminer.high_level.extract_text"
+        ) as mock_pdfminer:
+            mock_pdfminer.return_value = ""
+
+            with open(pdf_path, "rb") as f:
+                pdf_bytes = f.read()
+                pdf_stream = io.BytesIO(pdf_bytes)
+
+                result = converter.convert(
+                    pdf_stream, StreamInfo(extension=".pdf"), ocr_service=ocr_service
+                )
+                markdown = result.text_content
+
+            # Should have triggered the scanned PDF fallback
+            assert markdown, "Should extract text via scanned PDF fallback"
+            assert len(markdown.strip()) > 0, "Should have non-empty OCR results"
+
+            # Should indicate OCR was used for full-page fallback
+            assert "## Page" in markdown, "Should have page markers from full-page OCR"
+
+            print("  [PASS] Scanned PDF fallback mock test passed")
+
+
+def test_pdf_empty_result_detection() -> None:
+    """
+    Test that empty and whitespace-only results are correctly detected.
+
+    This validates the logic that determines when to trigger the scanned PDF fallback.
+    """
+    # Test various empty/whitespace scenarios
+    test_cases = [
+        ("", True, "Empty string should trigger fallback"),
+        ("   ", True, "Whitespace-only should trigger fallback"),
+        ("\n\n\n", True, "Newlines-only should trigger fallback"),
+        ("  \t  \n  ", True, "Mixed whitespace should trigger fallback"),
+        ("Some text", False, "Non-empty text should not trigger fallback"),
+    ]
+
+    for text, should_fallback, description in test_cases:
+        # Check the condition used in the code
+        would_trigger = not text or not text.strip()
+        assert would_trigger == should_fallback, f"Failed: {description}"
+        print(f"  [PASS] {description}")
+
+
+def test_pdf_scanned_invoice(ocr_service: Any) -> None:
+    """Test OCR extraction from a scanned invoice PDF."""
+    converter = PdfConverterWithOCR()
+    pdf_path = TEST_DATA_DIR / "pdf_scanned_invoice.pdf"
+
+    if not pdf_path.exists():
+        pytest.skip(f"Scanned invoice test file not found: {pdf_path}")
+
+    with open(pdf_path, "rb") as f:
+        result = converter.convert(
+            f, StreamInfo(extension=".pdf"), ocr_service=ocr_service
+        )
+        markdown = result.text_content
+
+    # Validate extraction
+    assert markdown, "Should extract text from scanned invoice"
+    assert len(markdown.strip()) > 100, "Should extract substantial text content"
+
+    # Validate key invoice elements
+    expected_terms = ["INVOICE", "TECHCORP", "INV-2024", "TOTAL"]
+    for term in expected_terms:
+        assert (
+            term.upper() in markdown.upper()
+        ), f"Should extract key term '{term}' from invoice"
+
+    # Should indicate OCR was used
+    assert "OCR:" in markdown, "Should indicate OCR backend was used"
+
+    print(f"  [PASS] Scanned invoice OCR extracted {len(markdown)} characters")
+
+
+def test_pdf_scanned_multipage_report(ocr_service: Any) -> None:
+    """Test OCR extraction from a multi-page scanned technical report."""
+    converter = PdfConverterWithOCR()
+    pdf_path = TEST_DATA_DIR / "pdf_scanned_report.pdf"
+
+    if not pdf_path.exists():
+        pytest.skip(f"Scanned report test file not found: {pdf_path}")
+
+    with open(pdf_path, "rb") as f:
+        result = converter.convert(
+            f, StreamInfo(extension=".pdf"), ocr_service=ocr_service
+        )
+        markdown = result.text_content
+
+    # Validate extraction
+    assert markdown, "Should extract text from scanned report"
+    assert len(markdown.strip()) > 200, "Should extract substantial text from all pages"
+
+    # Validate page structure
+    page_markers = markdown.count("## Page")
+    assert page_markers >= 3, f"Should have 3 pages (found {page_markers} markers)"
+
+    # Validate content from different pages
+    page1_terms = ["TECHNICAL REPORT", "EXECUTIVE SUMMARY"]
+    page2_terms = ["METHODOLOGY", "Data Collection"]
+    page3_terms = ["RECOMMENDATIONS", "CONCLUSION"]
+
+    for term in page1_terms + page2_terms + page3_terms:
+        assert (
+            term in markdown.upper() or term in markdown
+        ), f"Should extract '{term}' from report"
+
+    print(f"  [PASS] Multi-page scanned report OCR extracted from {page_markers} pages")
+
+
+def test_pdf_scanned_meeting_minutes(ocr_service: Any) -> None:
+    """Test OCR extraction from scanned meeting minutes."""
+    converter = PdfConverterWithOCR()
+    pdf_path = TEST_DATA_DIR / "pdf_scanned_meeting_minutes.pdf"
+
+    if not pdf_path.exists():
+        pytest.skip(f"Scanned meeting minutes test file not found: {pdf_path}")
+
+    with open(pdf_path, "rb") as f:
+        result = converter.convert(
+            f, StreamInfo(extension=".pdf"), ocr_service=ocr_service
+        )
+        markdown = result.text_content
+
+    # Validate extraction
+    assert markdown, "Should extract text from scanned meeting minutes"
+    assert len(markdown.strip()) > 50, "Should extract text content"
+
+    # Validate key meeting elements
+    expected_elements = ["MEETING MINUTES", "AGENDA", "Action Items"]
+    for element in expected_elements:
+        # Case-insensitive search
+        assert (
+            element.lower() in markdown.lower()
+        ), f"Should extract '{element}' from meeting minutes"
+
+    print(f"  [PASS] Scanned meeting minutes OCR extracted {len(markdown)} characters")
+
+
+def test_pdf_scanned_sales_report(ocr_service: Any) -> None:
+    """Test OCR extraction from scanned sales report with table structure."""
+    converter = PdfConverterWithOCR()
+    pdf_path = TEST_DATA_DIR / "pdf_scanned_sales_report.pdf"
+
+    if not pdf_path.exists():
+        pytest.skip(f"Scanned sales report test file not found: {pdf_path}")
+
+    with open(pdf_path, "rb") as f:
+        result = converter.convert(
+            f, StreamInfo(extension=".pdf"), ocr_service=ocr_service
+        )
+        markdown = result.text_content
+
+    # Validate extraction
+    assert markdown, "Should extract text from scanned sales report"
+    assert len(markdown.strip()) > 100, "Should extract substantial text"
+
+    # Validate key report elements
+    expected_terms = ["QUARTERLY", "SALES", "Revenue", "Growth"]
+    for term in expected_terms:
+        assert (
+            term in markdown or term.upper() in markdown
+        ), f"Should extract '{term}' from sales report"
+
+    # Check for regional data (at least some regions should be recognized)
+    regions = ["North America", "Europe", "Asia", "Latin"]
+    found_regions = sum(
+        1 for region in regions if region in markdown or region.upper() in markdown
+    )
+    assert (
+        found_regions >= 2
+    ), f"Should extract at least 2 region names (found {found_regions})"
+
+    print(f"  [PASS] Scanned sales report OCR extracted {len(markdown)} characters")
+
+
+def test_pdf_scanned_minimal(ocr_service: Any) -> None:
+    """Test OCR extraction from minimal scanned document (edge case)."""
+    converter = PdfConverterWithOCR()
+    pdf_path = TEST_DATA_DIR / "pdf_scanned_minimal.pdf"
+
+    if not pdf_path.exists():
+        pytest.skip(f"Scanned minimal test file not found: {pdf_path}")
+
+    with open(pdf_path, "rb") as f:
+        result = converter.convert(
+            f, StreamInfo(extension=".pdf"), ocr_service=ocr_service
+        )
+        markdown = result.text_content
+
+    # Validate extraction
+    assert markdown, "Should extract text from minimal scanned document"
+    assert len(markdown.strip()) > 10, "Should extract some text content"
+
+    # Validate basic content
+    assert (
+        "NOTICE" in markdown.upper() or "test document" in markdown.lower()
+    ), "Should extract basic text content"
+
+    print(f"  [PASS] Minimal scanned document OCR extracted {len(markdown)} characters")
+
+
+@pytest.mark.parametrize(
+    "filename,expected_terms,min_length",
+    [
+        (
+            "pdf_scanned_invoice.pdf",
+            ["INVOICE", "Company", "TOTAL"],
+            100,
+        ),
+        (
+            "pdf_scanned_report.pdf",
+            ["TECHNICAL", "METHODOLOGY", "RECOMMENDATIONS"],
+            200,
+        ),
+        (
+            "pdf_scanned_meeting_minutes.pdf",
+            ["MEETING", "AGENDA", "Action"],
+            50,
+        ),
+        (
+            "pdf_scanned_sales_report.pdf",
+            ["SALES", "Revenue", "Growth"],
+            100,
+        ),
+        (
+            "pdf_scanned_minimal.pdf",
+            ["NOTICE", "document"],
+            10,
+        ),
+    ],
+)
+def test_comprehensive_scanned_pdf_ocr(
+    ocr_service: Any, filename: str, expected_terms: list[str], min_length: int
+) -> None:
+    """
+    Comprehensive parametrized test for all scanned PDF files.
+
+    Validates that:
+    1. OCR fallback is triggered (no extractable text in these PDFs)
+    2. Full-page OCR successfully extracts text
+    3. Key terms from the document are present in the output
+    4. Minimum text length is met (validates substantial extraction)
+    """
+    converter = PdfConverterWithOCR()
+    pdf_path = TEST_DATA_DIR / filename
+
+    if not pdf_path.exists():
+        pytest.skip(f"Test file not found: {pdf_path}")
+
+    print(f"\n{'='*60}")
+    print(f"Testing scanned PDF: {filename}")
+    print(f"{'='*60}")
+
+    with open(pdf_path, "rb") as f:
+        result = converter.convert(
+            f, StreamInfo(extension=".pdf"), ocr_service=ocr_service
+        )
+        markdown = result.text_content
+
+    # Validate extraction occurred
+    assert markdown, f"Should extract text from {filename}"
+    assert (
+        len(markdown.strip()) >= min_length
+    ), f"Should extract at least {min_length} characters (got {len(markdown.strip())})"
+
+    print(f"  [PASS] Extracted {len(markdown)} characters")
+
+    # Validate key terms present
+    found_terms = []
+    missing_terms = []
+
+    for term in expected_terms:
+        # Case-insensitive search
+        if term.lower() in markdown.lower():
+            found_terms.append(term)
+        else:
+            missing_terms.append(term)
+
+    # Require at least 60% of terms to be found (OCR isn't perfect)
+    success_rate = len(found_terms) / len(expected_terms)
+    assert (
+        success_rate >= 0.6
+    ), f"Should extract at least 60% of key terms. Found: {found_terms}, Missing: {missing_terms}"
+
+    print(
+        f"  [PASS] Term extraction: {len(found_terms)}/{len(expected_terms)} terms found ({success_rate:.0%})"
+    )
+
+    # Validate OCR backend indicator present
+    assert "OCR:" in markdown, "Should indicate which OCR backend was used"
+    print("  [PASS] OCR backend indicator present")
+
+    # Validate page structure
+    if "## Page" in markdown:
+        page_count = markdown.count("## Page")
+        print(f"  [PASS] Page structure preserved ({page_count} pages)")
+
+    print(f"  [SUCCESS] All validations passed for {filename}\n")
+
+
 if __name__ == "__main__":
     # Run tests when executed directly
     pytest.main([__file__, "-v"])

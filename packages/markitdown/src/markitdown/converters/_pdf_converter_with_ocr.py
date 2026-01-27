@@ -10,7 +10,7 @@ from typing import BinaryIO, Any, Optional
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
-from ._ocr_service import MultiBackendOCRService, OCRResult
+from ._ocr_service import MultiBackendOCRService
 
 # Import dependencies
 _dependency_exc_info = None
@@ -285,7 +285,7 @@ class PdfConverterWithOCR(DocumentConverter):
             )  # type: ignore[union-attr]
 
         # Get OCR service if available
-        ocr_service: Optional[MultiBackendOCRService] = kwargs.get("ocr_service")
+        ocr_service: MultiBackendOCRService | None = kwargs.get("ocr_service")
 
         # Read PDF into BytesIO
         file_stream.seek(0)
@@ -410,6 +410,12 @@ class PdfConverterWithOCR(DocumentConverter):
             pdf_bytes.seek(0)
             markdown = pdfminer.high_level.extract_text(pdf_bytes)
 
+        # Final fallback: If still empty/whitespace and OCR is available,
+        # treat as scanned PDF and OCR full pages
+        if ocr_service and (not markdown or not markdown.strip()):
+            pdf_bytes.seek(0)
+            markdown = self._ocr_full_pages(pdf_bytes, ocr_service)
+
         return DocumentConverterResult(markdown=markdown)
 
     def _extract_page_images(self, pdf_bytes: io.BytesIO, page_num: int) -> list[dict]:
@@ -430,3 +436,99 @@ class PdfConverterWithOCR(DocumentConverter):
         images.sort(key=lambda x: x["y_pos"])
 
         return images
+
+    def _ocr_full_pages(
+        self, pdf_bytes: io.BytesIO, ocr_service: MultiBackendOCRService
+    ) -> str:
+        """
+        Fallback for scanned PDFs: Convert entire pages to images and OCR them.
+        Used when text extraction returns empty/whitespace results.
+
+        Args:
+            pdf_bytes: PDF file as BytesIO
+            ocr_service: OCR service to use
+
+        Returns:
+            Markdown text extracted from OCR of full pages
+        """
+        markdown_parts = []
+
+        try:
+            # Try using PyMuPDF for page rendering
+            pdf_bytes.seek(0)
+            doc = fitz.open(stream=pdf_bytes.read(), filetype="pdf")
+
+            for page_num in range(len(doc)):
+                try:
+                    page = doc[page_num]
+                    markdown_parts.append(f"\n## Page {page_num + 1}\n")
+
+                    # Render page to image at high DPI for better OCR
+                    # Using 300 DPI for good OCR quality
+                    pix = page.get_pixmap(dpi=300)
+
+                    # Convert to PIL Image
+                    img_data = pix.tobytes("png")
+                    img_stream = io.BytesIO(img_data)
+
+                    # Run OCR on the full page image
+                    ocr_result = ocr_service.extract_text(img_stream)
+
+                    if ocr_result.text.strip():
+                        markdown_parts.append(ocr_result.text.strip())
+                        if ocr_result.backend_used:
+                            markdown_parts.append(
+                                f"\n*(OCR: {ocr_result.backend_used})*\n"
+                            )
+                    else:
+                        markdown_parts.append(
+                            "*[No text could be extracted from this page]*"
+                        )
+
+                except Exception as e:
+                    markdown_parts.append(
+                        f"*[Error processing page {page_num + 1}: {str(e)}]*"
+                    )
+                    continue
+
+            doc.close()
+
+        except Exception:
+            # Fallback to pdfplumber rendering if PyMuPDF fails
+            try:
+                pdf_bytes.seek(0)
+                with pdfplumber.open(pdf_bytes) as pdf:
+                    for page_num, page in enumerate(pdf.pages, 1):
+                        try:
+                            markdown_parts.append(f"\n## Page {page_num}\n")
+
+                            # Render page to image
+                            page_img = page.to_image(resolution=300)
+                            img_stream = io.BytesIO()
+                            page_img.original.save(img_stream, format="PNG")
+                            img_stream.seek(0)
+
+                            # Run OCR
+                            ocr_result = ocr_service.extract_text(img_stream)
+
+                            if ocr_result.text.strip():
+                                markdown_parts.append(ocr_result.text.strip())
+                                if ocr_result.backend_used:
+                                    markdown_parts.append(
+                                        f"\n*(OCR: {ocr_result.backend_used})*\n"
+                                    )
+                            else:
+                                markdown_parts.append(
+                                    "*[No text could be extracted from this page]*"
+                                )
+
+                        except Exception as e:
+                            markdown_parts.append(
+                                f"*[Error processing page {page_num}: {str(e)}]*"
+                            )
+                            continue
+
+            except Exception:
+                return "*[Error: Could not process scanned PDF]*"
+
+        return "\n\n".join(markdown_parts).strip()
