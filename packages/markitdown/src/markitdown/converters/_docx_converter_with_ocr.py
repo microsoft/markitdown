@@ -46,7 +46,9 @@ class DocxConverterWithOCR(HtmlConverter):
         if extension == ".docx":
             return True
 
-        if mimetype.startswith("application/vnd.openxmlformats-officedocument.wordprocessingml"):
+        if mimetype.startswith(
+            "application/vnd.openxmlformats-officedocument.wordprocessingml"
+        ):
             return True
 
         return False
@@ -64,7 +66,9 @@ class DocxConverterWithOCR(HtmlConverter):
                     extension=".docx",
                     feature="docx",
                 )
-            ) from _dependency_exc_info[1].with_traceback(_dependency_exc_info[2])  # type: ignore[union-attr]
+            ) from _dependency_exc_info[1].with_traceback(
+                _dependency_exc_info[2]
+            )  # type: ignore[union-attr]
 
         # Get OCR service if available
         ocr_service: Optional[MultiBackendOCRService] = kwargs.get("ocr_service")
@@ -78,8 +82,7 @@ class DocxConverterWithOCR(HtmlConverter):
             file_stream.seek(0)
             pre_process_stream = pre_process_docx(file_stream)
             html_result = mammoth.convert_to_html(
-                pre_process_stream,
-                style_map=kwargs.get("style_map")
+                pre_process_stream, style_map=kwargs.get("style_map")
             ).value
 
             # Inject OCR results into HTML
@@ -96,9 +99,7 @@ class DocxConverterWithOCR(HtmlConverter):
             )
 
     def _extract_and_ocr_images(
-        self,
-        file_stream: BinaryIO,
-        ocr_service: MultiBackendOCRService
+        self, file_stream: BinaryIO, ocr_service: MultiBackendOCRService
     ) -> dict[str, str]:
         """
         Extract images from DOCX and OCR them.
@@ -171,10 +172,12 @@ class DocxConverterWithOCR(HtmlConverter):
             return ""  # Remove image if no OCR text available
 
         # Replace ALL img tags (including base64) with OCR text
-        result = re.sub(r'<img[^>]*>', replace_img, html)
+        result = re.sub(r"<img[^>]*>", replace_img, html)
 
         # If there are remaining OCR texts (images that weren't in HTML), append them
-        remaining_ocr = [ocr_texts[i] for i in range(len(ocr_texts)) if i not in used_indices]
+        remaining_ocr = [
+            ocr_texts[i] for i in range(len(ocr_texts)) if i not in used_indices
+        ]
         if remaining_ocr:
             result += f"<p><em>{''.join(remaining_ocr)}</em></p>"
 

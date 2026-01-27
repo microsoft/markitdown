@@ -41,7 +41,9 @@ class PptxConverterWithOCR(DocumentConverter):
         if extension == ".pptx":
             return True
 
-        if mimetype.startswith("application/vnd.openxmlformats-officedocument.presentationml"):
+        if mimetype.startswith(
+            "application/vnd.openxmlformats-officedocument.presentationml"
+        ):
             return True
 
         return False
@@ -59,7 +61,9 @@ class PptxConverterWithOCR(DocumentConverter):
                     extension=".pptx",
                     feature="pptx",
                 )
-            ) from _dependency_exc_info[1].with_traceback(_dependency_exc_info[2])  # type: ignore[union-attr]
+            ) from _dependency_exc_info[1].with_traceback(
+                _dependency_exc_info[2]
+            )  # type: ignore[union-attr]
 
         # Get OCR service
         ocr_service: Optional[MultiBackendOCRService] = kwargs.get("ocr_service")
@@ -88,10 +92,12 @@ class PptxConverterWithOCR(DocumentConverter):
                     if llm_client and kwargs.get("llm_model"):
                         try:
                             from ._llm_caption import llm_caption
+
                             image_filename = shape.image.filename
                             image_extension = None
                             if image_filename:
                                 import os
+
                                 image_extension = os.path.splitext(image_filename)[1]
 
                             image_stream_info = StreamInfo(
@@ -129,10 +135,14 @@ class PptxConverterWithOCR(DocumentConverter):
                         pass
 
                     # Combine descriptions
-                    combined_desc = "\\n".join(filter(None, [llm_description, ocr_text, alt_text])) or shape.name
+                    combined_desc = (
+                        "\\n".join(filter(None, [llm_description, ocr_text, alt_text]))
+                        or shape.name
+                    )
 
                     # Clean up description
                     import re
+
                     combined_desc = re.sub(r"[\\r\\n\\[\\]]", " ", combined_desc)
                     combined_desc = re.sub(r"\\s+", " ", combined_desc).strip()
 
@@ -203,6 +213,7 @@ class PptxConverterWithOCR(DocumentConverter):
 
     def _convert_table_to_markdown(self, table, **kwargs):
         import html
+
         html_table = "<html><body><table>"
         first_row = True
         for row in table.rows:

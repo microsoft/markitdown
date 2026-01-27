@@ -40,7 +40,12 @@ def _extract_images_from_page(page: Any) -> list[dict]:
         for i, img_dict in enumerate(images):
             try:
                 # Get image data
-                x0, y0, x1, y1 = img_dict['x0'], img_dict['top'], img_dict['x1'], img_dict['bottom']
+                x0, y0, x1, y1 = (
+                    img_dict["x0"],
+                    img_dict["top"],
+                    img_dict["x1"],
+                    img_dict["bottom"],
+                )
 
                 # Extract image from page
                 # We need to crop the image from the page
@@ -57,41 +62,43 @@ def _extract_images_from_page(page: Any) -> list[dict]:
                     page_obj = page.page_obj
 
                     # Navigate to resources
-                    if '/XObject' in page_obj['/Resources']:
-                        xobjects = page_obj['/Resources']['/XObject'].get_object()
+                    if "/XObject" in page_obj["/Resources"]:
+                        xobjects = page_obj["/Resources"]["/XObject"].get_object()
 
                         for obj_name in xobjects:
                             obj = xobjects[obj_name]
 
-                            if obj['/Subtype'] == '/Image':
+                            if obj["/Subtype"] == "/Image":
                                 # Extract image data
-                                size = (obj['/Width'], obj['/Height'])
+                                size = (obj["/Width"], obj["/Height"])
                                 data = obj.get_data()
 
                                 # Create PIL Image
                                 try:
-                                    if '/ColorSpace' in obj:
-                                        cs = obj['/ColorSpace']
-                                        if cs == '/DeviceRGB':
-                                            mode = 'RGB'
-                                        elif cs == '/DeviceGray':
-                                            mode = 'L'
+                                    if "/ColorSpace" in obj:
+                                        cs = obj["/ColorSpace"]
+                                        if cs == "/DeviceRGB":
+                                            mode = "RGB"
+                                        elif cs == "/DeviceGray":
+                                            mode = "L"
                                         else:
-                                            mode = 'RGB'
+                                            mode = "RGB"
                                     else:
-                                        mode = 'RGB'
+                                        mode = "RGB"
 
                                     img = Image.frombytes(mode, size, data)
                                     img_stream = io.BytesIO()
-                                    img.save(img_stream, format='PNG')
+                                    img.save(img_stream, format="PNG")
                                     img_stream.seek(0)
 
-                                    images_info.append({
-                                        'stream': img_stream,
-                                        'bbox': bbox,
-                                        'name': f"page_{page.page_number}_img_{i}",
-                                        'y_pos': y0  # For sorting
-                                    })
+                                    images_info.append(
+                                        {
+                                            "stream": img_stream,
+                                            "bbox": bbox,
+                                            "name": f"page_{page.page_number}_img_{i}",
+                                            "y_pos": y0,  # For sorting
+                                        }
+                                    )
                                 except Exception:
                                     # Try alternative extraction
                                     pass
@@ -144,7 +151,7 @@ def _extract_images_using_pymupdf(pdf_bytes: io.BytesIO, page_num: int) -> list[
 
                 # Save to stream
                 img_stream = io.BytesIO()
-                pil_img.save(img_stream, format='PNG')
+                pil_img.save(img_stream, format="PNG")
                 img_stream.seek(0)
 
                 # Get image position on page (for sorting)
@@ -152,12 +159,19 @@ def _extract_images_using_pymupdf(pdf_bytes: io.BytesIO, page_num: int) -> list[
                 img_rects = page.get_image_rects(xref)
                 y_pos = img_rects[0].y0 if img_rects else 0
 
-                images_info.append({
-                    'stream': img_stream,
-                    'bbox': (0, 0, pil_img.width, pil_img.height),  # Image dimensions
-                    'name': f"page_{page_num}_img_{img_index}",
-                    'y_pos': y_pos
-                })
+                images_info.append(
+                    {
+                        "stream": img_stream,
+                        "bbox": (
+                            0,
+                            0,
+                            pil_img.width,
+                            pil_img.height,
+                        ),  # Image dimensions
+                        "name": f"page_{page_num}_img_{img_index}",
+                        "y_pos": y_pos,
+                    }
+                )
 
             except Exception:
                 continue
@@ -187,10 +201,10 @@ def _extract_images_using_pdfplumber(page: Any) -> list[dict]:
 
         for i, img_dict in enumerate(images):
             try:
-                x0 = img_dict.get('x0', 0)
-                y0 = img_dict.get('top', 0)
-                x1 = img_dict.get('x1', 0)
-                y1 = img_dict.get('bottom', 0)
+                x0 = img_dict.get("x0", 0)
+                y0 = img_dict.get("top", 0)
+                x1 = img_dict.get("x1", 0)
+                y1 = img_dict.get("bottom", 0)
 
                 # Check if dimensions are valid
                 if x1 <= x0 or y1 <= y0:
@@ -204,15 +218,17 @@ def _extract_images_using_pdfplumber(page: Any) -> list[dict]:
 
                 # Save to stream
                 img_stream = io.BytesIO()
-                cropped.save(img_stream, format='PNG')
+                cropped.save(img_stream, format="PNG")
                 img_stream.seek(0)
 
-                images_info.append({
-                    'stream': img_stream,
-                    'bbox': (x0, y0, x1, y1),
-                    'name': f"page_{page.page_number}_img_{i}",
-                    'y_pos': y0
-                })
+                images_info.append(
+                    {
+                        "stream": img_stream,
+                        "bbox": (x0, y0, x1, y1),
+                        "name": f"page_{page.page_number}_img_{i}",
+                        "y_pos": y0,
+                    }
+                )
 
             except Exception:
                 continue
@@ -244,7 +260,9 @@ class PdfConverterWithOCR(DocumentConverter):
         if extension == ".pdf":
             return True
 
-        if mimetype.startswith("application/pdf") or mimetype.startswith("application/x-pdf"):
+        if mimetype.startswith("application/pdf") or mimetype.startswith(
+            "application/x-pdf"
+        ):
             return True
 
         return False
@@ -262,7 +280,9 @@ class PdfConverterWithOCR(DocumentConverter):
                     extension=".pdf",
                     feature="pdf",
                 )
-            ) from _dependency_exc_info[1].with_traceback(_dependency_exc_info[2])  # type: ignore[union-attr]
+            ) from _dependency_exc_info[1].with_traceback(
+                _dependency_exc_info[2]
+            )  # type: ignore[union-attr]
 
         # Get OCR service if available
         ocr_service: Optional[MultiBackendOCRService] = kwargs.get("ocr_service")
@@ -291,55 +311,78 @@ class PdfConverterWithOCR(DocumentConverter):
                                 current_line = []
                                 current_y = None
 
-                                for char in sorted(chars, key=lambda c: (c['top'], c['x0'])):
-                                    y = char['top']
+                                for char in sorted(
+                                    chars, key=lambda c: (c["top"], c["x0"])
+                                ):
+                                    y = char["top"]
                                     if current_y is None:
                                         current_y = y
                                     elif abs(y - current_y) > 2:  # New line threshold
                                         if current_line:
-                                            text = ''.join([c['text'] for c in current_line])
-                                            lines_with_y.append({'y': current_y, 'text': text.strip()})
+                                            text = "".join(
+                                                [c["text"] for c in current_line]
+                                            )
+                                            lines_with_y.append(
+                                                {"y": current_y, "text": text.strip()}
+                                            )
                                         current_line = []
                                         current_y = y
                                     current_line.append(char)
 
                                 # Add last line
                                 if current_line:
-                                    text = ''.join([c['text'] for c in current_line])
-                                    lines_with_y.append({'y': current_y, 'text': text.strip()})
+                                    text = "".join([c["text"] for c in current_line])
+                                    lines_with_y.append(
+                                        {"y": current_y, "text": text.strip()}
+                                    )
                             else:
                                 # Fallback: use simple text extraction
                                 text_content = page.extract_text() or ""
-                                lines_with_y = [{'y': i*10, 'text': line} for i, line in enumerate(text_content.split('\n'))]
+                                lines_with_y = [
+                                    {"y": i * 10, "text": line}
+                                    for i, line in enumerate(text_content.split("\n"))
+                                ]
 
                             # OCR all images
                             image_data = []
                             for img_info in images_on_page:
-                                ocr_result = ocr_service.extract_text(img_info['stream'])
+                                ocr_result = ocr_service.extract_text(
+                                    img_info["stream"]
+                                )
                                 if ocr_result.text.strip():
-                                    image_data.append({
-                                        'y_pos': img_info['y_pos'],
-                                        'name': img_info['name'],
-                                        'ocr_text': ocr_result.text,
-                                        'backend': ocr_result.backend_used,
-                                        'type': 'image'
-                                    })
+                                    image_data.append(
+                                        {
+                                            "y_pos": img_info["y_pos"],
+                                            "name": img_info["name"],
+                                            "ocr_text": ocr_result.text,
+                                            "backend": ocr_result.backend_used,
+                                            "type": "image",
+                                        }
+                                    )
 
                             # Add text items
-                            content_items = [{'y_pos': item['y'], 'text': item['text'], 'type': 'text'} for item in lines_with_y if item['text']]
+                            content_items = [
+                                {
+                                    "y_pos": item["y"],
+                                    "text": item["text"],
+                                    "type": "text",
+                                }
+                                for item in lines_with_y
+                                if item["text"]
+                            ]
                             content_items.extend(image_data)
 
                             # Sort all items by Y position (top to bottom)
-                            content_items.sort(key=lambda x: x['y_pos'])
+                            content_items.sort(key=lambda x: x["y_pos"])
 
                             # Build markdown by interleaving text and images
                             for item in content_items:
-                                if item['type'] == 'text':
-                                    markdown_content.append(item['text'])
+                                if item["type"] == "text":
+                                    markdown_content.append(item["text"])
                                 else:  # image
                                     img_marker = f"\n\n[Image: {item['name']}]\n"
                                     img_marker += f"{item['ocr_text']}\n"
-                                    if item.get('backend'):
+                                    if item.get("backend"):
                                         img_marker += f"(OCR: {item['backend']})\n"
                                     img_marker += "[End Image]\n"
                                     markdown_content.append(img_marker)
@@ -384,6 +427,6 @@ class PdfConverterWithOCR(DocumentConverter):
         images = _extract_images_using_pymupdf(pdf_bytes, page_num)
 
         # Sort by vertical position (top to bottom)
-        images.sort(key=lambda x: x['y_pos'])
+        images.sort(key=lambda x: x["y_pos"])
 
         return images

@@ -16,6 +16,7 @@ from .._stream_info import StreamInfo
 
 class OCRBackend(str, Enum):
     """Supported OCR backends."""
+
     TESSERACT = "tesseract"
     EASYOCR = "easyocr"
     LLM_VISION = "llm_vision"
@@ -25,6 +26,7 @@ class OCRBackend(str, Enum):
 @dataclass
 class OCRResult:
     """Result from OCR extraction."""
+
     text: str
     confidence: Optional[float] = None
     language: Optional[str] = None
@@ -34,6 +36,7 @@ class OCRResult:
 
 class OCRService(Protocol):
     """Protocol for OCR services."""
+
     def extract_text(self, image_stream: BinaryIO, **kwargs: Any) -> OCRResult:
         """Extract text from an image stream."""
         ...
@@ -59,6 +62,7 @@ class TesseractOCRService:
         try:
             import pytesseract
             from PIL import Image
+
             self._pytesseract = pytesseract
             self._PIL_Image = Image
         except ImportError:
@@ -68,9 +72,7 @@ class TesseractOCRService:
         """Extract text using Tesseract."""
         if self._dependency_exc_info is not None:
             return OCRResult(
-                text="",
-                backend_used="tesseract",
-                error="pytesseract not installed"
+                text="", backend_used="tesseract", error="pytesseract not installed"
             )
 
         try:
@@ -82,20 +84,18 @@ class TesseractOCRService:
 
             # Extract text
             text = self._pytesseract.image_to_string(
-                image,
-                lang=self.lang,
-                config=self.config
+                image, lang=self.lang, config=self.config
             )
 
             # Try to get confidence if available
             try:
                 data = self._pytesseract.image_to_data(
-                    image,
-                    lang=self.lang,
-                    output_type=self._pytesseract.Output.DICT
+                    image, lang=self.lang, output_type=self._pytesseract.Output.DICT
                 )
-                confidences = [c for c in data['conf'] if c != -1]
-                avg_confidence = sum(confidences) / len(confidences) if confidences else None
+                confidences = [c for c in data["conf"] if c != -1]
+                avg_confidence = (
+                    sum(confidences) / len(confidences) if confidences else None
+                )
             except Exception:
                 avg_confidence = None
 
@@ -103,14 +103,10 @@ class TesseractOCRService:
                 text=text.strip(),
                 confidence=avg_confidence,
                 language=self.lang,
-                backend_used="tesseract"
+                backend_used="tesseract",
             )
         except Exception as e:
-            return OCRResult(
-                text="",
-                backend_used="tesseract",
-                error=str(e)
-            )
+            return OCRResult(text="", backend_used="tesseract", error=str(e))
         finally:
             # Reset stream position
             image_stream.seek(0)
@@ -126,12 +122,13 @@ class EasyOCRService:
         Args:
             langs: List of language codes (default: ['en'])
         """
-        self.langs = langs or ['en']
+        self.langs = langs or ["en"]
         self._reader = None
         self._dependency_exc_info = None
 
         try:
             import easyocr
+
             # Lazy initialization - only create reader when needed
             self._easyocr = easyocr
         except ImportError:
@@ -147,9 +144,7 @@ class EasyOCRService:
         """Extract text using EasyOCR."""
         if self._dependency_exc_info is not None:
             return OCRResult(
-                text="",
-                backend_used="easyocr",
-                error="easyocr not installed"
+                text="", backend_used="easyocr", error="easyocr not installed"
             )
 
         try:
@@ -173,20 +168,18 @@ class EasyOCRService:
 
             # Calculate average confidence
             confidences = [prob for (bbox, text, prob) in result]
-            avg_confidence = sum(confidences) / len(confidences) if confidences else None
+            avg_confidence = (
+                sum(confidences) / len(confidences) if confidences else None
+            )
 
             return OCRResult(
                 text=combined_text.strip(),
                 confidence=avg_confidence,
                 language=",".join(self.langs),
-                backend_used="easyocr"
+                backend_used="easyocr",
             )
         except Exception as e:
-            return OCRResult(
-                text="",
-                backend_used="easyocr",
-                error=str(e)
-            )
+            return OCRResult(text="", backend_used="easyocr", error=str(e))
         finally:
             # Reset stream position
             image_stream.seek(0)
@@ -217,14 +210,12 @@ class LLMVisionOCRService:
         image_stream: BinaryIO,
         prompt: Optional[str] = None,
         stream_info: Optional[StreamInfo] = None,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> OCRResult:
         """Extract text using LLM vision."""
         if self.client is None:
             return OCRResult(
-                text="",
-                backend_used="llm_vision",
-                error="LLM client not configured"
+                text="", backend_used="llm_vision", error="LLM client not configured"
             )
 
         try:
@@ -240,6 +231,7 @@ class LLMVisionOCRService:
                 # Guess from stream
                 try:
                     from PIL import Image
+
                     image_stream.seek(0)
                     img = Image.open(image_stream)
                     fmt = img.format.lower() if img.format else "png"
@@ -269,8 +261,7 @@ class LLMVisionOCRService:
 
             # Call LLM
             response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages
+                model=self.model, messages=messages
             )
 
             text = response.choices[0].message.content
@@ -278,14 +269,10 @@ class LLMVisionOCRService:
             return OCRResult(
                 text=text.strip() if text else "",
                 backend_used="llm_vision",
-                confidence=None  # LLMs don't provide confidence scores
+                confidence=None,  # LLMs don't provide confidence scores
             )
         except Exception as e:
-            return OCRResult(
-                text="",
-                backend_used="llm_vision",
-                error=str(e)
-            )
+            return OCRResult(text="", backend_used="llm_vision", error=str(e))
         finally:
             # Reset stream position
             image_stream.seek(0)
@@ -332,23 +319,20 @@ class MultiBackendOCRService:
         # Tesseract
         if OCRBackend.TESSERACT in self.backends:
             self.services[OCRBackend.TESSERACT] = TesseractOCRService(
-                config=tesseract_config,
-                lang=tesseract_lang
+                config=tesseract_config, lang=tesseract_lang
             )
 
         # EasyOCR
         if OCRBackend.EASYOCR in self.backends:
             self.services[OCRBackend.EASYOCR] = EasyOCRService(
-                langs=easyocr_langs or ['en']
+                langs=easyocr_langs or ["en"]
             )
 
         # LLM Vision
         if OCRBackend.LLM_VISION in self.backends:
             if llm_client and llm_model:
                 self.services[OCRBackend.LLM_VISION] = LLMVisionOCRService(
-                    client=llm_client,
-                    model=llm_model,
-                    default_prompt=llm_prompt
+                    client=llm_client, model=llm_model, default_prompt=llm_prompt
                 )
 
     def extract_text(
@@ -357,7 +341,7 @@ class MultiBackendOCRService:
         prompt: Optional[str] = None,
         stream_info: Optional[StreamInfo] = None,
         min_text_length: int = 3,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> OCRResult:
         """
         Extract text using multiple backends with fallback.
@@ -386,15 +370,17 @@ class MultiBackendOCRService:
                 # Extract text
                 if backend == OCRBackend.LLM_VISION:
                     result = service.extract_text(
-                        image_stream,
-                        prompt=prompt,
-                        stream_info=stream_info
+                        image_stream, prompt=prompt, stream_info=stream_info
                     )
                 else:
                     result = service.extract_text(image_stream)
 
                 # Check if extraction was successful
-                if result.text and len(result.text) >= min_text_length and not result.error:
+                if (
+                    result.text
+                    and len(result.text) >= min_text_length
+                    and not result.error
+                ):
                     return result
 
                 # Store error for potential reporting
@@ -409,5 +395,5 @@ class MultiBackendOCRService:
         return OCRResult(
             text="",
             backend_used="none",
-            error=f"All OCR backends failed. Last error: {last_error}"
+            error=f"All OCR backends failed. Last error: {last_error}",
         )
