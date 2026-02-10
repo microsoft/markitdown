@@ -1,5 +1,6 @@
 #!/usr/bin/env python3 -m pytest
 """Tests for PDF table extraction functionality."""
+
 import os
 import re
 import pytest
@@ -656,9 +657,7 @@ class TestPdfTableExtraction:
         Expected output: Pipe-separated format with booking details, agency info,
         customer details, and show schedules in structured tables.
         """
-        pdf_path = os.path.join(
-            TEST_FILES_DIR, "movie-theater-booking-2024.pdf"
-        )
+        pdf_path = os.path.join(TEST_FILES_DIR, "movie-theater-booking-2024.pdf")
 
         if not os.path.exists(pdf_path):
             pytest.skip(f"Test file not found: {pdf_path}")
@@ -773,7 +772,9 @@ class TestPdfFullOutputComparison:
 
         # Check table structure
         table_rows = [line for line in actual_lines if line.startswith("|")]
-        assert len(table_rows) > 15, f"Should have >15 table rows, got {len(table_rows)}"
+        assert (
+            len(table_rows) > 15
+        ), f"Should have >15 table rows, got {len(table_rows)}"
 
     def test_sparse_borderless_table_full_output(self, markitdown):
         """Test complete output for SPARSE borderless table PDF."""
@@ -971,9 +972,7 @@ class TestPdfFullOutputComparison:
             expected_output = f.read()
 
         # Both should be empty (scanned PDF with no text layer)
-        assert (
-            actual_output.strip() == ""
-        ), "Scanned PDF should produce empty output"
+        assert actual_output.strip() == "", "Scanned PDF should produce empty output"
         assert (
             expected_output.strip() == ""
         ), "Expected output should be empty for scanned PDF"
