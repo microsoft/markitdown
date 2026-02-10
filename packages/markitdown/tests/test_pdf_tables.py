@@ -650,6 +650,140 @@ class TestPdfTableExtraction:
             result.text_content.strip() == ""
         ), f"Scanned PDF should have empty extraction, got: '{result.text_content[:100]}...'"
 
+    def test_broadcast_order_pdf_extraction(self, markitdown):
+        """Test extraction of broadcast order PDF with many columns.
+
+        Expected output: Pipe-separated format with order details, agencies,
+        advertisers, and line items in structured tables.
+        """
+        pdf_path = os.path.join(
+            TEST_FILES_DIR, "bf57756e-868b-4a9e-294a-81494d3ab2f1.pdf"
+        )
+
+        if not os.path.exists(pdf_path):
+            pytest.skip(f"Test file not found: {pdf_path}")
+
+        result = markitdown.convert(pdf_path)
+        text_content = result.text_content
+
+        # Validate pipe-separated table format
+        assert "|" in text_content, "Broadcast order should contain pipe separators"
+
+        # Validate key order information
+        expected_strings = [
+            "ORDER",
+            "1940495",  # Order number
+            "MIKE BLOOMBERG 2020 INC",  # Product description
+            "02/17/20 - 02/21/20",  # Flight dates
+            "WOC12391815",  # Alt order number
+        ]
+        validate_strings(result, expected_strings)
+
+        # Validate agency information
+        agency_strings = [
+            "Assembly / POL",  # Agency name
+            "Heather Goldsmith",  # Buying contact
+            "WTLV-TV",  # Station
+            "Jim Quinn",  # Primary AE
+        ]
+        validate_strings(result, agency_strings)
+
+        # Validate advertiser information
+        advertiser_strings = [
+            "POL/ Michael Bloomberg",
+            "A18-49",  # Demographic
+            "PL-Presidential",  # Product codes
+        ]
+        validate_strings(result, advertiser_strings)
+
+        # Validate bill plan totals
+        billing_strings = [
+            "$2,750.00",  # Gross amount
+            "$2,337.50",  # Net amount
+            "February 2020",  # Month
+        ]
+        validate_strings(result, billing_strings)
+
+        # Validate line item details
+        line_item_strings = [
+            "WTLV",  # Channel
+            "Local News @ 6p M-F",
+            "Lincoln Rhyme",
+            "$400.00",  # Rate
+            "$800.00",  # Rate
+            "$1,200.00",  # Amount
+        ]
+        validate_strings(result, line_item_strings)
+
+    def test_movie_theater_booking_pdf_extraction(self, markitdown):
+        """Test extraction of movie theater booking PDF with complex tables.
+
+        Expected output: Pipe-separated format with booking details, agency info,
+        customer details, and show schedules in structured tables.
+        """
+        pdf_path = os.path.join(
+            TEST_FILES_DIR, "movie-theater-booking-2024.pdf"
+        )
+
+        if not os.path.exists(pdf_path):
+            pytest.skip(f"Test file not found: {pdf_path}")
+
+        result = markitdown.convert(pdf_path)
+        text_content = result.text_content
+
+        # Validate pipe-separated table format
+        assert "|" in text_content, "Booking order should contain pipe separators"
+
+        # Validate key booking information
+        expected_strings = [
+            "BOOKING ORDER",
+            "2024-12-5678",  # Order number
+            "Holiday Movie Marathon Package",  # Product description
+            "12/20/2024 - 12/31/2024",  # Booking dates
+            "SC-WINTER-2024",  # Alt order number
+            "STARLIGHT CINEMAS",  # Cinema brand
+        ]
+        validate_strings(result, expected_strings)
+
+        # Validate agency information
+        agency_strings = [
+            "Premier Entertainment Group",  # Agency name
+            "Michael Chen",  # Contact
+            "Sarah Johnson",  # Primary contact
+            "Downtown Multiplex",  # Cinema name
+        ]
+        validate_strings(result, agency_strings)
+
+        # Validate customer information
+        customer_strings = [
+            "Universal Studios Distribution",  # Customer name
+            "Film Distributor",  # Category
+            "CUST-98765",  # Customer ID
+        ]
+        validate_strings(result, customer_strings)
+
+        # Validate booking summary totals
+        booking_strings = [
+            "$12,500.00",  # Gross amount
+            "$11,250.00",  # Net amount
+            "December 2024",  # Month
+            "48",  # Number of shows
+        ]
+        validate_strings(result, booking_strings)
+
+        # Validate show schedule details
+        show_strings = [
+            "Holiday Spectacular",  # Movie title
+            "Winter Wonderland",  # Movie title
+            "New Year Mystery",  # Movie title
+            "IMAX 3D",  # Format
+            "$250",  # Rate
+            "$300",  # Rate
+            "$3,000",  # Revenue
+            "$3,600",  # Revenue
+        ]
+        validate_strings(result, show_strings)
+
 
 class TestPdfTableMarkdownFormat:
     """Test that extracted tables have proper markdown formatting."""

@@ -142,11 +142,12 @@ def _extract_form_content_from_words(page: Any) -> str | None:
     all_table_x_positions.sort()
     global_columns: list[float] = []
     for x in all_table_x_positions:
-        if not global_columns or x - global_columns[-1] > 30:
+        if not global_columns or x - global_columns[-1] > 35:
             global_columns.append(x)
 
     # Too many columns suggests dense text, not a form
-    if len(global_columns) > 8:
+    # Increased limit to support complex forms with many columns
+    if len(global_columns) > 20:
         return None
 
     # Now classify each row as table row or not
