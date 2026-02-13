@@ -5,7 +5,6 @@ from typing import Pattern
 
 import pytest
 
-
 # Standard OCR format pattern (without backend info)
 OCR_FORMAT_PATTERN: Pattern[str] = re.compile(
     r"\[Image OCR: ([^\]]+)\]\n"  # Header with identifier
@@ -32,8 +31,7 @@ def validate_ocr_format(text: str, expected_count: int) -> list[dict[str, str]]:
     matches = OCR_FORMAT_PATTERN.findall(text)
 
     assert len(matches) == expected_count, (
-        f"Expected {expected_count} OCR blocks, found {len(matches)}. "
-        f"Text:\n{text}"
+        f"Expected {expected_count} OCR blocks, found {len(matches)}. " f"Text:\n{text}"
     )
 
     results = []

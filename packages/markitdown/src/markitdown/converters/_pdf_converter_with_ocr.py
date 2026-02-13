@@ -8,8 +8,7 @@ import sys
 from typing import Any, BinaryIO
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
-from .._exceptions import (MISSING_DEPENDENCY_MESSAGE,
-                           MissingDependencyException)
+from .._exceptions import MISSING_DEPENDENCY_MESSAGE, MissingDependencyException
 from .._stream_info import StreamInfo
 from ._ocr_service import MultiBackendOCRService
 

@@ -55,7 +55,6 @@ from ._exceptions import (
     FailedConversionAttempt,
 )
 
-
 # Lower priority values are tried first.
 PRIORITY_SPECIFIC_FILE_FORMAT = (
     0.0  # e.g., .docx, .pdf, .xlsx, Or specific pages, e.g., wikipedia
@@ -212,7 +211,6 @@ class MarkItDown:
             self.register_converter(OutlookMsgConverter())
             self.register_converter(EpubConverter())
             self.register_converter(CsvConverter())
-
 
             # Register Document Intelligence converter at the top of the stack if endpoint is provided
             docintel_endpoint = kwargs.get("docintel_endpoint")

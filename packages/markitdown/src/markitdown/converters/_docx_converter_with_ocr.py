@@ -9,8 +9,7 @@ import sys
 from typing import Any, BinaryIO, Optional
 
 from .._base_converter import DocumentConverterResult
-from .._exceptions import (MISSING_DEPENDENCY_MESSAGE,
-                           MissingDependencyException)
+from .._exceptions import MISSING_DEPENDENCY_MESSAGE, MissingDependencyException
 from .._stream_info import StreamInfo
 from ..converter_utils.docx.pre_process import pre_process_docx
 from ._html_converter import HtmlConverter

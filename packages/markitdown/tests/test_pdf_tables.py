@@ -1,5 +1,6 @@
 #!/usr/bin/env python3 -m pytest
 """Tests for PDF table extraction functionality."""
+
 import os
 import re
 import pytest
