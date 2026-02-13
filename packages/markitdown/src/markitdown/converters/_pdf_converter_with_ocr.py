@@ -19,17 +19,16 @@ try:
     import pdfminer.high_level
     import pdfplumber
     from PIL import Image
-    import fitz  # PyMuPDF for high-quality image extraction
 except ImportError:
     _dependency_exc_info = sys.exc_info()
 
 
 def _extract_images_from_page(page: Any) -> list[dict]:
     """
-    Extract images from a PDF page with position information.
+    Extract images from a PDF page by rendering page regions.
 
     Returns:
-        List of dicts with 'stream', 'bbox', 'name' keys
+        List of dicts with 'stream', 'bbox', 'name', 'y_pos' keys
     """
     images_info = []
 
@@ -39,168 +38,7 @@ def _extract_images_from_page(page: Any) -> list[dict]:
 
         for i, img_dict in enumerate(images):
             try:
-                # Get image data
-                x0, y0, x1, y1 = (
-                    img_dict["x0"],
-                    img_dict["top"],
-                    img_dict["x1"],
-                    img_dict["bottom"],
-                )
-
-                # Extract image from page
-                # We need to crop the image from the page
-                bbox = (x0, y0, x1, y1)
-
-                # Get the image object
-                # pdfplumber images don't directly give us the PIL image
-                # We need to extract it differently
-
-                # Try to get the image stream
-                # This is a workaround - we'll extract using the page object
-                try:
-                    # Get the PDF page object
-                    page_obj = page.page_obj
-
-                    # Navigate to resources
-                    if "/XObject" in page_obj["/Resources"]:
-                        xobjects = page_obj["/Resources"]["/XObject"].get_object()
-
-                        for obj_name in xobjects:
-                            obj = xobjects[obj_name]
-
-                            if obj["/Subtype"] == "/Image":
-                                # Extract image data
-                                size = (obj["/Width"], obj["/Height"])
-                                data = obj.get_data()
-
-                                # Create PIL Image
-                                try:
-                                    if "/ColorSpace" in obj:
-                                        cs = obj["/ColorSpace"]
-                                        if cs == "/DeviceRGB":
-                                            mode = "RGB"
-                                        elif cs == "/DeviceGray":
-                                            mode = "L"
-                                        else:
-                                            mode = "RGB"
-                                    else:
-                                        mode = "RGB"
-
-                                    img = Image.frombytes(mode, size, data)
-                                    img_stream = io.BytesIO()
-                                    img.save(img_stream, format="PNG")
-                                    img_stream.seek(0)
-
-                                    images_info.append(
-                                        {
-                                            "stream": img_stream,
-                                            "bbox": bbox,
-                                            "name": f"page_{page.page_number}_img_{i}",
-                                            "y_pos": y0,  # For sorting
-                                        }
-                                    )
-                                except Exception:
-                                    # Try alternative extraction
-                                    pass
-
-                except Exception:
-                    pass
-
-            except Exception:
-                continue
-
-    except Exception:
-        pass
-
-    return images_info
-
-
-def _extract_images_using_pymupdf(pdf_bytes: io.BytesIO, page_num: int) -> list[dict]:
-    """
-    Extract images using PyMuPDF for high-quality direct extraction.
-    This extracts the actual embedded image data without rendering.
-
-    Args:
-        pdf_bytes: PDF file as BytesIO
-        page_num: Page number (1-indexed)
-
-    Returns:
-        List of dicts with 'stream', 'bbox', 'name', 'y_pos' keys
-    """
-    images_info = []
-
-    try:
-        # Open PDF with PyMuPDF
-        pdf_bytes.seek(0)
-        doc = fitz.open(stream=pdf_bytes.read(), filetype="pdf")
-        page = doc[page_num - 1]  # PyMuPDF uses 0-indexed pages
-
-        # Get list of images
-        image_list = page.get_images()
-
-        for img_index, img_info in enumerate(image_list):
-            try:
-                xref = img_info[0]  # xref number
-
-                # Extract the actual embedded image
-                base_image = doc.extract_image(xref)
-                image_bytes = base_image["image"]
-
-                # Load as PIL Image
-                pil_img = Image.open(io.BytesIO(image_bytes))
-
-                # Save to stream
-                img_stream = io.BytesIO()
-                pil_img.save(img_stream, format="PNG")
-                img_stream.seek(0)
-
-                # Get image position on page (for sorting)
-                # Get image instances on this page
-                img_rects = page.get_image_rects(xref)
-                y_pos = img_rects[0].y0 if img_rects else 0
-
-                images_info.append(
-                    {
-                        "stream": img_stream,
-                        "bbox": (
-                            0,
-                            0,
-                            pil_img.width,
-                            pil_img.height,
-                        ),  # Image dimensions
-                        "name": f"page_{page_num}_img_{img_index}",
-                        "y_pos": y_pos,
-                    }
-                )
-
-            except Exception:
-                continue
-
-        doc.close()
-
-    except Exception:
-        pass
-
-    return images_info
-
-
-def _extract_images_using_pdfplumber(page: Any) -> list[dict]:
-    """
-    Alternative method to extract images using pdfplumber's to_image.
-    NOTE: This method renders the page as a screenshot, which degrades quality.
-    Use _extract_images_using_pymupdf() for better results.
-
-    Returns:
-        List of dicts with 'stream', 'bbox', 'name' keys
-    """
-    images_info = []
-
-    try:
-        # Get list of images from page
-        images = page.images
-
-        for i, img_dict in enumerate(images):
-            try:
+                # Get image coordinates
                 x0 = img_dict.get("x0", 0)
                 y0 = img_dict.get("top", 0)
                 x1 = img_dict.get("x1", 0)
@@ -420,7 +258,7 @@ class PdfConverterWithOCR(DocumentConverter):
 
     def _extract_page_images(self, pdf_bytes: io.BytesIO, page_num: int) -> list[dict]:
         """
-        Extract images from a PDF page using PyMuPDF for high quality.
+        Extract images from a PDF page using pdfplumber.
 
         Args:
             pdf_bytes: PDF file as BytesIO
@@ -429,8 +267,16 @@ class PdfConverterWithOCR(DocumentConverter):
         Returns:
             List of image info dicts with 'stream', 'bbox', 'name', 'y_pos'
         """
-        # Use PyMuPDF for high-quality direct image extraction
-        images = _extract_images_using_pymupdf(pdf_bytes, page_num)
+        images = []
+
+        try:
+            pdf_bytes.seek(0)
+            with pdfplumber.open(pdf_bytes) as pdf:
+                if page_num <= len(pdf.pages):
+                    page = pdf.pages[page_num - 1]  # 0-indexed
+                    images = _extract_images_from_page(page)
+        except Exception:
+            pass
 
         # Sort by vertical position (top to bottom)
         images.sort(key=lambda x: x["y_pos"])
@@ -454,81 +300,39 @@ class PdfConverterWithOCR(DocumentConverter):
         markdown_parts = []
 
         try:
-            # Try using PyMuPDF for page rendering
             pdf_bytes.seek(0)
-            doc = fitz.open(stream=pdf_bytes.read(), filetype="pdf")
+            with pdfplumber.open(pdf_bytes) as pdf:
+                for page_num, page in enumerate(pdf.pages, 1):
+                    try:
+                        markdown_parts.append(f"\n## Page {page_num}\n")
 
-            for page_num in range(len(doc)):
-                try:
-                    page = doc[page_num]
-                    markdown_parts.append(f"\n## Page {page_num + 1}\n")
+                        # Render page to image at high resolution for better OCR
+                        page_img = page.to_image(resolution=300)
+                        img_stream = io.BytesIO()
+                        page_img.original.save(img_stream, format="PNG")
+                        img_stream.seek(0)
 
-                    # Render page to image at high DPI for better OCR
-                    # Using 300 DPI for good OCR quality
-                    pix = page.get_pixmap(dpi=300)
+                        # Run OCR on the full page image
+                        ocr_result = ocr_service.extract_text(img_stream)
 
-                    # Convert to PIL Image
-                    img_data = pix.tobytes("png")
-                    img_stream = io.BytesIO(img_data)
-
-                    # Run OCR on the full page image
-                    ocr_result = ocr_service.extract_text(img_stream)
-
-                    if ocr_result.text.strip():
-                        markdown_parts.append(ocr_result.text.strip())
-                        if ocr_result.backend_used:
+                        if ocr_result.text.strip():
+                            markdown_parts.append(ocr_result.text.strip())
+                            if ocr_result.backend_used:
+                                markdown_parts.append(
+                                    f"\n*(OCR: {ocr_result.backend_used})*\n"
+                                )
+                        else:
                             markdown_parts.append(
-                                f"\n*(OCR: {ocr_result.backend_used})*\n"
+                                "*[No text could be extracted from this page]*"
                             )
-                    else:
+
+                    except Exception as e:
                         markdown_parts.append(
-                            "*[No text could be extracted from this page]*"
+                            f"*[Error processing page {page_num}: {str(e)}]*"
                         )
-
-                except Exception as e:
-                    markdown_parts.append(
-                        f"*[Error processing page {page_num + 1}: {str(e)}]*"
-                    )
-                    continue
-
-            doc.close()
+                        continue
 
         except Exception:
-            # Fallback to pdfplumber rendering if PyMuPDF fails
-            try:
-                pdf_bytes.seek(0)
-                with pdfplumber.open(pdf_bytes) as pdf:
-                    for page_num, page in enumerate(pdf.pages, 1):
-                        try:
-                            markdown_parts.append(f"\n## Page {page_num}\n")
-
-                            # Render page to image
-                            page_img = page.to_image(resolution=300)
-                            img_stream = io.BytesIO()
-                            page_img.original.save(img_stream, format="PNG")
-                            img_stream.seek(0)
-
-                            # Run OCR
-                            ocr_result = ocr_service.extract_text(img_stream)
-
-                            if ocr_result.text.strip():
-                                markdown_parts.append(ocr_result.text.strip())
-                                if ocr_result.backend_used:
-                                    markdown_parts.append(
-                                        f"\n*(OCR: {ocr_result.backend_used})*\n"
-                                    )
-                            else:
-                                markdown_parts.append(
-                                    "*[No text could be extracted from this page]*"
-                                )
-
-                        except Exception as e:
-                            markdown_parts.append(
-                                f"*[Error processing page {page_num}: {str(e)}]*"
-                            )
-                            continue
-
-            except Exception:
-                return "*[Error: Could not process scanned PDF]*"
+            return "*[Error: Could not process scanned PDF]*"
 
         return "\n\n".join(markdown_parts).strip()

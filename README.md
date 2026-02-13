@@ -176,23 +176,7 @@ result = md.convert("example.jpg")
 print(result.text_content)
 ```
 
-To extract text from images embedded in documents using OCR (requires Tesseract):
-
-```python
-from markitdown.converters._ocr_service import MultiBackendOCRService, OCRBackend
-from markitdown.converters._pdf_converter_with_ocr import PdfConverterWithOCR
-
-# Create OCR service with Tesseract
-ocr_service = MultiBackendOCRService(backends=[OCRBackend.TESSERACT])
-
-# Convert PDF with OCR
-converter = PdfConverterWithOCR()
-with open("document.pdf", "rb") as f:
-    result = converter.convert(f, ocr_service=ocr_service)
-    print(result.text_content)
-```
-
-To use LLM (GPT-4o, Gemini, etc.) for OCR instead of Tesseract:
+To extract text from images embedded in documents using OCR with LLM Vision:
 
 ```python
 from markitdown.converters._ocr_service import MultiBackendOCRService, OCRBackend
@@ -214,16 +198,6 @@ with open("document.pdf", "rb") as f:
     print(result.text_content)
 ```
 
-Multi-backend fallback (tries Tesseract first, falls back to LLM if Tesseract fails):
-
-```python
-ocr_service = MultiBackendOCRService(
-    backends=[OCRBackend.TESSERACT, OCRBackend.LLM_VISION],
-    llm_client=client,
-    llm_model="gpt-4o"
-)
-```
-
 OCR converters are available for PDF, DOCX, XLSX (multi-sheet), and PPTX formats. Images are extracted with context preservation (page numbers, cell references, relationship IDs).
 
 #### Scanned PDF Support
@@ -231,18 +205,22 @@ OCR converters are available for PDF, DOCX, XLSX (multi-sheet), and PPTX formats
 MarkItDown automatically detects scanned PDFs (documents with no extractable text) and falls back to full-page OCR. When a PDF extraction returns empty or whitespace-only results, the converter:
 
 1. Renders each page as a high-resolution image (300 DPI)
-2. Performs OCR on the full page image
+2. Performs OCR on the full page image using LLM Vision
 3. Preserves page structure with page markers
 4. Indicates which OCR backend was used
-
-This works seamlessly with any OCR backend (Tesseract, EasyOCR, LLM Vision):
 
 ```python
 from markitdown.converters._ocr_service import MultiBackendOCRService, OCRBackend
 from markitdown.converters._pdf_converter_with_ocr import PdfConverterWithOCR
+from openai import OpenAI
 
-# Create OCR service
-ocr_service = MultiBackendOCRService(backends=[OCRBackend.TESSERACT])
+# Create OCR service with LLM Vision
+client = OpenAI()
+ocr_service = MultiBackendOCRService(
+    backends=[OCRBackend.LLM_VISION],
+    llm_client=client,
+    llm_model="gpt-4o"
+)
 
 # Convert scanned PDF - fallback is automatic
 converter = PdfConverterWithOCR()
