@@ -131,8 +131,8 @@ class DocxConverterWithOCR(HtmlConverter):
                         ocr_result = ocr_service.extract_text(image_stream)
 
                         if ocr_result.text.strip():
-                            # Store with relationship ID
-                            ocr_text = f"\n[Image OCR: {rel.rId}]\n{ocr_result.text}\n[End OCR]\n"
+                            # Store with relationship ID using consistent format
+                            ocr_text = f"\n[Image OCR: {rel.rId}]\n{ocr_result.text}\n[End Image OCR]\n"
                             ocr_map[rel.rId] = ocr_text
 
                     except Exception:

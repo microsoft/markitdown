@@ -134,21 +134,25 @@ class PptxConverterWithOCR(DocumentConverter):
                     except Exception:
                         pass
 
-                    # Combine descriptions
-                    combined_desc = (
-                        "\\n".join(filter(None, [llm_description, ocr_text, alt_text]))
-                        or shape.name
-                    )
-
-                    # Clean up description
+                    # Use consistent OCR format
                     import re
+                    shape_identifier = f"slide_{slide_num}_img_{shape.name}"
 
-                    combined_desc = re.sub(r"[\\r\\n\\[\\]]", " ", combined_desc)
-                    combined_desc = re.sub(r"\\s+", " ", combined_desc).strip()
-
-                    # Add image markdown
-                    filename = re.sub(r"\\W", "", shape.name) + ".jpg"
-                    md_content += "\\n![" + combined_desc + "](" + filename + ")\\n"
+                    if ocr_text:
+                        # Use consistent OCR format
+                        md_content += f"\\n[Image OCR: {shape_identifier}]\\n"
+                        md_content += f"{ocr_text}\\n"
+                        md_content += "[End Image OCR]\\n"
+                    elif llm_description:
+                        # LLM description available
+                        md_content += f"\\n[Image OCR: {shape_identifier}]\\n"
+                        md_content += f"{llm_description}\\n"
+                        md_content += "[End Image OCR]\\n"
+                    elif alt_text:
+                        # Only alt text available
+                        md_content += f"\\n[Image: {shape_identifier}]\\n"
+                        md_content += f"{alt_text}\\n"
+                        md_content += "[End Image]\\n"
 
                 # Tables
                 if self._is_table(shape):

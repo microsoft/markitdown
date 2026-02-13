@@ -218,11 +218,10 @@ class PdfConverterWithOCR(DocumentConverter):
                                 if item["type"] == "text":
                                     markdown_content.append(item["text"])
                                 else:  # image
-                                    img_marker = f"\n\n[Image: {item['name']}]\n"
+                                    # Use consistent OCR format
+                                    img_marker = f"\n\n[Image OCR: {item['name']}]\n"
                                     img_marker += f"{item['ocr_text']}\n"
-                                    if item.get("backend"):
-                                        img_marker += f"(OCR: {item['backend']})\n"
-                                    img_marker += "[End Image]\n"
+                                    img_marker += "[End Image OCR]\n"
                                     markdown_content.append(img_marker)
                         else:
                             # No images, just add text
@@ -316,11 +315,12 @@ class PdfConverterWithOCR(DocumentConverter):
                         ocr_result = ocr_service.extract_text(img_stream)
 
                         if ocr_result.text.strip():
+                            # Use consistent OCR format for scanned pages
+                            markdown_parts.append(
+                                f"[Image OCR: page_{page_num}_fullpage]\n"
+                            )
                             markdown_parts.append(ocr_result.text.strip())
-                            if ocr_result.backend_used:
-                                markdown_parts.append(
-                                    f"\n*(OCR: {ocr_result.backend_used})*\n"
-                                )
+                            markdown_parts.append("\n[End Image OCR]\n")
                         else:
                             markdown_parts.append(
                                 "*[No text could be extracted from this page]*"
