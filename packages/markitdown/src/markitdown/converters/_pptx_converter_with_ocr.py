@@ -3,16 +3,15 @@ Enhanced PPTX Converter with improved OCR support.
 Already has LLM-based image description, this enhances it with traditional OCR fallback.
 """
 
-import sys
-import base64
 import io
+import sys
+from typing import Any, BinaryIO, Optional
 
-from typing import BinaryIO, Any, Optional
-
-from ._html_converter import HtmlConverter
 from .._base_converter import DocumentConverter, DocumentConverterResult
+from .._exceptions import (MISSING_DEPENDENCY_MESSAGE,
+                           MissingDependencyException)
 from .._stream_info import StreamInfo
-from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+from ._html_converter import HtmlConverter
 from ._ocr_service import MultiBackendOCRService
 
 _dependency_exc_info = None
@@ -135,7 +134,6 @@ class PptxConverterWithOCR(DocumentConverter):
                         pass
 
                     # Use consistent OCR format
-                    import re
                     shape_identifier = f"slide_{slide_num}_img_{shape.name}"
 
                     if ocr_text:

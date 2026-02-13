@@ -3,13 +3,10 @@ OCR Service Layer for MarkItDown
 Provides unified interface for multiple OCR backends with graceful fallback.
 """
 
-import sys
-import io
 import base64
-import mimetypes
-from typing import BinaryIO, Optional, Protocol, Any
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any, BinaryIO, Optional, Protocol
 
 from .._stream_info import StreamInfo
 
@@ -114,10 +111,29 @@ class LLMVisionOCRService:
                 }
             ]
 
-            # Call LLM
-            response = self.client.chat.completions.create(
+            # Call LLM (handle both sync and async clients)
+            import asyncio
+            import inspect
+
+            result = self.client.chat.completions.create(
                 model=self.model, messages=messages
             )
+
+            # If result is a coroutine, we need to run it in an event loop
+            if inspect.iscoroutine(result):
+                # Try to get the running event loop, or create a new one
+                try:
+                    asyncio.get_running_loop()
+                    # We're already in an async context, but this is a sync function
+                    # This shouldn't happen in normal usage
+                    raise RuntimeError(
+                        "Cannot use async LLM client in sync OCR context"
+                    )
+                except RuntimeError:
+                    # No running loop, create a new one (this is the normal case)
+                    response = asyncio.run(result)
+            else:
+                response = result
 
             text = response.choices[0].message.content
 

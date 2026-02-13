@@ -3,16 +3,17 @@ Enhanced DOCX Converter with OCR support for embedded images.
 Extracts images from Word documents and performs OCR while maintaining context.
 """
 
-import sys
 import io
 import re
-from typing import BinaryIO, Any, Optional
+import sys
+from typing import Any, BinaryIO, Optional
 
-from ._html_converter import HtmlConverter
-from ..converter_utils.docx.pre_process import pre_process_docx
 from .._base_converter import DocumentConverterResult
+from .._exceptions import (MISSING_DEPENDENCY_MESSAGE,
+                           MissingDependencyException)
 from .._stream_info import StreamInfo
-from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+from ..converter_utils.docx.pre_process import pre_process_docx
+from ._html_converter import HtmlConverter
 from ._ocr_service import MultiBackendOCRService
 
 # Try loading dependencies
@@ -159,7 +160,6 @@ class DocxConverterWithOCR(HtmlConverter):
 
         # Create a list of OCR texts and track which ones we've used
         ocr_texts = list(ocr_map.values())
-        ocr_keys = list(ocr_map.keys())
         used_indices = []
 
         def replace_img(match):

@@ -3,21 +3,21 @@ Enhanced XLSX Converter with OCR support for embedded images.
 Extracts images from Excel spreadsheets and performs OCR while maintaining cell context.
 """
 
-import sys
 import io
-from typing import BinaryIO, Any, Optional
+import sys
+from typing import Any, BinaryIO, Optional
 
-from ._html_converter import HtmlConverter
 from .._base_converter import DocumentConverter, DocumentConverterResult
-from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+from .._exceptions import (MISSING_DEPENDENCY_MESSAGE,
+                           MissingDependencyException)
 from .._stream_info import StreamInfo
+from ._html_converter import HtmlConverter
 from ._ocr_service import MultiBackendOCRService
 
 # Try loading dependencies
 _xlsx_dependency_exc_info = None
 try:
     import pandas as pd
-    import openpyxl
     from openpyxl import load_workbook
 except ImportError:
     _xlsx_dependency_exc_info = sys.exc_info()
