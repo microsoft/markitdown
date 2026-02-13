@@ -50,6 +50,16 @@ docker run -it --rm -v /home/user/data:/workdir markitdown-mcp:latest
 
 Once mounted, all files under data will be accessible under `/workdir` in the container. For example, if you have a file `example.txt` in `/home/user/data`, it will be accessible in the container at `/workdir/example.txt`.
 
+<details>
+	<summary>Running with the HTTP option</summary>
+
+If you want to run the container with the HTTP option, run the docker command like:
+
+```bash
+docker run -it --rm -p 3001:3001 markitdown-mcp:latest --http --host 127.0.0.1 --port 3001
+```
+</details>
+
 ## Accessing from Claude Desktop
 
 It is recommended to use the Docker image when running the MCP server for Claude Desktop.
