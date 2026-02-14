@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  # Development API server
+  api-dev:
+    build:
+      context: .
+      dockerfile: packages/markitdown-api/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - MARKITDOWN_API_HOST=0.0.0.0
+      - MARKITDOWN_API_PORT=8000
+      - MARKITDOWN_API_WORKERS=1
+      - MARKITDOWN_API_ENABLE_PLUGINS=true
+      - MARKITDOWN_API_RATE_LIMIT=0
+      - MARKITDOWN_API_MAX_FILE_SIZE=52428800 # 50MB
+    volumes:
+      - ./packages/markitdown-api/src:/usr/local/lib/python3.13/site-packages/markitdown_api
+    command: ["python", "-m", "uvicorn", "markitdown_api:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  # Production API server
+  api-prod:
+    build:
+      context: .
+      dockerfile: packages/markitdown-api/Dockerfile
+    ports:
+      - "8001:8000"
+    environment:
+      - MARKITDOWN_API_HOST=0.0.0.0
+      - MARKITDOWN_API_PORT=8000
+      - MARKITDOWN_API_WORKERS=2
+      - MARKITDOWN_API_ENABLE_PLUGINS=false
+      - MARKITDOWN_API_RATE_LIMIT=60
+      - MARKITDOWN_API_MAX_FILE_SIZE=10485760 # 10MB
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+
+  # MCP server
+  mcp:
+    build:
+      context: .
+      dockerfile: packages/markitdown-mcp/Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - MARKITDOWN_ENABLE_PLUGINS=false
+    command: ["markitdown-mcp", "--http", "--host", "0.0.0.0", "--port", "3001"]
