@@ -94,6 +94,48 @@ If you want to mount a directory, adjust it accordingly:
 }
 ```
 
+## Accessing from GitHub Copilot CLI
+
+Edit your `~/.copilot/mcp-config.json` to include the following JSON entry:
+
+```json
+{
+  "mcpServers": {
+    "markitdown": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "markitdown-mcp:latest"
+      ]
+    }
+  }
+}
+```
+
+If you want to mount a directory, adjust it accordingly:
+
+```json
+{
+  "mcpServers": {
+    "markitdown": {
+      "command": "docker",
+      "args": [
+	"run",
+	"--rm",
+	"-i",
+	"-v",
+	"/home/user/data:/workdir",
+	"markitdown-mcp:latest"
+      ]
+    }
+  }
+}
+```
+
+For more information, see the [GitHub Copilot CLI documentation](https://docs.github.com/en/copilot/how-tos/provide-context/use-mcp/extend-copilot-chat-with-mcp).
+
 ## Debugging
 
 To debug the MCP server you can use the `mcpinspector` tool.
