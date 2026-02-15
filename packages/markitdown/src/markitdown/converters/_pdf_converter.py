@@ -2,6 +2,9 @@ import sys
 import io
 import re
 from typing import BinaryIO, Any
+import pdfplumber
+import pdfminer
+# from pdfminer.layout import LAParams
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
@@ -10,44 +13,47 @@ from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 # Pattern for MasterFormat-style partial numbering (e.g., ".1", ".2", ".10")
 PARTIAL_NUMBERING_PATTERN = re.compile(r"^\.\d+$")
 
+def _clean_bullets(text: str) -> str:
+    # Comprehensive map of common PDF bullet glyphs
+    bullet_chars = {
+        '\uf0b7': '*',  # Standard round bullet
+        '\uf02d': '-',  # Hyphen bullet
+        '\u2022': '*',  # Bullet point
+        '\u00b7': '*',  # Middle dot
+        '\u25cb': '-',  # White circle bullet (The one that caused your error!)
+        '\u25cf': '*',  # Black circle bullet
+        '\u25a0': '-',  # Black square bullet
+    }
+    for char, replacement in bullet_chars.items():
+        text = text.replace(char, replacement)
+    
+    return text
 
 def _merge_partial_numbering_lines(text: str) -> str:
-    """
-    Post-process extracted text to merge MasterFormat-style partial numbering
-    with the following text line.
-
-    MasterFormat documents use partial numbering like:
-        .1  The intent of this Request for Proposal...
-        .2  Available information relative to...
-
-    Some PDF extractors split these into separate lines:
-        .1
-        The intent of this Request for Proposal...
-
-    This function merges them back together.
-    """
+    # First, fix the weird characters
+    text = _clean_bullets(text)
+    
     lines = text.split("\n")
     result_lines: list[str] = []
     i = 0
 
     while i < len(lines):
         line = lines[i]
-        stripped = line.strip()
-
-        # Check if this line is ONLY a partial numbering
-        if PARTIAL_NUMBERING_PATTERN.match(stripped):
-            # Look for the next non-empty line to merge with
+        # Use rstrip instead of strip to preserve leading indentation
+        stripped_left = line.lstrip() 
+        
+        if PARTIAL_NUMBERING_PATTERN.match(stripped_left):
             j = i + 1
             while j < len(lines) and not lines[j].strip():
                 j += 1
 
             if j < len(lines):
-                # Merge the partial numbering with the next line
-                next_line = lines[j].strip()
-                result_lines.append(f"{stripped} {next_line}")
-                i = j + 1  # Skip past the merged line
+                # Preserve the original indentation of the number
+                indent = line[:line.find(stripped_left)]
+                next_line_content = lines[j].strip()
+                result_lines.append(f"{indent}{stripped_left} {next_line_content}")
+                i = j + 1
             else:
-                # No next line to merge with, keep as is
                 result_lines.append(line)
                 i += 1
         else:
@@ -55,7 +61,6 @@ def _merge_partial_numbering_lines(text: str) -> str:
             i += 1
 
     return "\n".join(result_lines)
-
 
 # Load dependencies
 _dependency_exc_info = None
@@ -146,6 +151,9 @@ def _extract_form_content_from_words(page: Any) -> str | None:
     sorted_y_keys = sorted(rows_by_y.keys())
     page_width = page.width if hasattr(page, "width") else 612
 
+    # Identify the leftmost coordinate to establish a baseline for "zero indent"
+    min_x0 = min(w["x0"] for w in words) if words else 0
+
     # First pass: analyze each row
     row_info: list[dict] = []
     for y_key in sorted_y_keys:
@@ -154,39 +162,39 @@ def _extract_form_content_from_words(page: Any) -> str | None:
             continue
 
         first_x0 = row_words[0]["x0"]
-        last_x1 = row_words[-1]["x1"]
-        line_width = last_x1 - first_x0
-        combined_text = " ".join(w["text"] for w in row_words)
 
-        # Count distinct x-position groups (columns)
+        # --- NEW INDENTATION LOGIC ---
+        # Calculate how many "levels" of indentation to add.
+        # We assume ~10-15 points per indentation level in a standard PDF.
+        indent_offset = max(0, first_x0 - min_x0)
+        indent_spaces = " " * (int(indent_offset / 12) * 2) 
+        
+        combined_text = " ".join(w["text"] for w in row_words)
+        
+        # Apply the bullet fix immediately to catch '?'
+        combined_text = _clean_bullets(combined_text)
+
+        # Count columns for table detection
         x_positions = [w["x0"] for w in row_words]
         x_groups: list[float] = []
         for x in sorted(x_positions):
             if not x_groups or x - x_groups[-1] > 50:
                 x_groups.append(x)
 
-        # Determine row type
-        is_paragraph = line_width > page_width * 0.55 and len(combined_text) > 60
+        is_paragraph = (row_words[-1]["x1"] - first_x0) > page_width * 0.55 and len(combined_text) > 60
+        
+        has_partial_numbering = bool(PARTIAL_NUMBERING_PATTERN.match(row_words[0]["text"].strip()))
 
-        # Check for MasterFormat-style partial numbering (e.g., ".1", ".2")
-        # These should be treated as list items, not table rows
-        has_partial_numbering = False
-        if row_words:
-            first_word = row_words[0]["text"].strip()
-            if PARTIAL_NUMBERING_PATTERN.match(first_word):
-                has_partial_numbering = True
-
-        row_info.append(
-            {
-                "y_key": y_key,
-                "words": row_words,
-                "text": combined_text,
-                "x_groups": x_groups,
-                "is_paragraph": is_paragraph,
-                "num_columns": len(x_groups),
-                "has_partial_numbering": has_partial_numbering,
-            }
-        )
+        row_info.append({
+            "y_key": y_key,
+            "words": row_words,
+            "text": indent_spaces + combined_text, # Prepend the calculated spaces
+            "x_groups": x_groups,
+            "is_paragraph": is_paragraph,
+            "num_columns": len(x_groups),
+            "has_partial_numbering": has_partial_numbering,
+            "indent_level": indent_spaces
+        })
 
     # Collect ALL x-positions from rows with 3+ columns (table-like rows)
     # This gives us the global column structure
@@ -524,15 +532,23 @@ class PdfConverter(DocumentConverter):
         **kwargs: Any,
     ) -> DocumentConverterResult:
         if _dependency_exc_info is not None:
-            raise MissingDependencyException(
-                MISSING_DEPENDENCY_MESSAGE.format(
-                    converter=type(self).__name__,
-                    extension=".pdf",
-                    feature="pdf",
+            exc = _dependency_exc_info[1]
+            if exc is not None:
+                raise MissingDependencyException(
+                    MISSING_DEPENDENCY_MESSAGE.format(
+                        converter=type(self).__name__,
+                        extension=".pdf",
+                        feature="pdf",
+                    )
+                ) from exc.with_traceback(_dependency_exc_info[2])
+            else:
+                raise MissingDependencyException(
+                    MISSING_DEPENDENCY_MESSAGE.format(
+                        converter=type(self).__name__,
+                        extension=".pdf",
+                        feature="pdf",
+                    )
                 )
-            ) from _dependency_exc_info[1].with_traceback(
-                _dependency_exc_info[2]
-            )  # type: ignore[union-attr]
 
         assert isinstance(file_stream, io.IOBase)
 
@@ -569,7 +585,13 @@ class PdfConverter(DocumentConverter):
                 markdown = pdfminer.high_level.extract_text(pdf_bytes)
             else:
                 # Build markdown from chunks
-                markdown = "\n\n".join(markdown_chunks).strip()
+                markdown = "\n".join(markdown_chunks).strip()
+                # markdown = "\n\n".join(markdown_chunks).strip()
+                # 2. Fix Bullets (if not already done in the loop)
+                markdown = _clean_bullets(markdown)
+
+                    # 3. Merge numbering
+                markdown = _merge_partial_numbering_lines(markdown)
 
         except Exception:
             # Fallback if pdfplumber fails
@@ -585,3 +607,4 @@ class PdfConverter(DocumentConverter):
         markdown = _merge_partial_numbering_lines(markdown)
 
         return DocumentConverterResult(markdown=markdown)
+    
