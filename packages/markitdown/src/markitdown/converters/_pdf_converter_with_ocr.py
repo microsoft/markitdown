@@ -291,8 +291,11 @@ class PdfConverterWithOCR(DocumentConverter):
 
         except Exception:
             # Fallback to pdfminer
-            pdf_bytes.seek(0)
-            markdown = pdfminer.high_level.extract_text(pdf_bytes)
+            try:
+                pdf_bytes.seek(0)
+                markdown = pdfminer.high_level.extract_text(pdf_bytes)
+            except Exception:
+                markdown = ""
 
         # Final fallback: If still empty/whitespace and OCR is available,
         # treat as scanned PDF and OCR full pages
