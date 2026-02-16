@@ -112,6 +112,13 @@ class MarkItDown:
         requests_session = kwargs.get("requests_session")
         if requests_session is None:
             self._requests_session = requests.Session()
+            # Signal that we prefer markdown over HTML, etc. if the server supports it.
+            # e.g., https://blog.cloudflare.com/markdown-for-agents/
+            self._requests_session.headers.update(
+                {
+                    "Accept": "text/markdown, text/html;q=0.9, text/plain;q=0.8, */*;q=0.1"
+                }
+            )
         else:
             self._requests_session = requests_session
 
