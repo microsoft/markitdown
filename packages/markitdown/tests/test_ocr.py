@@ -25,6 +25,27 @@ from markitdown.converters._xlsx_converter_with_ocr import XlsxConverterWithOCR
 from markitdown.converters._pptx_converter_with_ocr import PptxConverterWithOCR
 from markitdown._stream_info import StreamInfo
 
+# Check for optional dependencies
+_skip_docx = False
+try:
+    import mammoth  # noqa: F401
+    from docx import Document  # noqa: F401
+except ImportError:
+    _skip_docx = True
+
+_skip_xlsx = False
+try:
+    import pandas  # noqa: F401
+    from openpyxl import load_workbook  # noqa: F401
+except ImportError:
+    _skip_xlsx = True
+
+_skip_pptx = False
+try:
+    import pptx  # noqa: F401
+except ImportError:
+    _skip_pptx = True
+
 # Test data directory
 TEST_DATA_DIR = Path(__file__).parent / "ocr_test_data"
 
@@ -357,6 +378,7 @@ def test_pdf_ocr_image_at_end(ocr_service: Any) -> None:
             print(f"  [PASS] {message}")
 
 
+@pytest.mark.skipif(_skip_docx, reason="docx dependencies not installed")
 def test_docx_ocr_basic(ocr_service: Any) -> None:
     """Test DOCX OCR extraction with position validation and no base64 check."""
     converter = DocxConverterWithOCR()
@@ -395,6 +417,7 @@ def test_docx_ocr_basic(ocr_service: Any) -> None:
             print(f"  [PASS] {message}")
 
 
+@pytest.mark.skipif(_skip_docx, reason="docx dependencies not installed")
 def test_docx_ocr_image_at_end(ocr_service: Any) -> None:
     """Test DOCX with image at document end with position validation."""
     converter = DocxConverterWithOCR()
@@ -422,6 +445,7 @@ def test_docx_ocr_image_at_end(ocr_service: Any) -> None:
             print(f"  [PASS] {message}")
 
 
+@pytest.mark.skipif(_skip_xlsx, reason="xlsx dependencies not installed")
 def test_xlsx_ocr_multisheet(ocr_service: Any) -> None:
     """Test XLSX OCR with multi-sheet processing and cell references."""
     converter = XlsxConverterWithOCR()
@@ -451,6 +475,7 @@ def test_xlsx_ocr_multisheet(ocr_service: Any) -> None:
     assert has_ocr, "Should extract OCR text from images"
 
 
+@pytest.mark.skipif(_skip_xlsx, reason="xlsx dependencies not installed")
 def test_xlsx_ocr_cell_references(ocr_service: Any) -> None:
     """Test XLSX cell position tracking."""
     converter = XlsxConverterWithOCR()
@@ -474,6 +499,7 @@ def test_xlsx_ocr_cell_references(ocr_service: Any) -> None:
     ), "Should process named sheets"
 
 
+@pytest.mark.skipif(_skip_pptx, reason="pptx dependencies not installed")
 def test_pptx_ocr_basic(ocr_service: Any) -> None:
     """Test PPTX OCR with alt text integration."""
     converter = PptxConverterWithOCR()
@@ -496,6 +522,7 @@ def test_pptx_ocr_basic(ocr_service: Any) -> None:
     assert "[Image OCR:" in markdown, "Should have OCR image markers"
 
 
+@pytest.mark.skipif(_skip_pptx, reason="pptx dependencies not installed")
 def test_pptx_ocr_multipage(ocr_service: Any) -> None:
     """Test PPTX with multiple slides."""
     converter = PptxConverterWithOCR()
@@ -585,6 +612,8 @@ def test_comprehensive_ocr_positioning(ocr_service: Any, filename: str) -> None:
         converter = PdfConverterWithOCR()
         extension = ".pdf"
     elif filename.endswith(".docx"):
+        if _skip_docx:
+            pytest.skip("docx dependencies not installed")
         converter = DocxConverterWithOCR()
         extension = ".docx"
     else:
