@@ -39,6 +39,12 @@ from .converters import (
     EpubConverter,
     DocumentIntelligenceConverter,
     CsvConverter,
+    PdfConverterWithOCR,
+    DocxConverterWithOCR,
+    XlsxConverterWithOCR,
+    PptxConverterWithOCR,
+    MultiBackendOCRService,
+    OCRBackend,
 )
 
 from ._base_converter import DocumentConverter, DocumentConverterResult
@@ -48,7 +54,6 @@ from ._exceptions import (
     UnsupportedFormatException,
     FailedConversionAttempt,
 )
-
 
 # Lower priority values are tried first.
 PRIORITY_SPECIFIC_FILE_FORMAT = (
@@ -191,14 +196,25 @@ class MarkItDown:
             self.register_converter(WikipediaConverter())
             self.register_converter(YouTubeConverter())
             self.register_converter(BingSerpConverter())
-            self.register_converter(DocxConverter())
-            self.register_converter(XlsxConverter())
+
+            # Register OCR-enabled converters if LLM client is available, otherwise use standard converters
+            if self._llm_client is not None and self._llm_model is not None:
+                # Use OCR-enabled converters for documents with embedded images
+                self.register_converter(DocxConverterWithOCR())
+                self.register_converter(XlsxConverterWithOCR())
+                self.register_converter(PptxConverterWithOCR())
+                self.register_converter(PdfConverterWithOCR())
+            else:
+                # Use standard converters without OCR
+                self.register_converter(DocxConverter())
+                self.register_converter(XlsxConverter())
+                self.register_converter(PptxConverter())
+                self.register_converter(PdfConverter())
+
             self.register_converter(XlsConverter())
-            self.register_converter(PptxConverter())
             self.register_converter(AudioConverter())
             self.register_converter(ImageConverter())
             self.register_converter(IpynbConverter())
-            self.register_converter(PdfConverter())
             self.register_converter(OutlookMsgConverter())
             self.register_converter(EpubConverter())
             self.register_converter(CsvConverter())
@@ -570,6 +586,19 @@ class MarkItDown:
 
                 if "llm_prompt" not in _kwargs and self._llm_prompt is not None:
                     _kwargs["llm_prompt"] = self._llm_prompt
+
+                # Auto-create OCR service if llm_client is available and not already provided
+                if "ocr_service" not in _kwargs:
+                    llm_client = _kwargs.get("llm_client", self._llm_client)
+                    llm_model = _kwargs.get("llm_model", self._llm_model)
+                    llm_prompt = _kwargs.get("llm_prompt", self._llm_prompt)
+                    if llm_client is not None and llm_model is not None:
+                        _kwargs["ocr_service"] = MultiBackendOCRService(
+                            backends=[OCRBackend.LLM_VISION],
+                            llm_client=llm_client,
+                            llm_model=llm_model,
+                            llm_prompt=llm_prompt,
+                        )
 
                 if "style_map" not in _kwargs and self._style_map is not None:
                     _kwargs["style_map"] = self._style_map

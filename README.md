@@ -176,6 +176,67 @@ result = md.convert("example.jpg")
 print(result.text_content)
 ```
 
+To extract text from images embedded in documents using OCR with LLM Vision:
+
+```python
+from markitdown.converters._ocr_service import MultiBackendOCRService, OCRBackend
+from markitdown.converters._pdf_converter_with_ocr import PdfConverterWithOCR
+from openai import OpenAI
+
+# Create OCR service with LLM Vision backend
+client = OpenAI()
+ocr_service = MultiBackendOCRService(
+    backends=[OCRBackend.LLM_VISION],
+    llm_client=client,
+    llm_model="gpt-4o"
+)
+
+# Convert PDF with LLM-based OCR
+converter = PdfConverterWithOCR()
+with open("document.pdf", "rb") as f:
+    result = converter.convert(f, ocr_service=ocr_service)
+    print(result.text_content)
+```
+
+OCR converters are available for PDF, DOCX, XLSX (multi-sheet), and PPTX formats. Images are extracted with context preservation (page numbers, cell references, relationship IDs).
+
+#### Scanned PDF Support
+
+MarkItDown automatically detects scanned PDFs (documents with no extractable text) and falls back to full-page OCR. When a PDF extraction returns empty or whitespace-only results, the converter:
+
+1. Renders each page as a high-resolution image (300 DPI)
+2. Performs OCR on the full page image using LLM Vision
+3. Preserves page structure with page markers
+4. Indicates which OCR backend was used
+
+```python
+from markitdown.converters._ocr_service import MultiBackendOCRService, OCRBackend
+from markitdown.converters._pdf_converter_with_ocr import PdfConverterWithOCR
+from openai import OpenAI
+
+# Create OCR service with LLM Vision
+client = OpenAI()
+ocr_service = MultiBackendOCRService(
+    backends=[OCRBackend.LLM_VISION],
+    llm_client=client,
+    llm_model="gpt-4o"
+)
+
+# Convert scanned PDF - fallback is automatic
+converter = PdfConverterWithOCR()
+with open("scanned_invoice.pdf", "rb") as f:
+    result = converter.convert(f, ocr_service=ocr_service)
+    print(result.text_content)
+```
+
+The fallback triggers automatically when:
+
+- PDF has no extractable text (truly scanned documents)
+- Text extraction returns only whitespace
+- No embedded text is found via pdfminer or pdfplumber
+
+No additional configuration is needed - just provide an OCR service and the converter handles the rest.
+
 ### Docker
 
 ```sh
