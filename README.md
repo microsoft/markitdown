@@ -140,6 +140,14 @@ To use Microsoft Document Intelligence for conversion:
 markitdown path-to-file.pdf -o document.md -d -e "<document_intelligence_endpoint>"
 ```
 
+You can also customize analysis features (repeatable or comma-separated):
+
+```bash
+markitdown path-to-file.pdf -d -e "<document_intelligence_endpoint>" --docintel-feature FORMULAS --docintel-feature OCR_HIGH_RESOLUTION,STYLE_FONT
+```
+
+If `--docintel-feature` is not specified, the default features are `FORMULAS`, `OCR_HIGH_RESOLUTION`, and `STYLE_FONT` for OCR-capable formats (e.g., PDF and images). For `.docx`, `.pptx`, `.xlsx`, and `.html`, no analysis features are sent by default.
+
 More information about how to set up an Azure Document Intelligence Resource can be found [here](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/how-to-guides/create-document-intelligence-resource?view=doc-intel-4.0.0)
 
 ### Python API

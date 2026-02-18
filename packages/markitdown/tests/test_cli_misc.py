@@ -1,6 +1,7 @@
 #!/usr/bin/env python3 -m pytest
 import subprocess
 from markitdown import __version__
+from markitdown.__main__ import _parse_docintel_features
 
 # This file contains CLI tests that are not directly tested by the FileTestVectors.
 # This includes things like help messages, version numbers, and invalid flags.
@@ -27,8 +28,39 @@ def test_invalid_flag() -> None:
     assert "SYNTAX" in result.stderr, "Expected 'SYNTAX' to appear in STDERR"
 
 
+def test_parse_docintel_features() -> None:
+    assert _parse_docintel_features(["FORMULAS", "STYLE_FONT,ocrHighResolution"]) == [
+        "FORMULAS",
+        "STYLE_FONT",
+        "ocrHighResolution",
+    ]
+
+
+def test_parse_docintel_features_none() -> None:
+    assert _parse_docintel_features(None) is None
+
+
+def test_parse_docintel_features_empty() -> None:
+    assert _parse_docintel_features([" ", ","]) is None
+
+
+def test_docintel_feature_requires_use_docintel() -> None:
+    result = subprocess.run(
+        ["python", "-m", "markitdown", "--docintel-feature", "FORMULAS"],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "--docintel-feature requires --use-docintel." in result.stdout
+
+
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     test_version()
     test_invalid_flag()
+    test_parse_docintel_features()
+    test_parse_docintel_features_none()
+    test_parse_docintel_features_empty()
+    test_docintel_feature_requires_use_docintel()
     print("All tests passed!")

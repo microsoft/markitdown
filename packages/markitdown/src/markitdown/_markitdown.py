@@ -221,6 +221,10 @@ class MarkItDown:
                 if docintel_version is not None:
                     docintel_args["api_version"] = docintel_version
 
+                docintel_features = kwargs.get("docintel_features")
+                if docintel_features is not None:
+                    docintel_args["analysis_features"] = docintel_features
+
                 self.register_converter(
                     DocumentIntelligenceConverter(**docintel_args),
                 )
