@@ -91,7 +91,23 @@ class AudioConverter(DocumentConverter):
         # Transcribe
         if audio_format:
             try:
-                transcript = transcribe_audio(file_stream, audio_format=audio_format)
+                # Extract transcription engine and parameters
+                engine = kwargs.get("transcription_engine", "google")
+                
+                # Build engine_kwargs from all transcription_* parameters
+                engine_kwargs = {}
+                for key, value in kwargs.items():
+                    if key.startswith("transcription_") and key != "transcription_engine":
+                        # Remove 'transcription_' prefix to get the actual parameter name
+                        param_name = key.replace("transcription_", "", 1)
+                        engine_kwargs[param_name] = value
+                
+                transcript = transcribe_audio(
+                    file_stream, 
+                    audio_format=audio_format,
+                    engine=engine,
+                    **engine_kwargs
+                )
                 if transcript:
                     md_content += "\n\n### Audio Transcript:\n" + transcript
             except MissingDependencyException:
