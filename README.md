@@ -140,6 +140,13 @@ To use Microsoft Document Intelligence for conversion:
 markitdown path-to-file.pdf -o document.md -d -e "<document_intelligence_endpoint>"
 ```
 
+You can also specify a Document Intelligence API version:
+
+```bash
+markitdown path-to-file.pdf -d -e "<document_intelligence_endpoint>" --docintel-api-version 2024-07-31-preview
+```
+
+If `--docintel-api-version` is not specified, the default API version is `2024-07-31-preview`.
 More information about how to set up an Azure Document Intelligence Resource can be found [here](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/how-to-guides/create-document-intelligence-resource?view=doc-intel-4.0.0)
 
 ### Python API
