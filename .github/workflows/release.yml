@@ -1,0 +1,55 @@
+name: Release Binaries
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build binary on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact_name: markitdown-linux-x64
+            executable_name: markitdown
+          - os: macos-latest
+            artifact_name: markitdown-macos-x64
+            executable_name: markitdown
+          - os: windows-latest
+            artifact_name: markitdown-windows-x64.exe
+            executable_name: markitdown.exe
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12' 
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install .[all] pyinstaller
+
+      - name: Build with PyInstaller
+        # Note: --collect-all magika is required for file type inference
+        run: |
+          pyinstaller --onefile --name markitdown --collect-all magika scripts/cli.py
+
+      - name: Rename binary for platform
+        shell: bash
+        run: |
+          mv dist/${{ matrix.executable_name }} dist/${{ matrix.artifact_name }}
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: dist/${{ matrix.artifact_name }}
