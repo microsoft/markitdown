@@ -33,10 +33,11 @@ class IpynbConverter(DocumentConverter):
                 cur_pos = file_stream.tell()
                 try:
                     encoding = stream_info.charset or "utf-8"
-                    notebook_content = file_stream.read().decode(encoding)
+                    # Read a small chunk to check for notebook markers
+                    chunk = file_stream.read(4096).decode(encoding, errors="ignore")
                     return (
-                        "nbformat" in notebook_content
-                        and "nbformat_minor" in notebook_content
+                        "nbformat" in chunk
+                        and "nbformat_minor" in chunk
                     )
                 finally:
                     file_stream.seek(cur_pos)
