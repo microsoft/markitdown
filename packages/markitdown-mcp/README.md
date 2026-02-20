@@ -50,6 +50,14 @@ docker run -it --rm -v /home/user/data:/workdir markitdown-mcp:latest
 
 Once mounted, all files under data will be accessible under `/workdir` in the container. For example, if you have a file `example.txt` in `/home/user/data`, it will be accessible in the container at `/workdir/example.txt`.
 
+## Running using uv
+
+[uv](https://docs.astral.sh/uv/) is an extremely fast alternative to [pip](https://pip.pypa.io/en/stable/) which allows running Python packages without installing them.
+
+```
+uvx markitdown-mcp
+```
+
 ## Accessing from Claude Desktop
 
 It is recommended to use the Docker image when running the MCP server for Claude Desktop.
@@ -88,6 +96,21 @@ If you want to mount a directory, adjust it accordingly:
 	"-v",
 	"/home/user/data:/workdir",
 	"markitdown-mcp:latest"
+      ]
+    }
+  }
+}
+```
+
+Alternatively, using `uv`:
+
+```json
+{
+  "mcpServers": {
+    "markitdown": {
+      "command": "uvx",
+      "args": [
+	"markitdown-mcp"
       ]
     }
   }
