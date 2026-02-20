@@ -9,6 +9,8 @@ from importlib.metadata import entry_points
 from .__about__ import __version__
 from ._markitdown import MarkItDown, StreamInfo, DocumentConverterResult
 
+DEFAULT_DOCINTEL_API_VERSION = "2024-07-31-preview"
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -89,6 +91,11 @@ def main():
         "--endpoint",
         type=str,
         help="Document Intelligence Endpoint. Required if using Document Intelligence.",
+    )
+    parser.add_argument(
+        "--docintel-api-version",
+        type=str,
+        help=f"Document Intelligence API version to use (default: {DEFAULT_DOCINTEL_API_VERSION}).",
     )
 
     parser.add_argument(
@@ -172,6 +179,8 @@ def main():
             )
         sys.exit(0)
 
+    if args.docintel_api_version is not None and not args.use_docintel:
+        _exit_with_error("--docintel-api-version requires --use-docintel.")
     if args.use_docintel:
         if args.endpoint is None:
             _exit_with_error(
@@ -180,9 +189,14 @@ def main():
         elif args.filename is None:
             _exit_with_error("Filename is required when using Document Intelligence.")
 
-        markitdown = MarkItDown(
-            enable_plugins=args.use_plugins, docintel_endpoint=args.endpoint
-        )
+        markitdown_kwargs = {
+            "enable_plugins": args.use_plugins,
+            "docintel_endpoint": args.endpoint,
+            "docintel_api_version": args.docintel_api_version
+            or DEFAULT_DOCINTEL_API_VERSION,
+        }
+
+        markitdown = MarkItDown(**markitdown_kwargs)
     else:
         markitdown = MarkItDown(enable_plugins=args.use_plugins)
 
