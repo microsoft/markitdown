@@ -30,7 +30,6 @@ dependencies = [
   "magika~=0.6.1",
   "charset-normalizer",
   "defusedxml",
-
 ]
 
 [project.optional-dependencies]
