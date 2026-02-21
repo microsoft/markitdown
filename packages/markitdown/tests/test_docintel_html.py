@@ -9,6 +9,7 @@ from markitdown._stream_info import StreamInfo
 def _make_converter(file_types):
     conv = DocumentIntelligenceConverter.__new__(DocumentIntelligenceConverter)
     conv._file_types = file_types
+    conv._analysis_features_override = None
     return conv
 
 
