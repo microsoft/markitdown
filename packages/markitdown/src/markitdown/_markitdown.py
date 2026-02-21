@@ -7,7 +7,7 @@ import traceback
 import io
 from dataclasses import dataclass
 from importlib.metadata import entry_points
-from typing import Any, List, Dict, Optional, Union, BinaryIO
+from typing import Any, Callable, List, Dict, Optional, Union, BinaryIO
 from pathlib import Path
 from urllib.parse import urlparse
 from warnings import warn
@@ -123,6 +123,7 @@ class MarkItDown:
         self._llm_client: Any = None
         self._llm_model: Union[str | None] = None
         self._llm_prompt: Union[str | None] = None
+        self._llm_describber: Union[Callable[..., Union[str, None]], None] = None
         self._exiftool_path: Union[str | None] = None
         self._style_map: Union[str | None] = None
 
@@ -148,6 +149,7 @@ class MarkItDown:
             self._llm_client = kwargs.get("llm_client")
             self._llm_model = kwargs.get("llm_model")
             self._llm_prompt = kwargs.get("llm_prompt")
+            self._llm_describber = kwargs.get("llm_describber")
             self._exiftool_path = kwargs.get("exiftool_path")
             self._style_map = kwargs.get("style_map")
 
@@ -570,6 +572,9 @@ class MarkItDown:
 
                 if "llm_prompt" not in _kwargs and self._llm_prompt is not None:
                     _kwargs["llm_prompt"] = self._llm_prompt
+
+                if "llm_describber" not in _kwargs and self._llm_describber is not None:
+                    _kwargs["llm_describber"] = self._llm_describber
 
                 if "style_map" not in _kwargs and self._style_map is not None:
                     _kwargs["style_map"] = self._style_map

@@ -176,6 +176,32 @@ result = md.convert("example.jpg")
 print(result.text_content)
 ```
 
+Alternatively, you can provide a custom `llm_describber` callback function to use any LLM for image descriptions. This provides greater flexibility and allows for the use of any multimodal LLM library.
+
+```python
+from markitdown import MarkItDown
+
+# Assume a hypothetical gemini_client is available
+# from gemini.client import GeminiClient
+# gemini_client = GeminiClient()
+
+def gemini_image_describber(data_uri: str, prompt: str) -> str:
+    """
+    A callback function that uses a hypothetical Gemini client to describe an image.
+    """
+    # response = gemini_client.multimodal.generate_content(
+    #     prompt=prompt,
+    #     image_data=data_uri
+    # )
+    # return response.text
+    return f"Description for prompt '{prompt}' and image data starting with '{data_uri[:50]}...'"
+
+
+md = MarkItDown(llm_describber=gemini_image_describber)
+result = md.convert("my_image.jpg")
+print(result.markdown)
+```
+
 ### Docker
 
 ```sh

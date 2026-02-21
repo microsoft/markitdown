@@ -99,34 +99,36 @@ class PptxConverter(DocumentConverter):
                     alt_text = ""
 
                     # Potentially generate a description using an LLM
+                    llm_describber = kwargs.get("llm_describber")
                     llm_client = kwargs.get("llm_client")
                     llm_model = kwargs.get("llm_model")
-                    if llm_client is not None and llm_model is not None:
-                        # Prepare a file_stream and stream_info for the image data
-                        image_filename = shape.image.filename
-                        image_extension = None
-                        if image_filename:
-                            image_extension = os.path.splitext(image_filename)[1]
-                        image_stream_info = StreamInfo(
-                            mimetype=shape.image.content_type,
-                            extension=image_extension,
-                            filename=image_filename,
+
+                    # Prepare a file_stream and stream_info for the image data
+                    image_filename = shape.image.filename
+                    image_extension = None
+                    if image_filename:
+                        image_extension = os.path.splitext(image_filename)[1]
+                    image_stream_info = StreamInfo(
+                        mimetype=shape.image.content_type,
+                        extension=image_extension,
+                        filename=image_filename,
+                    )
+
+                    image_stream = io.BytesIO(shape.image.blob)
+
+                    # Caption the image
+                    try:
+                        llm_description = llm_caption(
+                            image_stream,
+                            image_stream_info,
+                            llm_describber=llm_describber,
+                            client=llm_client,
+                            model=llm_model,
+                            prompt=kwargs.get("llm_prompt"),
                         )
-
-                        image_stream = io.BytesIO(shape.image.blob)
-
-                        # Caption the image
-                        try:
-                            llm_description = llm_caption(
-                                image_stream,
-                                image_stream_info,
-                                client=llm_client,
-                                model=llm_model,
-                                prompt=kwargs.get("llm_prompt"),
-                            )
-                        except Exception:
-                            # Unable to generate a description
-                            pass
+                    except Exception:
+                        # Unable to generate a description
+                        pass
 
                     # Also grab any description embedded in the deck
                     try:
@@ -136,7 +138,12 @@ class PptxConverter(DocumentConverter):
                         pass
 
                     # Prepare the alt, escaping any special characters
-                    alt_text = "\n".join([llm_description, alt_text]) or shape.name
+                    alt_text_parts = []
+                    if llm_description:
+                        alt_text_parts.append(llm_description)
+                    if alt_text:
+                        alt_text_parts.append(alt_text)
+                    alt_text = "\n".join(alt_text_parts) or shape.name
                     alt_text = re.sub(r"[\r\n\[\]]", " ", alt_text)
                     alt_text = re.sub(r"\s+", " ", alt_text).strip()
 
