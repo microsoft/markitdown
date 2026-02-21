@@ -140,6 +140,15 @@ To use Microsoft Document Intelligence for conversion:
 markitdown path-to-file.pdf -o document.md -d -e "<document_intelligence_endpoint>"
 ```
 
+You can also set the Azure Document Intelligence API key using an environment variable:
+
+```bash
+export AZURE_API_KEY="your-api-key"
+markitdown path-to-file.pdf -o document.md -d -e "<document_intelligence_endpoint>"
+```
+
+This is useful when you're not logged in with Azure CLI or want to directly use an API key.
+
 More information about how to set up an Azure Document Intelligence Resource can be found [here](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/how-to-guides/create-document-intelligence-resource?view=doc-intel-4.0.0)
 
 ### Python API
