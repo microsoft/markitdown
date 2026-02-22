@@ -110,6 +110,7 @@ At the moment, the following optional dependencies are available:
 * `[docx]` Installs dependencies for Word files
 * `[xlsx]` Installs dependencies for Excel files
 * `[xls]` Installs dependencies for older Excel files
+* `[csv]` Installs dependencies for csv files
 * `[pdf]` Installs dependencies for PDF files
 * `[outlook]` Installs dependencies for Outlook messages
 * `[az-doc-intel]` Installs dependencies for Azure Document Intelligence
