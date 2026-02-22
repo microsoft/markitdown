@@ -2,6 +2,7 @@ import zipfile
 from io import BytesIO
 from typing import BinaryIO
 from xml.etree import ElementTree as ET
+import logging
 
 from bs4 import BeautifulSoup, Tag
 
@@ -85,8 +86,15 @@ def _replace_equations(tag: Tag):
         # Create a new paragraph tag
         p_tag = Tag(name="w:p")
         # Replace each 'oMath' child tag with its LaTeX equivalent as block equations
-        for child_tag in tag.find_all("oMath"):
+        child_tags = tag.find_all("oMath")
+        for i, child_tag in enumerate(child_tags):
             p_tag.append(_get_omath_tag_replacement(child_tag, block=True))
+            # Add a line break between consecutive equations to prevent $$$$
+            if i < len(child_tags) - 1:
+                br_tag = Tag(name="w:br")
+                r_tag = Tag(name="w:r")
+                r_tag.append(br_tag)
+                p_tag.append(r_tag)
         # Replace the original 'oMathPara' tag with the new paragraph tag
         tag.replace_with(p_tag)
     elif tag.name == "oMath":
@@ -147,8 +155,9 @@ def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
                         updated_content = _pre_process_math(content)
                         # In the future, if there are more pre-processing steps, they can be added here
                         zip_output.writestr(name, updated_content)
-                    except Exception:
+                    except Exception as e:
                         # If there is an error in processing the content, write the original content
+                        logging.error(f"Could not convert equations in this document due to {e}")
                         zip_output.writestr(name, content)
                 else:
                     zip_output.writestr(name, content)
