@@ -166,3 +166,7 @@ cython_debug/
 src/.DS_Store
 .DS_Store
 .cursorrules
+
+# MarkItDown Batch Converter - User files
+uploads/
+outputs/
