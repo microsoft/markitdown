@@ -7,11 +7,10 @@ import sys
 import io
 from typing import BinaryIO, Any, Optional
 
-from ._html_converter import HtmlConverter
-from .._base_converter import DocumentConverter, DocumentConverterResult
-from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
-from .._stream_info import StreamInfo
-from ._ocr_service import MultiBackendOCRService
+from markitdown.converters import HtmlConverter
+from markitdown import DocumentConverter, DocumentConverterResult, StreamInfo
+from markitdown._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+from ._ocr_service import LLMVisionOCRService
 
 # Try loading dependencies
 _xlsx_dependency_exc_info = None
@@ -29,9 +28,10 @@ class XlsxConverterWithOCR(DocumentConverter):
     Extracts images with their cell positions and performs OCR.
     """
 
-    def __init__(self):
+    def __init__(self, ocr_service: Optional[LLMVisionOCRService] = None):
         super().__init__()
         self._html_converter = HtmlConverter()
+        self.ocr_service = ocr_service
 
     def accepts(
         self,
@@ -69,8 +69,8 @@ class XlsxConverterWithOCR(DocumentConverter):
                 _xlsx_dependency_exc_info[2]
             )  # type: ignore[union-attr]
 
-        # Get OCR service if available
-        ocr_service: Optional[MultiBackendOCRService] = kwargs.get("ocr_service")
+        # Get OCR service if available (from kwargs or instance)
+        ocr_service: Optional[LLMVisionOCRService] = kwargs.get("ocr_service") or self.ocr_service
 
         if ocr_service:
             # Remove ocr_service from kwargs to avoid duplicate argument error
@@ -102,7 +102,7 @@ class XlsxConverterWithOCR(DocumentConverter):
         return DocumentConverterResult(markdown=md_content.strip())
 
     def _convert_with_ocr(
-        self, file_stream: BinaryIO, ocr_service: MultiBackendOCRService, **kwargs: Any
+        self, file_stream: BinaryIO, ocr_service: LLMVisionOCRService, **kwargs: Any
     ) -> DocumentConverterResult:
         """Convert XLSX with image OCR."""
         file_stream.seek(0)
@@ -137,15 +137,13 @@ class XlsxConverterWithOCR(DocumentConverter):
             if images_with_ocr:
                 md_content += "### Images in this sheet:\n\n"
                 for img_info in images_with_ocr:
-                    cell_ref = img_info["cell_ref"]
                     ocr_text = img_info["ocr_text"]
-                    md_content += f"**Image near cell {cell_ref}:**\n"
-                    md_content += f"{ocr_text}\n\n"
+                    md_content += f"*[Image OCR]\n{ocr_text}\n[End OCR]*\n\n"
 
         return DocumentConverterResult(markdown=md_content.strip())
 
     def _extract_and_ocr_sheet_images(
-        self, sheet: Any, ocr_service: MultiBackendOCRService
+        self, sheet: Any, ocr_service: LLMVisionOCRService
     ) -> list[dict]:
         """
         Extract and OCR images from an Excel sheet.

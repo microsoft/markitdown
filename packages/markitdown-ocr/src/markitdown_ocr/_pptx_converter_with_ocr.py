@@ -9,11 +9,10 @@ import io
 
 from typing import BinaryIO, Any, Optional
 
-from ._html_converter import HtmlConverter
-from .._base_converter import DocumentConverter, DocumentConverterResult
-from .._stream_info import StreamInfo
-from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
-from ._ocr_service import MultiBackendOCRService
+from markitdown.converters import HtmlConverter
+from markitdown import DocumentConverter, DocumentConverterResult, StreamInfo
+from markitdown._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+from ._ocr_service import LLMVisionOCRService
 
 _dependency_exc_info = None
 try:
@@ -25,9 +24,10 @@ except ImportError:
 class PptxConverterWithOCR(DocumentConverter):
     """Enhanced PPTX Converter with OCR fallback."""
 
-    def __init__(self):
+    def __init__(self, ocr_service: Optional[LLMVisionOCRService] = None):
         super().__init__()
         self._html_converter = HtmlConverter()
+        self.ocr_service = ocr_service
 
     def accepts(
         self,
@@ -65,8 +65,8 @@ class PptxConverterWithOCR(DocumentConverter):
                 _dependency_exc_info[2]
             )  # type: ignore[union-attr]
 
-        # Get OCR service
-        ocr_service: Optional[MultiBackendOCRService] = kwargs.get("ocr_service")
+        # Get OCR service (from kwargs or instance)
+        ocr_service: Optional[LLMVisionOCRService] = kwargs.get("ocr_service") or self.ocr_service
         llm_client = kwargs.get("llm_client")
 
         presentation = pptx.Presentation(file_stream)
@@ -127,32 +127,18 @@ class PptxConverterWithOCR(DocumentConverter):
                         except Exception:
                             pass
 
-                    # Get alt text from slide
-                    alt_text = ""
-                    try:
-                        alt_text = shape._element._nvXxPr.cNvPr.attrib.get("descr", "")
-                    except Exception:
-                        pass
-
-                    # Combine descriptions
-                    combined_desc = (
-                        "\\n".join(filter(None, [llm_description, ocr_text, alt_text]))
-                        or shape.name
-                    )
-
-                    # Clean up description
-                    import re
-
-                    combined_desc = re.sub(r"[\\r\\n\\[\\]]", " ", combined_desc)
-                    combined_desc = re.sub(r"\\s+", " ", combined_desc).strip()
-
-                    # Add image markdown
-                    filename = re.sub(r"\\W", "", shape.name) + ".jpg"
-                    md_content += "\\n![" + combined_desc + "](" + filename + ")\\n"
+                    # Format extracted content using unified OCR block format
+                    content = (llm_description or ocr_text or "").strip()
+                    if content:
+                        md_content += (
+                            f"\n*[Image OCR]\n{content}\n[End OCR]*\n"
+                        )
 
                 # Tables
                 if self._is_table(shape):
-                    md_content += self._convert_table_to_markdown(shape.table, **kwargs)
+                    md_content += self._convert_table_to_markdown(
+                        shape.table, **kwargs
+                    )
 
                 # Charts
                 if shape.has_chart:

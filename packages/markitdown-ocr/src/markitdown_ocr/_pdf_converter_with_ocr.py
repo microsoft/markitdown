@@ -7,10 +7,9 @@ import sys
 import io
 from typing import BinaryIO, Any, Optional
 
-from .._base_converter import DocumentConverter, DocumentConverterResult
-from .._stream_info import StreamInfo
-from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
-from ._ocr_service import MultiBackendOCRService
+from markitdown import DocumentConverter, DocumentConverterResult, StreamInfo
+from markitdown._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+from ._ocr_service import LLMVisionOCRService
 
 # Import dependencies
 _dependency_exc_info = None
@@ -245,8 +244,9 @@ class PdfConverterWithOCR(DocumentConverter):
     Maintains document structure while extracting text from images inline.
     """
 
-    def __init__(self):
+    def __init__(self, ocr_service: Optional[LLMVisionOCRService] = None):
         super().__init__()
+        self.ocr_service = ocr_service
 
     def accepts(
         self,
@@ -284,8 +284,8 @@ class PdfConverterWithOCR(DocumentConverter):
                 _dependency_exc_info[2]
             )  # type: ignore[union-attr]
 
-        # Get OCR service if available
-        ocr_service: MultiBackendOCRService | None = kwargs.get("ocr_service")
+        # Get OCR service if available (from kwargs or instance)
+        ocr_service: LLMVisionOCRService | None = kwargs.get("ocr_service") or self.ocr_service
 
         # Read PDF into BytesIO
         file_stream.seek(0)
@@ -380,11 +380,10 @@ class PdfConverterWithOCR(DocumentConverter):
                                 if item["type"] == "text":
                                     markdown_content.append(item["text"])
                                 else:  # image
-                                    img_marker = f"\n\n[Image: {item['name']}]\n"
-                                    img_marker += f"{item['ocr_text']}\n"
-                                    if item.get("backend"):
-                                        img_marker += f"(OCR: {item['backend']})\n"
-                                    img_marker += "[End Image]\n"
+                                    ocr_text = item['ocr_text']
+                                    img_marker = (
+                                        f"\n\n*[Image OCR]\n{ocr_text}\n[End OCR]*\n"
+                                    )
                                     markdown_content.append(img_marker)
                         else:
                             # No images, just add text
@@ -438,7 +437,7 @@ class PdfConverterWithOCR(DocumentConverter):
         return images
 
     def _ocr_full_pages(
-        self, pdf_bytes: io.BytesIO, ocr_service: MultiBackendOCRService
+        self, pdf_bytes: io.BytesIO, ocr_service: LLMVisionOCRService
     ) -> str:
         """
         Fallback for scanned PDFs: Convert entire pages to images and OCR them.
@@ -475,11 +474,10 @@ class PdfConverterWithOCR(DocumentConverter):
                     ocr_result = ocr_service.extract_text(img_stream)
 
                     if ocr_result.text.strip():
-                        markdown_parts.append(ocr_result.text.strip())
-                        if ocr_result.backend_used:
-                            markdown_parts.append(
-                                f"\n*(OCR: {ocr_result.backend_used})*\n"
-                            )
+                        text = ocr_result.text.strip()
+                        markdown_parts.append(
+                            f"*[Image OCR]\n{text}\n[End OCR]*"
+                        )
                     else:
                         markdown_parts.append(
                             "*[No text could be extracted from this page]*"
@@ -512,11 +510,10 @@ class PdfConverterWithOCR(DocumentConverter):
                             ocr_result = ocr_service.extract_text(img_stream)
 
                             if ocr_result.text.strip():
-                                markdown_parts.append(ocr_result.text.strip())
-                                if ocr_result.backend_used:
-                                    markdown_parts.append(
-                                        f"\n*(OCR: {ocr_result.backend_used})*\n"
-                                    )
+                                text = ocr_result.text.strip()
+                                markdown_parts.append(
+                                    f"*[Image OCR]\n{text}\n[End OCR]*"
+                                )
                             else:
                                 markdown_parts.append(
                                     "*[No text could be extracted from this page]*"

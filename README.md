@@ -132,6 +132,35 @@ markitdown --use-plugins path-to-file.pdf
 
 To find available plugins, search GitHub for the hashtag `#markitdown-plugin`. To develop a plugin, see `packages/markitdown-sample-plugin`.
 
+#### markitdown-ocr Plugin
+
+The `markitdown-ocr` plugin adds OCR (Optical Character Recognition) support to PDF, DOCX, PPTX, and XLSX converters, enabling text extraction from embedded images.
+
+**Installation:**
+
+```bash
+pip install markitdown-ocr[tesseract]  # Fast local OCR
+# or
+pip install markitdown-ocr[all]        # All OCR backends
+```
+
+**Usage:**
+
+```bash
+markitdown document.pdf --use-plugins
+```
+
+Or in Python:
+
+```python
+from markitdown import MarkItDown
+
+md = MarkItDown(enable_plugins=True)
+result = md.convert("document_with_images.pdf")
+```
+
+The plugin uses LLM Vision for text extraction and automatically handles full-page OCR for scanned documents. See [`packages/markitdown-ocr/README.md`](packages/markitdown-ocr/README.md) for detailed documentation and configuration options.
+
 ### Azure Document Intelligence
 
 To use Microsoft Document Intelligence for conversion:
@@ -176,88 +205,65 @@ result = md.convert("example.jpg")
 print(result.text_content)
 ```
 
-To extract text from images embedded in documents using OCR (requires Tesseract):
+### OCR Support for Embedded Images
 
-```python
-from markitdown.converters._ocr_service import MultiBackendOCRService, OCRBackend
-from markitdown.converters._pdf_converter_with_ocr import PdfConverterWithOCR
+To extract text from images embedded in documents (PDF, DOCX, PPTX, XLSX), install the **markitdown-ocr plugin**:
 
-# Create OCR service with Tesseract
-ocr_service = MultiBackendOCRService(backends=[OCRBackend.TESSERACT])
-
-# Convert PDF with OCR
-converter = PdfConverterWithOCR()
-with open("document.pdf", "rb") as f:
-    result = converter.convert(f, ocr_service=ocr_service)
-    print(result.text_content)
+```bash
+pip install markitdown-ocr[tesseract]  # Fast local OCR
+# or
+pip install markitdown-ocr[all]        # All OCR backends (Tesseract, EasyOCR, LLM Vision)
 ```
 
-To use LLM (GPT-4o, Gemini, etc.) for OCR instead of Tesseract:
+**System Requirements**: For Tesseract backend, install the tesseract binary:
+
+* Ubuntu/Debian: `sudo apt-get install tesseract-ocr`
+* macOS: `brew install tesseract`
+* Windows: Download from [UB-Mannheim/tesseract](https://github.com/UB-Mannheim/tesseract/wiki)
+
+**Basic Usage:**
 
 ```python
-from markitdown.converters._ocr_service import MultiBackendOCRService, OCRBackend
-from markitdown.converters._pdf_converter_with_ocr import PdfConverterWithOCR
+from markitdown import MarkItDown
+
+# Enable plugins to activate OCR converters
+md = MarkItDown(enable_plugins=True)
+result = md.convert("document_with_images.pdf")
+print(result.text_content)
+```
+
+**Or from command line:**
+
+```bash
+markitdown document.pdf --use-plugins
+```
+
+**Advanced Configuration:**
+
+The plugin supports multiple OCR backends with automatic fallback:
+
+```python
+from markitdown import MarkItDown
 from openai import OpenAI
 
-# Create OCR service with LLM Vision backend
-client = OpenAI()
-ocr_service = MultiBackendOCRService(
-    backends=[OCRBackend.LLM_VISION],
-    llm_client=client,
+# Try Tesseract first (fast), fall back to LLM Vision if needed
+md = MarkItDown(
+    enable_plugins=True,
+    llm_client=OpenAI(),
     llm_model="gpt-4o"
 )
-
-# Convert PDF with LLM-based OCR
-converter = PdfConverterWithOCR()
-with open("document.pdf", "rb") as f:
-    result = converter.convert(f, ocr_service=ocr_service)
-    print(result.text_content)
+result = md.convert("complex_document.pdf")
 ```
 
-Multi-backend fallback (tries Tesseract first, falls back to LLM if Tesseract fails):
+**Features:**
 
-```python
-ocr_service = MultiBackendOCRService(
-    backends=[OCRBackend.TESSERACT, OCRBackend.LLM_VISION],
-    llm_client=client,
-    llm_model="gpt-4o"
-)
-```
+* ✨ Automatic OCR for embedded images in PDF, DOCX, PPTX, XLSX
+* 🔄 Multiple OCR backends: Tesseract (fast), EasyOCR (accurate), LLM Vision (best)
+* 📄 Full-page OCR for scanned PDFs (automatic detection)
+* 🌍 Multi-language support
+* 📍 Context preservation (page numbers, cell references)
 
-OCR converters are available for PDF, DOCX, XLSX (multi-sheet), and PPTX formats. Images are extracted with context preservation (page numbers, cell references, relationship IDs).
-
-#### Scanned PDF Support
-
-MarkItDown automatically detects scanned PDFs (documents with no extractable text) and falls back to full-page OCR. When a PDF extraction returns empty or whitespace-only results, the converter:
-
-1. Renders each page as a high-resolution image (300 DPI)
-2. Performs OCR on the full page image
-3. Preserves page structure with page markers
-4. Indicates which OCR backend was used
-
-This works seamlessly with any OCR backend (Tesseract, EasyOCR, LLM Vision):
-
-```python
-from markitdown.converters._ocr_service import MultiBackendOCRService, OCRBackend
-from markitdown.converters._pdf_converter_with_ocr import PdfConverterWithOCR
-
-# Create OCR service
-ocr_service = MultiBackendOCRService(backends=[OCRBackend.TESSERACT])
-
-# Convert scanned PDF - fallback is automatic
-converter = PdfConverterWithOCR()
-with open("scanned_invoice.pdf", "rb") as f:
-    result = converter.convert(f, ocr_service=ocr_service)
-    print(result.text_content)
-```
-
-The fallback triggers automatically when:
-
-- PDF has no extractable text (truly scanned documents)
-- Text extraction returns only whitespace
-- No embedded text is found via pdfminer or pdfplumber
-
-No additional configuration is needed - just provide an OCR service and the converter handles the rest.
+For detailed documentation, configuration options, and advanced usage, see the [markitdown-ocr README](packages/markitdown-ocr/README.md).
 
 ### Docker
 
