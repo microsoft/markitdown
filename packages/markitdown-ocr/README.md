@@ -102,12 +102,39 @@ When a file is converted:
 
 ## Supported File Formats
 
-| Format | Behavior |
-| ------ | --------- |
-| **PDF** | OCR for embedded images; full-page LLM OCR fallback for scanned (text-free) documents |
-| **DOCX** | OCR for inline images, maintaining document flow |
-| **PPTX** | OCR for slide images |
-| **XLSX** | OCR for embedded images, with cell-position context |
+### PDF
+
+- Embedded images are extracted by position (via `page.images` / page XObjects) and OCR'd inline, interleaved with the surrounding text in vertical reading order.
+- **Scanned PDFs** (pages with no extractable text) are detected automatically: each page is rendered at 300 DPI and sent to the LLM as a full-page image.
+- **Malformed PDFs** that pdfplumber/pdfminer cannot open (e.g. truncated EOF) are retried with PyMuPDF page rendering, so content is still recovered.
+
+### DOCX
+
+- Images are extracted via document part relationships (`doc.part.rels`).
+- OCR is run before the DOCX→HTML→Markdown pipeline executes: placeholder tokens are injected into the HTML so that the markdown converter does not escape the OCR markers, and the final placeholders are replaced with the formatted `*[Image OCR]...[End OCR]*` blocks after conversion.
+- Document flow (headings, paragraphs, tables) is fully preserved around the OCR blocks.
+
+### PPTX
+
+- Picture shapes, placeholder shapes with images, and images inside groups are all supported.
+- Shapes are processed in top-to-left reading order per slide.
+- If an `llm_client` is configured, the LLM is asked for a description first; OCR is used as the fallback when no description is returned.
+
+### XLSX
+
+- Images embedded in worksheets (`sheet._images`) are extracted per sheet.
+- Cell position is calculated from the image anchor coordinates (column/row → Excel letter notation).
+- Images are listed under a `### Images in this sheet:` section after the sheet's data table — they are not interleaved into the table rows.
+
+### Output format
+
+Every extracted OCR block is wrapped as:
+
+```text
+*[Image OCR]
+<extracted text>
+[End OCR]*
+```
 
 ## Troubleshooting
 
