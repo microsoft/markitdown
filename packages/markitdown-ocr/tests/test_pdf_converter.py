@@ -139,6 +139,21 @@ def test_pdf_complex_layout(svc: MockOCRService) -> None:
 
 
 # ---------------------------------------------------------------------------
+# pdf_multipage.pdf — pdfplumber/pdfminer fail (EOF); PyMuPDF fallback used
+# ---------------------------------------------------------------------------
+
+def test_pdf_multipage(svc: MockOCRService) -> None:
+    # pdfplumber cannot open this file (Unexpected EOF), so _ocr_full_pages
+    # falls back to PyMuPDF for page rendering.  Each page becomes one OCR block.
+    expected = (
+        f"## Page 1\n\n\n{_OCR_BLOCK}\n\n\n"
+        f"## Page 2\n\n\n{_OCR_BLOCK}\n\n\n"
+        f"## Page 3\n\n\n{_OCR_BLOCK}"
+    )
+    assert _convert("pdf_multipage.pdf", svc) == expected
+
+
+# ---------------------------------------------------------------------------
 # pdf_scanned_*.pdf — raster-only pages → full-page OCR
 # ---------------------------------------------------------------------------
 
@@ -172,36 +187,29 @@ def test_pdf_scanned_report(svc: MockOCRService) -> None:
 # ---------------------------------------------------------------------------
 
 def test_pdf_scanned_fallback_format(svc: MockOCRService) -> None:
-    """When pdfplumber returns no text, full-page OCR uses the same format."""
+    """_ocr_full_pages emits *[Image OCR]...[End OCR]* for each page."""
     path = TEST_DATA_DIR / "pdf_image_start.pdf"
     if not path.exists():
         pytest.skip(f"Test file not found: {path}")
 
     converter = PdfConverterWithOCR()
-    with (
-        patch("pdfplumber.open") as mock_plumber,
-        patch("pdfminer.high_level.extract_text", return_value=""),
-    ):
+    with patch("pdfplumber.open") as mock_plumber:
         mock_pdf = MagicMock()
         mock_page = MagicMock()
-        mock_page.extract_text.return_value = ""
-        mock_page.chars = []
-        mock_page.images = []
         mock_page.page_number = 1
         mock_pdf.pages = [mock_page]
         mock_pdf.__enter__.return_value = mock_pdf
         mock_plumber.return_value = mock_pdf
 
         with open(path, "rb") as f:
-            md = converter.convert(
-                io.BytesIO(f.read()),
-                StreamInfo(extension=".pdf"),
-                ocr_service=svc,
-            ).text_content
+            md = converter._ocr_full_pages(io.BytesIO(f.read()), svc)
 
-    assert md == _PAGE_1_SCANNED, (
-        f"Scanned fallback must produce:\n{_PAGE_1_SCANNED!r}\n"
-        f"Actual:\n{md!r}"
+    expected = (
+        "## Page 1\n\n\n"
+        "*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*"
+    )
+    assert md == expected, (
+        f"_ocr_full_pages must produce:\n{expected!r}\nActual:\n{md!r}"
     )
 
 

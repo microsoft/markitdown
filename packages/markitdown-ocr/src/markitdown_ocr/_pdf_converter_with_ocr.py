@@ -5,7 +5,7 @@ Extracts images from PDFs and performs OCR while maintaining document context.
 
 import io
 import sys
-from typing import Any, BinaryIO
+from typing import Any, BinaryIO, Optional
 
 from markitdown import DocumentConverter, DocumentConverterResult, StreamInfo
 from markitdown._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
@@ -355,67 +355,66 @@ class PdfConverterWithOCR(DocumentConverter):
                     try:
                         markdown_parts.append(f"\n## Page {page_num}\n")
 
-                        # Render page to image at high resolution for better OCR
+                        # Render page to image
                         page_img = page.to_image(resolution=300)
                         img_stream = io.BytesIO()
                         page_img.original.save(img_stream, format="PNG")
                         img_stream.seek(0)
 
-                        # Run OCR on the full page image
+                        # Run OCR
                         ocr_result = ocr_service.extract_text(img_stream)
 
-                    # Convert to PIL Image
-                    img_data = pix.tobytes("png")
-                    img_stream = io.BytesIO(img_data)
+                        if ocr_result.text.strip():
+                            text = ocr_result.text.strip()
+                            markdown_parts.append(
+                                f"*[Image OCR]\n{text}\n[End OCR]*"
+                            )
+                        else:
+                            markdown_parts.append(
+                                "*[No text could be extracted from this page]*"
+                            )
 
-                    # Run OCR on the full page image
-                    ocr_result = ocr_service.extract_text(img_stream)
-
-                    if ocr_result.text.strip():
-                        text = ocr_result.text.strip()
-                        markdown_parts.append(
-                            f"*[Image OCR]\n{text}\n[End OCR]*"
-                        )
-                    else:
+                    except Exception as e:
                         markdown_parts.append(
                             f"*[Error processing page {page_num}: {str(e)}]*"
                         )
                         continue
 
         except Exception:
-            # Fallback to pdfplumber rendering if PyMuPDF fails
+            # pdfplumber failed (e.g. malformed EOF) — try PyMuPDF for rendering
+            markdown_parts = []
             try:
+                import fitz  # PyMuPDF
+
                 pdf_bytes.seek(0)
-                with pdfplumber.open(pdf_bytes) as pdf:
-                    for page_num, page in enumerate(pdf.pages, 1):
-                        try:
-                            markdown_parts.append(f"\n## Page {page_num}\n")
+                doc = fitz.open(stream=pdf_bytes.read(), filetype="pdf")
+                for page_num in range(1, doc.page_count + 1):
+                    try:
+                        markdown_parts.append(f"\n## Page {page_num}\n")
+                        page = doc[page_num - 1]
+                        mat = fitz.Matrix(300 / 72, 300 / 72)  # 300 DPI
+                        pix = page.get_pixmap(matrix=mat)
+                        img_stream = io.BytesIO(pix.tobytes("png"))
+                        img_stream.seek(0)
 
-                            # Render page to image
-                            page_img = page.to_image(resolution=300)
-                            img_stream = io.BytesIO()
-                            page_img.original.save(img_stream, format="PNG")
-                            img_stream.seek(0)
+                        ocr_result = ocr_service.extract_text(img_stream)
 
-                            # Run OCR
-                            ocr_result = ocr_service.extract_text(img_stream)
-
-                            if ocr_result.text.strip():
-                                text = ocr_result.text.strip()
-                                markdown_parts.append(
-                                    f"*[Image OCR]\n{text}\n[End OCR]*"
-                                )
-                            else:
-                                markdown_parts.append(
-                                    "*[No text could be extracted from this page]*"
-                                )
-
-                        except Exception as e:
+                        if ocr_result.text.strip():
+                            text = ocr_result.text.strip()
                             markdown_parts.append(
-                                f"*[Error processing page {page_num}: {str(e)}]*"
+                                f"*[Image OCR]\n{text}\n[End OCR]*"
                             )
-                            continue
+                        else:
+                            markdown_parts.append(
+                                "*[No text could be extracted from this page]*"
+                            )
 
+                    except Exception as e:
+                        markdown_parts.append(
+                            f"*[Error processing page {page_num}: {str(e)}]*"
+                        )
+                        continue
+                doc.close()
             except Exception:
                 return "*[Error: Could not process scanned PDF]*"
 
