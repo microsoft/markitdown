@@ -3,9 +3,9 @@ Enhanced XLSX Converter with OCR support for embedded images.
 Extracts images from Excel spreadsheets and performs OCR while maintaining cell context.
 """
 
-import sys
 import io
-from typing import BinaryIO, Any, Optional
+import sys
+from typing import Any, BinaryIO, Optional
 
 from markitdown.converters import HtmlConverter
 from markitdown import DocumentConverter, DocumentConverterResult, StreamInfo
@@ -16,7 +16,6 @@ from ._ocr_service import LLMVisionOCRService
 _xlsx_dependency_exc_info = None
 try:
     import pandas as pd
-    import openpyxl
     from openpyxl import load_workbook
 except ImportError:
     _xlsx_dependency_exc_info = sys.exc_info()

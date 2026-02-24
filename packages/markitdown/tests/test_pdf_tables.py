@@ -1,5 +1,6 @@
 #!/usr/bin/env python3 -m pytest
 """Tests for PDF table extraction functionality."""
+
 import os
 import re
 import pytest
@@ -649,6 +650,332 @@ class TestPdfTableExtraction:
         assert (
             result.text_content.strip() == ""
         ), f"Scanned PDF should have empty extraction, got: '{result.text_content[:100]}...'"
+
+    def test_movie_theater_booking_pdf_extraction(self, markitdown):
+        """Test extraction of movie theater booking PDF with complex tables.
+
+        Expected output: Pipe-separated format with booking details, agency info,
+        customer details, and show schedules in structured tables.
+        """
+        pdf_path = os.path.join(TEST_FILES_DIR, "movie-theater-booking-2024.pdf")
+
+        if not os.path.exists(pdf_path):
+            pytest.skip(f"Test file not found: {pdf_path}")
+
+        result = markitdown.convert(pdf_path)
+        text_content = result.text_content
+
+        # Validate pipe-separated table format
+        assert "|" in text_content, "Booking order should contain pipe separators"
+
+        # Validate key booking information
+        expected_strings = [
+            "BOOKING ORDER",
+            "2024-12-5678",  # Order number
+            "Holiday Movie Marathon Package",  # Product description
+            "12/20/2024 - 12/31/2024",  # Booking dates
+            "SC-WINTER-2024",  # Alt order number
+            "STARLIGHT CINEMAS",  # Cinema brand
+        ]
+        validate_strings(result, expected_strings)
+
+        # Validate agency information
+        agency_strings = [
+            "Premier Entertainment Group",  # Agency name
+            "Michael Chen",  # Contact
+            "Sarah Johnson",  # Primary contact
+            "Downtown Multiplex",  # Cinema name
+        ]
+        validate_strings(result, agency_strings)
+
+        # Validate customer information
+        customer_strings = [
+            "Universal Studios Distribution",  # Customer name
+            "Film Distributor",  # Category
+            "CUST-98765",  # Customer ID
+        ]
+        validate_strings(result, customer_strings)
+
+        # Validate booking summary totals
+        booking_strings = [
+            "$12,500.00",  # Gross amount
+            "$11,250.00",  # Net amount
+            "December 2024",  # Month
+            "48",  # Number of shows
+        ]
+        validate_strings(result, booking_strings)
+
+        # Validate show schedule details
+        show_strings = [
+            "Holiday Spectacular",  # Movie title
+            "Winter Wonderland",  # Movie title
+            "New Year Mystery",  # Movie title
+            "IMAX 3D",  # Format
+            "$250",  # Rate
+            "$300",  # Rate
+            "$3,000",  # Revenue
+            "$3,600",  # Revenue
+        ]
+        validate_strings(result, show_strings)
+
+
+class TestPdfFullOutputComparison:
+    """Test that PDF extraction produces expected complete outputs."""
+
+    @pytest.fixture
+    def markitdown(self):
+        """Create MarkItDown instance."""
+        return MarkItDown()
+
+    def test_movie_theater_full_output(self, markitdown):
+        """Test complete output for movie theater booking PDF."""
+        pdf_path = os.path.join(TEST_FILES_DIR, "movie-theater-booking-2024.pdf")
+        expected_path = os.path.join(
+            TEST_FILES_DIR, "expected_outputs", "movie-theater-booking-2024.md"
+        )
+
+        if not os.path.exists(pdf_path):
+            pytest.skip(f"Test file not found: {pdf_path}")
+
+        if not os.path.exists(expected_path):
+            pytest.skip(f"Expected output not found: {expected_path}")
+
+        result = markitdown.convert(pdf_path)
+        actual_output = result.text_content
+
+        with open(expected_path, "r", encoding="utf-8") as f:
+            expected_output = f.read()
+
+        # Compare outputs
+        actual_lines = [line.rstrip() for line in actual_output.split("\n")]
+        expected_lines = [line.rstrip() for line in expected_output.split("\n")]
+
+        # Check line count
+        assert abs(len(actual_lines) - len(expected_lines)) <= 2, (
+            f"Line count mismatch: actual={len(actual_lines)}, "
+            f"expected={len(expected_lines)}"
+        )
+
+        # Check structural elements
+        assert actual_output.count("|") > 80, "Should have many pipe separators"
+        assert actual_output.count("---") > 8, "Should have table separators"
+
+        # Validate critical sections
+        for section in [
+            "BOOKING ORDER",
+            "STARLIGHT CINEMAS",
+            "2024-12-5678",
+            "Holiday Spectacular",
+            "$12,500.00",
+        ]:
+            assert section in actual_output, f"Missing section: {section}"
+
+        # Check table structure
+        table_rows = [line for line in actual_lines if line.startswith("|")]
+        assert (
+            len(table_rows) > 15
+        ), f"Should have >15 table rows, got {len(table_rows)}"
+
+    def test_sparse_borderless_table_full_output(self, markitdown):
+        """Test complete output for SPARSE borderless table PDF."""
+        pdf_path = os.path.join(
+            TEST_FILES_DIR, "SPARSE-2024-INV-1234_borderless_table.pdf"
+        )
+        expected_path = os.path.join(
+            TEST_FILES_DIR,
+            "expected_outputs",
+            "SPARSE-2024-INV-1234_borderless_table.md",
+        )
+
+        if not os.path.exists(pdf_path):
+            pytest.skip(f"Test file not found: {pdf_path}")
+
+        if not os.path.exists(expected_path):
+            pytest.skip(f"Expected output not found: {expected_path}")
+
+        result = markitdown.convert(pdf_path)
+        actual_output = result.text_content
+
+        with open(expected_path, "r", encoding="utf-8") as f:
+            expected_output = f.read()
+
+        # Compare outputs
+        actual_lines = [line.rstrip() for line in actual_output.split("\n")]
+        expected_lines = [line.rstrip() for line in expected_output.split("\n")]
+
+        # Check line count is close
+        assert abs(len(actual_lines) - len(expected_lines)) <= 2, (
+            f"Line count mismatch: actual={len(actual_lines)}, "
+            f"expected={len(expected_lines)}"
+        )
+
+        # Check structural elements
+        assert actual_output.count("|") > 50, "Should have many pipe separators"
+
+        # Validate critical sections
+        for section in [
+            "INVENTORY RECONCILIATION REPORT",
+            "SPARSE-2024-INV-1234",
+            "SKU-8847",
+            "SKU-9201",
+            "Variance Analysis",
+        ]:
+            assert section in actual_output, f"Missing section: {section}"
+
+    def test_repair_multipage_full_output(self, markitdown):
+        """Test complete output for REPAIR multipage invoice PDF."""
+        pdf_path = os.path.join(TEST_FILES_DIR, "REPAIR-2022-INV-001_multipage.pdf")
+        expected_path = os.path.join(
+            TEST_FILES_DIR, "expected_outputs", "REPAIR-2022-INV-001_multipage.md"
+        )
+
+        if not os.path.exists(pdf_path):
+            pytest.skip(f"Test file not found: {pdf_path}")
+
+        if not os.path.exists(expected_path):
+            pytest.skip(f"Expected output not found: {expected_path}")
+
+        result = markitdown.convert(pdf_path)
+        actual_output = result.text_content
+
+        with open(expected_path, "r", encoding="utf-8") as f:
+            expected_output = f.read()
+
+        # Compare outputs
+        actual_lines = [line.rstrip() for line in actual_output.split("\n")]
+        expected_lines = [line.rstrip() for line in expected_output.split("\n")]
+
+        # Check line count is close
+        assert abs(len(actual_lines) - len(expected_lines)) <= 2, (
+            f"Line count mismatch: actual={len(actual_lines)}, "
+            f"expected={len(expected_lines)}"
+        )
+
+        # Check structural elements
+        assert actual_output.count("|") > 40, "Should have many pipe separators"
+
+        # Validate critical sections
+        for section in [
+            "ZAVA AUTO REPAIR",
+            "Gabriel Diaz",
+            "Jeep",
+            "Grand Cherokee",
+            "GRAND TOTAL",
+        ]:
+            assert section in actual_output, f"Missing section: {section}"
+
+    def test_receipt_full_output(self, markitdown):
+        """Test complete output for RECEIPT retail purchase PDF."""
+        pdf_path = os.path.join(
+            TEST_FILES_DIR, "RECEIPT-2024-TXN-98765_retail_purchase.pdf"
+        )
+        expected_path = os.path.join(
+            TEST_FILES_DIR,
+            "expected_outputs",
+            "RECEIPT-2024-TXN-98765_retail_purchase.md",
+        )
+
+        if not os.path.exists(pdf_path):
+            pytest.skip(f"Test file not found: {pdf_path}")
+
+        if not os.path.exists(expected_path):
+            pytest.skip(f"Expected output not found: {expected_path}")
+
+        result = markitdown.convert(pdf_path)
+        actual_output = result.text_content
+
+        with open(expected_path, "r", encoding="utf-8") as f:
+            expected_output = f.read()
+
+        # Compare outputs
+        actual_lines = [line.rstrip() for line in actual_output.split("\n")]
+        expected_lines = [line.rstrip() for line in expected_output.split("\n")]
+
+        # Check line count is close
+        assert abs(len(actual_lines) - len(expected_lines)) <= 2, (
+            f"Line count mismatch: actual={len(actual_lines)}, "
+            f"expected={len(expected_lines)}"
+        )
+
+        # Validate critical sections
+        for section in [
+            "TECHMART ELECTRONICS",
+            "TXN-98765-2024",
+            "Sarah Mitchell",
+            "$821.14",
+            "RETURN POLICY",
+        ]:
+            assert section in actual_output, f"Missing section: {section}"
+
+    def test_academic_paper_full_output(self, markitdown):
+        """Test complete output for academic paper PDF."""
+        pdf_path = os.path.join(TEST_FILES_DIR, "test.pdf")
+        expected_path = os.path.join(TEST_FILES_DIR, "expected_outputs", "test.md")
+
+        if not os.path.exists(pdf_path):
+            pytest.skip(f"Test file not found: {pdf_path}")
+
+        if not os.path.exists(expected_path):
+            pytest.skip(f"Expected output not found: {expected_path}")
+
+        result = markitdown.convert(pdf_path)
+        actual_output = result.text_content
+
+        with open(expected_path, "r", encoding="utf-8") as f:
+            expected_output = f.read()
+
+        # Compare outputs
+        actual_lines = [line.rstrip() for line in actual_output.split("\n")]
+        expected_lines = [line.rstrip() for line in expected_output.split("\n")]
+
+        # Check line count is close
+        assert abs(len(actual_lines) - len(expected_lines)) <= 2, (
+            f"Line count mismatch: actual={len(actual_lines)}, "
+            f"expected={len(expected_lines)}"
+        )
+
+        # Academic paper should not have pipe separators
+        assert (
+            actual_output.count("|") == 0
+        ), "Academic paper should not have pipe separators"
+
+        # Validate critical sections
+        for section in [
+            "Introduction",
+            "Large language models",
+            "agents",
+            "multi-agent",
+        ]:
+            assert section in actual_output, f"Missing section: {section}"
+
+    def test_medical_scan_full_output(self, markitdown):
+        """Test complete output for medical report scan PDF (empty, no text layer)."""
+        pdf_path = os.path.join(
+            TEST_FILES_DIR, "MEDRPT-2024-PAT-3847_medical_report_scan.pdf"
+        )
+        expected_path = os.path.join(
+            TEST_FILES_DIR,
+            "expected_outputs",
+            "MEDRPT-2024-PAT-3847_medical_report_scan.md",
+        )
+
+        if not os.path.exists(pdf_path):
+            pytest.skip(f"Test file not found: {pdf_path}")
+
+        if not os.path.exists(expected_path):
+            pytest.skip(f"Expected output not found: {expected_path}")
+
+        result = markitdown.convert(pdf_path)
+        actual_output = result.text_content
+
+        with open(expected_path, "r", encoding="utf-8") as f:
+            expected_output = f.read()
+
+        # Both should be empty (scanned PDF with no text layer)
+        assert actual_output.strip() == "", "Scanned PDF should produce empty output"
+        assert (
+            expected_output.strip() == ""
+        ), "Expected output should be empty for scanned PDF"
 
 
 class TestPdfTableMarkdownFormat:

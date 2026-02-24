@@ -3,9 +3,9 @@ Enhanced PPTX Converter with improved OCR support.
 Already has LLM-based image description, this enhances it with traditional OCR fallback.
 """
 
-import sys
-import base64
 import io
+import sys
+from typing import Any, BinaryIO, Optional
 
 from typing import BinaryIO, Any, Optional
 

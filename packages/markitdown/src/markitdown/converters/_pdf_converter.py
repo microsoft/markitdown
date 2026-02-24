@@ -198,15 +198,62 @@ def _extract_form_content_from_words(page: Any) -> str | None:
     if not all_table_x_positions:
         return None
 
-    # Compute global column boundaries
+    # Compute adaptive column clustering tolerance based on gap analysis
     all_table_x_positions.sort()
+
+    # Calculate gaps between consecutive x-positions
+    gaps = []
+    for i in range(len(all_table_x_positions) - 1):
+        gap = all_table_x_positions[i + 1] - all_table_x_positions[i]
+        if gap > 5:  # Only significant gaps
+            gaps.append(gap)
+
+    # Determine optimal tolerance using statistical analysis
+    if gaps and len(gaps) >= 3:
+        # Use 70th percentile of gaps as threshold (balances precision/recall)
+        sorted_gaps = sorted(gaps)
+        percentile_70_idx = int(len(sorted_gaps) * 0.70)
+        adaptive_tolerance = sorted_gaps[percentile_70_idx]
+
+        # Clamp tolerance to reasonable range [25, 50]
+        adaptive_tolerance = max(25, min(50, adaptive_tolerance))
+    else:
+        # Fallback to conservative value
+        adaptive_tolerance = 35
+
+    # Compute global column boundaries using adaptive tolerance
     global_columns: list[float] = []
     for x in all_table_x_positions:
-        if not global_columns or x - global_columns[-1] > 30:
+        if not global_columns or x - global_columns[-1] > adaptive_tolerance:
             global_columns.append(x)
 
-    # Too many columns suggests dense text, not a form
-    if len(global_columns) > 8:
+    # Adaptive max column check based on page characteristics
+    # Calculate average column width
+    if len(global_columns) > 1:
+        content_width = global_columns[-1] - global_columns[0]
+        avg_col_width = content_width / len(global_columns)
+
+        # Forms with very narrow columns (< 30px) are likely dense text
+        if avg_col_width < 30:
+            return None
+
+        # Compute adaptive max based on columns per inch
+        # Typical forms have 3-8 columns per inch
+        columns_per_inch = len(global_columns) / (content_width / 72)
+
+        # If density is too high (> 10 cols/inch), likely not a form
+        if columns_per_inch > 10:
+            return None
+
+        # Adaptive max: allow more columns for wider pages
+        # Standard letter is 612pt wide, so scale accordingly
+        adaptive_max_columns = int(20 * (page_width / 612))
+        adaptive_max_columns = max(15, adaptive_max_columns)  # At least 15
+
+        if len(global_columns) > adaptive_max_columns:
+            return None
+    else:
+        # Single column, not a form
         return None
 
     # Now classify each row as table row or not

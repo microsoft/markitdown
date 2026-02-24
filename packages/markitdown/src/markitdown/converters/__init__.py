@@ -23,6 +23,11 @@ from ._doc_intel_converter import (
 )
 from ._epub_converter import EpubConverter
 from ._csv_converter import CsvConverter
+from ._pdf_converter_with_ocr import PdfConverterWithOCR
+from ._docx_converter_with_ocr import DocxConverterWithOCR
+from ._xlsx_converter_with_ocr import XlsxConverterWithOCR
+from ._pptx_converter_with_ocr import PptxConverterWithOCR
+from ._ocr_service import MultiBackendOCRService, OCRBackend, OCRResult
 
 __all__ = [
     "PlainTextConverter",
@@ -45,4 +50,11 @@ __all__ = [
     "DocumentIntelligenceFileType",
     "EpubConverter",
     "CsvConverter",
+    "PdfConverterWithOCR",
+    "DocxConverterWithOCR",
+    "XlsxConverterWithOCR",
+    "PptxConverterWithOCR",
+    "MultiBackendOCRService",
+    "OCRBackend",
+    "OCRResult",
 ]

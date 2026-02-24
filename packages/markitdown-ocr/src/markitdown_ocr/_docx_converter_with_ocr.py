@@ -3,10 +3,10 @@ Enhanced DOCX Converter with OCR support for embedded images.
 Extracts images from Word documents and performs OCR while maintaining context.
 """
 
-import sys
 import io
 import re
-from typing import BinaryIO, Any, Optional
+import sys
+from typing import Any, BinaryIO, Optional
 
 from markitdown.converters import HtmlConverter
 from markitdown.converter_utils.docx.pre_process import pre_process_docx
