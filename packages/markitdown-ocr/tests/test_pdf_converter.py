@@ -62,6 +62,7 @@ def _convert(filename: str, ocr_service: MockOCRService) -> str:
 # pdf_image_start.pdf
 # ---------------------------------------------------------------------------
 
+
 def test_pdf_image_start(svc: MockOCRService) -> None:
     expected = (
         "## Page 1\n\n\n\n\n"
@@ -76,6 +77,7 @@ def test_pdf_image_start(svc: MockOCRService) -> None:
 # ---------------------------------------------------------------------------
 # pdf_image_middle.pdf
 # ---------------------------------------------------------------------------
+
 
 def test_pdf_image_middle(svc: MockOCRService) -> None:
     expected = (
@@ -94,6 +96,7 @@ def test_pdf_image_middle(svc: MockOCRService) -> None:
 # pdf_image_end.pdf
 # ---------------------------------------------------------------------------
 
+
 def test_pdf_image_end(svc: MockOCRService) -> None:
     expected = (
         "## Page 1\n\n\n"
@@ -109,6 +112,7 @@ def test_pdf_image_end(svc: MockOCRService) -> None:
 # ---------------------------------------------------------------------------
 # pdf_multiple_images.pdf
 # ---------------------------------------------------------------------------
+
 
 def test_pdf_multiple_images(svc: MockOCRService) -> None:
     expected = (
@@ -126,6 +130,7 @@ def test_pdf_multiple_images(svc: MockOCRService) -> None:
 # pdf_complex_layout.pdf
 # ---------------------------------------------------------------------------
 
+
 def test_pdf_complex_layout(svc: MockOCRService) -> None:
     expected = (
         "## Page 1\n\n\n"
@@ -142,6 +147,7 @@ def test_pdf_complex_layout(svc: MockOCRService) -> None:
 # pdf_multipage.pdf — pdfplumber/pdfminer fail (EOF); PyMuPDF fallback used
 # ---------------------------------------------------------------------------
 
+
 def test_pdf_multipage(svc: MockOCRService) -> None:
     # pdfplumber cannot open this file (Unexpected EOF), so _ocr_full_pages
     # falls back to PyMuPDF for page rendering.  Each page becomes one OCR block.
@@ -156,6 +162,7 @@ def test_pdf_multipage(svc: MockOCRService) -> None:
 # ---------------------------------------------------------------------------
 # pdf_scanned_*.pdf — raster-only pages → full-page OCR
 # ---------------------------------------------------------------------------
+
 
 def test_pdf_scanned_invoice(svc: MockOCRService) -> None:
     assert _convert("pdf_scanned_invoice.pdf", svc) == _PAGE_1_SCANNED
@@ -186,6 +193,7 @@ def test_pdf_scanned_report(svc: MockOCRService) -> None:
 # Scanned PDF fallback path (pdfplumber finds no text → full-page OCR)
 # ---------------------------------------------------------------------------
 
+
 def test_pdf_scanned_fallback_format(svc: MockOCRService) -> None:
     """_ocr_full_pages emits *[Image OCR]...[End OCR]* for each page."""
     path = TEST_DATA_DIR / "pdf_image_start.pdf"
@@ -204,18 +212,16 @@ def test_pdf_scanned_fallback_format(svc: MockOCRService) -> None:
         with open(path, "rb") as f:
             md = converter._ocr_full_pages(io.BytesIO(f.read()), svc)
 
-    expected = (
-        "## Page 1\n\n\n"
-        "*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*"
-    )
-    assert md == expected, (
-        f"_ocr_full_pages must produce:\n{expected!r}\nActual:\n{md!r}"
-    )
+    expected = "## Page 1\n\n\n" "*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*"
+    assert (
+        md == expected
+    ), f"_ocr_full_pages must produce:\n{expected!r}\nActual:\n{md!r}"
 
 
 # ---------------------------------------------------------------------------
 # No OCR service — no OCR tags emitted
 # ---------------------------------------------------------------------------
+
 
 def test_pdf_no_ocr_service_no_tags() -> None:
     path = TEST_DATA_DIR / "pdf_image_middle.pdf"

@@ -52,21 +52,17 @@ def register_converters(markitdown: MarkItDown, **kwargs: Any) -> None:
     PRIORITY_OCR_ENHANCED = -1.0
 
     markitdown.register_converter(
-        PdfConverterWithOCR(ocr_service=ocr_service),
-        priority=PRIORITY_OCR_ENHANCED
+        PdfConverterWithOCR(ocr_service=ocr_service), priority=PRIORITY_OCR_ENHANCED
     )
 
     markitdown.register_converter(
-        DocxConverterWithOCR(ocr_service=ocr_service),
-        priority=PRIORITY_OCR_ENHANCED
+        DocxConverterWithOCR(ocr_service=ocr_service), priority=PRIORITY_OCR_ENHANCED
     )
 
     markitdown.register_converter(
-        PptxConverterWithOCR(ocr_service=ocr_service),
-        priority=PRIORITY_OCR_ENHANCED
+        PptxConverterWithOCR(ocr_service=ocr_service), priority=PRIORITY_OCR_ENHANCED
     )
 
     markitdown.register_converter(
-        XlsxConverterWithOCR(ocr_service=ocr_service),
-        priority=PRIORITY_OCR_ENHANCED
+        XlsxConverterWithOCR(ocr_service=ocr_service), priority=PRIORITY_OCR_ENHANCED
     )

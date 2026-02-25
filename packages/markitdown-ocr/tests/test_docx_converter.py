@@ -56,6 +56,7 @@ def _convert(filename: str, ocr_service: MockOCRService) -> str:
 # docx_image_start.docx
 # ---------------------------------------------------------------------------
 
+
 def test_docx_image_start(svc: MockOCRService) -> None:
     expected = (
         "Document with Image at Start\n\n"
@@ -69,6 +70,7 @@ def test_docx_image_start(svc: MockOCRService) -> None:
 # ---------------------------------------------------------------------------
 # docx_image_middle.docx
 # ---------------------------------------------------------------------------
+
 
 def test_docx_image_middle(svc: MockOCRService) -> None:
     expected = (
@@ -86,6 +88,7 @@ def test_docx_image_middle(svc: MockOCRService) -> None:
 # docx_image_end.docx
 # ---------------------------------------------------------------------------
 
+
 def test_docx_image_end(svc: MockOCRService) -> None:
     expected = (
         "Report\n\n"
@@ -100,6 +103,7 @@ def test_docx_image_end(svc: MockOCRService) -> None:
 # ---------------------------------------------------------------------------
 # docx_multiple_images.docx
 # ---------------------------------------------------------------------------
+
 
 def test_docx_multiple_images(svc: MockOCRService) -> None:
     expected = (
@@ -116,6 +120,7 @@ def test_docx_multiple_images(svc: MockOCRService) -> None:
 # ---------------------------------------------------------------------------
 # docx_multipage.docx
 # ---------------------------------------------------------------------------
+
 
 def test_docx_multipage(svc: MockOCRService) -> None:
     expected = (
@@ -143,6 +148,7 @@ def test_docx_multipage(svc: MockOCRService) -> None:
 # docx_complex_layout.docx
 # ---------------------------------------------------------------------------
 
+
 def test_docx_complex_layout(svc: MockOCRService) -> None:
     expected = (
         "Complex Document\n\n"
@@ -160,6 +166,7 @@ def test_docx_complex_layout(svc: MockOCRService) -> None:
 # ---------------------------------------------------------------------------
 # _inject_placeholders — internal unit tests (no file I/O)
 # ---------------------------------------------------------------------------
+
 
 def test_inject_placeholders_single_image() -> None:
     converter = DocxConverterWithOCR()
@@ -203,6 +210,7 @@ def test_inject_placeholders_empty_map_leaves_html_unchanged() -> None:
 # ---------------------------------------------------------------------------
 # No OCR service — no OCR tags emitted
 # ---------------------------------------------------------------------------
+
 
 def test_docx_no_ocr_service_no_tags() -> None:
     path = TEST_DATA_DIR / "docx_image_middle.docx"

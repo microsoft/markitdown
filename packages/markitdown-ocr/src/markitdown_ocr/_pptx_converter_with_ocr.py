@@ -11,7 +11,10 @@ from typing import BinaryIO, Any, Optional
 
 from markitdown.converters import HtmlConverter
 from markitdown import DocumentConverter, DocumentConverterResult, StreamInfo
-from markitdown._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+from markitdown._exceptions import (
+    MissingDependencyException,
+    MISSING_DEPENDENCY_MESSAGE,
+)
 from ._ocr_service import LLMVisionOCRService
 
 _dependency_exc_info = None
@@ -66,7 +69,9 @@ class PptxConverterWithOCR(DocumentConverter):
             )  # type: ignore[union-attr]
 
         # Get OCR service (from kwargs or instance)
-        ocr_service: Optional[LLMVisionOCRService] = kwargs.get("ocr_service") or self.ocr_service
+        ocr_service: Optional[LLMVisionOCRService] = (
+            kwargs.get("ocr_service") or self.ocr_service
+        )
         llm_client = kwargs.get("llm_client")
 
         presentation = pptx.Presentation(file_stream)
@@ -130,15 +135,11 @@ class PptxConverterWithOCR(DocumentConverter):
                     # Format extracted content using unified OCR block format
                     content = (llm_description or ocr_text or "").strip()
                     if content:
-                        md_content += (
-                            f"\n*[Image OCR]\n{content}\n[End OCR]*\n"
-                        )
+                        md_content += f"\n*[Image OCR]\n{content}\n[End OCR]*\n"
 
                 # Tables
                 if self._is_table(shape):
-                    md_content += self._convert_table_to_markdown(
-                        shape.table, **kwargs
-                    )
+                    md_content += self._convert_table_to_markdown(shape.table, **kwargs)
 
                 # Charts
                 if shape.has_chart:

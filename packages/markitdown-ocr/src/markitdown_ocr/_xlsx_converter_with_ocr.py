@@ -9,7 +9,10 @@ from typing import Any, BinaryIO, Optional
 
 from markitdown.converters import HtmlConverter
 from markitdown import DocumentConverter, DocumentConverterResult, StreamInfo
-from markitdown._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+from markitdown._exceptions import (
+    MissingDependencyException,
+    MISSING_DEPENDENCY_MESSAGE,
+)
 from ._ocr_service import LLMVisionOCRService
 
 # Try loading dependencies
@@ -69,7 +72,9 @@ class XlsxConverterWithOCR(DocumentConverter):
             )  # type: ignore[union-attr]
 
         # Get OCR service if available (from kwargs or instance)
-        ocr_service: Optional[LLMVisionOCRService] = kwargs.get("ocr_service") or self.ocr_service
+        ocr_service: Optional[LLMVisionOCRService] = (
+            kwargs.get("ocr_service") or self.ocr_service
+        )
 
         if ocr_service:
             # Remove ocr_service from kwargs to avoid duplicate argument error

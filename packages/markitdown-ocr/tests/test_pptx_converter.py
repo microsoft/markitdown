@@ -62,6 +62,7 @@ def _convert(filename: str, ocr_service: MockOCRService) -> str:
 # pptx_image_start.pptx
 # ---------------------------------------------------------------------------
 
+
 def test_pptx_image_start(svc: MockOCRService) -> None:
     # Slide 1: title "Welcome" followed by an image
     expected = (
@@ -74,6 +75,7 @@ def test_pptx_image_start(svc: MockOCRService) -> None:
 # ---------------------------------------------------------------------------
 # pptx_image_middle.pptx
 # ---------------------------------------------------------------------------
+
 
 def test_pptx_image_middle(svc: MockOCRService) -> None:
     # Slide 1: Introduction | Slide 2: Architecture + image | Slide 3: Conclusion  # noqa: E501
@@ -90,6 +92,7 @@ def test_pptx_image_middle(svc: MockOCRService) -> None:
 # pptx_image_end.pptx
 # ---------------------------------------------------------------------------
 
+
 def test_pptx_image_end(svc: MockOCRService) -> None:
     # Slide 1: Presentation | Slide 2: Thank You + image
     expected = (
@@ -103,6 +106,7 @@ def test_pptx_image_end(svc: MockOCRService) -> None:
 # ---------------------------------------------------------------------------
 # pptx_multiple_images.pptx
 # ---------------------------------------------------------------------------
+
 
 def test_pptx_multiple_images(svc: MockOCRService) -> None:
     # Slide 1: two images, no title text
@@ -118,6 +122,7 @@ def test_pptx_multiple_images(svc: MockOCRService) -> None:
 # pptx_complex_layout.pptx
 # ---------------------------------------------------------------------------
 
+
 def test_pptx_complex_layout(svc: MockOCRService) -> None:
     expected = (
         "\\n\\n<!-- Slide number: 1 -->\\n# Product Comparison"
@@ -130,6 +135,7 @@ def test_pptx_complex_layout(svc: MockOCRService) -> None:
 # ---------------------------------------------------------------------------
 # No OCR service — no OCR tags emitted
 # ---------------------------------------------------------------------------
+
 
 def test_pptx_no_ocr_service_no_tags() -> None:
     path = TEST_DATA_DIR / "pptx_image_middle.pptx"

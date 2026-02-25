@@ -8,7 +8,10 @@ import sys
 from typing import Any, BinaryIO, Optional
 
 from markitdown import DocumentConverter, DocumentConverterResult, StreamInfo
-from markitdown._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+from markitdown._exceptions import (
+    MissingDependencyException,
+    MISSING_DEPENDENCY_MESSAGE,
+)
 from ._ocr_service import LLMVisionOCRService
 
 # Import dependencies
@@ -170,7 +173,9 @@ class PdfConverterWithOCR(DocumentConverter):
             )  # type: ignore[union-attr]
 
         # Get OCR service if available (from kwargs or instance)
-        ocr_service: LLMVisionOCRService | None = kwargs.get("ocr_service") or self.ocr_service
+        ocr_service: LLMVisionOCRService | None = (
+            kwargs.get("ocr_service") or self.ocr_service
+        )
 
         # Read PDF into BytesIO
         file_stream.seek(0)
@@ -265,7 +270,7 @@ class PdfConverterWithOCR(DocumentConverter):
                                 if item["type"] == "text":
                                     markdown_content.append(item["text"])
                                 else:  # image
-                                    ocr_text = item['ocr_text']
+                                    ocr_text = item["ocr_text"]
                                     img_marker = (
                                         f"\n\n*[Image OCR]\n{ocr_text}\n[End OCR]*\n"
                                     )
@@ -366,9 +371,7 @@ class PdfConverterWithOCR(DocumentConverter):
 
                         if ocr_result.text.strip():
                             text = ocr_result.text.strip()
-                            markdown_parts.append(
-                                f"*[Image OCR]\n{text}\n[End OCR]*"
-                            )
+                            markdown_parts.append(f"*[Image OCR]\n{text}\n[End OCR]*")
                         else:
                             markdown_parts.append(
                                 "*[No text could be extracted from this page]*"
@@ -401,9 +404,7 @@ class PdfConverterWithOCR(DocumentConverter):
 
                         if ocr_result.text.strip():
                             text = ocr_result.text.strip()
-                            markdown_parts.append(
-                                f"*[Image OCR]\n{text}\n[End OCR]*"
-                            )
+                            markdown_parts.append(f"*[Image OCR]\n{text}\n[End OCR]*")
                         else:
                             markdown_parts.append(
                                 "*[No text could be extracted from this page]*"

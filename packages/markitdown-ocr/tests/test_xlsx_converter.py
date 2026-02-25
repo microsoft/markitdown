@@ -63,6 +63,7 @@ def _convert(filename: str, ocr_service: MockOCRService) -> str:
 # xlsx_image_start.xlsx
 # ---------------------------------------------------------------------------
 
+
 def test_xlsx_image_start(svc: MockOCRService) -> None:
     expected = (
         "## Sales Q1\n\n"
@@ -86,6 +87,7 @@ def test_xlsx_image_start(svc: MockOCRService) -> None:
 # ---------------------------------------------------------------------------
 # xlsx_image_middle.xlsx
 # ---------------------------------------------------------------------------
+
 
 def test_xlsx_image_middle(svc: MockOCRService) -> None:
     expected = (
@@ -120,6 +122,7 @@ def test_xlsx_image_middle(svc: MockOCRService) -> None:
 # ---------------------------------------------------------------------------
 # xlsx_image_end.xlsx
 # ---------------------------------------------------------------------------
+
 
 def test_xlsx_image_end(svc: MockOCRService) -> None:
     expected = (
@@ -159,6 +162,7 @@ def test_xlsx_image_end(svc: MockOCRService) -> None:
 # xlsx_multiple_images.xlsx
 # ---------------------------------------------------------------------------
 
+
 def test_xlsx_multiple_images(svc: MockOCRService) -> None:
     expected = (
         "## Overview\n\n"
@@ -192,6 +196,7 @@ def test_xlsx_multiple_images(svc: MockOCRService) -> None:
 # ---------------------------------------------------------------------------
 # xlsx_complex_layout.xlsx
 # ---------------------------------------------------------------------------
+
 
 def test_xlsx_complex_layout(svc: MockOCRService) -> None:
     expected = (
@@ -231,6 +236,7 @@ def test_xlsx_complex_layout(svc: MockOCRService) -> None:
 # ---------------------------------------------------------------------------
 # No OCR service — no OCR tags emitted
 # ---------------------------------------------------------------------------
+
 
 def test_xlsx_no_ocr_service_no_tags() -> None:
     path = TEST_DATA_DIR / "xlsx_image_middle.xlsx"
