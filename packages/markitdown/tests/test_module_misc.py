@@ -502,3 +502,18 @@ if __name__ == "__main__":
         test()
         print("OK")
     print("All tests passed!")
+
+
+def test_pptx_llm_returns_none():
+    """Issue #1534: PptxConverter crashes with TypeError when LLM returns None."""
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    # Simulate LLM returning None content
+    mock_response.choices = [MagicMock(message=MagicMock(content=None))]
+    mock_client.chat.completions.create.return_value = mock_response
+
+    markitdown = MarkItDown(llm_client=mock_client, llm_model="gpt-4o")
+
+    # This should not raise TypeError: sequence item 0: expected str instance, NoneType found
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.pptx"))
+    assert result.text_content is not None
