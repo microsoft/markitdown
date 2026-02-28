@@ -12,7 +12,26 @@ def file_uri_to_path(file_uri: str) -> Tuple[str | None, str]:
         raise ValueError(f"Not a file URL: {file_uri}")
 
     netloc = parsed.netloc if parsed.netloc else None
-    path = os.path.abspath(url2pathname(parsed.path))
+    path = url2pathname(parsed.path)
+
+    # On Windows, we need to guard against UNC path bypass attempts
+    # (where UNC paths are encoded in the URI path component to bypass netloc checks)
+    if os.name == 'nt':
+        # Check for UNC path in the path component (bypasses netloc check)
+        if netloc is None and (path.startswith('\\\\') or path.startswith('//')):
+            # Extract the server name part from potential UNC path
+            # Both \\server\share and //server/share start the server name after the 2nd char
+            unc_part = path[2:]
+
+            # Get the server name by splitting on the first separator
+            potential_server = unc_part.replace('/', '\\').split('\\', 1)[0]
+
+            # If it looks like a server name (doesn't contain : for drive letters like C:)
+            # and is not empty, it's likely a UNC path attempt
+            if potential_server and ':' not in potential_server:
+                raise ValueError(f"File URI contains UNC path in path component: {file_uri}")
+
+    path = os.path.abspath(path)
     return netloc, path
 
 
