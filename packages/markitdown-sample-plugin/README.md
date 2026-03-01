@@ -26,10 +26,10 @@ class RtfConverter(DocumentConverter):
         stream_info: StreamInfo,
         **kwargs: Any,
     ) -> bool:
-	
-	# Implement logic to check if the file stream is an RTF file
-	# ...
-	raise NotImplementedError()
+
+        # Implement logic to check if the file stream is an RTF file
+        # ...
+        raise NotImplementedError()
 
 
     def convert(
@@ -39,9 +39,9 @@ class RtfConverter(DocumentConverter):
         **kwargs: Any,
     ) -> DocumentConverterResult:
 
-	# Implement logic to convert the file stream to Markdown
-	# ...
-	raise NotImplementedError()
+        # Implement logic to convert the file stream to Markdown
+        # ...
+        raise NotImplementedError()
 ```
 
 Next, make sure your package implements and exports the following:
