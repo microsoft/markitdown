@@ -1,3 +1,4 @@
+import email
 import sys
 from typing import Any, Union, BinaryIO
 from .._stream_info import StreamInfo
@@ -97,6 +98,17 @@ class OutlookMsgConverter(DocumentConverter):
 
         # Extract email metadata
         md_content = "# Email Message\n\n"
+
+        #Get raw headers
+        raw_headers = self._get_stream_data(msg, "__substg1.0_007D001F")
+
+        #Add the email date to markdown
+        if raw_headers:
+            parsed_headers = email.message_from_string(raw_headers)
+            email_date = parsed_headers.get("Date")
+
+            if email_date:
+                md_content += f"**Date:** {email_date}\n"
 
         # Get headers
         headers = {
