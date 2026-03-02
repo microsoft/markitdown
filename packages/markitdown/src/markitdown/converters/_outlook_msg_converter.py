@@ -103,6 +103,7 @@ class OutlookMsgConverter(DocumentConverter):
             "From": self._get_stream_data(msg, "__substg1.0_0C1F001F"),
             "To": self._get_stream_data(msg, "__substg1.0_0E04001F"),
             "Cc": self._get_stream_data(msg, "__substg1.0_0E03001F"),
+            "Bcc": self._get_stream_data(msg, "__substg1.0_0E02001F"),
             "Subject": self._get_stream_data(msg, "__substg1.0_0037001F"),
         }
 
