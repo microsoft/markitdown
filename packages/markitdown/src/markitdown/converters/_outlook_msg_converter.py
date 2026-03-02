@@ -1,5 +1,6 @@
 from ast import Set
 import email
+import re
 import sys
 from typing import Any, Union, BinaryIO
 from .._stream_info import StreamInfo
@@ -138,7 +139,17 @@ class OutlookMsgConverter(DocumentConverter):
 
         # Get email body
         body = self._get_stream_data(msg, "__substg1.0_1000001F")
+        # Fallback
+        if not body:
+            body = self._get_stream_data(msg, "__substg1.0_10130102")
+
         if body:
+            # Remove styles and scripts
+            body = re.sub(r'<(style|script)[^>]*>.*?</\1>', '', body, flags=re.IGNORECASE | re.DOTALL)
+            
+            # Remove HTML code
+            body = re.sub(r'<[^>]+>', '', body).strip()
+            
             md_content += body
 
         msg.close()
@@ -158,16 +169,19 @@ class OutlookMsgConverter(DocumentConverter):
         try:
             if msg.exists(stream_path):
                 data = msg.openstream(stream_path).read()
-                # Try UTF-16 first (common for .msg files)
-                try:
+
+                # Check the property type (the last 4 characters of the path)
+                prop_type = stream_path[-4:]
+                if prop_type == "001F":
+                    # PT_UNICODE: Decode as UTF-16-LE
                     return data.decode("utf-16-le").replace('\x00', '').strip()
-                except UnicodeDecodeError:
-                    # Fall back to UTF-8
+                else:
+                    # PT_BINARY (0102) or PT_STRING8 (001E): Decode as UTF-8
                     try:
                         return data.decode("utf-8").replace('\x00', '').strip()
                     except UnicodeDecodeError:
-                        # Last resort - ignore errors
-                        return data.decode("utf-8", errors="ignore").replace('\x00', '').strip()
+                        # Fallback for older legacy encodings
+                        return data.decode("windows-1252", errors="ignore").replace('\x00', '').strip()
         except Exception:
             pass
         return None
