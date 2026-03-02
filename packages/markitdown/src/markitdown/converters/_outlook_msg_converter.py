@@ -185,9 +185,12 @@ class OutlookMsgConverter(DocumentConverter):
         data_stream_path = f"{attach_dir}/__substg1.0_37010102"
         size_bytes = 0
 
-        if msg.exists(data_stream_path):
-                    size_bytes = msg.get_size(data_stream_path)
-        
+        try:
+            if msg.exists(data_stream_path):
+                        size_bytes = msg.get_size(data_stream_path)
+        except Exception:
+            pass
+            
         #Format file size
         if size_bytes >= 1048576:
             size_str = f"{size_bytes / 1048576:.2f} MB"
@@ -199,7 +202,10 @@ class OutlookMsgConverter(DocumentConverter):
     def _get_attach_dirs(self, msg: any):
         attach_dirs = set()
 
-        for stream_path in msg.listdir():
-            if stream_path[0].startswith("__attach_version1.0_"):
-                attach_dirs.add(stream_path[0])
+        try:
+            for stream_path in msg.listdir():
+                if stream_path[0].startswith("__attach_version1.0_"):
+                    attach_dirs.add(stream_path[0])
+        except Exception:
+            pass
         return attach_dirs
