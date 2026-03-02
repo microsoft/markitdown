@@ -111,7 +111,7 @@ class OutlookMsgConverter(DocumentConverter):
 
             if email_date:
                 md_content += f"- **Date:** {email_date}\n"
-        
+
         # Fallback
 
         # Get headers
@@ -147,11 +147,16 @@ class OutlookMsgConverter(DocumentConverter):
 
         if body:
             # Remove styles and scripts
-            body = re.sub(r'<(style|script)[^>]*>.*?</\1>', '', body, flags=re.IGNORECASE | re.DOTALL)
-            
+            body = re.sub(
+                r"<(style|script)[^>]*>.*?</\1>",
+                "",
+                body,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+
             # Remove HTML code
-            body = re.sub(r'<[^>]+>', '', body).strip()
-            
+            body = re.sub(r"<[^>]+>", "", body).strip()
+
             md_content += body
 
         msg.close()
@@ -176,18 +181,22 @@ class OutlookMsgConverter(DocumentConverter):
                 prop_type = stream_path[-4:]
                 if prop_type == "001F":
                     # PT_UNICODE: Decode as UTF-16-LE
-                    return data.decode("utf-16-le").replace('\x00', '').strip()
+                    return data.decode("utf-16-le").replace("\x00", "").strip()
                 else:
                     # PT_BINARY (0102) or PT_STRING8 (001E): Decode as UTF-8
                     try:
-                        return data.decode("utf-8").replace('\x00', '').strip()
+                        return data.decode("utf-8").replace("\x00", "").strip()
                     except UnicodeDecodeError:
                         # Fallback for older legacy encodings
-                        return data.decode("windows-1252", errors="ignore").replace('\x00', '').strip()
+                        return (
+                            data.decode("windows-1252", errors="ignore")
+                            .replace("\x00", "")
+                            .strip()
+                        )
         except Exception:
             pass
         return None
-    
+
     def _get_attach_info(self, msg: any, attach_dir: any):
         # Get the filename
         filename = self._get_stream_data(msg, f"{attach_dir}/__substg1.0_3707001F")
@@ -203,10 +212,10 @@ class OutlookMsgConverter(DocumentConverter):
 
         try:
             if msg.exists(data_stream_path):
-                        size_bytes = msg.get_size(data_stream_path)
+                size_bytes = msg.get_size(data_stream_path)
         except Exception:
             pass
-            
+
         # Format file size
         if size_bytes >= 1048576:
             size_str = f"{size_bytes / 1048576:.2f} MB"
@@ -214,7 +223,7 @@ class OutlookMsgConverter(DocumentConverter):
             size_str = f"{size_bytes / 1024:.2f} KB"
 
         return f"* {filename} ({size_str})\n"
-    
+
     def _get_attach_dirs(self, msg: any):
         attach_dirs = set()
 
@@ -225,15 +234,15 @@ class OutlookMsgConverter(DocumentConverter):
         except Exception:
             pass
         return attach_dirs
-    
+
     def _get_sender(self, msg: Any):
         # When the downloaded .msg file came from the sent folder, the sender is behind a different path
         try:
             sender = self._get_stream_data(msg, "__substg1.0_5D01001F")
-            
+
             if not sender:
                 sender = self._get_stream_data(msg, "__substg1.0_0C1F001F")
-                
+
             if sender and (sender.startswith("/O=") or sender.startswith("/o=")):
                 raw_headers = self._get_stream_data(msg, "__substg1.0_007D001F")
                 if raw_headers:
