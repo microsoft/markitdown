@@ -132,7 +132,7 @@ class OutlookMsgConverter(DocumentConverter):
         attach_dirs = self._get_attach_dirs(msg)
 
         if attach_dirs:
-            md_content += "\n\n## Attachments\n"
+            md_content += "\n\n## Attachments\n\n"
 
             for attach_dir in sorted(attach_dirs):
                 md_content += self._get_attach_info(msg, attach_dir)
