@@ -100,16 +100,16 @@ class OutlookMsgConverter(DocumentConverter):
         # Extract email metadata
         md_content = "# Email Message\n\n"
 
-        #Get raw headers
+        # Get raw headers
         raw_headers = self._get_stream_data(msg, "__substg1.0_007D001F")
 
-        #Add the email date to markdown
+        # Add the email date to markdown
         if raw_headers:
             parsed_headers = email.message_from_string(raw_headers)
             email_date = parsed_headers.get("Date")
 
             if email_date:
-                md_content += f"**Date:** {email_date}\n"
+                md_content += f"- **Date:** {email_date}\n"
 
         # Get headers
         headers = {
@@ -123,9 +123,9 @@ class OutlookMsgConverter(DocumentConverter):
         # Add headers to markdown
         for key, value in headers.items():
             if value:
-                md_content += f"**{key}:** {value}\n"
+                md_content += f"- **{key}:** {value}\n"
 
-        #Add attachment info
+        # Add attachment info
         attach_dirs = self._get_attach_dirs(msg)
 
         if attach_dirs:
@@ -160,28 +160,28 @@ class OutlookMsgConverter(DocumentConverter):
                 data = msg.openstream(stream_path).read()
                 # Try UTF-16 first (common for .msg files)
                 try:
-                    return data.decode("utf-16-le").strip()
+                    return data.decode("utf-16-le").replace('\x00', '').strip()
                 except UnicodeDecodeError:
                     # Fall back to UTF-8
                     try:
-                        return data.decode("utf-8").strip()
+                        return data.decode("utf-8").replace('\x00', '').strip()
                     except UnicodeDecodeError:
                         # Last resort - ignore errors
-                        return data.decode("utf-8", errors="ignore").strip()
+                        return data.decode("utf-8", errors="ignore").replace('\x00', '').strip()
         except Exception:
             pass
         return None
     
     def _get_attach_info(self, msg: any, attach_dir: any):
-        #Get the filename
+        # Get the filename
         filename = self._get_stream_data(msg, f"{attach_dir}/__substg1.0_3707001F")
-        #Fallbacks
+        # Fallbacks
         if not filename:
             filename = self._get_stream_data(msg, f"{attach_dir}/__substg1.0_3704001F")
         if not filename:
             filename = "Unknown_Filename"
 
-        #Get the file size
+        # Get the file size
         data_stream_path = f"{attach_dir}/__substg1.0_37010102"
         size_bytes = 0
 
@@ -191,7 +191,7 @@ class OutlookMsgConverter(DocumentConverter):
         except Exception:
             pass
             
-        #Format file size
+        # Format file size
         if size_bytes >= 1048576:
             size_str = f"{size_bytes / 1048576:.2f} MB"
         else:
