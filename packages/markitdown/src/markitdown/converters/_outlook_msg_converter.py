@@ -1,3 +1,4 @@
+from ast import Set
 import email
 import sys
 from typing import Any, Union, BinaryIO
@@ -124,6 +125,15 @@ class OutlookMsgConverter(DocumentConverter):
             if value:
                 md_content += f"**{key}:** {value}\n"
 
+        #Add attachment info
+        attach_dirs = self._get_attach_dirs(msg)
+
+        if attach_dirs:
+            md_content += "\n\n## Attachments\n"
+
+            for attach_dir in sorted(attach_dirs):
+                md_content += self._get_attach_info(msg, attach_dir)
+
         md_content += "\n## Content\n\n"
 
         # Get email body
@@ -161,3 +171,35 @@ class OutlookMsgConverter(DocumentConverter):
         except Exception:
             pass
         return None
+    
+    def _get_attach_info(self, msg: any, attach_dir: any):
+        #Get the filename
+        filename = self._get_stream_data(msg, f"{attach_dir}/__substg1.0_3707001F")
+        #Fallbacks
+        if not filename:
+            filename = self._get_stream_data(msg, f"{attach_dir}/__substg1.0_3704001F")
+        if not filename:
+            filename = "Unknown_Filename"
+
+        #Get the file size
+        data_stream_path = f"{attach_dir}/__substg1.0_37010102"
+        size_bytes = 0
+
+        if msg.exists(data_stream_path):
+                    size_bytes = msg.get_size(data_stream_path)
+        
+        #Format file size
+        if size_bytes >= 1048576:
+            size_str = f"{size_bytes / 1048576:.2f} MB"
+        else:
+            size_str = f"{size_bytes / 1024:.2f} KB"
+
+        return f"* {filename} ({size_str})\n"
+    
+    def _get_attach_dirs(self, msg: any):
+        attach_dirs = set()
+
+        for stream_path in msg.listdir():
+            if stream_path[0].startswith("__attach_version1.0_"):
+                attach_dirs.add(stream_path[0])
+        return attach_dirs
