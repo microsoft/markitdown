@@ -111,10 +111,12 @@ class OutlookMsgConverter(DocumentConverter):
 
             if email_date:
                 md_content += f"- **Date:** {email_date}\n"
+        
+        # Fallback
 
         # Get headers
         headers = {
-            "From": self._get_stream_data(msg, "__substg1.0_0C1F001F"),
+            "From": self._get_sender(msg),
             "To": self._get_stream_data(msg, "__substg1.0_0E04001F"),
             "Cc": self._get_stream_data(msg, "__substg1.0_0E03001F"),
             "Bcc": self._get_stream_data(msg, "__substg1.0_0E02001F"),
@@ -223,3 +225,21 @@ class OutlookMsgConverter(DocumentConverter):
         except Exception:
             pass
         return attach_dirs
+    
+    def _get_sender(self, msg: Any):
+        # When the downloaded .msg file came from the sent folder, the sender is behind a different path
+        try:
+            sender = self._get_stream_data(msg, "__substg1.0_5D01001F")
+            
+            if not sender:
+                sender = self._get_stream_data(msg, "__substg1.0_0C1F001F")
+                
+            if sender and (sender.startswith("/O=") or sender.startswith("/o=")):
+                raw_headers = self._get_stream_data(msg, "__substg1.0_007D001F")
+                if raw_headers:
+                    parsed_headers = email.message_from_string(raw_headers)
+                    if parsed_headers.get("From"):
+                        sender = parsed_headers.get("From")
+        except Exception:
+            pass
+        return sender
