@@ -1,0 +1,4 @@
+flask>=3.0.0
+flask-cors>=4.0.0
+werkzeug>=3.0.0
+markitdown[all]>=0.1.0
