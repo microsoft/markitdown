@@ -455,6 +455,19 @@ def test_markitdown_llm_parameters() -> None:
     assert len(messages) == 1
     assert messages[0]["content"][0]["text"] == test_prompt
 
+def test_pptx_null_llm_caption() -> None:
+    """Test that a None response from llm_caption does not cause a crash (Issue #1534)."""
+    from unittest.mock import patch
+    
+    with patch("markitdown.converters._pptx_converter.llm_caption", return_value=None) as mock_llm_caption:
+        markitdown = MarkItDown(llm_client="dummy_client", llm_model="dummy_model")
+        
+        # Test PPTX file - should not crash
+        result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.pptx"))
+        
+        # Ensure it was called
+        assert mock_llm_caption.called
+
 
 @pytest.mark.skipif(
     skip_llm,
