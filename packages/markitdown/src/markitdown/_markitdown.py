@@ -251,14 +251,17 @@ class MarkItDown:
 
     def convert(
         self,
-        source: Union[str, requests.Response, Path, BinaryIO],
+        source: Union[
+            str, requests.Response, Path, BinaryIO, bytes, bytearray, memoryview
+        ],
         *,
         stream_info: Optional[StreamInfo] = None,
         **kwargs: Any,
     ) -> DocumentConverterResult:  # TODO: deal with kwargs
         """
         Args:
-            - source: can be a path (str or Path), url, or a requests.response object
+            - source: can be a path (str or Path), url, a requests.response object,
+              a bytes-like object, or a binary stream
             - stream_info: optional stream info to use for the conversion. If None, infer from source
             - kwargs: additional arguments to pass to the converter
         """
@@ -287,6 +290,13 @@ class MarkItDown:
         # Request response
         elif isinstance(source, requests.Response):
             return self.convert_response(source, stream_info=stream_info, **kwargs)
+        # Bytes-like objects
+        elif isinstance(source, (bytes, bytearray, memoryview)):
+            return self.convert_stream(
+                io.BytesIO(bytes(source)),
+                stream_info=stream_info,
+                **kwargs,
+            )
         # Binary stream
         elif (
             hasattr(source, "read")
@@ -296,7 +306,8 @@ class MarkItDown:
             return self.convert_stream(source, stream_info=stream_info, **kwargs)
         else:
             raise TypeError(
-                f"Invalid source type: {type(source)}. Expected str, requests.Response, BinaryIO."
+                "Invalid source type: "
+                f"{type(source)}. Expected str, requests.Response, bytes-like input, or BinaryIO."
             )
 
     def convert_local(
@@ -555,9 +566,9 @@ class MarkItDown:
             for converter_registration in sorted_registrations:
                 converter = converter_registration.converter
                 # Sanity check -- make sure the cur_pos is still the same
-                assert (
-                    cur_pos == file_stream.tell()
-                ), "File stream position should NOT change between guess iterations"
+                assert cur_pos == file_stream.tell(), (
+                    "File stream position should NOT change between guess iterations"
+                )
 
                 _kwargs = {k: v for k, v in kwargs.items()}
 
@@ -596,9 +607,9 @@ class MarkItDown:
                     pass
 
                 # accept() should not have changed the file stream position
-                assert (
-                    cur_pos == file_stream.tell()
-                ), f"{type(converter).__name__}.accept() should NOT change the file_stream position"
+                assert cur_pos == file_stream.tell(), (
+                    f"{type(converter).__name__}.accept() should NOT change the file_stream position"
+                )
 
                 # Attempt the conversion
                 if _accepts:
