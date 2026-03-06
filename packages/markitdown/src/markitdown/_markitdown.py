@@ -82,6 +82,29 @@ def _load_plugins() -> Union[None, List[Any]]:
     return _plugins
 
 
+def _rewrite_github_markdown_url(uri: str) -> str:
+    """Prefer raw markdown content for GitHub blob URLs that target markdown files."""
+    parsed = urlparse(uri)
+    if parsed.netloc.lower() != "github.com":
+        return uri
+
+    path_parts = [part for part in parsed.path.split("/") if part]
+    if len(path_parts) < 5 or path_parts[2] != "blob":
+        return uri
+
+    if not path_parts[-1].lower().endswith((".md", ".markdown")):
+        return uri
+
+    owner, repo = path_parts[0], path_parts[1]
+    ref = path_parts[3]
+    relative_path = "/".join(path_parts[4:])
+    return parsed._replace(
+        scheme="https",
+        netloc="raw.githubusercontent.com",
+        path=f"/{owner}/{repo}/{ref}/{relative_path}",
+    ).geturl()
+
+
 @dataclass(kw_only=True, frozen=True)
 class ConverterRegistration:
     """A registration of a converter with its priority and other metadata."""
@@ -449,7 +472,8 @@ class MarkItDown:
             )
         # HTTP/HTTPS URIs
         elif uri.startswith("http:") or uri.startswith("https:"):
-            response = self._requests_session.get(uri, stream=True)
+            request_uri = _rewrite_github_markdown_url(uri)
+            response = self._requests_session.get(request_uri, stream=True)
             response.raise_for_status()
             return self.convert_response(
                 response,
@@ -555,9 +579,9 @@ class MarkItDown:
             for converter_registration in sorted_registrations:
                 converter = converter_registration.converter
                 # Sanity check -- make sure the cur_pos is still the same
-                assert (
-                    cur_pos == file_stream.tell()
-                ), "File stream position should NOT change between guess iterations"
+                assert cur_pos == file_stream.tell(), (
+                    "File stream position should NOT change between guess iterations"
+                )
 
                 _kwargs = {k: v for k, v in kwargs.items()}
 
@@ -596,9 +620,9 @@ class MarkItDown:
                     pass
 
                 # accept() should not have changed the file stream position
-                assert (
-                    cur_pos == file_stream.tell()
-                ), f"{type(converter).__name__}.accept() should NOT change the file_stream position"
+                assert cur_pos == file_stream.tell(), (
+                    f"{type(converter).__name__}.accept() should NOT change the file_stream position"
+                )
 
                 # Attempt the conversion
                 if _accepts:
