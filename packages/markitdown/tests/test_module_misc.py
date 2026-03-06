@@ -282,6 +282,16 @@ def test_input_as_strings() -> None:
     result = markitdown.convert_stream(io.BytesIO(input_data))
     assert "# Test" in result.text_content
 
+
+def test_convert_accepts_bytes_like_inputs() -> None:
+    markitdown = MarkItDown()
+
+    input_data = b"<html><body><h1>Test</h1></body></html>"
+
+    assert "# Test" in markitdown.convert(input_data).text_content
+    assert "# Test" in markitdown.convert(bytearray(input_data)).text_content
+    assert "# Test" in markitdown.convert(memoryview(input_data)).text_content
+
     # Test input with leading blank characters
     input_data = b"   \n\n\n<html><body><h1>Test</h1></body></html>"
     result = markitdown.convert_stream(io.BytesIO(input_data))
