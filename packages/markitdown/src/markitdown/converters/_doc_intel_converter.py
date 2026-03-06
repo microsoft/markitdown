@@ -136,6 +136,7 @@ class DocumentIntelligenceConverter(DocumentConverter):
         endpoint: str,
         api_version: str = "2024-07-31-preview",
         credential: AzureKeyCredential | TokenCredential | None = None,
+        include_formulas: bool = False,
         file_types: List[DocumentIntelligenceFileType] = [
             DocumentIntelligenceFileType.DOCX,
             DocumentIntelligenceFileType.PPTX,
@@ -154,11 +155,13 @@ class DocumentIntelligenceConverter(DocumentConverter):
             endpoint (str): The endpoint for the Document Intelligence service.
             api_version (str): The API version to use. Defaults to "2024-07-31-preview".
             credential (AzureKeyCredential | TokenCredential | None): The credential to use for authentication.
+            include_formulas (bool): Whether to enable formula extraction for OCR-capable file types.
             file_types (List[DocumentIntelligenceFileType]): The file types to accept. Defaults to all supported file types.
         """
 
         super().__init__()
         self._file_types = file_types
+        self._include_formulas = include_formulas
 
         # Raise an error if the dependencies are not available.
         # This is different than other converters since this one isn't even instantiated
@@ -166,9 +169,7 @@ class DocumentIntelligenceConverter(DocumentConverter):
         if _dependency_exc_info is not None:
             raise MissingDependencyException(
                 "DocumentIntelligenceConverter requires the optional dependency [az-doc-intel] (or [all]) to be installed. E.g., `pip install markitdown[az-doc-intel]`"
-            ) from _dependency_exc_info[
-                1
-            ].with_traceback(  # type: ignore[union-attr]
+            ) from _dependency_exc_info[1].with_traceback(  # type: ignore[union-attr]
                 _dependency_exc_info[2]
             )
 
@@ -228,11 +229,15 @@ class DocumentIntelligenceConverter(DocumentConverter):
             if mimetype.startswith(prefix):
                 return []
 
-        return [
-            DocumentAnalysisFeature.FORMULAS,  # enable formula extraction
+        features = [
             DocumentAnalysisFeature.OCR_HIGH_RESOLUTION,  # enable high resolution OCR
             DocumentAnalysisFeature.STYLE_FONT,  # enable font style extraction
         ]
+        if self._include_formulas:
+            features.insert(
+                0, DocumentAnalysisFeature.FORMULAS
+            )  # enable formula extraction
+        return features
 
     def convert(
         self,
