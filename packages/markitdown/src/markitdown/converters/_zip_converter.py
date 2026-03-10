@@ -12,6 +12,24 @@ from .._exceptions import UnsupportedFormatException, FileConversionException
 if TYPE_CHECKING:
     from .._markitdown import MarkItDown
 
+def normalize_zip_filename(name: str) -> str:
+    """
+    normalize_zip_filename that may be garbed due to encoding issues.
+    """
+
+    try:
+        raw = name.encode("cp437")
+    except UnicodeDecodeError:
+        return name
+    
+    for enc in ["utf-8", "cp932", "gbk", "big5"]:
+        try:
+            return raw.decode(enc)
+        except UnicodeDecodeError:
+            continue
+    
+    return name
+
 ACCEPTED_MIME_TYPE_PREFIXES = [
     "application/zip",
 ]
@@ -94,9 +112,16 @@ class ZipConverter(DocumentConverter):
         md_content = f"Content from the zip file `{file_path}`:\n\n"
 
         with zipfile.ZipFile(file_stream, "r") as zipObj:
-            for name in zipObj.namelist():
+            for info in zipObj.infolist():
+                raw_name = info.filename
+                name = normalize_zip_filename(raw_name)
+
+                #skip macOS metadata files
+                if name.startswith("_MACOSX/") or "/._" in name:
+                    continue
+                
                 try:
-                    z_file_stream = io.BytesIO(zipObj.read(name))
+                    z_file_stream = io.BytesIO(zipObj.read(info))
                     z_file_stream_info = StreamInfo(
                         extension=os.path.splitext(name)[1],
                         filename=os.path.basename(name),
