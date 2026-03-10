@@ -166,11 +166,14 @@ See [`packages/markitdown-ocr/README.md`](packages/markitdown-ocr/README.md) for
 
 ### Azure Document Intelligence
 
-To use Microsoft Document Intelligence for conversion:
+To use Microsoft Document Intelligence for conversion from the command line:
 
 ```bash
+export AZURE_API_KEY="<document_intelligence_api_key>"
 markitdown path-to-file.pdf -o document.md -d -e "<document_intelligence_endpoint>"
 ```
+
+If `AZURE_API_KEY` is not set, MarkItDown will fall back to `DefaultAzureCredential`.
 
 More information about how to set up an Azure Document Intelligence Resource can be found [here](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/how-to-guides/create-document-intelligence-resource?view=doc-intel-4.0.0)
 
@@ -186,15 +189,24 @@ result = md.convert("test.xlsx")
 print(result.text_content)
 ```
 
-Document Intelligence conversion in Python:
+Document Intelligence conversion in Python using an API key:
 
 ```python
+import os
+
+from azure.core.credentials import AzureKeyCredential
 from markitdown import MarkItDown
 
-md = MarkItDown(docintel_endpoint="<document_intelligence_endpoint>")
+md = MarkItDown(
+    docintel_endpoint=os.environ["AZURE_DOC_INT_ENDPOINT"],
+    docintel_credential=AzureKeyCredential(os.environ["AZURE_API_KEY"]),
+    docintel_file_types=["pdf"],
+)
 result = md.convert("test.pdf")
 print(result.text_content)
 ```
+
+If you omit `docintel_credential`, MarkItDown will use `AZURE_API_KEY` when it is set and otherwise fall back to `DefaultAzureCredential`.
 
 To use Large Language Models for image descriptions (currently only for pptx and image files), provide `llm_client` and `llm_model`:
 
