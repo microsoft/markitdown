@@ -5,8 +5,11 @@ import re
 import shutil
 import pytest
 from unittest.mock import MagicMock
+from types import SimpleNamespace
 
 from markitdown._uri_utils import parse_data_uri, file_uri_to_path
+from markitdown.converters._docx_converter import DocxConverter, DEFAULT_STYLE_MAP
+from markitdown.converters import _docx_converter
 
 from markitdown import (
     MarkItDown,
@@ -259,6 +262,56 @@ def test_docx_comments() -> None:
         os.path.join(TEST_FILES_DIR, "test_with_comment.docx")
     )
     validate_strings(result, DOCX_COMMENT_TEST_STRINGS)
+
+
+def test_docx_converter_preserves_underline_by_default(monkeypatch) -> None:
+    converter = DocxConverter()
+    captured = {}
+
+    monkeypatch.setattr(_docx_converter, "pre_process_docx", lambda stream: stream)
+
+    def fake_convert_to_html(stream, style_map=None):
+        captured["style_map"] = style_map
+        return SimpleNamespace(value="<p><u>underlined</u></p>")
+
+    monkeypatch.setattr(_docx_converter.mammoth, "convert_to_html", fake_convert_to_html)
+    monkeypatch.setattr(
+        converter._html_converter,
+        "convert_string",
+        lambda html, **kwargs: html,
+    )
+
+    result = converter.convert(io.BytesIO(b"docx"), StreamInfo(extension=".docx"))
+
+    assert captured["style_map"] == DEFAULT_STYLE_MAP
+    assert result == "<p><u>underlined</u></p>"
+
+
+def test_docx_converter_appends_custom_style_map(monkeypatch) -> None:
+    converter = DocxConverter()
+    captured = {}
+
+    monkeypatch.setattr(_docx_converter, "pre_process_docx", lambda stream: stream)
+
+    def fake_convert_to_html(stream, style_map=None):
+        captured["style_map"] = style_map
+        return SimpleNamespace(value="<p>comment</p>")
+
+    monkeypatch.setattr(_docx_converter.mammoth, "convert_to_html", fake_convert_to_html)
+    monkeypatch.setattr(
+        converter._html_converter,
+        "convert_string",
+        lambda html, **kwargs: html,
+    )
+
+    result = converter.convert(
+        io.BytesIO(b"docx"),
+        StreamInfo(extension=".docx"),
+        style_map="comment-reference => ",
+    )
+
+    assert captured["style_map"] == f"{DEFAULT_STYLE_MAP}\ncomment-reference => "
+    assert result == "<p>comment</p>"
 
 
 def test_docx_equations() -> None:
