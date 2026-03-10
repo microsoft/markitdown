@@ -1,7 +1,6 @@
 import sys
 import io
-from warnings import warn
-
+import logging
 from typing import BinaryIO, Any
 
 from ._html_converter import HtmlConverter
@@ -10,14 +9,12 @@ from .._base_converter import DocumentConverterResult
 from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 
-# Try loading optional (but in this case, required) dependencies
-# Save reporting of any exceptions for later
+logger = logging.getLogger(__name__)
+
 _dependency_exc_info = None
 try:
     import mammoth
-
 except ImportError:
-    # Preserve the error and stack trace for later
     _dependency_exc_info = sys.exc_info()
 
 
@@ -30,7 +27,8 @@ ACCEPTED_FILE_EXTENSIONS = [".docx"]
 
 class DocxConverter(HtmlConverter):
     """
-    Converts DOCX files to Markdown. Style information (e.g.m headings) and tables are preserved where possible.
+    Converts DOCX files to Markdown.
+    Gracefully handles malformed DOCX files with missing style information.
     """
 
     def __init__(self):
@@ -41,27 +39,22 @@ class DocxConverter(HtmlConverter):
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
-        **kwargs: Any,  # Options to pass to the converter
+        **kwargs: Any,
     ) -> bool:
         mimetype = (stream_info.mimetype or "").lower()
         extension = (stream_info.extension or "").lower()
 
-        if extension in ACCEPTED_FILE_EXTENSIONS:
-            return True
-
-        for prefix in ACCEPTED_MIME_TYPE_PREFIXES:
-            if mimetype.startswith(prefix):
-                return True
-
-        return False
+        return (
+            extension in ACCEPTED_FILE_EXTENSIONS
+            or any(mimetype.startswith(p) for p in ACCEPTED_MIME_TYPE_PREFIXES)
+        )
 
     def convert(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
-        **kwargs: Any,  # Options to pass to the converter
+        **kwargs: Any,
     ) -> DocumentConverterResult:
-        # Check: the dependencies
         if _dependency_exc_info is not None:
             raise MissingDependencyException(
                 MISSING_DEPENDENCY_MESSAGE.format(
@@ -69,15 +62,30 @@ class DocxConverter(HtmlConverter):
                     extension=".docx",
                     feature="docx",
                 )
-            ) from _dependency_exc_info[
-                1
-            ].with_traceback(  # type: ignore[union-attr]
+            ) from _dependency_exc_info[1].with_traceback(  # type: ignore
                 _dependency_exc_info[2]
             )
 
-        style_map = kwargs.get("style_map", None)
-        pre_process_stream = pre_process_docx(file_stream)
-        return self._html_converter.convert_string(
-            mammoth.convert_to_html(pre_process_stream, style_map=style_map).value,
-            **kwargs,
-        )
+        style_map = kwargs.get("style_map")
+
+        # Preprocess and fully buffer the DOCX to avoid stream reuse issues
+        processed = pre_process_docx(file_stream)
+        buffer = io.BytesIO(processed.read())
+        buffer.seek(0)
+
+        try:
+            result = mammoth.convert_to_html(buffer, style_map=style_map)
+            html = result.value
+        except KeyError as exc:
+            # Known issue: malformed DOCX with missing w:styleId
+            logger.warning(
+                "DOCX conversion encountered missing style metadata (%s). "
+                "Falling back to default style handling.",
+                exc,
+            )
+
+            buffer.seek(0)
+            result = mammoth.convert_to_html(buffer)
+            html = result.value
+
+        return self._html_converter.convert_string(html, **kwargs)
