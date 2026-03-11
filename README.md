@@ -21,7 +21,7 @@ MarkItDown currently supports the conversion from:
 - PowerPoint
 - Word
 - Excel
-- Images (EXIF metadata and OCR)
+- Images (EXIF metadata and OCR — requires `markitdown-ocr` plugin)
 - Audio (EXIF metadata and speech transcription)
 - HTML
 - Text-based formats (CSV, JSON, XML)
@@ -161,6 +161,14 @@ print(result.text_content)
 ```
 
 If no `llm_client` is provided the plugin still loads, but OCR is silently skipped and the standard built-in converter is used instead.
+
+**CLI Usage:**
+
+```bash
+pip install markitdown-ocr
+export OPENAI_API_KEY="your-api-key"
+markitdown --use-plugins document_with_images.pdf -o document.md
+```
 
 See [`packages/markitdown-ocr/README.md`](packages/markitdown-ocr/README.md) for detailed documentation.
 
