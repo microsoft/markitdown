@@ -1,5 +1,4 @@
 """Tests for LLM gateway compatibility (configurable base_url and model)."""
-import importlib
 import os
 import sys
 import tempfile
