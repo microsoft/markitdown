@@ -10,7 +10,7 @@ from operator import attrgetter
 
 from ._html_converter import HtmlConverter
 from ._llm_caption import llm_caption
-from .._base_converter import DocumentConverter, DocumentConverterResult
+from .._base_converter import DocumentConverter, DocumentConverterResult, PageInfo
 from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 
@@ -78,19 +78,23 @@ class PptxConverter(DocumentConverter):
                 _dependency_exc_info[2]
             )
 
+        # Check if page extraction is requested
+        extract_pages = kwargs.get("extract_pages", False)
+
         # Perform the conversion
         presentation = pptx.Presentation(file_stream)
         md_content = ""
+        pages = [] if extract_pages else None
         slide_num = 0
         for slide in presentation.slides:
             slide_num += 1
 
-            md_content += f"\n\n<!-- Slide number: {slide_num} -->\n"
+            slide_content = f"\n\n<!-- Slide number: {slide_num} -->\n"
 
             title = slide.shapes.title
 
             def get_shape_content(shape, **kwargs):
-                nonlocal md_content
+                nonlocal slide_content
                 # Pictures
                 if self._is_picture(shape):
                     # https://github.com/scanny/python-pptx/pull/512#issuecomment-1713100069
@@ -145,26 +149,28 @@ class PptxConverter(DocumentConverter):
                         blob = shape.image.blob
                         content_type = shape.image.content_type or "image/png"
                         b64_string = base64.b64encode(blob).decode("utf-8")
-                        md_content += f"\n![{alt_text}](data:{content_type};base64,{b64_string})\n"
+                        slide_content += f"\n![{alt_text}](data:{content_type};base64,{b64_string})\n"
                     else:
                         # A placeholder name
                         filename = re.sub(r"\W", "", shape.name) + ".jpg"
-                        md_content += "\n![" + alt_text + "](" + filename + ")\n"
+                        slide_content += "\n![" + alt_text + "](" + filename + ")\n"
 
                 # Tables
                 if self._is_table(shape):
-                    md_content += self._convert_table_to_markdown(shape.table, **kwargs)
+                    slide_content += self._convert_table_to_markdown(
+                        shape.table, **kwargs
+                    )
 
                 # Charts
                 if shape.has_chart:
-                    md_content += self._convert_chart_to_markdown(shape.chart)
+                    slide_content += self._convert_chart_to_markdown(shape.chart)
 
                 # Text areas
                 elif shape.has_text_frame:
                     if shape == title:
-                        md_content += "# " + shape.text.lstrip() + "\n"
+                        slide_content += "# " + shape.text.lstrip() + "\n"
                     else:
-                        md_content += shape.text + "\n"
+                        slide_content += shape.text + "\n"
 
                 # Group Shapes
                 if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.GROUP:
@@ -188,16 +194,25 @@ class PptxConverter(DocumentConverter):
             for shape in sorted_shapes:
                 get_shape_content(shape, **kwargs)
 
-            md_content = md_content.strip()
+            slide_content = slide_content.strip()
 
             if slide.has_notes_slide:
-                md_content += "\n\n### Notes:\n"
+                slide_content += "\n\n### Notes:\n"
                 notes_frame = slide.notes_slide.notes_text_frame
                 if notes_frame is not None:
-                    md_content += notes_frame.text
-                md_content = md_content.strip()
+                    slide_content += notes_frame.text
+                slide_content = slide_content.strip()
 
-        return DocumentConverterResult(markdown=md_content.strip())
+            # Add to overall content
+            md_content += slide_content
+
+            # If extracting pages, add to pages list
+            if extract_pages:
+                pages.append(
+                    PageInfo(page_number=slide_num, content=slide_content.strip())
+                )
+
+        return DocumentConverterResult(markdown=md_content.strip(), pages=pages)
 
     def _is_picture(self, shape):
         if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.PICTURE:
