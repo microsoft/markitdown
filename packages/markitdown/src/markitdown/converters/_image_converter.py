@@ -1,9 +1,9 @@
-from typing import BinaryIO, Any, Union
-import base64
-import mimetypes
+from typing import BinaryIO, Any
+import asyncio
 from ._exiftool import exiftool_metadata
-from .._base_converter import DocumentConverter, DocumentConverterResult
+from .._base_converter import DocumentConverter, DocumentConverterResult, AsyncDocumentConverterResult
 from .._stream_info import StreamInfo
+from ._llm_caption import llm_caption
 
 ACCEPTED_MIME_TYPE_PREFIXES = [
     "image/jpeg",
@@ -69,7 +69,7 @@ class ImageConverter(DocumentConverter):
         llm_client = kwargs.get("llm_client")
         llm_model = kwargs.get("llm_model")
         if llm_client is not None and llm_model is not None:
-            llm_description = self._get_llm_description(
+            llm_description = llm_caption(
                 file_stream,
                 stream_info,
                 client=llm_client,
@@ -77,62 +77,14 @@ class ImageConverter(DocumentConverter):
                 prompt=kwargs.get("llm_prompt"),
             )
 
+            if asyncio.iscoroutine(llm_description):
+                return AsyncDocumentConverterResult(
+                    llm_description,
+                )
+
             if llm_description is not None:
                 md_content += "\n# Description:\n" + llm_description.strip() + "\n"
 
         return DocumentConverterResult(
             markdown=md_content,
         )
-
-    def _get_llm_description(
-        self,
-        file_stream: BinaryIO,
-        stream_info: StreamInfo,
-        *,
-        client,
-        model,
-        prompt=None,
-    ) -> Union[None, str]:
-        if prompt is None or prompt.strip() == "":
-            prompt = "Write a detailed caption for this image."
-
-        # Get the content type
-        content_type = stream_info.mimetype
-        if not content_type:
-            content_type, _ = mimetypes.guess_type(
-                "_dummy" + (stream_info.extension or "")
-            )
-        if not content_type:
-            content_type = "application/octet-stream"
-
-        # Convert to base64
-        cur_pos = file_stream.tell()
-        try:
-            base64_image = base64.b64encode(file_stream.read()).decode("utf-8")
-        except Exception as e:
-            return None
-        finally:
-            file_stream.seek(cur_pos)
-
-        # Prepare the data-uri
-        data_uri = f"data:{content_type};base64,{base64_image}"
-
-        # Prepare the OpenAI API request
-        messages = [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": data_uri,
-                        },
-                    },
-                ],
-            }
-        ]
-
-        # Call the OpenAI API
-        response = client.chat.completions.create(model=model, messages=messages)
-        return response.choices[0].message.content
