@@ -8,14 +8,26 @@ Verifies that:
 - Memory stays constant regardless of page count
 """
 
+import gc
 import io
 import os
+import tracemalloc
+
 import pytest
 from unittest.mock import patch, MagicMock
 
 from markitdown import MarkItDown
 
 TEST_FILES_DIR = os.path.join(os.path.dirname(__file__), "test_files")
+
+
+def _has_fpdf2() -> bool:
+    try:
+        import fpdf  # noqa: F401
+
+        return True
+    except ImportError:
+        return False
 
 
 def _make_form_page():
@@ -241,3 +253,99 @@ class TestPdfMemoryOptimization:
         assert (
             close_call_count > 0
         ), "page.close() was never called during PDF conversion"
+
+
+def _generate_table_pdf(num_pages: int) -> bytes:
+    """Generate a PDF with table-like content on every page."""
+    from fpdf import FPDF
+
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=False)
+    for page_num in range(num_pages):
+        pdf.add_page()
+        pdf.set_font("Helvetica", size=10)
+        pdf.set_xy(10, 10)
+        pdf.cell(60, 8, "Parameter", border=1)
+        pdf.cell(60, 8, "Value", border=1)
+        pdf.cell(60, 8, "Unit", border=1)
+        pdf.ln()
+        for row in range(20):
+            y = 18 + row * 8
+            if y > 270:
+                break
+            pdf.set_xy(10, y)
+            pdf.cell(60, 8, f"Param_{page_num}_{row}", border=1)
+            pdf.cell(60, 8, f"{(page_num * 100 + row) * 1.23:.2f}", border=1)
+            pdf.cell(60, 8, "kg/m2", border=1)
+    return pdf.output()
+
+
+@pytest.mark.skipif(
+    not _has_fpdf2(),
+    reason="fpdf2 not installed",
+)
+class TestPdfMemoryBenchmark:
+    """Benchmark: verify memory stays constant with page.close() fix."""
+
+    def test_memory_does_not_grow_linearly(self):
+        """Peak memory for 200 pages should be far less than without the fix.
+
+        Without page.close(), 200 pages uses ~225 MiB (linear growth).
+        With the fix, peak memory should stay under 30 MiB.
+        """
+        from markitdown import StreamInfo
+
+        num_pages = 200
+        pdf_bytes = _generate_table_pdf(num_pages)
+
+        gc.collect()
+        tracemalloc.start()
+
+        md = MarkItDown()
+        buf = io.BytesIO(pdf_bytes)
+        md.convert_stream(buf, stream_info=StreamInfo(extension=".pdf"))
+
+        _, peak = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+
+        peak_mib = peak / 1024 / 1024
+        # Without the fix this would be ~225 MiB. With the fix it should
+        # be well under 30 MiB. Use a generous threshold to avoid flaky
+        # failures on different machines.
+        assert peak_mib < 30, (
+            f"Peak memory {peak_mib:.1f} MiB for {num_pages} pages is too high. "
+            f"Expected < 30 MiB with page.close() fix."
+        )
+
+    def test_memory_constant_across_page_counts(self):
+        """Peak memory should not scale linearly with page count.
+
+        Converts 50-page and 200-page PDFs and asserts the peak memory
+        ratio is much less than the 4x page count ratio.
+        """
+        from markitdown import StreamInfo
+
+        results = {}
+        for num_pages in [50, 200]:
+            pdf_bytes = _generate_table_pdf(num_pages)
+
+            gc.collect()
+            tracemalloc.start()
+
+            md = MarkItDown()
+            buf = io.BytesIO(pdf_bytes)
+            md.convert_stream(buf, stream_info=StreamInfo(extension=".pdf"))
+
+            _, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+            results[num_pages] = peak
+
+        ratio = results[200] / results[50]
+        # With O(n) memory growth the ratio would be ~4x.
+        # With the fix it should be close to 1x (well under 2x).
+        assert ratio < 2.0, (
+            f"Memory ratio 200p/50p = {ratio:.2f}x — "
+            f"expected < 2.0x (constant memory). "
+            f"50p={results[50] / 1024 / 1024:.1f} MiB, "
+            f"200p={results[200] / 1024 / 1024:.1f} MiB"
+        )
