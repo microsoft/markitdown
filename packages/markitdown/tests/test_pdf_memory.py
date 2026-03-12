@@ -125,7 +125,6 @@ class TestPdfMemoryOptimization:
         ) as mock_pdfplumber, patch(
             "markitdown.converters._pdf_converter.pdfminer"
         ) as mock_pdfminer:
-
             mock_pdfplumber.open.side_effect = _mock_pdfplumber_open(pages)
             mock_pdfminer.high_level.extract_text.return_value = "Plain text content"
 
@@ -152,7 +151,6 @@ class TestPdfMemoryOptimization:
         ) as mock_pdfplumber, patch(
             "markitdown.converters._pdf_converter.pdfminer"
         ) as mock_pdfminer:
-
             mock_pdfplumber.open.side_effect = _mock_pdfplumber_open(pages)
             mock_pdfminer.high_level.extract_text.return_value = "text"
 
