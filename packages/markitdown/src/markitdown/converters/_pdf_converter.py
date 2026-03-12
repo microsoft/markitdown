@@ -424,39 +424,41 @@ class PdfConverter(DocumentConverter):
 
         assert isinstance(file_stream, io.IOBase)
 
-        markdown_chunks: list[str] = []
-
         # Read file stream into BytesIO for compatibility with pdfplumber
         pdf_bytes = io.BytesIO(file_stream.read())
 
         try:
-            # Track how many pages are form-style vs plain text
-            form_pages = 0
-            plain_pages = 0
+            # Single pass: check every page for form-style content.
+            # Pages with tables/forms get rich extraction; plain-text
+            # pages are collected separately. page.close() is called
+            # after each page to free pdfplumber's cached objects and
+            # keep memory usage constant regardless of page count.
+            markdown_chunks: list[str] = []
+            form_page_count = 0
+            plain_page_indices: list[int] = []
 
             with pdfplumber.open(pdf_bytes) as pdf:
-                for page in pdf.pages:
-                    # Try form-style word position extraction
+                for page_idx, page in enumerate(pdf.pages):
                     page_content = _extract_form_content_from_words(page)
 
-                    # If extraction returns None, this page is not form-style
-                    if page_content is None:
-                        plain_pages += 1
-                        # Extract text using pdfplumber's basic extraction for this page
+                    if page_content is not None:
+                        form_page_count += 1
+                        if page_content.strip():
+                            markdown_chunks.append(page_content)
+                    else:
+                        plain_page_indices.append(page_idx)
                         text = page.extract_text()
                         if text and text.strip():
                             markdown_chunks.append(text.strip())
-                    else:
-                        form_pages += 1
-                        if page_content.strip():
-                            markdown_chunks.append(page_content)
 
-            # If most pages are plain text, use pdfminer for better text handling
-            if plain_pages > form_pages and plain_pages > 0:
+                    page.close()  # Free cached page data immediately
+
+            # If no pages had form-style content, use pdfminer for
+            # the whole document (better text spacing for prose).
+            if form_page_count == 0:
                 pdf_bytes.seek(0)
                 markdown = pdfminer.high_level.extract_text(pdf_bytes)
             else:
-                # Build markdown from chunks
                 markdown = "\n\n".join(markdown_chunks).strip()
 
         except Exception:
