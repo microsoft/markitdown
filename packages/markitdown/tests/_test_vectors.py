@@ -5,6 +5,7 @@ from typing import List
 @dataclasses.dataclass(frozen=True, kw_only=True)
 class FileTestVector(object):
     filename: str
+    embedded_img: bool = False
     mimetype: str | None
     charset: str | None
     url: str | None
@@ -236,6 +237,27 @@ GENERAL_TEST_VECTORS = [
     ),
 ]
 
+EMBEDDED_IMG_TEST_VECTORS = [
+    FileTestVector(
+        filename="test.docx",
+        mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        charset=None,
+        url=None,
+        must_include=[
+            "314b0a30-5b04-470b-b9f7-eed2c2bec74a",
+            "49e168b7-d2ae-407f-a055-2167576f39a1",
+            "## d666f1f7-46cb-42bd-9a39-9a39cf2a509f",
+            "# Abstract",
+            "# Introduction",
+            "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation",
+            "## [embedded image] ##",
+        ],
+        must_not_include=[
+            "data:image/png;base64...",
+            "data:image/png;base64,iVBORw0KGgoAAAANSU",
+        ],
+    )
+]
 
 DATA_URI_TEST_VECTORS = [
     FileTestVector(
