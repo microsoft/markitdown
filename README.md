@@ -196,6 +196,10 @@ result = md.convert("test.pdf")
 print(result.text_content)
 ```
 
+Formula extraction is disabled by default for Azure Document Intelligence. To
+enable it for OCR-capable files, pass `docintel_enable_formulas=True` when you
+construct `MarkItDown`.
+
 To use Large Language Models for image descriptions (currently only for pptx and image files), provide `llm_client` and `llm_model`:
 
 ```python
