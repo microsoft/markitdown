@@ -601,6 +601,7 @@ class MarkItDown:
                 ), f"{type(converter).__name__}.accept() should NOT change the file_stream position"
 
                 # Attempt the conversion
+                res = None
                 if _accepts:
                     try:
                         res = converter.convert(file_stream, stream_info, **_kwargs)
