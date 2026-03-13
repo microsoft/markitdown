@@ -215,7 +215,7 @@ def _handle_output(args, result: DocumentConverterResult):
 
 
 def _exit_with_error(message: str):
-    print(message)
+    print(message, file=sys.stderr)
     sys.exit(1)
 
 
