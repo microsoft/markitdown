@@ -8,7 +8,7 @@ on:
 
 jobs:
   copilot-setup-steps:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
