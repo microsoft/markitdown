@@ -69,7 +69,7 @@ conda activate markitdown
 To install MarkItDown, use pip: `pip install 'markitdown[all]'`. Alternatively, you can install it from the source:
 
 ```bash
-git clone git@github.com:microsoft/markitdown.git
+git clone https://github.com/microsoft/markitdown.git
 cd markitdown
 pip install -e 'packages/markitdown[all]'
 ```
