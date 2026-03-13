@@ -1,0 +1,154 @@
+<mxfile host="65bd71144e">
+    <diagram id="PULM-7RwXS6CnYJKRTg3" name="Page-1">
+        <mxGraphModel dx="2103" dy="704" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" background="#ffffff" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="2" value="" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="150" y="70" width="1250" height="590" as="geometry"/>
+                </mxCell>
+                <mxCell id="3" value="&lt;b&gt;&lt;font style=&quot;font-size: 18px;&quot;&gt;MarkitDown CLI&lt;/font&gt;&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="220" y="130" width="150" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="8" value="" style="edgeStyle=none;html=1;" parent="1" source="4" target="7" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="4" value="&lt;font style=&quot;color: rgb(24, 20, 29);&quot;&gt;&lt;b&gt;CLI Interface&lt;/b&gt;&lt;br&gt;(__main__.py)&lt;br&gt;Entry point for command-line usage, parses input args, triggers conversions.&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="200" y="190" width="220" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="5" value="" style="endArrow=classic;html=1;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" parent="1" target="4" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="20" y="212" as="sourcePoint"/>
+                        <mxPoint x="330" y="270" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="7" value="&lt;span data-end=&quot;720&quot; data-start=&quot;693&quot;&gt;&lt;b&gt;Conversion Orchestrator&lt;/b&gt;&lt;br&gt;(_markitdown.py)&lt;/span&gt;&lt;div&gt;&lt;span data-end=&quot;720&quot; data-start=&quot;693&quot;&gt;Central logic: dispatches to specific format converters and controls&lt;/span&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="620" y="190" width="220" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="12" value="&lt;span style=&quot;color: rgb(0, 0, 0); font-size: 11px; text-wrap-mode: nowrap; background-color: rgb(255, 255, 255);&quot;&gt;Parse arguments and provide&lt;/span&gt;&lt;div&gt;&lt;span style=&quot;color: rgb(0, 0, 0); font-size: 11px; text-wrap-mode: nowrap; background-color: rgb(255, 255, 255);&quot;&gt;&amp;nbsp;file as input&lt;/span&gt;&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="480" y="206" width="90" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="14" value="" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.418;entryY=0.973;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" source="7" target="4" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="570" y="350" as="sourcePoint"/>
+                        <mxPoint x="620" y="300" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="730" y="320"/>
+                            <mxPoint x="292" y="320"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="15" value="&lt;span style=&quot;font-size: 11px; text-wrap-mode: nowrap; background-color: rgb(255, 255, 255);&quot;&gt;Generate output as a Markdown file&lt;/span&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="425" y="290" width="170" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="16" value="&lt;span style=&quot;font-size: 11px; text-wrap-mode: nowrap; background-color: rgb(255, 255, 255);&quot;&gt;Input as file with arguments&lt;/span&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="-10" y="180" width="170" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="17" value="" style="endArrow=classic;html=1;exitX=0;exitY=0.75;exitDx=0;exitDy=0;" parent="1" source="4" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="230" y="350" as="sourcePoint"/>
+                        <mxPoint x="20" y="258" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="18" value="&lt;span style=&quot;font-size: 11px; text-wrap-mode: nowrap; background-color: rgb(255, 255, 255);&quot;&gt;Output as Markdown file&lt;/span&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry y="230" width="170" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="20" value="" style="edgeStyle=none;html=1;" parent="1" source="19" target="7" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="19" value="&lt;span data-end=&quot;720&quot; data-start=&quot;693&quot;&gt;&lt;strong data-end=&quot;843&quot; data-start=&quot;822&quot;&gt;Format Converters&lt;/strong&gt;&lt;br&gt;(converters/)&lt;/span&gt;&lt;div&gt;&lt;span data-end=&quot;720&quot; data-start=&quot;693&quot;&gt;Houses individual file-type conversion modules (PDF, Word, CSV, etc.).&lt;/span&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="1040" y="190" width="220" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="21" value="Provides different types of converters" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="850" y="205" width="180" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="22" value="&lt;span data-end=&quot;720&quot; data-start=&quot;693&quot;&gt;&lt;strong data-end=&quot;843&quot; data-start=&quot;822&quot;&gt;Base Converter Interface&lt;/strong&gt;&lt;br&gt;(_base_converter.py)&lt;/span&gt;&lt;div&gt;Determines if the converter can handle the document based on metadata without altering the input stream.&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="1041" y="310" width="220" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="23" value="" style="endArrow=classic;html=1;" parent="1" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="1040" y="350" as="sourcePoint"/>
+                        <mxPoint x="790" y="280" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="950" y="350"/>
+                            <mxPoint x="790" y="350"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="24" value="Provides interface for metadata-based conversion." style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="830" y="320" width="180" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="25" value="&lt;span data-end=&quot;720&quot; data-start=&quot;693&quot;&gt;&lt;b&gt;Error Handling&lt;/b&gt;&lt;/span&gt;&lt;div&gt;&lt;span data-end=&quot;720&quot; data-start=&quot;693&quot;&gt;(_exceptions.py)&lt;/span&gt;&lt;div&gt;Custom exception classes&lt;/div&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="1040" y="426" width="220" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="26" value="" style="endArrow=classic;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;" parent="1" source="25" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="970" y="390" as="sourcePoint"/>
+                        <mxPoint x="790" y="280" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="790" y="470"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="27" value="Provides&amp;nbsp;&lt;span style=&quot;color: rgb(63, 63, 63);&quot;&gt;Custom exception classes&lt;/span&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="830" y="440" width="180" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="28" value="&lt;strong data-end=&quot;1203&quot; data-start=&quot;1178&quot;&gt;Stream&amp;nbsp;&lt;/strong&gt;&lt;br&gt;&lt;div&gt;&lt;span data-end=&quot;720&quot; data-start=&quot;693&quot;&gt;(_stream_info.py)&lt;/span&gt;&lt;div&gt;Provides a structured, immutable snapshot of file stream metadata for use in conversion and analysis.&lt;/div&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="375" y="370" width="220" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="29" value="" style="endArrow=classic;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" parent="1" source="28" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="680" y="390" as="sourcePoint"/>
+                        <mxPoint x="790" y="280" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="790" y="415"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="30" value="&lt;span style=&quot;&quot; data-is-only-node=&quot;&quot; data-end=&quot;12&quot; data-start=&quot;0&quot;&gt;Provides&lt;/span&gt; metadata snapshot for input streams." style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="600" y="380" width="180" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="31" value="&lt;div&gt;&lt;span data-end=&quot;720&quot; data-start=&quot;693&quot;&gt;&lt;b&gt;URI Handlers&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span data-end=&quot;720&quot; data-start=&quot;693&quot;&gt;(_uri_utils.py)&lt;/span&gt;&lt;div&gt;&lt;span style=&quot;&quot; data-is-only-node=&quot;&quot; data-end=&quot;12&quot; data-start=&quot;0&quot;&gt;Provides&lt;/span&gt; utilities to parse and convert file and data URIs into usable file paths and content.&lt;/div&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="375" y="505" width="220" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="32" value="" style="endArrow=classic;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.75;entryY=1;entryDx=0;entryDy=0;" parent="1" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="599" y="550" as="sourcePoint"/>
+                        <mxPoint x="789" y="280" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="790" y="550"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="33" value="Provides URI parsing and conversion utilities." style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="600" y="516" width="180" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="34" value="&lt;b&gt;About&lt;/b&gt;&lt;br&gt;&lt;div&gt;&lt;span data-end=&quot;720&quot; data-start=&quot;693&quot;&gt;(_about_.py)&lt;/span&gt;&lt;div&gt;Indicates the copyright and license information along with the version of the code&lt;/div&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="197" y="370" width="165" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="35" value="" style="endArrow=classic;html=1;exitX=0.25;exitY=0;exitDx=0;exitDy=0;entryX=0.179;entryY=0.994;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" source="34" target="4" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="430" y="390" as="sourcePoint"/>
+                        <mxPoint x="480" y="340" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="36" value="&lt;span style=&quot;font-size: 11px; text-wrap-mode: nowrap; background-color: rgb(255, 255, 255);&quot;&gt;Provide code version&lt;/span&gt;&lt;span style=&quot;font-family: monospace; font-size: 0px; text-align: start; text-wrap-mode: nowrap;&quot;&gt;%3CmxGraphModel%3E%3Croot%3E%3CmxCell%20id%3D%220%22%2F%3E%3CmxCell%20id%3D%221%22%20parent%3D%220%22%2F%3E%3CmxCell%20id%3D%222%22%20value%3D%22%26lt%3Bspan%20style%3D%26quot%3Bfont-size%3A%2011px%3B%20text-wrap-mode%3A%20nowrap%3B%20background-color%3A%20rgb(255%2C%20255%2C%20255)%3B%26quot%3B%26gt%3BGive%20Output%20as%20MarkDown%20file%26lt%3B%2Fspan%26gt%3B%22%20style%3D%22text%3Bhtml%3D1%3Balign%3Dcenter%3BverticalAlign%3Dmiddle%3BwhiteSpace%3Dwrap%3Brounded%3D0%3B%22%20vertex%3D%221%22%20parent%3D%221%22%3E%3CmxGeometry%20x%3D%22425%22%20y%3D%22290%22%20width%3D%22170%22%20height%3D%2230%22%20as%3D%22geometry%22%2F%3E%3C%2FmxCell%3E%3C%2Froot%3E%3C%2FmxGraphModel%3E&lt;/span&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="150" y="330" width="170" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="38" style="edgeStyle=none;html=1;entryX=0.995;entryY=0.543;entryDx=0;entryDy=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryPerimeter=0;" edge="1" parent="1" target="19">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="1260" y="133" as="sourcePoint"/>
+                        <mxPoint x="1260" y="233" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="1310" y="133"/>
+                            <mxPoint x="1310" y="238"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="37" value="&lt;span data-end=&quot;720&quot; data-start=&quot;693&quot;&gt;&lt;strong data-end=&quot;843&quot; data-start=&quot;822&quot;&gt;Converters Utils&lt;/strong&gt;&lt;br&gt;(converters_utils/)&lt;/span&gt;&lt;div&gt;Provide utility functions for DOCX and math sections&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="1040" y="90" width="220" height="90" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
