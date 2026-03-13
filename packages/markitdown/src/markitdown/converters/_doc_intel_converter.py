@@ -50,6 +50,12 @@ except ImportError:
 # TODO: currently, there is a bug in the document intelligence SDK with importing the "ContentFormat" enum.
 # This constant is a temporary fix until the bug is resolved.
 CONTENT_FORMAT = "markdown"
+AnalysisFeatureInput = DocumentAnalysisFeature | str
+DEFAULT_DOCINTEL_ANALYSIS_FEATURES: List[DocumentAnalysisFeature] = [
+    DocumentAnalysisFeature.FORMULAS,
+    DocumentAnalysisFeature.OCR_HIGH_RESOLUTION,
+    DocumentAnalysisFeature.STYLE_FONT,
+]
 
 
 class DocumentIntelligenceFileType(str, Enum):
@@ -136,6 +142,7 @@ class DocumentIntelligenceConverter(DocumentConverter):
         endpoint: str,
         api_version: str = "2024-07-31-preview",
         credential: AzureKeyCredential | TokenCredential | None = None,
+        analysis_features: List[AnalysisFeatureInput] | None = None,
         file_types: List[DocumentIntelligenceFileType] = [
             DocumentIntelligenceFileType.DOCX,
             DocumentIntelligenceFileType.PPTX,
@@ -154,11 +161,17 @@ class DocumentIntelligenceConverter(DocumentConverter):
             endpoint (str): The endpoint for the Document Intelligence service.
             api_version (str): The API version to use. Defaults to "2024-07-31-preview".
             credential (AzureKeyCredential | TokenCredential | None): The credential to use for authentication.
+            analysis_features (List[AnalysisFeatureInput] | None): Optional analysis features to always send.
             file_types (List[DocumentIntelligenceFileType]): The file types to accept. Defaults to all supported file types.
         """
 
         super().__init__()
         self._file_types = file_types
+        self._analysis_features_override = (
+            self._normalize_analysis_feature_list(analysis_features)
+            if analysis_features is not None
+            else None
+        )
 
         # Raise an error if the dependencies are not available.
         # This is different than other converters since this one isn't even instantiated
@@ -204,12 +217,90 @@ class DocumentIntelligenceConverter(DocumentConverter):
 
         return False
 
-    def _analysis_features(self, stream_info: StreamInfo) -> List[str]:
+    def _coerce_analysis_features(
+        self, features: AnalysisFeatureInput | List[AnalysisFeatureInput]
+    ) -> List[AnalysisFeatureInput]:
+        """Coerce analysis feature inputs into a flat list."""
+        if isinstance(features, str):
+            return features.split(",")
+
+        if isinstance(features, (list, tuple, set)):
+            coerced: List[AnalysisFeatureInput] = []
+            for feature in features:
+                if isinstance(feature, str):
+                    coerced.extend(feature.split(","))
+                else:
+                    coerced.append(feature)
+            return coerced
+
+        return [features]
+
+    def _resolve_analysis_feature(
+        self, feature: AnalysisFeatureInput
+    ) -> DocumentAnalysisFeature | None:
+        """Resolve feature inputs to SDK constants."""
+        if isinstance(feature, DocumentAnalysisFeature):
+            return feature
+
+        feature_value = getattr(feature, "value", feature)
+        token = str(feature_value).strip()
+        if len(token) == 0:
+            return None
+
+        if "." in token:
+            token = token.rsplit(".", maxsplit=1)[-1]
+
+        normalized_token = token.replace("-", "_").replace(" ", "_")
+        if normalized_token.isupper():
+            canonical_name = normalized_token
+        else:
+            canonical_name = re.sub(r"(?<!^)(?=[A-Z])", "_", normalized_token).upper()
+        resolved = getattr(DocumentAnalysisFeature, canonical_name, None)
+        if resolved is not None:
+            return resolved
+
+        raise ValueError(
+            f"Invalid Document Intelligence analysis feature: {token}. "
+            "Use SDK constants such as DocumentAnalysisFeature.FORMULAS."
+        )
+
+    def _normalize_analysis_feature_list(
+        self, features: AnalysisFeatureInput | List[AnalysisFeatureInput]
+    ) -> List[DocumentAnalysisFeature]:
+        """Normalize and de-duplicate configured feature constants."""
+        normalized: List[DocumentAnalysisFeature] = []
+        seen = set()
+        for feature in self._coerce_analysis_features(features):
+            resolved = self._resolve_analysis_feature(feature)
+            if resolved is None:
+                continue
+
+            dedupe_key = str(getattr(resolved, "value", resolved)).lower()
+            if dedupe_key in seen:
+                continue
+
+            seen.add(dedupe_key)
+            normalized.append(resolved)
+        return normalized
+
+    def _analysis_features(
+        self,
+        stream_info: StreamInfo,
+        feature_overrides: AnalysisFeatureInput
+        | List[AnalysisFeatureInput]
+        | None = None,
+    ) -> List[DocumentAnalysisFeature]:
         """
         Helper needed to determine which analysis features to use.
         Certain document analysis features are not availiable for
         office filetypes (.xlsx, .pptx, .html, .docx)
         """
+        if feature_overrides is not None:
+            return self._normalize_analysis_feature_list(feature_overrides)
+
+        if self._analysis_features_override is not None:
+            return self._analysis_features_override
+
         mimetype = (stream_info.mimetype or "").lower()
         extension = (stream_info.extension or "").lower()
 
@@ -228,11 +319,7 @@ class DocumentIntelligenceConverter(DocumentConverter):
             if mimetype.startswith(prefix):
                 return []
 
-        return [
-            DocumentAnalysisFeature.FORMULAS,  # enable formula extraction
-            DocumentAnalysisFeature.OCR_HIGH_RESOLUTION,  # enable high resolution OCR
-            DocumentAnalysisFeature.STYLE_FONT,  # enable font style extraction
-        ]
+        return DEFAULT_DOCINTEL_ANALYSIS_FEATURES.copy()
 
     def convert(
         self,
@@ -244,7 +331,10 @@ class DocumentIntelligenceConverter(DocumentConverter):
         poller = self.doc_intel_client.begin_analyze_document(
             model_id="prebuilt-layout",
             body=AnalyzeDocumentRequest(bytes_source=file_stream.read()),
-            features=self._analysis_features(stream_info),
+            features=self._analysis_features(
+                stream_info=stream_info,
+                feature_overrides=kwargs.get("docintel_features"),
+            ),
             output_content_format=CONTENT_FORMAT,  # TODO: replace with "ContentFormat.MARKDOWN" when the bug is fixed
         )
         result: AnalyzeResult = poller.result()
