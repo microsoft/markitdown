@@ -110,6 +110,12 @@ def main():
         help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
     )
 
+    parser.add_argument(
+        "-l",
+        "--language",
+        help="Language code for audio transcription (e.g., 'en-US', 'fr-FR', 'es-ES'). Default is 'en-US'.",
+    )
+
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
 
@@ -144,6 +150,15 @@ def main():
                 _exit_with_error(f"Invalid charset: {charset_hint}")
         else:
             charset_hint = None
+
+    language_hint = args.language
+    if language_hint is not None:
+        language_hint = language_hint.strip()
+        if len(language_hint) > 0:
+            if language_hint.count("-") != 1:
+                _exit_with_error(f"Invalid language: {language_hint}")
+        else:
+            language_hint = None
 
     stream_info = None
     if (
@@ -191,10 +206,14 @@ def main():
             sys.stdin.buffer,
             stream_info=stream_info,
             keep_data_uris=args.keep_data_uris,
+            language=language_hint,
         )
     else:
         result = markitdown.convert(
-            args.filename, stream_info=stream_info, keep_data_uris=args.keep_data_uris
+            args.filename,
+            stream_info=stream_info,
+            keep_data_uris=args.keep_data_uris,
+            language=language_hint,
         )
 
     _handle_output(args, result)
