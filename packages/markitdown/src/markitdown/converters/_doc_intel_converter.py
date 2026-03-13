@@ -136,16 +136,7 @@ class DocumentIntelligenceConverter(DocumentConverter):
         endpoint: str,
         api_version: str = "2024-07-31-preview",
         credential: AzureKeyCredential | TokenCredential | None = None,
-        file_types: List[DocumentIntelligenceFileType] = [
-            DocumentIntelligenceFileType.DOCX,
-            DocumentIntelligenceFileType.PPTX,
-            DocumentIntelligenceFileType.XLSX,
-            DocumentIntelligenceFileType.PDF,
-            DocumentIntelligenceFileType.JPEG,
-            DocumentIntelligenceFileType.PNG,
-            DocumentIntelligenceFileType.BMP,
-            DocumentIntelligenceFileType.TIFF,
-        ],
+        file_types: List[DocumentIntelligenceFileType] = None,
     ):
         """
         Initialize the DocumentIntelligenceConverter.
@@ -156,6 +147,8 @@ class DocumentIntelligenceConverter(DocumentConverter):
             credential (AzureKeyCredential | TokenCredential | None): The credential to use for authentication.
             file_types (List[DocumentIntelligenceFileType]): The file types to accept. Defaults to all supported file types.
         """
+        if file_types is None:
+            file_types = []
 
         super().__init__()
         self._file_types = file_types
