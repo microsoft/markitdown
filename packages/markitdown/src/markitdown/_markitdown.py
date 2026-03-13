@@ -615,9 +615,16 @@ class MarkItDown:
 
                 if res is not None:
                     # Normalize the content
-                    res.text_content = "\n".join(
-                        [line.rstrip() for line in re.split(r"\r?\n", res.text_content)]
-                    )
+                    lines = res.text_content.splitlines()
+                    normalized_lines = []
+                    for line in lines:
+                        # Preserve a hard break (exactly two spaces)
+                        if line.endswith("  ") and not line.endswith("   "):
+                            normalized_lines.append(line.rstrip() + "  ")
+                        else:
+                            normalized_lines.append(line.rstrip())
+
+                    res.text_content = "\n".join(normalized_lines)
                     res.text_content = re.sub(r"\n{3,}", "\n\n", res.text_content)
                     return res
 
