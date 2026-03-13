@@ -4,6 +4,7 @@ import os
 import io
 import re
 import html
+import uuid
 
 from typing import BinaryIO, Any
 from operator import attrgetter
@@ -139,17 +140,61 @@ class PptxConverter(DocumentConverter):
                     alt_text = "\n".join([llm_description, alt_text]) or shape.name
                     alt_text = re.sub(r"[\r\n\[\]]", " ", alt_text)
                     alt_text = re.sub(r"\s+", " ", alt_text).strip()
+                    
+                    uploader = kwargs.get("upload_handler")
+                    keep_data_uris = kwargs.get("keep_data_uris", False)
 
-                    # If keep_data_uris is True, use base64 encoding for images
-                    if kwargs.get("keep_data_uris", False):
+                    try:
                         blob = shape.image.blob
-                        content_type = shape.image.content_type or "image/png"
-                        b64_string = base64.b64encode(blob).decode("utf-8")
-                        md_content += f"\n![{alt_text}](data:{content_type};base64,{b64_string})\n"
-                    else:
-                        # A placeholder name
-                        filename = re.sub(r"\W", "", shape.name) + ".jpg"
-                        md_content += "\n![" + alt_text + "](" + filename + ")\n"
+                        original_ext = os.path.splitext(shape.image.filename)[1] if shape.image.filename else ".jpg"
+                        unique_filename = f"{uuid.uuid4().hex}{original_ext}"
+                        
+                        # Use uploader if available
+                        if uploader:
+                            meta = {
+                                "filename": unique_filename,
+                                "content_type": shape.image.content_type or "image/png",
+                            }
+                            image_url = uploader(blob, meta)
+                            
+                            # Verify if a valid URL was returned
+                            if image_url and isinstance(image_url, str) and image_url.strip():
+                                md_content += f"\n![{alt_text}]({image_url})\n"
+                            else:
+                                print(f"Warning: Upload handler returned invalid URL for {unique_filename}")
+                                # Fallback if uploader fails
+                                if keep_data_uris:
+                                    content_type = shape.image.content_type or "image/png"
+                                    b64_string = base64.b64encode(blob).decode("utf-8")
+                                    md_content += f"\n![{alt_text}](data:{content_type};base64,{b64_string})\n"
+                                else:
+                                    filename = re.sub(r"\W", "", shape.name) + ".jpg"
+                                    md_content += "\n![" + alt_text + "](" + filename + ")\n"
+                        # No uploader but data URI retention is enabled
+                        elif keep_data_uris:
+                            content_type = shape.image.content_type or "image/png"
+                            b64_string = base64.b64encode(blob).decode("utf-8")
+                            md_content += f"\n![{alt_text}](data:{content_type};base64,{b64_string})\n"
+                        # Default case: use filename only
+                        else:
+                            filename = re.sub(r"\W", "", shape.name) + ".jpg"
+                            md_content += "\n![" + alt_text + "](" + filename + ")\n"
+                            
+                    except Exception as e:
+                        print(f"Error processing image: {str(e)}")
+                        # Default handling on error
+                        if keep_data_uris:
+                            try:
+                                blob = shape.image.blob
+                                content_type = shape.image.content_type or "image/png"
+                                b64_string = base64.b64encode(blob).decode("utf-8")
+                                md_content += f"\n![{alt_text}](data:{content_type};base64,{b64_string})\n"
+                            except:
+                                filename = re.sub(r"\W", "", shape.name) + ".jpg"
+                                md_content += "\n![" + alt_text + "](" + filename + ")\n"
+                        else:
+                            filename = re.sub(r"\W", "", shape.name) + ".jpg"
+                            md_content += "\n![" + alt_text + "](" + filename + ")\n"
 
                 # Tables
                 if self._is_table(shape):
