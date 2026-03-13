@@ -1,13 +1,20 @@
+import base64
+import io
+import mimetypes
 import os
+import posixpath
 import zipfile
 from defusedxml import minidom
 from xml.dom.minidom import Document
 
-from typing import BinaryIO, Any, Dict, List
+from typing import BinaryIO, Any, Dict, List, Optional
+from urllib.parse import urlsplit, unquote
 
-from ._html_converter import HtmlConverter
-from .._base_converter import DocumentConverterResult
-from .._stream_info import StreamInfo
+from bs4 import BeautifulSoup
+
+from markitdown.converters._html_converter import HtmlConverter
+from markitdown._base_converter import DocumentConverterResult
+from markitdown._stream_info import StreamInfo
 
 ACCEPTED_MIME_TYPE_PREFIXES = [
     "application/epub",
@@ -33,10 +40,10 @@ class EpubConverter(HtmlConverter):
         self._html_converter = HtmlConverter()
 
     def accepts(
-        self,
-        file_stream: BinaryIO,
-        stream_info: StreamInfo,
-        **kwargs: Any,  # Options to pass to the converter
+            self,
+            file_stream: BinaryIO,
+            stream_info: StreamInfo,
+            **kwargs: Any,  # Options to pass to the converter
     ) -> bool:
         mimetype = (stream_info.mimetype or "").lower()
         extension = (stream_info.extension or "").lower()
@@ -51,10 +58,10 @@ class EpubConverter(HtmlConverter):
         return False
 
     def convert(
-        self,
-        file_stream: BinaryIO,
-        stream_info: StreamInfo,
-        **kwargs: Any,  # Options to pass to the converter
+            self,
+            file_stream: BinaryIO,
+            stream_info: StreamInfo,
+            **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
         with zipfile.ZipFile(file_stream, "r") as z:
             # Extracts metadata (title, authors, language, publisher, date, description, cover) from an EPUB file."""
@@ -77,12 +84,6 @@ class EpubConverter(HtmlConverter):
                 "identifier": self._get_text_from_node(opf_dom, "dc:identifier"),
             }
 
-            # Extract manifest items (ID → href mapping)
-            manifest = {
-                item.getAttribute("id"): item.getAttribute("href")
-                for item in opf_dom.getElementsByTagName("item")
-            }
-
             # Extract spine order (ID refs)
             spine_items = opf_dom.getElementsByTagName("itemref")
             spine_order = [item.getAttribute("idref") for item in spine_items]
@@ -91,6 +92,19 @@ class EpubConverter(HtmlConverter):
             base_path = "/".join(
                 opf_path.split("/")[:-1]
             )  # Get base directory of content.opf
+
+            # Extract manifest items (ID → href mapping), and a path → media-type map.
+            manifest: Dict[str, str] = {}
+            media_type_by_path: Dict[str, str] = {}
+            for item in opf_dom.getElementsByTagName("item"):
+                item_id = item.getAttribute("id")
+                href = item.getAttribute("href")
+                if item_id and href:
+                    manifest[item_id] = href
+                    full_path = f"{base_path}/{href}" if base_path else href
+                    media_type = item.getAttribute("media-type")
+                    if media_type:
+                        media_type_by_path[full_path] = media_type
             spine = [
                 f"{base_path}/{manifest[item_id]}" if base_path else manifest[item_id]
                 for item_id in spine_order
@@ -99,21 +113,30 @@ class EpubConverter(HtmlConverter):
 
             # Extract and convert the content
             markdown_content: List[str] = []
+            keep_data_uris = kwargs.get("keep_data_uris", False)
             for file in spine:
                 if file in z.namelist():
                     with z.open(file) as f:
-                        filename = os.path.basename(file)
-                        extension = os.path.splitext(filename)[1].lower()
-                        mimetype = MIME_TYPE_MAPPING.get(extension)
-                        converted_content = self._html_converter.convert(
-                            f,
-                            StreamInfo(
-                                mimetype=mimetype,
-                                extension=extension,
-                                filename=filename,
-                            ),
+                        html_bytes = f.read()
+
+                    if keep_data_uris:
+                        html_bytes = self._inline_images(
+                            html_bytes, file, z, media_type_by_path
                         )
-                        markdown_content.append(converted_content.markdown.strip())
+
+                    filename = os.path.basename(file)
+                    extension = os.path.splitext(filename)[1].lower()
+                    mimetype = MIME_TYPE_MAPPING.get(extension)
+                    converted_content = self._html_converter.convert(
+                        io.BytesIO(html_bytes),
+                        StreamInfo(
+                            mimetype=mimetype,
+                            extension=extension,
+                            filename=filename,
+                        ),
+                        **kwargs,
+                    )
+                    markdown_content.append(converted_content.markdown.strip())
 
             # Format and add the metadata
             metadata_markdown = []
@@ -144,3 +167,56 @@ class EpubConverter(HtmlConverter):
             if node.firstChild and hasattr(node.firstChild, "nodeValue"):
                 texts.append(node.firstChild.nodeValue.strip())
         return texts
+
+    def _inline_images(
+            self,
+            html_bytes: bytes,
+            html_path: str,
+            zip_file: zipfile.ZipFile,
+            media_type_by_path: Dict[str, str],
+    ) -> bytes:
+        soup = BeautifulSoup(html_bytes, "html.parser")
+        updated = False
+        for img in soup.find_all("img"):
+            src = img.get("src") or img.get("data-src")
+            if not src:
+                continue
+
+            if src.startswith("data:"):
+                continue
+
+            parsed = urlsplit(src)
+            if parsed.scheme or parsed.netloc:
+                continue
+
+            img_path = self._resolve_epub_path(html_path, unquote(parsed.path))
+            if not img_path or img_path not in zip_file.namelist():
+                continue
+
+            with zip_file.open(img_path) as img_f:
+                data = img_f.read()
+
+            content_type = media_type_by_path.get(img_path)
+            if not content_type:
+                content_type, _ = mimetypes.guess_type(img_path)
+            if not content_type:
+                content_type = "application/octet-stream"
+
+            b64 = base64.b64encode(data).decode("ascii")
+            img["src"] = f"data:{content_type};base64,{b64}"
+            updated = True
+
+        if not updated:
+            return html_bytes
+
+        return str(soup).encode("utf-8")
+
+    def _resolve_epub_path(self, html_path: str, resource_path: str) -> Optional[str]:
+        if not resource_path:
+            return None
+
+        if resource_path.startswith("/"):
+            return resource_path.lstrip("/")
+
+        base_dir = posixpath.dirname(html_path)
+        return posixpath.normpath(posixpath.join(base_dir, resource_path))
