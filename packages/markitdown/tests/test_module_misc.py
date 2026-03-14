@@ -382,6 +382,17 @@ def test_exceptions() -> None:
     assert type(exc_info.value.attempts[0].converter).__name__ == "PptxConverter"
 
 
+def test_xlsx_blank_cells() -> None:
+    # Blank cells in .xlsx should render as empty strings, not "NaN"
+    markitdown = MarkItDown()
+    result = markitdown.convert(
+        os.path.join(TEST_FILES_DIR, "test_xlsx_blank_cells.xlsx")
+    )
+    assert "NaN" not in result.markdown
+    assert "Alice" in result.markdown
+    assert "Bob" in result.markdown
+
+
 @pytest.mark.skipif(
     skip_exiftool,
     reason="do not run if exiftool is not installed",
