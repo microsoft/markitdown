@@ -101,7 +101,10 @@ class TestPdfMemoryOptimization:
             buf = io.BytesIO(b"fake pdf content")
             from markitdown import StreamInfo
 
-            md.convert_stream(buf, stream_info=StreamInfo(extension=".pdf"))
+            md.convert_stream(
+                buf,
+                stream_info=StreamInfo(extension=".pdf", mimetype="application/pdf"),
+            )
 
         # page.close() must be called on ALL pages
         for i, page in enumerate(pages):
@@ -132,7 +135,10 @@ class TestPdfMemoryOptimization:
             buf = io.BytesIO(b"fake pdf content")
             from markitdown import StreamInfo
 
-            result = md.convert_stream(buf, stream_info=StreamInfo(extension=".pdf"))
+            result = md.convert_stream(
+                buf,
+                stream_info=StreamInfo(extension=".pdf", mimetype="application/pdf"),
+            )
 
         # pdfminer should be used for the final text extraction
         assert mock_pdfminer.high_level.extract_text.called, (
@@ -158,7 +164,10 @@ class TestPdfMemoryOptimization:
             buf = io.BytesIO(b"fake pdf content")
             from markitdown import StreamInfo
 
-            md.convert_stream(buf, stream_info=StreamInfo(extension=".pdf"))
+            md.convert_stream(
+                buf,
+                stream_info=StreamInfo(extension=".pdf", mimetype="application/pdf"),
+            )
 
         for i, page in enumerate(pages):
             assert (
@@ -189,7 +198,10 @@ class TestPdfMemoryOptimization:
             buf = io.BytesIO(b"fake pdf content")
             from markitdown import StreamInfo
 
-            result = md.convert_stream(buf, stream_info=StreamInfo(extension=".pdf"))
+            result = md.convert_stream(
+                buf,
+                stream_info=StreamInfo(extension=".pdf", mimetype="application/pdf"),
+            )
 
         # All pages should have close() called
         for i, page in enumerate(pages):
@@ -220,7 +232,10 @@ class TestPdfMemoryOptimization:
             buf = io.BytesIO(b"fake pdf content")
             from markitdown import StreamInfo
 
-            md.convert_stream(buf, stream_info=StreamInfo(extension=".pdf"))
+            md.convert_stream(
+                buf,
+                stream_info=StreamInfo(extension=".pdf", mimetype="application/pdf"),
+            )
 
         assert mock_pdfplumber.open.call_count == 1, (
             f"Expected 1 pdfplumber.open call (single pass), "
