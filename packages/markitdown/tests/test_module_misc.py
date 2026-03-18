@@ -456,6 +456,21 @@ def test_markitdown_llm_parameters() -> None:
     assert messages[0]["content"][0]["text"] == test_prompt
 
 
+def test_markitdown_pptx_none_llm_description(monkeypatch: pytest.MonkeyPatch) -> None:
+    """PPTX conversion should handle null LLM captions without raising TypeError."""
+
+    monkeypatch.setattr(
+        "markitdown.converters._pptx_converter.llm_caption",
+        lambda *args, **kwargs: None,
+    )
+
+    markitdown = MarkItDown(llm_client=MagicMock(), llm_model="gpt-4o")
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.pptx"))
+
+    # Conversion should succeed and still include regular PPTX-derived content.
+    validate_strings(result, PPTX_TEST_STRINGS)
+
+
 @pytest.mark.skipif(
     skip_llm,
     reason="do not run llm tests without a key",
