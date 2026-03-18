@@ -218,7 +218,7 @@ client = OpenAI(
     api_key="YOUR_MINIMAX_API_KEY",
     base_url="https://api.minimax.io/v1",
 )
-md = MarkItDown(llm_client=client, llm_model="MiniMax-M2.5")
+md = MarkItDown(llm_client=client, llm_model="MiniMax-M2.7")
 result = md.convert("example.jpg")
 print(result.text_content)
 ```
