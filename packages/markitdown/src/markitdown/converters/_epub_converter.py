@@ -25,7 +25,7 @@ MIME_TYPE_MAPPING = {
 
 class EpubConverter(HtmlConverter):
     """
-    Converts EPUB files to Markdown. Style information (e.g.m headings) and tables are preserved where possible.
+    Converts EPUB files to Markdown. Style information (e.g., headings) and tables are preserved where possible.
     """
 
     def __init__(self):

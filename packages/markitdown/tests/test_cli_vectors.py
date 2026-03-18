@@ -27,7 +27,7 @@ TEST_FILES_DIR = os.path.join(os.path.dirname(__file__), "test_files")
 TEST_FILES_URL = "https://raw.githubusercontent.com/microsoft/markitdown/refs/heads/main/packages/markitdown/tests/test_files"
 
 
-# Prepare CLI test vectors (remove vectors that require mockig the url)
+# Prepare CLI test vectors (remove vectors that require mocking the url)
 CLI_TEST_VECTORS: List[FileTestVector] = []
 for test_vector in GENERAL_TEST_VECTORS:
     if test_vector.url is not None:
@@ -96,7 +96,7 @@ def test_output_to_file(shared_tmp_dir, test_vector) -> None:
 
 @pytest.mark.parametrize("test_vector", CLI_TEST_VECTORS)
 def test_input_from_stdin_without_hints(shared_tmp_dir, test_vector) -> None:
-    """Test that the CLI readds from stdin correctly."""
+    """Test that the CLI reads from stdin correctly."""
 
     test_input = b""
     with open(os.path.join(TEST_FILES_DIR, test_vector.filename), "rb") as stream:

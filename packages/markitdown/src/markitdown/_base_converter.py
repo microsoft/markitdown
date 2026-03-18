@@ -51,7 +51,7 @@ class DocumentConverter:
         """
         Return a quick determination on if the converter should attempt converting the document.
         This is primarily based `stream_info` (typically, `stream_info.mimetype`, `stream_info.extension`).
-        In cases where the data is retrieved via HTTP, the `steam_info.url` might also be referenced to
+        In cases where the data is retrieved via HTTP, the `stream_info.url` might also be referenced to
         make a determination (e.g., special converters for Wikipedia, YouTube etc).
         Finally, it is conceivable that the `stream_info.filename` might be used to in cases
         where the filename is well-known (e.g., `Dockerfile`, `Makefile`, etc)
@@ -71,7 +71,7 @@ class DocumentConverter:
 
         Parameters:
         - file_stream: The file-like object to convert. Must support seek(), tell(), and read() methods.
-        - stream_info: The StreamInfo object containing metadata about the file (mimetype, extension, charset, set)
+        - stream_info: The StreamInfo object containing metadata about the file (mimetype, extension, charset)
         - kwargs: Additional keyword arguments for the converter.
 
         Returns:
@@ -92,7 +92,7 @@ class DocumentConverter:
 
         Parameters:
         - file_stream: The file-like object to convert. Must support seek(), tell(), and read() methods.
-        - stream_info: The StreamInfo object containing metadata about the file (mimetype, extension, charset, set)
+        - stream_info: The StreamInfo object containing metadata about the file (mimetype, extension, charset)
         - kwargs: Additional keyword arguments for the converter.
 
         Returns:
