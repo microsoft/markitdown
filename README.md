@@ -1,13 +1,14 @@
-# MarkItDown
+C#
+ MarkItDown
+console.martline
+[[PyPI](https://img.shields.io/pypi/v/markitdown.svg)](https://pypi.org/project/markitdown/)
+[PyPI - Downloads](https://img.shields.io/pypi/dd/markitdown)
+[[Built by AutoGen Team](https://img.shields.io/badge/Built%20by-AutoGen%20Team-blue)](https://github.com/microsoft/autogen)
 
-[![PyPI](https://img.shields.io/pypi/v/markitdown.svg)](https://pypi.org/project/markitdown/)
-![PyPI - Downloads](https://img.shields.io/pypi/dd/markitdown)
-[![Built by AutoGen Team](https://img.shields.io/badge/Built%20by-AutoGen%20Team-blue)](https://github.com/microsoft/autogen)
-
-> [!TIP]
+> [TIP]
 > MarkItDown now offers an MCP (Model Context Protocol) server for integration with LLM applications like Claude Desktop. See [markitdown-mcp](https://github.com/microsoft/markitdown/tree/main/packages/markitdown-mcp) for more information.
 
-> [!IMPORTANT]
+> [IMPORTANT]
 > Breaking changes between 0.0.1 to 0.1.0:
 > * Dependencies are now organized into optional feature-groups (further details below). Use `pip install 'markitdown[all]'` to have backward-compatible behavior.
 > * convert\_stream() now requires a binary file-like object (e.g., a file opened in binary mode, or an io.BytesIO object). This is a breaking change from the previous version, where it previously also accepted text file-like objects, like io.StringIO.
@@ -39,7 +40,7 @@ responses unprompted. This suggests that they have been trained on vast amounts 
 Markdown-formatted text, and understand it well. As a side benefit, Markdown conventions
 are also highly token-efficient.
 
-## Prerequisites
+C# Prerequisites
 MarkItDown requires Python 3.10 or higher. It is recommended to use a virtual environment to avoid dependency conflicts.
 
 With the standard Python installation, you can create and activate a virtual environment using the following commands:
@@ -64,7 +65,7 @@ conda create -n markitdown python=3.12
 conda activate markitdown
 ```
 
-## Installation
+C# Installation
 
 To install MarkItDown, use pip: `pip install 'markitdown[all]'`. Alternatively, you can install it from the source:
 
@@ -74,9 +75,9 @@ cd markitdown
 pip install -e 'packages/markitdown[all]'
 ```
 
-## Usage
+C# Usage
 
-### Command-Line
+c# Command-Line
 
 ```bash
 markitdown path-to-file.pdf > document.md
@@ -94,7 +95,7 @@ You can also pipe content:
 cat path-to-file.pdf | markitdown
 ```
 
-### Optional Dependencies
+C# Optional Dependencies
 MarkItDown has optional dependencies for activating various file formats. Earlier in this document, we installed all optional dependencies with the `[all]` option. However, you can also install them individually for more control. For example:
 
 ```bash
@@ -116,7 +117,7 @@ At the moment, the following optional dependencies are available:
 * `[audio-transcription]` Installs dependencies for audio transcription of wav and mp3 files
 * `[youtube-transcription]` Installs dependencies for fetching YouTube video transcription
 
-### Plugins
+C# Plugins
 
 MarkItDown also supports 3rd-party plugins. Plugins are disabled by default. To list installed plugins:
 
@@ -132,18 +133,18 @@ markitdown --use-plugins path-to-file.pdf
 
 To find available plugins, search GitHub for the hashtag `#markitdown-plugin`. To develop a plugin, see `packages/markitdown-sample-plugin`.
 
-#### markitdown-ocr Plugin
+c# markitdown-ocr Plugin
 
 The `markitdown-ocr` plugin adds OCR support to PDF, DOCX, PPTX, and XLSX converters, extracting text from embedded images using LLM Vision — the same `llm_client` / `llm_model` pattern that MarkItDown already uses for image descriptions. No new ML libraries or binary dependencies required.
 
-**Installation:**
+Installation:
 
 ```bash
 pip install markitdown-ocr
 pip install openai  # or any OpenAI-compatible client
 ```
 
-**Usage:**
+Usage:
 
 Pass the same `llm_client` and `llm_model` you would use for image descriptions:
 
@@ -164,7 +165,7 @@ If no `llm_client` is provided the plugin still loads, but OCR is silently skipp
 
 See [`packages/markitdown-ocr/README.md`](packages/markitdown-ocr/README.md) for detailed documentation.
 
-### Azure Document Intelligence
+ Azure Document Intelligence
 
 To use Microsoft Document Intelligence for conversion:
 
@@ -174,7 +175,7 @@ markitdown path-to-file.pdf -o document.md -d -e "<document_intelligence_endpoin
 
 More information about how to set up an Azure Document Intelligence Resource can be found [here](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/how-to-guides/create-document-intelligence-resource?view=doc-intel-4.0.0)
 
-### Python API
+Python API
 
 Basic usage in Python:
 
@@ -208,14 +209,14 @@ result = md.convert("example.jpg")
 print(result.text_content)
 ```
 
-### Docker
+ Docker
 
 ```sh
 docker build -t markitdown:latest .
 docker run --rm -i markitdown:latest < ~/your-file.pdf > output.md
 ```
 
-## Contributing
+Contributing
 
 This project welcomes contributions and suggestions. Most contributions require you to agree to a
 Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
@@ -229,7 +230,7 @@ This project has adopted the [Microsoft Open Source Code of Conduct](https://ope
 For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
 contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
 
-### How to Contribute
+ How to Contribute
 
 You can help by looking at issues or helping review PRs. Any issue or PR is welcome, but we have also marked some as 'open for contribution' and 'open for reviewing' to help facilitate community contributions. These are of course just suggestions and you are welcome to contribute in any way you like.
 
@@ -237,12 +238,12 @@ You can help by looking at issues or helping review PRs. Any issue or PR is welc
 
 |            | All                                                          | Especially Needs Help from Community                                                                                                      |
 | ---------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| **Issues** | [All Issues](https://github.com/microsoft/markitdown/issues) | [Issues open for contribution](https://github.com/microsoft/markitdown/issues?q=is%3Aissue+is%3Aopen+label%3A%22open+for+contribution%22) |
-| **PRs**    | [All PRs](https://github.com/microsoft/markitdown/pulls)     | [PRs open for reviewing](https://github.com/microsoft/markitdown/pulls?q=is%3Apr+is%3Aopen+label%3A%22open+for+reviewing%22)              |
+| Issues | [All Issues](https://github.com/microsoft/markitdown/issues) | [Issues open for contribution](https://github.com/microsoft/markitdown/issues?q=is%3Aissue+is%3Aopen+label%3A%22open+for+contribution%22) |
+| PRs    | [All PRs](https://github.com/microsoft/markitdown/pulls)     | [PRs open for reviewing](https://github.com/microsoft/markitdown/pulls?q=is%3Apr+is%3Aopen+label%3A%22open+for+reviewing%22)              |
 
 </div>
 
-### Running Tests and Checks
+c# Running Tests and Checks
 
 - Navigate to the MarkItDown package:
 
@@ -267,11 +268,11 @@ You can help by looking at issues or helping review PRs. Any issue or PR is welc
 
 - Run pre-commit checks before submitting a PR: `pre-commit run --all-files`
 
-### Contributing 3rd-party Plugins
+c# Contributing 3rd-party Plugins
 
 You can also contribute by creating and sharing 3rd party plugins. See `packages/markitdown-sample-plugin` for more details.
 
-## Trademarks
+c# Trademarks
 
 This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft
 trademarks or logos is subject to and must follow
