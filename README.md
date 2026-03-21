@@ -30,6 +30,47 @@ MarkItDown currently supports the conversion from:
 - EPubs
 - ... and more!
 
+## Supported Formats
+
+### Excel (.xlsx, .xls)
+- Each sheet is converted to a separate Markdown table
+- Supports currency formatting (e.g., `$1,199.00`, `€299.50`)
+- Install dependencies: `pip install 'markitdown[xlsx]'` for `.xlsx`, `pip install 'markitdown[xls]'` for `.xls`
+- **Known limitations:** Complex merged cells and conditional formatting are not preserved
+
+### PDF (.pdf)
+- Text content is extracted and converted to Markdown
+- Install dependencies: `pip install 'markitdown[pdf]'`
+- **Known limitations:** Complex multi-column layouts may not preserve reading order; scanned PDFs require OCR plugin
+
+### PowerPoint (.pptx)
+- Slide titles, text content, and tables are extracted
+- Install dependencies: `pip install 'markitdown[pptx]'`
+- **Known limitations:** Slide images are not extracted by default (use `markitdown-ocr` plugin for image text)
+
+### Word (.docx)
+- Headings, paragraphs, tables, and lists are preserved
+- Install dependencies: `pip install 'markitdown[docx]'`
+
+### Images (.jpg, .png, etc.)
+- Extracts EXIF metadata
+- Optionally generates image descriptions using an LLM (requires `llm_client` and `llm_model`)
+
+### Audio (.wav, .mp3)
+- Extracts EXIF metadata
+- Optionally transcribes speech to text
+- Install dependencies: `pip install 'markitdown[audio-transcription]'`
+
+### HTML
+- Converts HTML structure to Markdown, preserving headings, links, and tables
+- No additional dependencies required
+
+### Others
+- **CSV / JSON / XML**: Converted to readable Markdown text
+- **YouTube URLs**: Fetches video transcript if available (`pip install 'markitdown[youtube-transcription]'`)
+- **EPub**: Extracts chapter text content
+- **ZIP**: Iterates over all files inside and converts each one
+
 ## Why Markdown?
 
 Markdown is extremely close to plain text, with minimal markup or formatting, but still
