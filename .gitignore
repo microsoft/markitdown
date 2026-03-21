@@ -166,3 +166,7 @@ cython_debug/
 src/.DS_Store
 .DS_Store
 .cursorrules
+
+
+create_test_file.py
+test_currency.xlsx
