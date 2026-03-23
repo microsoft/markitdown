@@ -7,7 +7,7 @@ import io
 import sys
 from typing import Any, BinaryIO, Optional
 
-from markitdown import DocumentConverter, DocumentConverterResult, StreamInfo
+from markitdown import DocumentConverter, DocumentConverterResult, PageInfo, StreamInfo
 from markitdown._exceptions import (
     MissingDependencyException,
     MISSING_DEPENDENCY_MESSAGE,
@@ -177,15 +177,20 @@ class PdfConverterWithOCR(DocumentConverter):
             kwargs.get("ocr_service") or self.ocr_service
         )
 
+        # Check if page-level extraction is requested
+        extract_pages = kwargs.get("extract_pages", False)
+
         # Read PDF into BytesIO
         file_stream.seek(0)
         pdf_bytes = io.BytesIO(file_stream.read())
 
         markdown_content = []
+        page_contents: list[str] = [] if extract_pages else []
 
         try:
             with pdfplumber.open(pdf_bytes) as pdf:
                 for page_num, page in enumerate(pdf.pages, 1):
+                    page_parts: list[str] = []
                     markdown_content.append(f"\n## Page {page_num}\n")
 
                     # If OCR is enabled, interleave text and images by position
@@ -269,22 +274,31 @@ class PdfConverterWithOCR(DocumentConverter):
                             for item in content_items:
                                 if item["type"] == "text":
                                     markdown_content.append(item["text"])
+                                    page_parts.append(item["text"])
                                 else:  # image
                                     ocr_text = item["ocr_text"]
                                     img_marker = (
                                         f"\n\n*[Image OCR]\n{ocr_text}\n[End OCR]*\n"
                                     )
                                     markdown_content.append(img_marker)
+                                    page_parts.append(img_marker)
                         else:
                             # No images detected - just extract regular text
                             text_content = page.extract_text() or ""
                             if text_content.strip():
                                 markdown_content.append(text_content.strip())
+                                page_parts.append(text_content.strip())
                     else:
                         # No OCR, just extract text
                         text_content = page.extract_text() or ""
                         if text_content.strip():
                             markdown_content.append(text_content.strip())
+                            page_parts.append(text_content.strip())
+
+                    if extract_pages:
+                        page_contents.append(
+                            "\n\n".join(page_parts).strip()
+                        )
 
                 # Build final markdown
                 markdown = "\n\n".join(markdown_content).strip()
@@ -308,7 +322,15 @@ class PdfConverterWithOCR(DocumentConverter):
             pdf_bytes.seek(0)
             markdown = self._ocr_full_pages(pdf_bytes, ocr_service)
 
-        return DocumentConverterResult(markdown=markdown)
+        # Build pages list if requested
+        pages = None
+        if extract_pages and page_contents:
+            pages = [
+                PageInfo(page_number=i + 1, content=content)
+                for i, content in enumerate(page_contents)
+            ]
+
+        return DocumentConverterResult(markdown=markdown, pages=pages)
 
     def _extract_page_images(self, pdf_bytes: io.BytesIO, page_num: int) -> list[dict]:
         """
