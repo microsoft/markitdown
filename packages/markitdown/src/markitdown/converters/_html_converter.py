@@ -55,10 +55,25 @@ class HtmlConverter(DocumentConverter):
         # Print only the main content
         body_elm = soup.find("body")
         webpage_text = ""
-        if body_elm:
-            webpage_text = _CustomMarkdownify(**kwargs).convert_soup(body_elm)
-        else:
-            webpage_text = _CustomMarkdownify(**kwargs).convert_soup(soup)
+        try:
+            if body_elm:
+                webpage_text = _CustomMarkdownify(**kwargs).convert_soup(body_elm)
+            else:
+                webpage_text = _CustomMarkdownify(**kwargs).convert_soup(soup)
+        except RecursionError:
+            # Large or deeply-nested HTML can exceed Python's recursion limit
+            # during markdownify's recursive DOM traversal.  Fall back to
+            # BeautifulSoup's iterative get_text() so the caller still gets
+            # usable plain-text content instead of raw HTML.
+            import warnings
+
+            warnings.warn(
+                "HTML document is too deeply nested for markdown conversion "
+                "(RecursionError). Falling back to plain-text extraction.",
+                stacklevel=2,
+            )
+            target = body_elm if body_elm else soup
+            webpage_text = target.get_text("\n", strip=True)
 
         assert isinstance(webpage_text, str)
 
