@@ -1,11 +1,17 @@
+import base64
+import mimetypes
+import os
+import re
 import sys
 import io
 from warnings import warn
 
+from bs4 import BeautifulSoup
 from typing import BinaryIO, Any
 
 from ._html_converter import HtmlConverter
 from ..converter_utils.docx.pre_process import pre_process_docx
+from ..converter_utils.images import resolve_images_dir
 from .._base_converter import DocumentConverterResult
 from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
@@ -26,6 +32,9 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 ]
 
 ACCEPTED_FILE_EXTENSIONS = [".docx"]
+
+# Map mimetypes.guess_extension() quirks to sane extensions
+_EXT_FIXES = {".jpe": ".jpg", ".jpeg": ".jpg"}
 
 
 class DocxConverter(HtmlConverter):
@@ -77,7 +86,34 @@ class DocxConverter(HtmlConverter):
 
         style_map = kwargs.get("style_map", None)
         pre_process_stream = pre_process_docx(file_stream)
-        return self._html_converter.convert_string(
-            mammoth.convert_to_html(pre_process_stream, style_map=style_map).value,
-            **kwargs,
-        )
+        html = mammoth.convert_to_html(pre_process_stream, style_map=style_map).value
+
+        save_images = kwargs.get("save_images", False)
+        if save_images:
+            actual_images_dir, md_prefix = resolve_images_dir(
+                save_images, stream_info, "docx"
+            )
+            html = self._save_images(html, actual_images_dir, md_prefix)
+
+        return self._html_converter.convert_string(html, **kwargs)
+
+    def _save_images(self, html: str, images_dir: str, md_prefix: str) -> str:
+        """Extract base64 data URI images from mammoth HTML, save to *images_dir*,
+        and replace each src with a *md_prefix*/filename relative path."""
+        soup = BeautifulSoup(html, "html.parser")
+        for i, img in enumerate(soup.find_all("img")):
+            src = img.get("src", "")
+            if not src.startswith("data:"):
+                continue
+            try:
+                header, b64data = src.split(",", 1)
+                mime = header.split(":")[1].split(";")[0]
+                ext = mimetypes.guess_extension(mime) or ".bin"
+                ext = _EXT_FIXES.get(ext, ext)
+                filename = f"image_{i + 1}{ext}"
+                with open(os.path.join(images_dir, filename), "wb") as f:
+                    f.write(base64.b64decode(b64data))
+                img["src"] = f"{md_prefix}/{filename}"
+            except Exception:
+                continue
+        return str(soup)

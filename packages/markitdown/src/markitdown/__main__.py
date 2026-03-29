@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: MIT
 import argparse
+import os
+import re
 import sys
 import codecs
 from textwrap import dedent
@@ -110,6 +112,17 @@ def main():
         help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
     )
 
+    parser.add_argument(
+        "--save-images",
+        nargs="?",
+        const=True,
+        default=False,
+        metavar="DIR",
+        help="Extract images from documents and save them to a directory. "
+        "If DIR is omitted, images are saved to ./images_{output_filename}/. "
+        "When omitted entirely, images are not included in the output (default).",
+    )
+
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
 
@@ -186,15 +199,32 @@ def main():
     else:
         markitdown = MarkItDown(enable_plugins=args.use_plugins)
 
+    # Resolve the images directory path
+    save_images = args.save_images
+    if save_images is True:
+        # Auto-compute directory name from output filename, then input filename
+        if args.output:
+            stem = os.path.splitext(os.path.basename(args.output))[0]
+        elif args.filename:
+            stem = os.path.splitext(os.path.basename(args.filename))[0]
+        else:
+            stem = "output"
+        stem = re.sub(r"[^\w\-]", "_", stem)
+        save_images = f"images_{stem}"
+
     if args.filename is None:
         result = markitdown.convert_stream(
             sys.stdin.buffer,
             stream_info=stream_info,
             keep_data_uris=args.keep_data_uris,
+            save_images=save_images,
         )
     else:
         result = markitdown.convert(
-            args.filename, stream_info=stream_info, keep_data_uris=args.keep_data_uris
+            args.filename,
+            stream_info=stream_info,
+            keep_data_uris=args.keep_data_uris,
+            save_images=save_images,
         )
 
     _handle_output(args, result)
