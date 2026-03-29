@@ -146,6 +146,7 @@ class DocumentIntelligenceConverter(DocumentConverter):
             DocumentIntelligenceFileType.BMP,
             DocumentIntelligenceFileType.TIFF,
         ],
+        enable_formulas: bool = True,
     ):
         """
         Initialize the DocumentIntelligenceConverter.
@@ -154,7 +155,9 @@ class DocumentIntelligenceConverter(DocumentConverter):
             endpoint (str): The endpoint for the Document Intelligence service.
             api_version (str): The API version to use. Defaults to "2024-07-31-preview".
             credential (AzureKeyCredential | TokenCredential | None): The credential to use for authentication.
-            file_types (List[DocumentIntelligenceFileType]): The file types to accept. Defaults to all supported file types.
+            file_types (List[DocumentIntelligenceFileType]): The file types to accept. Defaults to all supported types.
+            enable_formulas (bool): Whether to enable formula extraction. Defaults to True for backward compatibility.
+                Set to False to improve accuracy on documents without mathematical formulas.
         """
 
         super().__init__()
@@ -180,6 +183,7 @@ class DocumentIntelligenceConverter(DocumentConverter):
 
         self.endpoint = endpoint
         self.api_version = api_version
+        self._enable_formulas = enable_formulas
         self.doc_intel_client = DocumentIntelligenceClient(
             endpoint=self.endpoint,
             api_version=self.api_version,
@@ -228,11 +232,13 @@ class DocumentIntelligenceConverter(DocumentConverter):
             if mimetype.startswith(prefix):
                 return []
 
-        return [
-            DocumentAnalysisFeature.FORMULAS,  # enable formula extraction
+        features = [
             DocumentAnalysisFeature.OCR_HIGH_RESOLUTION,  # enable high resolution OCR
             DocumentAnalysisFeature.STYLE_FONT,  # enable font style extraction
         ]
+        if self._enable_formulas:
+            features.append(DocumentAnalysisFeature.FORMULAS)
+        return features
 
     def convert(
         self,
