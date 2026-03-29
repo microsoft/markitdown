@@ -1,0 +1,57 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "markitdown-ocr"
+dynamic = ["version"]
+description = 'OCR plugin for MarkItDown - Extracts text from images in PDF, DOCX, PPTX, and XLSX via LLM Vision'
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+keywords = ["markitdown", "ocr", "pdf", "docx", "xlsx", "pptx", "llm", "vision"]
+authors = [
+  { name = "Contributors", email = "noreply@github.com" },
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: Implementation :: CPython",
+]
+
+# Core dependencies — matches the file-format libraries markitdown already uses
+dependencies = [
+  "markitdown>=0.1.0",
+  "pdfminer.six>=20251230",
+  "pdfplumber>=0.11.9",
+  "PyMuPDF>=1.24.0",
+  "mammoth~=1.11.0",
+  "python-docx",
+  "python-pptx",
+  "pandas",
+  "openpyxl",
+  "Pillow>=9.0.0",
+]
+
+# llm_client is passed in by the user (same as for markitdown image descriptions);
+# install openai or any OpenAI-compatible SDK separately.
+[project.optional-dependencies]
+llm = [
+  "openai>=1.0.0",
+]
+
+[project.urls]
+Documentation = "https://github.com/microsoft/markitdown#readme"
+Issues = "https://github.com/microsoft/markitdown/issues"
+Source = "https://github.com/microsoft/markitdown"
+
+[tool.hatch.version]
+path = "src/markitdown_ocr/__about__.py"
+
+# CRITICAL: Plugin entry point - MarkItDown will discover this plugin through this entry point
+[project.entry-points."markitdown.plugin"]
+ocr = "markitdown_ocr"
