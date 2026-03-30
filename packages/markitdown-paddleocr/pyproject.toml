@@ -1,0 +1,72 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "markitdown-paddleocr"
+dynamic = ["version"]
+description = "PaddleOCR plugin for MarkItDown with scanned PDF fallback"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+keywords = ["markitdown", "ocr", "pdf", "paddleocr", "scanned-pdf"]
+authors = [
+  { name = "Contributors", email = "noreply@github.com" },
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: Implementation :: CPython",
+]
+dependencies = [
+  "markitdown>=0.1.0",
+  "pdfminer.six>=20251230",
+  "pdfplumber>=0.11.9",
+  "PyMuPDF>=1.24.0",
+  "paddleocr>=3.0.0",
+]
+
+[project.urls]
+Documentation = "https://github.com/microsoft/markitdown#readme"
+Issues = "https://github.com/microsoft/markitdown/issues"
+Source = "https://github.com/microsoft/markitdown"
+
+[tool.hatch.version]
+path = "src/markitdown_paddleocr/__about__.py"
+
+[project.entry-points."markitdown.plugin"]
+paddleocr = "markitdown_paddleocr"
+
+[tool.hatch.envs.types]
+extra-dependencies = [
+  "mypy>=1.0.0",
+]
+
+[tool.hatch.envs.types.scripts]
+check = "mypy --install-types --non-interactive {args:src/markitdown_paddleocr tests}"
+
+[tool.coverage.run]
+source_pkgs = ["markitdown-paddleocr", "tests"]
+branch = true
+parallel = true
+omit = [
+  "src/markitdown_paddleocr/__about__.py",
+]
+
+[tool.coverage.paths]
+markitdown-paddleocr = ["src/markitdown_paddleocr", "*/markitdown-paddleocr/src/markitdown_paddleocr"]
+tests = ["tests", "*/markitdown-paddleocr/tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+]
+
+[tool.hatch.build.targets.sdist]
+only-include = ["src/markitdown_paddleocr"]
