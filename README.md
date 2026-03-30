@@ -74,6 +74,10 @@ cd markitdown
 pip install -e 'packages/markitdown[all]'
 ```
 
+## Hosted deployment
+
+A hosted deployment is available on [Fronteir AI](https://fronteir.ai/mcp/microsoft-markitdown).
+
 ## Usage
 
 ### Command-Line
