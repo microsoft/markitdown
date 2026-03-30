@@ -26,12 +26,6 @@ pip install openai
 
 ## Usage
 
-### Command Line
-
-```bash
-markitdown document.pdf --use-plugins --llm-client openai --llm-model gpt-4o
-```
-
 ### Python API
 
 Pass `llm_client` and `llm_model` to `MarkItDown()` exactly as you would for image descriptions:
@@ -51,6 +45,12 @@ print(result.text_content)
 ```
 
 If no `llm_client` is provided the plugin still loads, but OCR is silently skipped — falling back to the standard built-in converter.
+
+### Command Line
+
+MarkItDown's built-in CLI can enable installed plugins with `--use-plugins`, but it does not currently construct Python client objects such as `OpenAI()` for you.
+
+For that reason, this plugin is primarily configured through the Python API shown above, where you can pass `llm_client` and `llm_model` directly to `MarkItDown(...)`.
 
 ### Custom Prompt
 
@@ -99,6 +99,8 @@ When a file is converted:
 3. Each image is sent to the LLM with an extraction prompt
 4. The returned text is inserted inline, preserving document structure
 5. If the LLM call fails, conversion continues without that image's text
+
+This plugin is one example of the broader plugin-first extension model in MarkItDown: backend-specific OCR or document-processing logic can live in separately installed packages without changing the default core behavior.
 
 ## Supported File Formats
 

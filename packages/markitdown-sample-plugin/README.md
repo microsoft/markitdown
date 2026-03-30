@@ -71,6 +71,8 @@ sample_plugin = "markitdown_sample_plugin"
 
 Here, the value of `sample_plugin` can be any key, but should ideally be the name of the plugin. The value is the fully qualified name of the package implementing the plugin.
 
+If your plugin needs optional configuration, you can also read additional keyword arguments passed through `MarkItDown(enable_plugins=True, **kwargs)` from `register_converters(markitdown, **kwargs)`.
+
 
 ## Installation
 

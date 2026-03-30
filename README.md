@@ -132,6 +132,12 @@ markitdown --use-plugins path-to-file.pdf
 
 To find available plugins, search GitHub for the hashtag `#markitdown-plugin`. To develop a plugin, see `packages/markitdown-sample-plugin`.
 
+Plugins are the recommended extension path for optional or backend-specific functionality, especially when an extension:
+
+- adds non-default dependencies
+- depends on external services or model runtimes
+- changes converter behavior only for opt-in users
+
 #### markitdown-ocr Plugin
 
 The `markitdown-ocr` plugin adds OCR support to PDF, DOCX, PPTX, and XLSX converters, extracting text from embedded images using LLM Vision — the same `llm_client` / `llm_model` pattern that MarkItDown already uses for image descriptions. No new ML libraries or binary dependencies required.
@@ -143,7 +149,7 @@ pip install markitdown-ocr
 pip install openai  # or any OpenAI-compatible client
 ```
 
-**Usage:**
+**Usage (Python API):**
 
 Pass the same `llm_client` and `llm_model` you would use for image descriptions:
 
