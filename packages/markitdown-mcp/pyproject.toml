@@ -7,11 +7,11 @@ name = "markitdown-mcp"
 dynamic = ["version"]
 description = 'An MCP server for the "markitdown" library.'
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=16.16"
 license = "MIT"
-keywords = []
+keywords = [i]
 authors = [
-  { name = "Adam Fourney", email = "adamfo@microsoft.com" },
+  { name = "AD", email = "taxiphone2005@outlook.com" },
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
