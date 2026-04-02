@@ -3,6 +3,7 @@ import io
 import os
 import re
 import shutil
+import zipfile
 import pytest
 from unittest.mock import MagicMock
 
@@ -272,6 +273,109 @@ def test_docx_equations() -> None:
     # Find block equations wrapped with double $$ and check if they are present
     block_equations = re.findall(r"\$\$(.+?)\$\$", result.text_content)
     assert block_equations, "No block equations found in the document."
+
+
+def _build_docx_with_xml(document_xml: bytes) -> io.BytesIO:
+    """Helper: build a minimal DOCX zip containing the given word/document.xml."""
+    content_types = b"""\
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels"
+    ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml"
+    ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>"""
+    root_rels = b"""\
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1"
+    Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+    Target="word/document.xml"/>
+</Relationships>"""
+    word_rels = b"""\
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>"""
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("[Content_Types].xml", content_types)
+        zf.writestr("_rels/.rels", root_rels)
+        zf.writestr("word/_rels/document.xml.rels", word_rels)
+        zf.writestr("word/document.xml", document_xml)
+    buf.seek(0)
+    return buf
+
+
+def test_docx_xxe_entity_blocked() -> None:
+    """Regression test: DOCX with XXE payload must not leak local file contents."""
+    from markitdown.converter_utils.docx.pre_process import pre_process_docx
+
+    xxe_xml = b"""\
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!DOCTYPE w:document [
+  <!ENTITY xxe SYSTEM "file:///etc/hostname">
+]>
+<w:document
+  xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"
+  xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <m:oMathPara>
+        <m:oMath>&xxe;</m:oMath>
+      </m:oMathPara>
+    </w:p>
+  </w:body>
+</w:document>"""
+
+    malicious_docx = _build_docx_with_xml(xxe_xml)
+
+    # Read the target file so we know what to look for
+    target_content = ""
+    try:
+        target_content = open("/etc/hostname").read().strip()
+    except FileNotFoundError:
+        pass  # Non-Linux; the entity simply won't resolve — still must not crash
+
+    # pre_process_docx should either sanitize the payload or fall back gracefully
+    result_buf = pre_process_docx(malicious_docx)
+    result_buf.seek(0)
+    with zipfile.ZipFile(result_buf) as zf:
+        doc_xml = zf.read("word/document.xml").decode(errors="replace")
+
+    if target_content:
+        assert target_content not in doc_xml, (
+            "XXE payload was expanded — local file content leaked into output"
+        )
+
+
+def test_docx_billion_laughs_blocked() -> None:
+    """Regression test: DOCX with Billion Laughs must not cause entity expansion."""
+    from markitdown.converter_utils.docx.pre_process import pre_process_docx
+
+    bomb_xml = b"""\
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!DOCTYPE w:document [
+  <!ENTITY lol  "lol">
+  <!ENTITY lol2 "&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;">
+  <!ENTITY lol3 "&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;">
+  <!ENTITY lol4 "&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;">
+  <!ENTITY lol5 "&lol4;&lol4;&lol4;&lol4;&lol4;&lol4;&lol4;&lol4;&lol4;&lol4;">
+]>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body><w:p><w:r><w:t>&lol5;</w:t></w:r></w:p></w:body>
+</w:document>"""
+
+    malicious_docx = _build_docx_with_xml(bomb_xml)
+    result_buf = pre_process_docx(malicious_docx)
+    result_buf.seek(0)
+    with zipfile.ZipFile(result_buf) as zf:
+        doc_xml = zf.read("word/document.xml").decode(errors="replace")
+
+    # If entity expansion happened, "lol" would appear thousands of times
+    assert doc_xml.count("lol") < 100, (
+        "Billion Laughs entity expansion detected in output"
+    )
 
 
 def test_input_as_strings() -> None:
