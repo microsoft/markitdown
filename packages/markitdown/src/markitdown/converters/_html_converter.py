@@ -1,4 +1,5 @@
 import io
+import warnings
 from typing import Any, BinaryIO, Optional
 from bs4 import BeautifulSoup
 
@@ -44,6 +45,10 @@ class HtmlConverter(DocumentConverter):
         stream_info: StreamInfo,
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
+        # Pop our own keyword before forwarding the rest to markdownify.
+        # strict=True raises RecursionError instead of falling back to plain text.
+        strict: bool = kwargs.pop("strict", False)
+
         # Parse the stream
         encoding = "utf-8" if stream_info.charset is None else stream_info.charset
         soup = BeautifulSoup(file_stream, "html.parser", from_encoding=encoding)
@@ -61,12 +66,12 @@ class HtmlConverter(DocumentConverter):
             else:
                 webpage_text = _CustomMarkdownify(**kwargs).convert_soup(soup)
         except RecursionError:
+            if strict:
+                raise
             # Large or deeply-nested HTML can exceed Python's recursion limit
             # during markdownify's recursive DOM traversal.  Fall back to
             # BeautifulSoup's iterative get_text() so the caller still gets
             # usable plain-text content instead of raw HTML.
-            import warnings
-
             warnings.warn(
                 "HTML document is too deeply nested for markdown conversion "
                 "(RecursionError). Falling back to plain-text extraction.",
