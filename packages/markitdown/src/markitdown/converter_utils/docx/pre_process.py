@@ -1,9 +1,12 @@
+import logging
 import zipfile
 from io import BytesIO
 from typing import BinaryIO
 from xml.etree import ElementTree as ET
 
 from bs4 import BeautifulSoup, Tag
+
+logger = logging.getLogger(__name__)
 
 from .math.omml import OMML_NS, oMath2Latex
 
@@ -109,9 +112,15 @@ def _pre_process_math(content: bytes) -> bytes:
     """
     soup = BeautifulSoup(content.decode(), features="xml")
     for tag in soup.find_all("oMathPara"):
-        _replace_equations(tag)
+        try:
+            _replace_equations(tag)
+        except Exception:
+            logger.warning("Failed to convert oMathPara equation to LaTeX", exc_info=True)
     for tag in soup.find_all("oMath"):
-        _replace_equations(tag)
+        try:
+            _replace_equations(tag)
+        except Exception:
+            logger.warning("Failed to convert oMath equation to LaTeX", exc_info=True)
     return str(soup).encode()
 
 
