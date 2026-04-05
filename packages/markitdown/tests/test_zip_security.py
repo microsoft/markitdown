@@ -133,6 +133,7 @@ class TestZipBombProtection:
         patched = io.BytesIO(bytes(raw))
         patched.seek(0)
 
-        # Should not crash - graceful degradation
+        # Should not crash - graceful degradation with truncation note
         result = md.convert_stream(patched, stream_info=ZIP_STREAM_INFO)
         assert result.markdown is not None
+        assert "Extraction stopped early" in result.markdown

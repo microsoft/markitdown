@@ -64,15 +64,27 @@ class ZipConverter(DocumentConverter):
     - Uses appropriate converters for each file type
     - Preserves formatting of converted content
     - Cleans up temporary files after processing
+
+    Note: Size checks use ``zipfile.ZipInfo.file_size`` from the local file header.
+    A deliberately crafted archive can spoof this value, so the protection guards
+    against accidental or naive zip bombs but not adversarial archives with falsified
+    headers. Streaming decompression with a running byte counter would be needed for
+    full protection against crafted bombs.
     """
 
     def __init__(
         self,
         *,
         markitdown: "MarkItDown",
+        max_file_size: int = MAX_DECOMPRESSED_FILE_SIZE,
+        max_ratio: int = MAX_DECOMPRESSION_RATIO,
+        max_total_size: int = MAX_TOTAL_DECOMPRESSED_SIZE,
     ):
         super().__init__()
         self._markitdown = markitdown
+        self._max_file_size = max_file_size
+        self._max_ratio = max_ratio
+        self._max_total_size = max_total_size
 
     def accepts(
         self,
@@ -111,38 +123,47 @@ class ZipConverter(DocumentConverter):
                 if info.is_dir():
                     continue
 
-                # Check individual file size
-                if info.file_size > MAX_DECOMPRESSED_FILE_SIZE:
+                # Check individual file size.
+                # Files that exceed the per-file limit are skipped but do not
+                # count toward total_decompressed: the per-file check already
+                # prevents them from being read, so the cumulative cap only
+                # tracks data that was actually extracted.
+                if info.file_size > self._max_file_size:
                     logger.warning(
                         "Skipping '%s': decompressed size %d bytes exceeds "
                         "limit of %d bytes",
                         name,
                         info.file_size,
-                        MAX_DECOMPRESSED_FILE_SIZE,
+                        self._max_file_size,
                     )
                     continue
 
                 # Check decompression ratio (zip bomb detection)
                 compressed = max(info.compress_size, 1)
                 ratio = info.file_size / compressed
-                if ratio > MAX_DECOMPRESSION_RATIO:
+                if ratio > self._max_ratio:
                     logger.warning(
                         "Skipping '%s': decompression ratio %.1f:1 exceeds "
                         "limit of %d:1",
                         name,
                         ratio,
-                        MAX_DECOMPRESSION_RATIO,
+                        self._max_ratio,
                     )
                     continue
 
                 # Check cumulative decompressed size
                 total_decompressed += info.file_size
-                if total_decompressed > MAX_TOTAL_DECOMPRESSED_SIZE:
+                if total_decompressed > self._max_total_size:
                     logger.warning(
                         "Stopping extraction: cumulative decompressed size "
                         "%d bytes exceeds limit of %d bytes",
                         total_decompressed,
-                        MAX_TOTAL_DECOMPRESSED_SIZE,
+                        self._max_total_size,
+                    )
+                    md_content += (
+                        "\n> **Note:** Extraction stopped early "
+                        "because the cumulative size limit was reached. "
+                        "Some files were not converted.\n\n"
                     )
                     break
 
