@@ -274,6 +274,28 @@ def test_docx_equations() -> None:
     assert block_equations, "No block equations found in the document."
 
 
+def test_docx_equations_omit_empty_run() -> None:
+    """Regression test: m:r elements without m:t child must not crash the
+    OMML-to-LaTeX conversion and must not cause other equations to be lost."""
+    from markitdown.converter_utils.docx.pre_process import _pre_process_math
+
+    # An oMath with one formatting-only m:r (no m:t) followed by a normal m:r
+    content = (
+        b'<?xml version="1.0" encoding="UTF-8"?>'
+        b'<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
+        b'            xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">'
+        b"<w:body><w:p>"
+        b"<m:oMath>"
+        b"  <m:r><m:rPr><m:sty m:val=\"bi\"/></m:rPr></m:r>"
+        b"  <m:r><m:t>x</m:t></m:r>"
+        b"</m:oMath>"
+        b"</w:p></w:body></w:document>"
+    )
+    result = _pre_process_math(content).decode()
+    # The equation should be present and wrapped in $ signs
+    assert "$x$" in result
+
+
 def test_input_as_strings() -> None:
     markitdown = MarkItDown()
 
