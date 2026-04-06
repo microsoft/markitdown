@@ -332,10 +332,10 @@ def test_deeply_nested_html_fallback() -> None:
         sys.setrecursionlimit(original_limit)
 
     # The output should contain the text content, not raw HTML
-    assert "Deep content" in result.text_content
-    assert "bold text" in result.text_content
-    assert "<div" not in result.text_content
-    assert "<p>" not in result.text_content
+    assert "Deep content" in result.markdown
+    assert "bold text" in result.markdown
+    assert "<div" not in result.markdown
+    assert "<p>" not in result.markdown
 
 
 def test_doc_rlink() -> None:
