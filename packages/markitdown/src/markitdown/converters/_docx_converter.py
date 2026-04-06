@@ -26,6 +26,20 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 ]
 
 ACCEPTED_FILE_EXTENSIONS = [".docx"]
+UNDERLINE_STYLE_MAP = "u => u"
+
+
+def _merge_underline_style_map(style_map: str | None) -> str:
+    """Add the Mammoth underline mapping unless the caller already supplied one."""
+
+    if style_map is None or not style_map.strip():
+        return UNDERLINE_STYLE_MAP
+
+    for line in style_map.splitlines():
+        if line.strip().startswith("u =>"):
+            return style_map
+
+    return f"{style_map.rstrip()}\n{UNDERLINE_STYLE_MAP}"
 
 
 class DocxConverter(HtmlConverter):
@@ -76,6 +90,8 @@ class DocxConverter(HtmlConverter):
             )
 
         style_map = kwargs.get("style_map", None)
+        if kwargs.get("preserve_underlines"):
+            style_map = _merge_underline_style_map(style_map)
         pre_process_stream = pre_process_docx(file_stream)
         return self._html_converter.convert_string(
             mammoth.convert_to_html(pre_process_stream, style_map=style_map).value,

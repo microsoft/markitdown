@@ -5,8 +5,11 @@ import re
 import shutil
 import pytest
 from unittest.mock import MagicMock
+from unittest.mock import patch
 
 from markitdown._uri_utils import parse_data_uri, file_uri_to_path
+from markitdown._base_converter import DocumentConverterResult
+from markitdown.converters._docx_converter import DocxConverter
 
 from markitdown import (
     MarkItDown,
@@ -272,6 +275,81 @@ def test_docx_equations() -> None:
     # Find block equations wrapped with double $$ and check if they are present
     block_equations = re.findall(r"\$\$(.+?)\$\$", result.text_content)
     assert block_equations, "No block equations found in the document."
+
+
+def test_html_preserve_underlines() -> None:
+    html = b"<html><body><p>alpha <u>beta</u> gamma</p></body></html>"
+
+    default_result = MarkItDown().convert_stream(
+        io.BytesIO(html),
+        stream_info=StreamInfo(extension=".html"),
+    )
+    assert "<u>beta</u>" not in default_result.text_content
+    assert "alpha beta gamma" in default_result.text_content
+
+    preserved_result = MarkItDown(preserve_underlines=True).convert_stream(
+        io.BytesIO(html),
+        stream_info=StreamInfo(extension=".html"),
+    )
+    assert "alpha <u>beta</u> gamma" in preserved_result.text_content
+
+
+def test_docx_preserve_underlines_adds_style_map() -> None:
+    converter = DocxConverter()
+    converter._html_converter.convert_string = MagicMock(
+        return_value=DocumentConverterResult(markdown="<u>underlined</u>")
+    )
+
+    with (
+        patch(
+            "markitdown.converters._docx_converter.pre_process_docx",
+            return_value=io.BytesIO(b"fake"),
+        ),
+        patch(
+            "markitdown.converters._docx_converter.mammoth.convert_to_html",
+            return_value=MagicMock(value="<p><u>underlined</u></p>"),
+        ) as convert_to_html,
+    ):
+        converter.convert(
+            io.BytesIO(b"fake"),
+            StreamInfo(extension=".docx"),
+            preserve_underlines=True,
+        )
+
+    assert convert_to_html.call_args.kwargs["style_map"] == "u => u"
+    converter._html_converter.convert_string.assert_called_once_with(
+        "<p><u>underlined</u></p>",
+        preserve_underlines=True,
+    )
+
+
+def test_docx_preserve_underlines_merges_existing_style_map() -> None:
+    converter = DocxConverter()
+    converter._html_converter.convert_string = MagicMock(
+        return_value=DocumentConverterResult(markdown="<u>underlined</u>")
+    )
+
+    with (
+        patch(
+            "markitdown.converters._docx_converter.pre_process_docx",
+            return_value=io.BytesIO(b"fake"),
+        ),
+        patch(
+            "markitdown.converters._docx_converter.mammoth.convert_to_html",
+            return_value=MagicMock(value="<p><u>underlined</u></p>"),
+        ) as convert_to_html,
+    ):
+        converter.convert(
+            io.BytesIO(b"fake"),
+            StreamInfo(extension=".docx"),
+            preserve_underlines=True,
+            style_map="comment-reference => ",
+        )
+
+    assert (
+        convert_to_html.call_args.kwargs["style_map"]
+        == "comment-reference =>\nu => u"
+    )
 
 
 def test_input_as_strings() -> None:

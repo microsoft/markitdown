@@ -186,6 +186,16 @@ result = md.convert("test.xlsx")
 print(result.text_content)
 ```
 
+To preserve underlined text from supported sources such as DOCX as literal HTML underline tags:
+
+```python
+from markitdown import MarkItDown
+
+md = MarkItDown(preserve_underlines=True)
+result = md.convert("underlined.docx")
+print(result.text_content)  # e.g. "<u>important</u>"
+```
+
 Document Intelligence conversion in Python:
 
 ```python
