@@ -221,6 +221,10 @@ class MarkItDown:
                 if docintel_version is not None:
                     docintel_args["api_version"] = docintel_version
 
+                docintel_enable_formulas = kwargs.get("docintel_enable_formulas")
+                if docintel_enable_formulas is not None:
+                    docintel_args["include_formulas"] = docintel_enable_formulas
+
                 self.register_converter(
                     DocumentIntelligenceConverter(**docintel_args),
                 )
@@ -555,9 +559,9 @@ class MarkItDown:
             for converter_registration in sorted_registrations:
                 converter = converter_registration.converter
                 # Sanity check -- make sure the cur_pos is still the same
-                assert (
-                    cur_pos == file_stream.tell()
-                ), "File stream position should NOT change between guess iterations"
+                assert cur_pos == file_stream.tell(), (
+                    "File stream position should NOT change between guess iterations"
+                )
 
                 _kwargs = {k: v for k, v in kwargs.items()}
 
@@ -596,9 +600,9 @@ class MarkItDown:
                     pass
 
                 # accept() should not have changed the file stream position
-                assert (
-                    cur_pos == file_stream.tell()
-                ), f"{type(converter).__name__}.accept() should NOT change the file_stream position"
+                assert cur_pos == file_stream.tell(), (
+                    f"{type(converter).__name__}.accept() should NOT change the file_stream position"
+                )
 
                 # Attempt the conversion
                 if _accepts:

@@ -3,9 +3,13 @@ import io
 import os
 import re
 import shutil
-import pytest
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import pytest
+
+from markitdown import _markitdown
+from markitdown.converters import _doc_intel_converter
 from markitdown._uri_utils import parse_data_uri, file_uri_to_path
 
 from markitdown import (
@@ -286,6 +290,64 @@ def test_input_as_strings() -> None:
     input_data = b"   \n\n\n<html><body><h1>Test</h1></body></html>"
     result = markitdown.convert_stream(io.BytesIO(input_data))
     assert "# Test" in result.text_content
+
+
+def test_docintel_analysis_features_disable_formulas_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        _doc_intel_converter,
+        "DocumentAnalysisFeature",
+        SimpleNamespace(
+            FORMULAS="FORMULAS",
+            OCR_HIGH_RESOLUTION="OCR_HIGH_RESOLUTION",
+            STYLE_FONT="STYLE_FONT",
+        ),
+    )
+
+    converter = _doc_intel_converter.DocumentIntelligenceConverter.__new__(
+        _doc_intel_converter.DocumentIntelligenceConverter
+    )
+    converter._include_formulas = False
+
+    assert converter._analysis_features(StreamInfo(extension=".pdf")) == [
+        "OCR_HIGH_RESOLUTION",
+        "STYLE_FONT",
+    ]
+
+    converter._include_formulas = True
+
+    assert converter._analysis_features(StreamInfo(extension=".pdf")) == [
+        "FORMULAS",
+        "OCR_HIGH_RESOLUTION",
+        "STYLE_FONT",
+    ]
+
+
+@pytest.mark.parametrize("enable_formulas", [False, True])
+def test_markitdown_passes_docintel_formula_setting(
+    monkeypatch: pytest.MonkeyPatch,
+    enable_formulas: bool,
+) -> None:
+    captured_kwargs: dict[str, object] = {}
+
+    class FakeDocumentIntelligenceConverter:
+        def __init__(self, **kwargs: object) -> None:
+            captured_kwargs.update(kwargs)
+
+    monkeypatch.setattr(
+        _markitdown,
+        "DocumentIntelligenceConverter",
+        FakeDocumentIntelligenceConverter,
+    )
+
+    MarkItDown(
+        docintel_endpoint="https://example.cognitiveservices.azure.com/",
+        docintel_enable_formulas=enable_formulas,
+    )
+
+    assert captured_kwargs["endpoint"] == "https://example.cognitiveservices.azure.com/"
+    assert captured_kwargs["include_formulas"] is enable_formulas
 
 
 def test_doc_rlink() -> None:
