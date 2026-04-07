@@ -1,8 +1,10 @@
 import sys
 from typing import Any, Union, BinaryIO
+from bs4 import BeautifulSoup
 from .._stream_info import StreamInfo
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+from ._markdownify import _CustomMarkdownify
 
 # Try loading optional (but in this case, required) dependencies
 # Save reporting of any exceptions for later
@@ -112,10 +114,25 @@ class OutlookMsgConverter(DocumentConverter):
 
         md_content += "\n## Content\n\n"
 
-        # Get email body
-        body = self._get_stream_data(msg, "__substg1.0_1000001F")
-        if body:
-            md_content += body
+        # Try HTML body first (preserves formatting like tables).
+        # MSG files store HTML body as either Unicode (001F) or Binary (0102).
+        html_body = self._get_stream_data(
+            msg, "__substg1.0_1013001F"
+        ) or self._get_binary_stream_html(msg, "__substg1.0_10130102")
+        if html_body:
+            soup = BeautifulSoup(html_body, "html.parser")
+            for script in soup(["script", "style"]):
+                script.extract()
+            body_elm = soup.find("body")
+            if body_elm:
+                md_content += _CustomMarkdownify(**kwargs).convert_soup(body_elm)
+            else:
+                md_content += _CustomMarkdownify(**kwargs).convert_soup(soup)
+        else:
+            # Fall back to plain text body
+            body = self._get_stream_data(msg, "__substg1.0_1000001F")
+            if body:
+                md_content += body
 
         msg.close()
 
@@ -144,6 +161,23 @@ class OutlookMsgConverter(DocumentConverter):
                     except UnicodeDecodeError:
                         # Last resort - ignore errors
                         return data.decode("utf-8", errors="ignore").strip()
+        except Exception:
+            pass
+        return None
+
+    def _get_binary_stream_html(self, msg: Any, stream_path: str) -> Union[str, None]:
+        """Helper to extract binary HTML body stream, which uses byte-based encoding."""
+        assert olefile is not None
+        assert isinstance(msg, olefile.OleFileIO)
+
+        try:
+            if msg.exists(stream_path):
+                data = msg.openstream(stream_path).read()
+                # Binary HTML streams are typically ASCII or UTF-8
+                try:
+                    return data.decode("utf-8").strip()
+                except UnicodeDecodeError:
+                    return data.decode("latin-1").strip()
         except Exception:
             pass
         return None
