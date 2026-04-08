@@ -123,7 +123,7 @@ class PptxConverter(DocumentConverter):
                                 client=llm_client,
                                 model=llm_model,
                                 prompt=kwargs.get("llm_prompt"),
-                            )
+                            ) or ""
                         except Exception:
                             # Unable to generate a description
                             pass
