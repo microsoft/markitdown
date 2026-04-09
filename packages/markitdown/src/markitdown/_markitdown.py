@@ -159,19 +159,23 @@ class MarkItDown:
                 candidate = shutil.which("exiftool")
                 if candidate:
                     candidate = os.path.abspath(candidate)
+                    candidate_dir = os.path.dirname(candidate)
+                    trusted_dirs = [
+                        "/usr/bin",
+                        "/usr/local/bin",
+                        "/opt",
+                        "/opt/bin",
+                        "/opt/local/bin",
+                        "/opt/homebrew/bin",
+                        "C:\\Windows",
+                        "C:\\Windows\\System32",
+                        "C:\\Program Files",
+                        "C:\\Program Files (x86)",
+                    ]
                     if any(
-                        d == os.path.dirname(candidate)
-                        for d in [
-                            "/usr/bin",
-                            "/usr/local/bin",
-                            "/opt",
-                            "/opt/bin",
-                            "/opt/local/bin",
-                            "/opt/homebrew/bin",
-                            "C:\\Windows\\System32",
-                            "C:\\Program Files",
-                            "C:\\Program Files (x86)",
-                        ]
+                        candidate_dir == d
+                        or candidate_dir.startswith(d + os.sep)
+                        for d in trusted_dirs
                     ):
                         self._exiftool_path = candidate
 
