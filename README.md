@@ -9,9 +9,10 @@
 
 > [!IMPORTANT]
 > Breaking changes between 0.0.1 to 0.1.0:
-> * Dependencies are now organized into optional feature-groups (further details below). Use `pip install 'markitdown[all]'` to have backward-compatible behavior.
-> * convert\_stream() now requires a binary file-like object (e.g., a file opened in binary mode, or an io.BytesIO object). This is a breaking change from the previous version, where it previously also accepted text file-like objects, like io.StringIO.
-> * The DocumentConverter class interface has changed to read from file-like streams rather than file paths. *No temporary files are created anymore*. If you are the maintainer of a plugin, or custom DocumentConverter, you likely need to update your code. Otherwise, if only using the MarkItDown class or CLI (as in these examples), you should not need to change anything.
+>
+> - Dependencies are now organized into optional feature-groups (further details below). Use `pip install 'markitdown[all]'` to have backward-compatible behavior.
+> - convert_stream() now requires a binary file-like object (e.g., a file opened in binary mode, or an io.BytesIO object). This is a breaking change from the previous version, where it previously also accepted text file-like objects, like io.StringIO.
+> - The DocumentConverter class interface has changed to read from file-like streams rather than file paths. _No temporary files are created anymore_. If you are the maintainer of a plugin, or custom DocumentConverter, you likely need to update your code. Otherwise, if only using the MarkItDown class or CLI (as in these examples), you should not need to change anything.
 
 MarkItDown is a lightweight Python utility for converting various files to Markdown for use with LLMs and related text analysis pipelines. To this end, it is most comparable to [textract](https://github.com/deanmalmgren/textract), but with a focus on preserving important document structure and content as Markdown (including: headings, lists, tables, links, etc.) While the output is often reasonably presentable and human-friendly, it is meant to be consumed by text analysis tools -- and may not be the best option for high-fidelity document conversions for human consumption.
 
@@ -40,6 +41,7 @@ Markdown-formatted text, and understand it well. As a side benefit, Markdown con
 are also highly token-efficient.
 
 ## Prerequisites
+
 MarkItDown requires Python 3.10 or higher. It is recommended to use a virtual environment to avoid dependency conflicts.
 
 With the standard Python installation, you can create and activate a virtual environment using the following commands:
@@ -94,7 +96,30 @@ You can also pipe content:
 cat path-to-file.pdf | markitdown
 ```
 
+### Shell Shortcut (Optional)
+
+If you frequently work with a dedicated `markitdown` Conda environment,
+you can define a shell shortcut in your `.zshrc` or `.bashrc`.
+
+```bash
+markitdown-init() {
+    if conda info --envs | grep -q "markitdown"; then
+        conda activate markitdown
+        markitdown --version
+    else
+        echo "The Conda environment 'markitdown' does not exist."
+    fi
+}
+```
+
+After adding this function, you can run:
+
+```bash
+markitdown-init
+```
+
 ### Optional Dependencies
+
 MarkItDown has optional dependencies for activating various file formats. Earlier in this document, we installed all optional dependencies with the `[all]` option. However, you can also install them individually for more control. For example:
 
 ```bash
@@ -105,16 +130,16 @@ will install only the dependencies for PDF, DOCX, and PPTX files.
 
 At the moment, the following optional dependencies are available:
 
-* `[all]` Installs all optional dependencies
-* `[pptx]` Installs dependencies for PowerPoint files
-* `[docx]` Installs dependencies for Word files
-* `[xlsx]` Installs dependencies for Excel files
-* `[xls]` Installs dependencies for older Excel files
-* `[pdf]` Installs dependencies for PDF files
-* `[outlook]` Installs dependencies for Outlook messages
-* `[az-doc-intel]` Installs dependencies for Azure Document Intelligence
-* `[audio-transcription]` Installs dependencies for audio transcription of wav and mp3 files
-* `[youtube-transcription]` Installs dependencies for fetching YouTube video transcription
+- `[all]` Installs all optional dependencies
+- `[pptx]` Installs dependencies for PowerPoint files
+- `[docx]` Installs dependencies for Word files
+- `[xlsx]` Installs dependencies for Excel files
+- `[xls]` Installs dependencies for older Excel files
+- `[pdf]` Installs dependencies for PDF files
+- `[outlook]` Installs dependencies for Outlook messages
+- `[az-doc-intel]` Installs dependencies for Azure Document Intelligence
+- `[audio-transcription]` Installs dependencies for audio transcription of wav and mp3 files
+- `[youtube-transcription]` Installs dependencies for fetching YouTube video transcription
 
 ### Plugins
 
