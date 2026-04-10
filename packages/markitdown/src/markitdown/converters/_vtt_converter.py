@@ -158,8 +158,12 @@ class VttConverter(DocumentConverter):
         return paragraphs
 
     def _clean_text(self, text: str) -> str:
+        # Handle <v Name> - voice only
         text = re.sub(r"<v\s+([^>]+)>", r"\1: ", text)
-        text = re.sub(r"<v\.([^>]+)>", r"\1: ", text)
+        # Handle <v.class Name> - voice with class (extract just the name)
+        text = re.sub(r"<v\.\S+\s+([^>]+)>", r"\1: ", text)
+        # Handle <v.class> - voice with class only (no name)
+        text = re.sub(r"<v\.([^>\s]+)>", r"\1: ", text)
         text = re.sub(r"</?c[^>]*>", "", text)
         text = re.sub(r"</?b>", "", text)
         text = re.sub(r"</?i>", "", text)

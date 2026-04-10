@@ -172,3 +172,31 @@ def test_vtt_direct_converter():
     assert "Hello, welcome to the meeting." in result.markdown
     assert "John:" in result.markdown
     assert "[00:00:01.000]" in result.markdown
+
+
+def test_vtt_invalid_timestamp_raises_exception():
+    """Test that invalid timestamps raise FileConversionException."""
+    from markitdown._exceptions import FileConversionException
+
+    converter = VttConverter()
+    info = StreamInfo(extension=".vtt", mimetype="text/vtt", charset="utf-8")
+    # Invalid: 99 minutes (should be max 59)
+    vtt = b"WEBVTT\n\n00:99:30.000 --> 00:00:01.000\nTest\n"
+    stream = io.BytesIO(vtt)
+
+    with pytest.raises(FileConversionException) as exc_info:
+        converter.convert(stream, info)
+
+    assert "Invalid timestamp" in str(exc_info.value)
+
+
+def test_vtt_voice_with_class():
+    """Test handling of voice tags with class (<v.class Name>)."""
+    md = MarkItDown()
+    info = StreamInfo(extension=".vtt", mimetype="text/vtt", charset="utf-8")
+    vtt = b"WEBVTT\n\n00:00:01.000 --> 00:00:03.000\n<v.loud Speaker> Hello\n"
+    result = md.convert_stream(io.BytesIO(vtt), stream_info=info)
+
+    # Should extract just "Speaker: " not "loud Speaker: "
+    assert "Speaker: Hello" in result.markdown
+    assert "loud Speaker:" not in result.markdown
