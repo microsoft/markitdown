@@ -122,5 +122,15 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
             return "[x] " if el.has_attr("checked") else "[ ] "
         return ""
 
+    def convert_u(
+        self,
+        el: Any,
+        text: str,
+        convert_as_inline: Optional[bool] = False,
+        **kwargs,
+    ) -> str:
+        """Preserve underline formatting using HTML <u> tags (Markdown has no underline syntax)."""
+        return "<u>%s</u>" % text
+
     def convert_soup(self, soup: Any) -> str:
         return super().convert_soup(soup)  # type: ignore
