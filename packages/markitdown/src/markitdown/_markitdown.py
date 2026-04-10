@@ -144,6 +144,8 @@ class MarkItDown:
         This method should only be called once, if built-ins were initially disabled.
         """
         if not self._builtins_enabled:
+            disabled_converters = set(kwargs.get("disabled_converters") or [])
+
             # TODO: Move these into converter constructors
             self._llm_client = kwargs.get("llm_client")
             self._llm_model = kwargs.get("llm_model")
@@ -178,30 +180,30 @@ class MarkItDown:
             # Register converters for successful browsing operations
             # Later registrations are tried first / take higher priority than earlier registrations
             # To this end, the most specific converters should appear below the most generic converters
-            self.register_converter(
-                PlainTextConverter(), priority=PRIORITY_GENERIC_FILE_FORMAT
+            def maybe_register(converter: DocumentConverter, priority: float) -> None:
+                if type(converter).__name__ not in disabled_converters:
+                    self.register_converter(converter, priority=priority)
+
+            maybe_register(PlainTextConverter(), PRIORITY_GENERIC_FILE_FORMAT)
+            maybe_register(
+                ZipConverter(markitdown=self), PRIORITY_GENERIC_FILE_FORMAT
             )
-            self.register_converter(
-                ZipConverter(markitdown=self), priority=PRIORITY_GENERIC_FILE_FORMAT
-            )
-            self.register_converter(
-                HtmlConverter(), priority=PRIORITY_GENERIC_FILE_FORMAT
-            )
-            self.register_converter(RssConverter())
-            self.register_converter(WikipediaConverter())
-            self.register_converter(YouTubeConverter())
-            self.register_converter(BingSerpConverter())
-            self.register_converter(DocxConverter())
-            self.register_converter(XlsxConverter())
-            self.register_converter(XlsConverter())
-            self.register_converter(PptxConverter())
-            self.register_converter(AudioConverter())
-            self.register_converter(ImageConverter())
-            self.register_converter(IpynbConverter())
-            self.register_converter(PdfConverter())
-            self.register_converter(OutlookMsgConverter())
-            self.register_converter(EpubConverter())
-            self.register_converter(CsvConverter())
+            maybe_register(HtmlConverter(), PRIORITY_GENERIC_FILE_FORMAT)
+            maybe_register(RssConverter(), PRIORITY_SPECIFIC_FILE_FORMAT)
+            maybe_register(WikipediaConverter(), PRIORITY_SPECIFIC_FILE_FORMAT)
+            maybe_register(YouTubeConverter(), PRIORITY_SPECIFIC_FILE_FORMAT)
+            maybe_register(BingSerpConverter(), PRIORITY_SPECIFIC_FILE_FORMAT)
+            maybe_register(DocxConverter(), PRIORITY_SPECIFIC_FILE_FORMAT)
+            maybe_register(XlsxConverter(), PRIORITY_SPECIFIC_FILE_FORMAT)
+            maybe_register(XlsConverter(), PRIORITY_SPECIFIC_FILE_FORMAT)
+            maybe_register(PptxConverter(), PRIORITY_SPECIFIC_FILE_FORMAT)
+            maybe_register(AudioConverter(), PRIORITY_SPECIFIC_FILE_FORMAT)
+            maybe_register(ImageConverter(), PRIORITY_SPECIFIC_FILE_FORMAT)
+            maybe_register(IpynbConverter(), PRIORITY_SPECIFIC_FILE_FORMAT)
+            maybe_register(PdfConverter(), PRIORITY_SPECIFIC_FILE_FORMAT)
+            maybe_register(OutlookMsgConverter(), PRIORITY_SPECIFIC_FILE_FORMAT)
+            maybe_register(EpubConverter(), PRIORITY_SPECIFIC_FILE_FORMAT)
+            maybe_register(CsvConverter(), PRIORITY_SPECIFIC_FILE_FORMAT)
 
             # Register Document Intelligence converter at the top of the stack if endpoint is provided
             docintel_endpoint = kwargs.get("docintel_endpoint")
