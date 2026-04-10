@@ -27,8 +27,42 @@ def test_invalid_flag() -> None:
     assert "SYNTAX" in result.stderr, "Expected 'SYNTAX' to appear in STDERR"
 
 
+def test_stdin_dash_filename() -> None:
+    result = subprocess.run(
+        ["python", "-m", "markitdown", "-", "-x", "txt"],
+        input=b"Hello from stdin dash mode",
+        capture_output=True,
+    )
+
+    assert result.returncode == 0, f"CLI exited with error: {result.stderr!r}"
+    stdout = result.stdout.decode("utf-8", errors="replace")
+    assert "Hello from stdin dash mode" in stdout
+
+
+def test_docintel_rejects_stdin_dash() -> None:
+    result = subprocess.run(
+        [
+            "python",
+            "-m",
+            "markitdown",
+            "-",
+            "-d",
+            "-e",
+            "https://example.cognitiveservices.azure.com/",
+        ],
+        input=b"dummy",
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "stdin is not supported" in result.stdout
+
+
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     test_version()
     test_invalid_flag()
+    test_stdin_dash_filename()
+    test_docintel_rejects_stdin_dash()
     print("All tests passed!")
