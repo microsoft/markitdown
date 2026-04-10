@@ -88,9 +88,9 @@ def test_vtt_converter_rejects_non_vtt():
 
 
 def test_basic_vtt_conversion():
-    """Test basic WebVTT to Markdown conversion."""
     md = MarkItDown()
-    result = md.convert_stream(io.BytesIO(SAMPLE_VTT.encode()), ".vtt")
+    info = StreamInfo(extension=".vtt", mimetype="text/vtt", charset="utf-8")
+    result = md.convert_stream(io.BytesIO(SAMPLE_VTT.encode()), stream_info=info)
 
     assert "Hello, welcome to the meeting." in result.markdown
     assert "John:" in result.markdown
@@ -99,68 +99,63 @@ def test_basic_vtt_conversion():
 
 
 def test_vtt_speaker_tags():
-    """Test handling of speaker voice tags."""
     md = MarkItDown()
-    result = md.convert_stream(io.BytesIO(VTT_WITH_SPEAKERS.encode()), ".vtt")
+    info = StreamInfo(extension=".vtt", mimetype="text/vtt", charset="utf-8")
+    result = md.convert_stream(io.BytesIO(VTT_WITH_SPEAKERS.encode()), stream_info=info)
 
     assert "Bob:" in result.markdown
     assert "Important point here" in result.markdown
 
 
 def test_vtt_multiline_cues():
-    """Test handling of multi-line cue text."""
     md = MarkItDown()
-    result = md.convert_stream(io.BytesIO(VTT_MULTILINE.encode()), ".vtt")
+    info = StreamInfo(extension=".vtt", mimetype="text/vtt", charset="utf-8")
+    result = md.convert_stream(io.BytesIO(VTT_MULTILINE.encode()), stream_info=info)
 
-    # Multi-line cues should be joined with spaces
     assert "first line" in result.markdown
     assert "continues the same cue" in result.markdown
     assert "third line" in result.markdown
 
 
 def test_vtt_timestamps_removed():
-    """Test that timestamps are not in the output text."""
     md = MarkItDown()
-    result = md.convert_stream(io.BytesIO(SAMPLE_VTT.encode()), ".vtt")
+    info = StreamInfo(extension=".vtt", mimetype="text/vtt", charset="utf-8")
+    result = md.convert_stream(io.BytesIO(SAMPLE_VTT.encode()), stream_info=info)
 
-    # Timestamps should be in [HH:MM:SS.mmm] format, not raw VTT format
     assert "00:00 -->" not in result.markdown
     assert "00:00:01.000 --> 00:00:03.000" not in result.markdown
 
 
 def test_vtt_timestamps_in_output():
-    """Test that timestamps appear in output in bracket format."""
     md = MarkItDown()
-    result = md.convert_stream(io.BytesIO(SAMPLE_VTT.encode()), ".vtt")
+    info = StreamInfo(extension=".vtt", mimetype="text/vtt", charset="utf-8")
+    result = md.convert_stream(io.BytesIO(SAMPLE_VTT.encode()), stream_info=info)
 
-    # Timestamps should appear in [HH:MM:SS.mmm] format
     assert "[00:00:01.000]" in result.markdown
     assert "[00:00:04.000]" in result.markdown
 
 
 def test_vtt_webvtt_header_stripped():
-    """Test that WEBVTT header is stripped from output."""
     md = MarkItDown()
-    result = md.convert_stream(io.BytesIO(SAMPLE_VTT.encode()), ".vtt")
+    info = StreamInfo(extension=".vtt", mimetype="text/vtt", charset="utf-8")
+    result = md.convert_stream(io.BytesIO(SAMPLE_VTT.encode()), stream_info=info)
 
     assert "WEBVTT" not in result.markdown
 
 
 def test_vtt_empty_file():
-    """Test handling of empty VTT file."""
     md = MarkItDown()
-    result = md.convert_stream(io.BytesIO(VTT_EMPTY.encode()), ".vtt")
+    info = StreamInfo(extension=".vtt", mimetype="text/vtt", charset="utf-8")
+    result = md.convert_stream(io.BytesIO(VTT_EMPTY.encode()), stream_info=info)
 
-    # Empty file should return empty or minimal markdown
     assert result.markdown.strip() == "" or "[00:" not in result.markdown
 
 
 def test_vtt_html_tags_stripped():
-    """Test that HTML-like tags are stripped."""
     md = MarkItDown()
-    result = md.convert_stream(io.BytesIO(VTT_WITH_SPEAKERS.encode()), ".vtt")
+    info = StreamInfo(extension=".vtt", mimetype="text/vtt", charset="utf-8")
+    result = md.convert_stream(io.BytesIO(VTT_WITH_SPEAKERS.encode()), stream_info=info)
 
-    # Tags should be stripped
     assert "<c.highlight>" not in result.markdown
     assert "</c>" not in result.markdown
     assert "<v.bob>" not in result.markdown
