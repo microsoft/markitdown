@@ -42,6 +42,8 @@ are also highly token-efficient.
 ## Prerequisites
 MarkItDown requires Python 3.10 or higher. It is recommended to use a virtual environment to avoid dependency conflicts.
 
+The packages in this repository currently publish Python classifiers for 3.10, 3.11, 3.12, and 3.13.
+
 With the standard Python installation, you can create and activate a virtual environment using the following commands:
 
 ```bash
@@ -74,6 +76,23 @@ cd markitdown
 pip install -e 'packages/markitdown[all]'
 ```
 
+## Package Ecosystem
+
+This repository contains multiple related Python packages:
+
+- **markitdown**: the core converter library and CLI. See [`packages/markitdown/README.md`](packages/markitdown/README.md).
+- **markitdown-mcp**: an MCP server that exposes MarkItDown tools to MCP-compatible clients. See [`packages/markitdown-mcp/README.md`](packages/markitdown-mcp/README.md).
+- **markitdown-ocr**: a plugin that adds OCR for PDF, DOCX, PPTX, and XLSX via LLM Vision. See [`packages/markitdown-ocr/README.md`](packages/markitdown-ocr/README.md).
+- **markitdown-sample-plugin**: a reference implementation for writing custom plugins. See [`packages/markitdown-sample-plugin/README.md`](packages/markitdown-sample-plugin/README.md).
+
+### Package Compatibility
+
+| Package | PyPI name | Requires Python |
+| --- | --- | --- |
+| Core converter | `markitdown` | >=3.10 |
+| MCP server | `markitdown-mcp` | >=3.10 |
+| OCR plugin | `markitdown-ocr` | >=3.10 |
+
 ## Usage
 
 ### Command-Line
@@ -92,6 +111,20 @@ You can also pipe content:
 
 ```bash
 cat path-to-file.pdf | markitdown
+```
+
+Advanced command-line examples:
+
+```bash
+# Convert from a URL
+markitdown https://example.com/page.html > page.md
+
+# Read from stdin with stream hints
+cat path-to-file.pdf | markitdown -x pdf
+cat path-to-file.pdf | markitdown -m application/pdf
+
+# Keep data URIs in output (instead of truncating them)
+markitdown input.html --keep-data-uris > output.md
 ```
 
 ### Optional Dependencies
@@ -186,6 +219,16 @@ result = md.convert("test.xlsx")
 print(result.text_content)
 ```
 
+MarkItDown can also convert URI sources directly (for example `http(s):`, `file:`, and `data:`):
+
+```python
+from markitdown import MarkItDown
+
+md = MarkItDown()
+result = md.convert("https://example.com")
+print(result.text_content)
+```
+
 Document Intelligence conversion in Python:
 
 ```python
@@ -270,6 +313,13 @@ You can help by looking at issues or helping review PRs. Any issue or PR is welc
 ### Contributing 3rd-party Plugins
 
 You can also contribute by creating and sharing 3rd party plugins. See `packages/markitdown-sample-plugin` for more details.
+
+## Troubleshooting
+
+- Plugin not loading? Verify it is installed in the active environment, then run `markitdown --list-plugins` and enable plugins with `--use-plugins`.
+- Missing converter support for a file type? Install the corresponding optional dependencies shown in [Optional Dependencies](#optional-dependencies).
+- Using OCR and not seeing OCR output? Check plugin requirements and behavior in [`packages/markitdown-ocr/README.md`](packages/markitdown-ocr/README.md).
+- Running the MCP server in production-like environments? Review transport and security notes in [`packages/markitdown-mcp/README.md`](packages/markitdown-mcp/README.md).
 
 ## Trademarks
 
