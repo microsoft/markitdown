@@ -101,7 +101,7 @@ def main():
     parser.add_argument(
         "--list-plugins",
         action="store_true",
-        help="List installed 3rd-party plugins. Plugins are loaded when using the -p or --use-plugin option.",
+        help="List installed 3rd-party plugins. Plugins are loaded when using the -p or --use-plugins option.",
     )
 
     parser.add_argument(
@@ -210,10 +210,13 @@ def _handle_output(args, result: DocumentConverterResult):
         with open(args.output, "w", encoding="utf-8") as f:
             f.write(result.markdown)
     else:
-        # Handle stdout encoding errors more gracefully
+        # Handle stdout encoding errors more gracefully.
+        # In some environments (tests, redirected streams), sys.stdout.encoding
+        # can be missing or None.
+        stdout_encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
         print(
-            result.markdown.encode(sys.stdout.encoding, errors="replace").decode(
-                sys.stdout.encoding
+            result.markdown.encode(stdout_encoding, errors="replace").decode(
+                stdout_encoding
             )
         )
 
