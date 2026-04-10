@@ -4,6 +4,7 @@ Extracts images from PDFs and performs OCR while maintaining document context.
 """
 
 import io
+import os
 import sys
 from typing import Any, BinaryIO, Optional
 
@@ -25,9 +26,13 @@ except ImportError:
     _dependency_exc_info = sys.exc_info()
 
 
-def _extract_images_from_page(page: Any) -> list[dict]:
+def _extract_images_from_page(page: Any, max_dimension: int = 1500) -> list[dict]:
     """
     Extract images from a PDF page by rendering page regions.
+
+    Args:
+        page: PDF page object from pdfplumber
+        max_dimension: Maximum width/height for resized images (default: 1500)
 
     Returns:
         List of dicts with 'stream', 'bbox', 'name', 'y_pos' keys
@@ -73,6 +78,13 @@ def _extract_images_from_page(page: Any) -> list[dict]:
                         # Convert to RGB if needed (handle CMYK, etc.)
                         if pil_img.mode not in ("RGB", "L"):
                             pil_img = pil_img.convert("RGB")
+
+                        # Resize large images to reduce LLM Vision API load
+                        # Target: max 1500 pixels width/height (suitable for OCR)
+                        if pil_img.width > max_dimension or pil_img.height > max_dimension:
+                            scale = min(max_dimension / pil_img.width, max_dimension / pil_img.height)
+                            new_size = (int(pil_img.width * scale), int(pil_img.height * scale))
+                            pil_img = pil_img.resize(new_size, Image.LANCZOS)
 
                         # Save to stream as PNG
                         img_stream = io.BytesIO()
@@ -132,9 +144,19 @@ class PdfConverterWithOCR(DocumentConverter):
     Maintains document structure while extracting text from images inline.
     """
 
-    def __init__(self, ocr_service: Optional[LLMVisionOCRService] = None):
+    def __init__(
+        self,
+        ocr_service: Optional[LLMVisionOCRService] = None,
+        max_image_dimension: Optional[int] = None,
+    ):
         super().__init__()
         self.ocr_service = ocr_service
+        # Use provided value, or read from environment variable, or default to 1500
+        if max_image_dimension is None:
+            max_image_dimension = int(os.environ.get("MARKITDOWN_MAX_IMAGE_DIMENSION", "1500"))
+        if max_image_dimension <= 0:
+            raise ValueError("max_image_dimension must be a positive integer")
+        self.max_image_dimension = max_image_dimension
 
     def accepts(
         self,
@@ -310,25 +332,31 @@ class PdfConverterWithOCR(DocumentConverter):
 
         return DocumentConverterResult(markdown=markdown)
 
-    def _extract_page_images(self, pdf_bytes: io.BytesIO, page_num: int) -> list[dict]:
+    def _extract_page_images(
+        self, pdf_bytes: io.BytesIO, page_num: int, max_dimension: Optional[int] = None
+    ) -> list[dict]:
         """
         Extract images from a PDF page using pdfplumber.
 
         Args:
             pdf_bytes: PDF file as BytesIO
             page_num: Page number (1-indexed)
+            max_dimension: Maximum width/height for resized images (optional, uses instance default if not provided)
 
         Returns:
             List of image info dicts with 'stream', 'bbox', 'name', 'y_pos'
         """
         images = []
 
+        # Use provided max_dimension or fall back to instance default
+        dimension_limit = max_dimension if max_dimension is not None else self.max_image_dimension
+
         try:
             pdf_bytes.seek(0)
             with pdfplumber.open(pdf_bytes) as pdf:
                 if page_num <= len(pdf.pages):
                     page = pdf.pages[page_num - 1]  # 0-indexed
-                    images = _extract_images_from_page(page)
+                    images = _extract_images_from_page(page, dimension_limit)
         except Exception:
             pass
 

@@ -4,10 +4,16 @@ Provides LLM Vision-based image text extraction.
 """
 
 import base64
-from typing import Any, BinaryIO
+import os
+from typing import Any, BinaryIO, Optional
 from dataclasses import dataclass
 
 from markitdown import StreamInfo
+
+# Environment variable names for OCR configuration
+OCR_API_KEY_ENV = "MARKITDOWN_OCR_API_KEY"
+OCR_API_BASE_ENV = "MARKITDOWN_OCR_API_BASE"
+OCR_MODEL_ENV = "MARKITDOWN_OCR_MODEL"
 
 
 @dataclass
@@ -44,6 +50,53 @@ class LLMVisionOCRService:
             "Return ONLY the extracted text, maintaining the original "
             "layout and order. Do not add any commentary or description."
         )
+
+    @classmethod
+    def from_env(cls, default_prompt: str | None = None) -> "LLMVisionOCRService":
+        """
+        Create LLMVisionOCRService from environment variables.
+
+        Required environment variables:
+            MARKITDOWN_OCR_API_KEY: API key for the OpenAI-compatible service
+            MARKITDOWN_OCR_MODEL: Model name (e.g., 'gpt-4o', 'gemini-2.0-flash')
+
+        Optional environment variables:
+            MARKITDOWN_OCR_API_BASE: API base URL (defaults to OpenAI's API)
+
+        Args:
+            default_prompt: Default prompt for OCR extraction
+
+        Returns:
+            LLMVisionOCRService instance
+
+        Raises:
+            ValueError: If required environment variables are not set
+        """
+        api_key = os.environ.get(OCR_API_KEY_ENV)
+        model = os.environ.get(OCR_MODEL_ENV)
+
+        if not api_key:
+            raise ValueError(
+                f"Missing required environment variable: {OCR_API_KEY_ENV}"
+            )
+        if not model:
+            raise ValueError(
+                f"Missing required environment variable: {OCR_MODEL_ENV}"
+            )
+
+        # Import OpenAI here to allow the module to load without it
+        try:
+            from openai import OpenAI
+        except ImportError:
+            raise ImportError(
+                "OpenAI package is required for LLMVisionOCRService. "
+                "Install it with: pip install openai"
+            )
+
+        api_base = os.environ.get(OCR_API_BASE_ENV)
+        client = OpenAI(api_key=api_key, base_url=api_base)
+
+        return cls(client=client, model=model, default_prompt=default_prompt)
 
     def extract_text(
         self,
