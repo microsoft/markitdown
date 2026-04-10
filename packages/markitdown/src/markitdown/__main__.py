@@ -172,13 +172,17 @@ def main():
             )
         sys.exit(0)
 
+    use_stdin = args.filename is None or args.filename == "-"
+
     if args.use_docintel:
         if args.endpoint is None:
             _exit_with_error(
                 "Document Intelligence Endpoint is required when using Document Intelligence."
             )
-        elif args.filename is None:
-            _exit_with_error("Filename is required when using Document Intelligence.")
+        elif use_stdin:
+            _exit_with_error(
+                "A local filename is required when using Document Intelligence (stdin is not supported)."
+            )
 
         markitdown = MarkItDown(
             enable_plugins=args.use_plugins, docintel_endpoint=args.endpoint
@@ -186,7 +190,7 @@ def main():
     else:
         markitdown = MarkItDown(enable_plugins=args.use_plugins)
 
-    if args.filename is None:
+    if use_stdin:
         result = markitdown.convert_stream(
             sys.stdin.buffer,
             stream_info=stream_info,
