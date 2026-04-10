@@ -13,6 +13,7 @@ try:
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=DeprecationWarning)
         warnings.filterwarnings("ignore", category=SyntaxWarning)
+        warnings.filterwarnings("ignore", message=".*ffmpeg.*", category=RuntimeWarning)
         import speech_recognition as sr
         import pydub
 except ImportError:
