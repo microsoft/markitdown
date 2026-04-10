@@ -23,6 +23,7 @@ MarkItDown currently supports the conversion from:
 - Excel
 - Images (EXIF metadata and OCR)
 - Audio (EXIF metadata and speech transcription)
+  - *Note: Audio conversion requires `ffmpeg` or `avconv` to be installed on your system. If not installed, you may see a `RuntimeWarning`.*
 - HTML
 - Text-based formats (CSV, JSON, XML)
 - ZIP files (iterates over contents)
