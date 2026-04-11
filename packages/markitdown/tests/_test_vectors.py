@@ -236,7 +236,7 @@ GENERAL_TEST_VECTORS = [
     ),
     FileTestVector(
         filename="test.one",
-        mimetype="application/onenote",
+        mimetype="application/msonenote",
         charset=None,
         url=None,
         must_include=[
