@@ -180,9 +180,15 @@ class YouTubeConverter(DocumentConverter):
                     )
 
                     if transcript:
-                        transcript_text = " ".join(
-                            [part["text"] for part in transcript]
-                        )  # type: ignore
+                        # Version 1.x of youtube-transcript-api returns a list of FetchedTranscript objects
+                        # that use attribute access (snip.text) rather than dictionary access (part["text"]).
+                        # To support both, we check if the first element is a dictionary.
+                        if isinstance(transcript[0], dict):
+                            transcript_text = " ".join(
+                                [part["text"] for part in transcript]
+                            )
+                        else:
+                            transcript_text = " ".join([part.text for part in transcript])
                 except Exception as e:
                     # No transcript available
                     if len(languages) == 1:
@@ -194,7 +200,13 @@ class YouTubeConverter(DocumentConverter):
                             .translate(youtube_transcript_languages[0])
                             .fetch()
                         )
-                        transcript_text = " ".join([part.text for part in transcript])
+                        if transcript:
+                            if isinstance(transcript[0], dict):
+                                transcript_text = " ".join(
+                                    [part["text"] for part in transcript]
+                                )
+                            else:
+                                transcript_text = " ".join([part.text for part in transcript])
             if transcript_text:
                 webpage_text += f"\n### Transcript\n{transcript_text}\n"
 
