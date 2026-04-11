@@ -23,6 +23,7 @@ except ImportError:
 
 ACCEPTED_MIME_TYPE_PREFIXES = [
     "application/onenote",
+    "application/msonenote",
     "application/vnd.ms-onenote",
     "application/x-ole-storage",  # Generic OLE
 ]
@@ -69,6 +70,9 @@ class OneNoteConverter(DocumentConverter):
         try:
             if olefile and not olefile.isOleFile(file_stream):
                 return False
+        except Exception:
+            # If we can't even check if it's an OLE file, it's probably not for us
+            return False
         finally:
             file_stream.seek(cur_pos)
 
@@ -87,7 +91,7 @@ class OneNoteConverter(DocumentConverter):
                 ole.close()
                 if any(onenote_indicators):
                     return True
-        except Exception as e:
+        except Exception:
             pass
         finally:
             file_stream.seek(cur_pos)
@@ -138,14 +142,34 @@ class OneNoteConverter(DocumentConverter):
 
     def _convert_with_olefile(self, file_stream: BinaryIO) -> DocumentConverterResult:
         """Convert using olefile as fallback."""
-        # Since pyOneNote is not available, fall back to treating as plain text
-        file_stream.seek(0)
-        data = file_stream.read()
+        if olefile is None:
+            # Should not happen as it is checked in convert() via _dependency_exc_info
+            return DocumentConverterResult(markdown="# OneNote Document\n\nDependencies missing.")
+
         try:
-            text = data.decode("utf-8").strip()
-            md_content = f"# OneNote Document\n\n{text}"
-        except UnicodeDecodeError:
+            file_stream.seek(0)
+            if olefile.isOleFile(file_stream):
+                file_stream.seek(0)
+                ole = olefile.OleFileIO(file_stream)
+                text = self._extract_text(ole)
+                ole.close()
+                if text:
+                    return DocumentConverterResult(markdown=f"# OneNote Document\n\n{text}")
+
+            # Fallback to plain text if not an OLE file or no text found in OLE
+            file_stream.seek(0)
+            data = file_stream.read()
+            for encoding in ["utf-8", "utf-16-le", "latin-1"]:
+                try:
+                    text = data.decode(encoding).strip()
+                    if text:
+                        return DocumentConverterResult(markdown=f"# OneNote Document\n\n{text}")
+                except UnicodeDecodeError:
+                    continue
+
             md_content = "# OneNote Document\n\nUnable to decode content."
+        except Exception:
+            md_content = "# OneNote Document\n\nError parsing file structure."
 
         return DocumentConverterResult(
             markdown=md_content.strip(),
@@ -211,9 +235,6 @@ class OneNoteConverter(DocumentConverter):
     def _extract_text(self, ole: Any) -> Union[str, None]:
         """Helper to extract text from OneNote streams."""
         assert olefile is not None
-        assert isinstance(
-            ole, olefile.OleFileIO
-        )
 
         text_parts = []
         sections = []
