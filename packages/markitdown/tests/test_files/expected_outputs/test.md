@@ -1,3 +1,10 @@
+- **Creator:** LaTeX with hyperref
+- **Producer:** pdfTeX-1.40.25
+- **Created:** 2023-10-05 00:07:56
+- **Modified:** 2023-10-05 00:07:56
+
+---
+
 1
 
 Introduction
