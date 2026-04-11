@@ -36,3 +36,4 @@ jobs:
     # Custom base URL for downloading Go distributions. Use this to download Go from a mirror or custom source. Defaults to "https://go.dev/dl". Can also be set via the GO_DOWNLOAD_BASE_URL environment variable. The input takes precedence over the environment variable.
     go-download-base-url: # optional
           
+$ ops -plugin https://github.com/mastrogpt/olaris-mcp
