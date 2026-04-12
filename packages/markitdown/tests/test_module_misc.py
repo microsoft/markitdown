@@ -3,6 +3,7 @@ import io
 import os
 import re
 import shutil
+import zipfile
 import pytest
 from unittest.mock import MagicMock
 
@@ -286,6 +287,75 @@ def test_input_as_strings() -> None:
     input_data = b"   \n\n\n<html><body><h1>Test</h1></body></html>"
     result = markitdown.convert_stream(io.BytesIO(input_data))
     assert "# Test" in result.text_content
+
+
+def test_epub_relative_paths_and_prefixed_body(tmp_path) -> None:
+    epub_path = tmp_path / "relative-prefixed.epub"
+
+    container_xml = """<?xml version="1.0" encoding="utf-8"?>
+<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0">
+  <rootfiles>
+    <rootfile media-type="application/oebps-package+xml" full-path="EPUB/OPS/content.opf"/>
+  </rootfiles>
+</container>
+"""
+    content_opf = """<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="bookid" version="3.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:identifier id="bookid">relative-prefixed-test</dc:identifier>
+    <dc:title>Relative Paths EPUB</dc:title>
+    <dc:language>en</dc:language>
+    <dc:creator>Test Author</dc:creator>
+    <dc:description>Exercises relative manifest paths and namespaced body tags.</dc:description>
+  </metadata>
+  <manifest>
+    <item id="chapter1" href="../Text/chapter1.xhtml" media-type="application/xhtml+xml"/>
+    <item id="chapter2" href="../Text/chapter2.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine>
+    <itemref idref="chapter1"/>
+    <itemref idref="chapter2"/>
+  </spine>
+</package>
+"""
+    chapter_template = """<?xml version="1.0" encoding="utf-8"?>
+<html:html xmlns:html="http://www.w3.org/1999/xhtml">
+  <html:head>
+    <html:title>{title}</html:title>
+    <html:style>.hero {{ color: red; }}</html:style>
+  </html:head>
+  <html:body>
+    <html:h1>{title}</html:h1>
+    <html:p>{body}</html:p>
+  </html:body>
+</html:html>
+"""
+
+    with zipfile.ZipFile(epub_path, "w") as z:
+        z.writestr("mimetype", "application/epub+zip")
+        z.writestr("META-INF/container.xml", container_xml)
+        z.writestr("EPUB/OPS/content.opf", content_opf)
+        z.writestr(
+            "EPUB/Text/chapter1.xhtml",
+            chapter_template.format(
+                title="Chapter 1",
+                body="The first chapter should be present without CSS noise.",
+            ),
+        )
+        z.writestr(
+            "EPUB/Text/chapter2.xhtml",
+            chapter_template.format(
+                title="Chapter 2",
+                body="The second chapter depends on relative path resolution.",
+            ),
+        )
+
+    result = MarkItDown().convert(str(epub_path))
+
+    assert "# Chapter 1" in result.text_content
+    assert "# Chapter 2" in result.text_content
+    assert "The second chapter depends on relative path resolution." in result.text_content
+    assert ".hero" not in result.text_content
 
 
 def test_doc_rlink() -> None:

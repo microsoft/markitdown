@@ -20,6 +20,22 @@ ACCEPTED_FILE_EXTENSIONS = [
 class HtmlConverter(DocumentConverter):
     """Anything with content type text/html"""
 
+    def _normalize_namespaced_tags(self, soup: BeautifulSoup) -> None:
+        for tag in soup.find_all():
+            if isinstance(tag.name, str):
+                tag.name = tag.name.rsplit(":", 1)[-1]
+
+    def _find_body_element(self, soup: BeautifulSoup):
+        body_elm = soup.find("body")
+        if body_elm is not None:
+            return body_elm
+
+        for tag in soup.find_all():
+            if isinstance(tag.name, str) and tag.name.rsplit(":", 1)[-1].lower() == "body":
+                return tag
+
+        return None
+
     def accepts(
         self,
         file_stream: BinaryIO,
@@ -47,13 +63,14 @@ class HtmlConverter(DocumentConverter):
         # Parse the stream
         encoding = "utf-8" if stream_info.charset is None else stream_info.charset
         soup = BeautifulSoup(file_stream, "html.parser", from_encoding=encoding)
+        self._normalize_namespaced_tags(soup)
 
         # Remove javascript and style blocks
         for script in soup(["script", "style"]):
             script.extract()
 
         # Print only the main content
-        body_elm = soup.find("body")
+        body_elm = self._find_body_element(soup)
         webpage_text = ""
         if body_elm:
             webpage_text = _CustomMarkdownify(**kwargs).convert_soup(body_elm)
