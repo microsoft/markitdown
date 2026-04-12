@@ -1,11 +1,7 @@
-# -*- coding: utf-8 -*-
-
 """
 Adapted from https://github.com/xiilei/dwml/blob/master/dwml/latex_dict.py
 On 25/03/2025
 """
-
-from __future__ import unicode_literals
 
 CHARS = ("{", "}", "_", "^", "#", "&", "$", "%", "~")
 
@@ -116,7 +112,6 @@ T = {
     # Relation symbols
     "\u2190": "\\leftarrow ",
     "\u2191": "\\uparrow ",
-    "\u2192": "\\rightarrow ",
     "\u2193": "\\downright ",
     "\u2194": "\\leftrightarrow ",
     "\u2195": "\\updownarrow ",

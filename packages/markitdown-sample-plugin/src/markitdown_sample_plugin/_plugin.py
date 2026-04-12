@@ -1,14 +1,14 @@
 import locale
-from typing import BinaryIO, Any
+from typing import Any, BinaryIO
+
 from striprtf.striprtf import rtf_to_text
 
 from markitdown import (
-    MarkItDown,
     DocumentConverter,
     DocumentConverterResult,
+    MarkItDown,
     StreamInfo,
 )
-
 
 __plugin_interface_version__ = (
     1  # The version of the plugin interface that this plugin uses

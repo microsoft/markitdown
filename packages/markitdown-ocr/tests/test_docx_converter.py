@@ -18,11 +18,11 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from markitdown_ocr._ocr_service import OCRResult  # noqa: E402
+from markitdown import StreamInfo  # noqa: E402
 from markitdown_ocr._docx_converter_with_ocr import (  # noqa: E402
     DocxConverterWithOCR,
 )
-from markitdown import StreamInfo  # noqa: E402
+from markitdown_ocr._ocr_service import OCRResult  # noqa: E402
 
 TEST_DATA_DIR = Path(__file__).parent / "ocr_test_data"
 

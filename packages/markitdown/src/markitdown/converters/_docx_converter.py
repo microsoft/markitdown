@@ -1,14 +1,11 @@
 import sys
-import io
-from warnings import warn
+from typing import Any, BinaryIO
 
-from typing import BinaryIO, Any
-
-from ._html_converter import HtmlConverter
-from ..converter_utils.docx.pre_process import pre_process_docx
 from .._base_converter import DocumentConverterResult
+from .._exceptions import MISSING_DEPENDENCY_MESSAGE, MissingDependencyException
 from .._stream_info import StreamInfo
-from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+from ..converter_utils.docx.pre_process import pre_process_docx
+from ._html_converter import HtmlConverter
 
 # Try loading optional (but in this case, required) dependencies
 # Save reporting of any exceptions for later
@@ -69,13 +66,11 @@ class DocxConverter(HtmlConverter):
                     extension=".docx",
                     feature="docx",
                 )
-            ) from _dependency_exc_info[
-                1
-            ].with_traceback(  # type: ignore[union-attr]
+            ) from _dependency_exc_info[1].with_traceback(  # type: ignore[union-attr]
                 _dependency_exc_info[2]
             )
 
-        style_map = kwargs.get("style_map", None)
+        style_map = kwargs.get("style_map")
         pre_process_stream = pre_process_docx(file_stream)
         return self._html_converter.convert_string(
             mammoth.convert_to_html(pre_process_stream, style_map=style_map).value,

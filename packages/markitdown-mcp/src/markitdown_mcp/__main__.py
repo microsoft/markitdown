@@ -1,17 +1,19 @@
 import contextlib
-import sys
 import os
+import sys
 from collections.abc import AsyncIterator
+
+import uvicorn
+from mcp.server import Server
 from mcp.server.fastmcp import FastMCP
-from starlette.applications import Starlette
 from mcp.server.sse import SseServerTransport
+from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.routing import Mount, Route
 from starlette.types import Receive, Scope, Send
-from mcp.server import Server
-from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+
 from markitdown import MarkItDown
-import uvicorn
 
 # Initialize FastMCP server for MarkItDown (SSE)
 mcp = FastMCP("markitdown")

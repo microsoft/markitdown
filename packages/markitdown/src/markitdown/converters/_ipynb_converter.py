@@ -1,5 +1,5 @@
-from typing import BinaryIO, Any
 import json
+from typing import Any, BinaryIO
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._exceptions import FileConversionException

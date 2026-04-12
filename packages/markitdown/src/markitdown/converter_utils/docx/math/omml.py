@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 """
 Office Math Markup Language (OMML)
 Adapted from https://github.com/xiilei/dwml/blob/master/dwml/omml.py
@@ -9,32 +7,32 @@ On 25/03/2025
 from defusedxml import ElementTree as ET
 
 from .latex_dict import (
+    ALN,
+    ARR,
+    BACKSLASH,
+    BLANK,
+    BRK,
     CHARS,
     CHR,
     CHR_BO,
     CHR_DEFAULT,
-    POS,
-    POS_DEFAULT,
-    SUB,
-    SUP,
-    F,
-    F_DEFAULT,
-    T,
-    FUNC,
-    D,
     D_DEFAULT,
-    RAD,
-    RAD_DEFAULT,
-    ARR,
+    F_DEFAULT,
+    FUNC,
+    FUNC_PLACE,
     LIM_FUNC,
     LIM_TO,
     LIM_UPP,
+    POS,
+    POS_DEFAULT,
+    RAD,
+    RAD_DEFAULT,
+    SUB,
+    SUP,
+    D,
+    F,
     M,
-    BRK,
-    BLANK,
-    BACKSLASH,
-    ALN,
-    FUNC_PLACE,
+    T,
 )
 
 OMML_NS = "{http://schemas.openxmlformats.org/officeDocument/2006/math}"
@@ -72,7 +70,7 @@ def get_val(key, default=None, store=CHR):
         return default
 
 
-class Tag2Method(object):
+class Tag2Method:
     def call_method(self, elm, stag=None):
         getmethod = self.tag2meth.get
         if stag is None:
@@ -104,8 +102,8 @@ class Tag2Method(object):
         """
         process children of the elm,return dict
         """
-        latex_chars = dict()
-        for stag, t, e in self.process_children_list(elm, include):
+        latex_chars = {}
+        for stag, t, _ in self.process_children_list(elm, include):
             latex_chars[stag] = t
         return latex_chars
 
@@ -153,7 +151,7 @@ class Pr(Tag2Method):
     def do_common(self, elm):
         stag = elm.tag.replace(OMML_NS, "")
         if stag in self.__val_tags:
-            t = elm.get("{0}val".format(OMML_NS))
+            t = elm.get(f"{OMML_NS}val")
             self.__innerdict[stag] = t
         return None
 
@@ -267,12 +265,12 @@ class oMath2Latex(Tag2Method):
         the func name
         """
         latex_chars = []
-        for stag, t, e in self.process_children_list(elm):
+        for stag, t, _ in self.process_children_list(elm):
             if stag == "r":
                 if FUNC.get(t):
                     latex_chars.append(FUNC[t])
                 else:
-                    raise NotImplementedError("Not support func %s" % t)
+                    raise NotImplementedError(f"Not support func {t}")
             else:
                 latex_chars.append(t)
         t = BLANK.join(latex_chars)
@@ -316,7 +314,7 @@ class oMath2Latex(Tag2Method):
         t_dict = self.process_children_dict(elm, include=("e", "lim"))
         latex_s = LIM_FUNC.get(t_dict["e"])
         if not latex_s:
-            raise NotImplementedError("Not support lim %s" % t_dict["e"])
+            raise NotImplementedError(f"Not support lim {t_dict['e']}")
         else:
             return latex_s.format(lim=t_dict.get("lim"))
 
@@ -338,7 +336,7 @@ class oMath2Latex(Tag2Method):
         the Matrix object
         """
         rows = []
-        for stag, t, e in self.process_children_list(elm):
+        for stag, t, _ in self.process_children_list(elm):
             if stag == "mPr":
                 pass
             elif stag == "mr":
@@ -359,7 +357,7 @@ class oMath2Latex(Tag2Method):
         """
         res = []
         bo = ""
-        for stag, t, e in self.process_children_list(elm):
+        for stag, t, _ in self.process_children_list(elm):
             if stag == "naryPr":
                 bo = get_val(t.chr, store=CHR_BO)
             else:
@@ -373,7 +371,7 @@ class oMath2Latex(Tag2Method):
         @todo \text (latex pure text support)
         """
         _str = []
-        for s in elm.findtext("./{0}t".format(OMML_NS)):
+        for s in elm.findtext(f"./{OMML_NS}t"):
             # s = s if isinstance(s,unicode) else unicode(s,'utf-8')
             _str.append(self._t_dict.get(s, s))
         return escape_latex(BLANK.join(_str))

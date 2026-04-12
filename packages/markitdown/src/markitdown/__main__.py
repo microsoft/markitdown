@@ -2,12 +2,13 @@
 #
 # SPDX-License-Identifier: MIT
 import argparse
-import sys
 import codecs
-from textwrap import dedent
+import sys
 from importlib.metadata import entry_points
+from textwrap import dedent
+
 from .__about__ import __version__
-from ._markitdown import MarkItDown, StreamInfo, DocumentConverterResult
+from ._markitdown import DocumentConverterResult, MarkItDown, StreamInfo
 
 
 def main():

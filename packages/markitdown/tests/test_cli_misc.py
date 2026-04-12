@@ -1,5 +1,6 @@
 #!/usr/bin/env python3 -m pytest
 import subprocess
+
 from markitdown import __version__
 
 # This file contains CLI tests that are not directly tested by the FileTestVectors.
@@ -21,9 +22,9 @@ def test_invalid_flag() -> None:
     )
 
     assert result.returncode != 0, f"CLI exited with error: {result.stderr}"
-    assert (
-        "unrecognized arguments" in result.stderr
-    ), "Expected 'unrecognized arguments' to appear in STDERR"
+    assert "unrecognized arguments" in result.stderr, (
+        "Expected 'unrecognized arguments' to appear in STDERR"
+    )
     assert "SYNTAX" in result.stderr, "Expected 'SYNTAX' to appear in STDERR"
 
 

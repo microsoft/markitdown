@@ -1,13 +1,13 @@
 import os
 import zipfile
-from defusedxml import minidom
+from typing import Any, BinaryIO
 from xml.dom.minidom import Document
 
-from typing import BinaryIO, Any, Dict, List
+from defusedxml import minidom
 
-from ._html_converter import HtmlConverter
 from .._base_converter import DocumentConverterResult
 from .._stream_info import StreamInfo
+from ._html_converter import HtmlConverter
 
 ACCEPTED_MIME_TYPE_PREFIXES = [
     "application/epub",
@@ -67,7 +67,7 @@ class EpubConverter(HtmlConverter):
 
             # Parse content.opf
             opf_dom = minidom.parse(z.open(opf_path))
-            metadata: Dict[str, Any] = {
+            metadata: dict[str, Any] = {
                 "title": self._get_text_from_node(opf_dom, "dc:title"),
                 "authors": self._get_all_texts_from_nodes(opf_dom, "dc:creator"),
                 "language": self._get_text_from_node(opf_dom, "dc:language"),
@@ -98,7 +98,7 @@ class EpubConverter(HtmlConverter):
             ]
 
             # Extract and convert the content
-            markdown_content: List[str] = []
+            markdown_content: list[str] = []
             for file in spine:
                 if file in z.namelist():
                     with z.open(file) as f:
@@ -137,9 +137,9 @@ class EpubConverter(HtmlConverter):
         else:
             return None
 
-    def _get_all_texts_from_nodes(self, dom: Document, tag_name: str) -> List[str]:
+    def _get_all_texts_from_nodes(self, dom: Document, tag_name: str) -> list[str]:
         """Helper function to extract all occurrences of a tag (e.g., multiple authors)."""
-        texts: List[str] = []
+        texts: list[str] = []
         for node in dom.getElementsByTagName(tag_name):
             if node.firstChild and hasattr(node.firstChild, "nodeValue"):
                 texts.append(node.firstChild.nodeValue.strip())

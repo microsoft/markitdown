@@ -1,8 +1,9 @@
 import sys
-from typing import Any, Union, BinaryIO
-from .._stream_info import StreamInfo
+from typing import Any, BinaryIO
+
 from .._base_converter import DocumentConverter, DocumentConverterResult
-from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+from .._exceptions import MISSING_DEPENDENCY_MESSAGE, MissingDependencyException
+from .._stream_info import StreamInfo
 
 # Try loading optional (but in this case, required) dependencies
 # Save reporting of any exceptions for later
@@ -63,7 +64,7 @@ class OutlookMsgConverter(DocumentConverter):
                     "__properties_version1.0" in toc
                     and "__recip_version1.0_#00000000" in toc
                 )
-        except Exception as e:
+        except Exception:
             pass
         finally:
             file_stream.seek(cur_pos)
@@ -84,9 +85,7 @@ class OutlookMsgConverter(DocumentConverter):
                     extension=".msg",
                     feature="outlook",
                 )
-            ) from _dependency_exc_info[
-                1
-            ].with_traceback(  # type: ignore[union-attr]
+            ) from _dependency_exc_info[1].with_traceback(  # type: ignore[union-attr]
                 _dependency_exc_info[2]
             )
 
@@ -124,7 +123,7 @@ class OutlookMsgConverter(DocumentConverter):
             title=headers.get("Subject"),
         )
 
-    def _get_stream_data(self, msg: Any, stream_path: str) -> Union[str, None]:
+    def _get_stream_data(self, msg: Any, stream_path: str) -> str | None:
         """Helper to safely extract and decode stream data from the MSG file."""
         assert olefile is not None
         assert isinstance(

@@ -4,8 +4,8 @@ Provides LLM Vision-based image text extraction.
 """
 
 import base64
-from typing import Any, BinaryIO
 from dataclasses import dataclass
+from typing import Any, BinaryIO
 
 from markitdown import StreamInfo
 

@@ -1,4 +1,5 @@
-from typing import Any, BinaryIO, Optional
+from typing import Any, BinaryIO
+
 from ._stream_info import StreamInfo
 
 
@@ -9,7 +10,7 @@ class DocumentConverterResult:
         self,
         markdown: str,
         *,
-        title: Optional[str] = None,
+        title: str | None = None,
     ):
         """
         Initialize the DocumentConverterResult.

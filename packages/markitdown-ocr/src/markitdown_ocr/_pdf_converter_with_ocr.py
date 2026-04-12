@@ -5,13 +5,14 @@ Extracts images from PDFs and performs OCR while maintaining document context.
 
 import io
 import sys
-from typing import Any, BinaryIO, Optional
+from typing import Any, BinaryIO
 
 from markitdown import DocumentConverter, DocumentConverterResult, StreamInfo
 from markitdown._exceptions import (
-    MissingDependencyException,
     MISSING_DEPENDENCY_MESSAGE,
+    MissingDependencyException,
 )
+
 from ._ocr_service import LLMVisionOCRService
 
 # Import dependencies
@@ -49,7 +50,7 @@ def _extract_images_from_page(page: Any) -> list[dict]:
         # Method 3: Try filtering all objects for image types
         if not images and hasattr(page, "objects"):
             all_objs = page.objects
-            for obj_type in all_objs.keys():
+            for obj_type in all_objs:
                 if "image" in obj_type.lower() or "xobject" in obj_type.lower():
                     potential_imgs = all_objs.get(obj_type, [])
                     if potential_imgs:
@@ -132,7 +133,7 @@ class PdfConverterWithOCR(DocumentConverter):
     Maintains document structure while extracting text from images inline.
     """
 
-    def __init__(self, ocr_service: Optional[LLMVisionOCRService] = None):
+    def __init__(self, ocr_service: LLMVisionOCRService | None = None):
         super().__init__()
         self.ocr_service = ocr_service
 
@@ -148,12 +149,9 @@ class PdfConverterWithOCR(DocumentConverter):
         if extension == ".pdf":
             return True
 
-        if mimetype.startswith("application/pdf") or mimetype.startswith(
+        return mimetype.startswith("application/pdf") or mimetype.startswith(
             "application/x-pdf"
-        ):
-            return True
-
-        return False
+        )
 
     def convert(
         self,
@@ -168,9 +166,7 @@ class PdfConverterWithOCR(DocumentConverter):
                     extension=".pdf",
                     feature="pdf",
                 )
-            ) from _dependency_exc_info[1].with_traceback(
-                _dependency_exc_info[2]
-            )  # type: ignore[union-attr]
+            ) from _dependency_exc_info[1].with_traceback(_dependency_exc_info[2])  # type: ignore[union-attr]
 
         # Get OCR service if available (from kwargs or instance)
         ocr_service: LLMVisionOCRService | None = (

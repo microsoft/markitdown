@@ -1,54 +1,52 @@
+import codecs
+import contextlib
+import io
 import mimetypes
 import os
 import re
-import sys
 import shutil
+import sys
 import traceback
-import io
 from dataclasses import dataclass
 from importlib.metadata import entry_points
-from typing import Any, List, Dict, Optional, Union, BinaryIO
 from pathlib import Path
+from typing import Any, BinaryIO
 from urllib.parse import urlparse
 from warnings import warn
-import requests
-import magika
+
 import charset_normalizer
-import codecs
-
-from ._stream_info import StreamInfo
-from ._uri_utils import parse_data_uri, file_uri_to_path
-
-from .converters import (
-    PlainTextConverter,
-    HtmlConverter,
-    RssConverter,
-    WikipediaConverter,
-    YouTubeConverter,
-    IpynbConverter,
-    BingSerpConverter,
-    PdfConverter,
-    DocxConverter,
-    XlsxConverter,
-    XlsConverter,
-    PptxConverter,
-    ImageConverter,
-    AudioConverter,
-    OutlookMsgConverter,
-    ZipConverter,
-    EpubConverter,
-    DocumentIntelligenceConverter,
-    CsvConverter,
-)
+import magika
+import requests
 
 from ._base_converter import DocumentConverter, DocumentConverterResult
-
 from ._exceptions import (
+    FailedConversionAttempt,
     FileConversionException,
     UnsupportedFormatException,
-    FailedConversionAttempt,
 )
-
+from ._stream_info import StreamInfo
+from ._uri_utils import file_uri_to_path, parse_data_uri
+from .converters import (
+    AudioConverter,
+    BingSerpConverter,
+    CsvConverter,
+    DocumentIntelligenceConverter,
+    DocxConverter,
+    EpubConverter,
+    HtmlConverter,
+    ImageConverter,
+    IpynbConverter,
+    OutlookMsgConverter,
+    PdfConverter,
+    PlainTextConverter,
+    PptxConverter,
+    RssConverter,
+    WikipediaConverter,
+    XlsConverter,
+    XlsxConverter,
+    YouTubeConverter,
+    ZipConverter,
+)
 
 # Lower priority values are tried first.
 PRIORITY_SPECIFIC_FILE_FORMAT = (
@@ -59,10 +57,10 @@ PRIORITY_GENERIC_FILE_FORMAT = (
 )
 
 
-_plugins: Union[None, List[Any]] = None  # If None, plugins have not been loaded yet.
+_plugins: None | list[Any] = None  # If None, plugins have not been loaded yet.
 
 
-def _load_plugins() -> Union[None, List[Any]]:
+def _load_plugins() -> None | list[Any]:
     """Lazy load plugins, exiting early if already loaded."""
     global _plugins
 
@@ -77,7 +75,10 @@ def _load_plugins() -> Union[None, List[Any]]:
             _plugins.append(entry_point.load())
         except Exception:
             tb = traceback.format_exc()
-            warn(f"Plugin '{entry_point.name}' failed to load ... skipping:\n{tb}")
+            warn(
+                f"Plugin '{entry_point.name}' failed to load ... skipping:\n{tb}",
+                stacklevel=2,
+            )
 
     return _plugins
 
@@ -97,8 +98,8 @@ class MarkItDown:
     def __init__(
         self,
         *,
-        enable_builtins: Union[None, bool] = None,
-        enable_plugins: Union[None, bool] = None,
+        enable_builtins: None | bool = None,
+        enable_plugins: None | bool = None,
         **kwargs,
     ):
         self._builtins_enabled = False
@@ -121,13 +122,13 @@ class MarkItDown:
 
         # TODO - remove these (see enable_builtins)
         self._llm_client: Any = None
-        self._llm_model: Union[str | None] = None
-        self._llm_prompt: Union[str | None] = None
-        self._exiftool_path: Union[str | None] = None
-        self._style_map: Union[str | None] = None
+        self._llm_model: str | None = None
+        self._llm_prompt: str | None = None
+        self._exiftool_path: str | None = None
+        self._style_map: str | None = None
 
         # Register the converters
-        self._converters: List[ConverterRegistration] = []
+        self._converters: list[ConverterRegistration] = []
 
         if (
             enable_builtins is None or enable_builtins
@@ -206,7 +207,7 @@ class MarkItDown:
             # Register Document Intelligence converter at the top of the stack if endpoint is provided
             docintel_endpoint = kwargs.get("docintel_endpoint")
             if docintel_endpoint is not None:
-                docintel_args: Dict[str, Any] = {}
+                docintel_args: dict[str, Any] = {}
                 docintel_args["endpoint"] = docintel_endpoint
 
                 docintel_credential = kwargs.get("docintel_credential")
@@ -227,7 +228,9 @@ class MarkItDown:
 
             self._builtins_enabled = True
         else:
-            warn("Built-in converters are already enabled.", RuntimeWarning)
+            warn(
+                "Built-in converters are already enabled.", RuntimeWarning, stacklevel=2
+            )
 
     def enable_plugins(self, **kwargs) -> None:
         """
@@ -244,16 +247,21 @@ class MarkItDown:
                     plugin.register_converters(self, **kwargs)
                 except Exception:
                     tb = traceback.format_exc()
-                    warn(f"Plugin '{plugin}' failed to register converters:\n{tb}")
+                    warn(
+                        f"Plugin '{plugin}' failed to register converters:\n{tb}",
+                        stacklevel=2,
+                    )
             self._plugins_enabled = True
         else:
-            warn("Plugins converters are already enabled.", RuntimeWarning)
+            warn(
+                "Plugins converters are already enabled.", RuntimeWarning, stacklevel=2
+            )
 
     def convert(
         self,
-        source: Union[str, requests.Response, Path, BinaryIO],
+        source: str | requests.Response | Path | BinaryIO,
         *,
-        stream_info: Optional[StreamInfo] = None,
+        stream_info: StreamInfo | None = None,
         **kwargs: Any,
     ) -> DocumentConverterResult:  # TODO: deal with kwargs
         """
@@ -273,7 +281,7 @@ class MarkItDown:
             ):
                 # Rename the url argument to mock_url
                 # (Deprecated -- use stream_info)
-                _kwargs = {k: v for k, v in kwargs.items()}
+                _kwargs = dict(kwargs)
                 if "url" in _kwargs:
                     _kwargs["mock_url"] = _kwargs["url"]
                     del _kwargs["url"]
@@ -301,11 +309,11 @@ class MarkItDown:
 
     def convert_local(
         self,
-        path: Union[str, Path],
+        path: str | Path,
         *,
-        stream_info: Optional[StreamInfo] = None,
-        file_extension: Optional[str] = None,  # Deprecated -- use stream_info
-        url: Optional[str] = None,  # Deprecated -- use stream_info
+        stream_info: StreamInfo | None = None,
+        file_extension: str | None = None,  # Deprecated -- use stream_info
+        url: str | None = None,  # Deprecated -- use stream_info
         **kwargs: Any,
     ) -> DocumentConverterResult:
         if isinstance(path, Path):
@@ -340,21 +348,18 @@ class MarkItDown:
         self,
         stream: BinaryIO,
         *,
-        stream_info: Optional[StreamInfo] = None,
-        file_extension: Optional[str] = None,  # Deprecated -- use stream_info
-        url: Optional[str] = None,  # Deprecated -- use stream_info
+        stream_info: StreamInfo | None = None,
+        file_extension: str | None = None,  # Deprecated -- use stream_info
+        url: str | None = None,  # Deprecated -- use stream_info
         **kwargs: Any,
     ) -> DocumentConverterResult:
-        guesses: List[StreamInfo] = []
+        guesses: list[StreamInfo] = []
 
         # Do we have anything on which to base a guess?
         base_guess = None
         if stream_info is not None or file_extension is not None or url is not None:
             # Start with a non-Null base guess
-            if stream_info is None:
-                base_guess = StreamInfo()
-            else:
-                base_guess = stream_info
+            base_guess = StreamInfo() if stream_info is None else stream_info
 
             if file_extension is not None:
                 # Deprecated -- use stream_info
@@ -387,9 +392,9 @@ class MarkItDown:
         self,
         url: str,
         *,
-        stream_info: Optional[StreamInfo] = None,
-        file_extension: Optional[str] = None,
-        mock_url: Optional[str] = None,
+        stream_info: StreamInfo | None = None,
+        file_extension: str | None = None,
+        mock_url: str | None = None,
         **kwargs: Any,
     ) -> DocumentConverterResult:
         """Alias for convert_uri()"""
@@ -406,11 +411,10 @@ class MarkItDown:
         self,
         uri: str,
         *,
-        stream_info: Optional[StreamInfo] = None,
-        file_extension: Optional[str] = None,  # Deprecated -- use stream_info
-        mock_url: Optional[
-            str
-        ] = None,  # Mock the request as if it came from a different URL
+        stream_info: StreamInfo | None = None,
+        file_extension: str | None = None,  # Deprecated -- use stream_info
+        mock_url: str
+        | None = None,  # Mock the request as if it came from a different URL
         **kwargs: Any,
     ) -> DocumentConverterResult:
         uri = uri.strip()
@@ -467,14 +471,14 @@ class MarkItDown:
         self,
         response: requests.Response,
         *,
-        stream_info: Optional[StreamInfo] = None,
-        file_extension: Optional[str] = None,  # Deprecated -- use stream_info
-        url: Optional[str] = None,  # Deprecated -- use stream_info
+        stream_info: StreamInfo | None = None,
+        file_extension: str | None = None,  # Deprecated -- use stream_info
+        url: str | None = None,  # Deprecated -- use stream_info
         **kwargs: Any,
     ) -> DocumentConverterResult:
         # If there is a content-type header, get the mimetype and charset (if present)
-        mimetype: Optional[str] = None
-        charset: Optional[str] = None
+        mimetype: str | None = None
+        charset: str | None = None
 
         if "content-type" in response.headers:
             parts = response.headers["content-type"].split(";")
@@ -486,8 +490,8 @@ class MarkItDown:
                         charset = _charset
 
         # If there is a content-disposition header, get the filename and possibly the extension
-        filename: Optional[str] = None
-        extension: Optional[str] = None
+        filename: str | None = None
+        extension: str | None = None
         if "content-disposition" in response.headers:
             m = re.search(r"filename=([^;]+)", response.headers["content-disposition"])
             if m:
@@ -536,12 +540,12 @@ class MarkItDown:
         return self._convert(file_stream=buffer, stream_info_guesses=guesses, **kwargs)
 
     def _convert(
-        self, *, file_stream: BinaryIO, stream_info_guesses: List[StreamInfo], **kwargs
+        self, *, file_stream: BinaryIO, stream_info_guesses: list[StreamInfo], **kwargs
     ) -> DocumentConverterResult:
-        res: Union[None, DocumentConverterResult] = None
+        res: None | DocumentConverterResult = None
 
         # Keep track of which converters throw exceptions
-        failed_attempts: List[FailedConversionAttempt] = []
+        failed_attempts: list[FailedConversionAttempt] = []
 
         # Create a copy of the page_converters list, sorted by priority.
         # We do this with each call to _convert because the priority of converters may change between calls.
@@ -555,11 +559,11 @@ class MarkItDown:
             for converter_registration in sorted_registrations:
                 converter = converter_registration.converter
                 # Sanity check -- make sure the cur_pos is still the same
-                assert (
-                    cur_pos == file_stream.tell()
-                ), "File stream position should NOT change between guess iterations"
+                assert cur_pos == file_stream.tell(), (
+                    "File stream position should NOT change between guess iterations"
+                )
 
-                _kwargs = {k: v for k, v in kwargs.items()}
+                _kwargs = dict(kwargs)
 
                 # Copy any additional global options
                 if "llm_client" not in _kwargs and self._llm_client is not None:
@@ -590,15 +594,13 @@ class MarkItDown:
 
                 # Check if the converter will accept the file, and if so, try to convert it
                 _accepts = False
-                try:
+                with contextlib.suppress(NotImplementedError):
                     _accepts = converter.accepts(file_stream, stream_info, **_kwargs)
-                except NotImplementedError:
-                    pass
 
                 # accept() should not have changed the file stream position
-                assert (
-                    cur_pos == file_stream.tell()
-                ), f"{type(converter).__name__}.accept() should NOT change the file_stream position"
+                assert cur_pos == file_stream.tell(), (
+                    f"{type(converter).__name__}.accept() should NOT change the file_stream position"
+                )
 
                 # Attempt the conversion
                 if _accepts:
@@ -635,6 +637,7 @@ class MarkItDown:
         warn(
             "register_page_converter is deprecated. Use register_converter instead.",
             DeprecationWarning,
+            stacklevel=2,
         )
         self.register_converter(converter)
 
@@ -672,11 +675,11 @@ class MarkItDown:
 
     def _get_stream_info_guesses(
         self, file_stream: BinaryIO, base_guess: StreamInfo
-    ) -> List[StreamInfo]:
+    ) -> list[StreamInfo]:
         """
         Given a base guess, attempt to guess or expand on the stream info using the stream content (via magika).
         """
-        guesses: List[StreamInfo] = []
+        guesses: list[StreamInfo] = []
 
         # Enhance the base guess with information based on the extension or mimetype
         enhanced_guess = base_guess.copy_and_update()

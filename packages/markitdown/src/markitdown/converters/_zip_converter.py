@@ -1,12 +1,11 @@
-import zipfile
 import io
 import os
-
-from typing import BinaryIO, Any, TYPE_CHECKING
+import zipfile
+from typing import TYPE_CHECKING, Any, BinaryIO
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
+from .._exceptions import FileConversionException, UnsupportedFormatException
 from .._stream_info import StreamInfo
-from .._exceptions import UnsupportedFormatException, FileConversionException
 
 # Break otherwise circular import for type hinting
 if TYPE_CHECKING:

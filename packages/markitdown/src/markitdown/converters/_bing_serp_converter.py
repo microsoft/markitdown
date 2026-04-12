@@ -1,8 +1,9 @@
-import re
 import base64
 import binascii
-from urllib.parse import parse_qs, urlparse
+import re
 from typing import Any, BinaryIO
+from urllib.parse import parse_qs, urlparse
+
 from bs4 import BeautifulSoup
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
@@ -79,7 +80,7 @@ class BingSerpConverter(DocumentConverter):
 
         # Parse the algorithmic results
         _markdownify = _CustomMarkdownify(**kwargs)
-        results = list()
+        results = []
         for result in soup.find_all(class_="b_algo"):
             if not hasattr(result, "find_all"):
                 continue

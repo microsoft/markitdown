@@ -6,15 +6,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
       - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.x"
-
-      - name: Install pre-commit
-        run: |
-          pip install pre-commit
-          pre-commit install --install-hooks
-
+        run: uv python install 3.12
       - name: Run pre-commit
-        run: pre-commit run --all-files
+        run: uvx pre-commit run --all-files

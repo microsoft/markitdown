@@ -1,12 +1,12 @@
-import sys
-import re
 import os
-from typing import BinaryIO, Any, List
+import re
+import sys
 from enum import Enum
+from typing import Any, BinaryIO
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
-from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException
+from .._stream_info import StreamInfo
 
 # Try loading optional (but in this case, required) dependencies
 # Save reporting of any exceptions for later
@@ -68,9 +68,9 @@ class DocumentIntelligenceFileType(str, Enum):
     TIFF = "tiff"
 
 
-def _get_mime_type_prefixes(types: List[DocumentIntelligenceFileType]) -> List[str]:
+def _get_mime_type_prefixes(types: list[DocumentIntelligenceFileType]) -> list[str]:
     """Get the MIME type prefixes for the given file types."""
-    prefixes: List[str] = []
+    prefixes: list[str] = []
     for type_ in types:
         if type_ == DocumentIntelligenceFileType.DOCX:
             prefixes.append(
@@ -101,9 +101,9 @@ def _get_mime_type_prefixes(types: List[DocumentIntelligenceFileType]) -> List[s
     return prefixes
 
 
-def _get_file_extensions(types: List[DocumentIntelligenceFileType]) -> List[str]:
+def _get_file_extensions(types: list[DocumentIntelligenceFileType]) -> list[str]:
     """Get the file extensions for the given file types."""
-    extensions: List[str] = []
+    extensions: list[str] = []
     for type_ in types:
         if type_ == DocumentIntelligenceFileType.DOCX:
             extensions.append(".docx")
@@ -136,16 +136,7 @@ class DocumentIntelligenceConverter(DocumentConverter):
         endpoint: str,
         api_version: str = "2024-07-31-preview",
         credential: AzureKeyCredential | TokenCredential | None = None,
-        file_types: List[DocumentIntelligenceFileType] = [
-            DocumentIntelligenceFileType.DOCX,
-            DocumentIntelligenceFileType.PPTX,
-            DocumentIntelligenceFileType.XLSX,
-            DocumentIntelligenceFileType.PDF,
-            DocumentIntelligenceFileType.JPEG,
-            DocumentIntelligenceFileType.PNG,
-            DocumentIntelligenceFileType.BMP,
-            DocumentIntelligenceFileType.TIFF,
-        ],
+        file_types: list[DocumentIntelligenceFileType] | None = None,
     ):
         """
         Initialize the DocumentIntelligenceConverter.
@@ -154,11 +145,20 @@ class DocumentIntelligenceConverter(DocumentConverter):
             endpoint (str): The endpoint for the Document Intelligence service.
             api_version (str): The API version to use. Defaults to "2024-07-31-preview".
             credential (AzureKeyCredential | TokenCredential | None): The credential to use for authentication.
-            file_types (List[DocumentIntelligenceFileType]): The file types to accept. Defaults to all supported file types.
+            file_types (List[DocumentIntelligenceFileType] | None): The file types to accept. Defaults to all supported file types.
         """
 
         super().__init__()
-        self._file_types = file_types
+        self._file_types = file_types or [
+            DocumentIntelligenceFileType.DOCX,
+            DocumentIntelligenceFileType.PPTX,
+            DocumentIntelligenceFileType.XLSX,
+            DocumentIntelligenceFileType.PDF,
+            DocumentIntelligenceFileType.JPEG,
+            DocumentIntelligenceFileType.PNG,
+            DocumentIntelligenceFileType.BMP,
+            DocumentIntelligenceFileType.TIFF,
+        ]
 
         # Raise an error if the dependencies are not available.
         # This is different than other converters since this one isn't even instantiated
@@ -166,9 +166,7 @@ class DocumentIntelligenceConverter(DocumentConverter):
         if _dependency_exc_info is not None:
             raise MissingDependencyException(
                 "DocumentIntelligenceConverter requires the optional dependency [az-doc-intel] (or [all]) to be installed. E.g., `pip install markitdown[az-doc-intel]`"
-            ) from _dependency_exc_info[
-                1
-            ].with_traceback(  # type: ignore[union-attr]
+            ) from _dependency_exc_info[1].with_traceback(  # type: ignore[union-attr]
                 _dependency_exc_info[2]
             )
 
@@ -204,7 +202,7 @@ class DocumentIntelligenceConverter(DocumentConverter):
 
         return False
 
-    def _analysis_features(self, stream_info: StreamInfo) -> List[str]:
+    def _analysis_features(self, stream_info: StreamInfo) -> list[str]:
         """
         Helper needed to determine which analysis features to use.
         Certain document analysis features are not availiable for

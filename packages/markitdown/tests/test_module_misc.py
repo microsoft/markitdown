@@ -3,29 +3,27 @@ import io
 import os
 import re
 import shutil
-import pytest
 from unittest.mock import MagicMock
 
-from markitdown._uri_utils import parse_data_uri, file_uri_to_path
+import pytest
 
 from markitdown import (
-    MarkItDown,
-    UnsupportedFormatException,
     FileConversionException,
+    MarkItDown,
     StreamInfo,
+    UnsupportedFormatException,
 )
+from markitdown._uri_utils import file_uri_to_path, parse_data_uri
 
 # This file contains module tests that are not directly tested by the FileTestVectors.
 # This includes things like helper functions and runtime conversion options
 # (e.g., LLM clients, exiftool path, transcription services, etc.)
 
-skip_remote = (
-    True if os.environ.get("GITHUB_ACTIONS") else False
-)  # Don't run these tests in CI
+skip_remote = bool(os.environ.get("GITHUB_ACTIONS"))  # Don't run these tests in CI
 
 
 # Don't run the llm tests without a key and the client library
-skip_llm = False if os.environ.get("OPENAI_API_KEY") else True
+skip_llm = not os.environ.get("OPENAI_API_KEY")
 try:
     import openai
 except ModuleNotFoundError:
@@ -310,7 +308,7 @@ def test_doc_rlink() -> None:
     )
 
     if os.path.exists(rlink_file_path):
-        with open(rlink_file_path, "r", encoding="utf-8") as f:
+        with open(rlink_file_path, encoding="utf-8") as f:
             existing_content = f.read()
             if existing_content != rlink_content:
                 raise ValueError(

@@ -1,4 +1,4 @@
-from typing import Optional, List, Any
+from typing import Any
 
 MISSING_DEPENDENCY_MESSAGE = """{converter} recognized the input as a potential {extension} file, but the dependencies needed to read {extension} files have not been installed. To resolve this error, include the optional dependency [{feature}] or [all] when installing MarkItDown. For example:
 
@@ -39,12 +39,12 @@ class UnsupportedFormatException(MarkItDownException):
     pass
 
 
-class FailedConversionAttempt(object):
+class FailedConversionAttempt:
     """
     Represents an a single attempt to convert a file.
     """
 
-    def __init__(self, converter: Any, exc_info: Optional[tuple] = None):
+    def __init__(self, converter: Any, exc_info: tuple | None = None):
         self.converter = converter
         self.exc_info = exc_info
 
@@ -57,8 +57,8 @@ class FileConversionException(MarkItDownException):
 
     def __init__(
         self,
-        message: Optional[str] = None,
-        attempts: Optional[List[FailedConversionAttempt]] = None,
+        message: str | None = None,
+        attempts: list[FailedConversionAttempt] | None = None,
     ):
         self.attempts = attempts
 
