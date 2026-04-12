@@ -57,8 +57,13 @@ class CsvConverter(DocumentConverter):
         # Create markdown table
         markdown_table = []
 
+        def escape_pipe(cell: str) -> str:
+            return cell.replace("|", "\\|")
+
         # Add header row
-        markdown_table.append("| " + " | ".join(rows[0]) + " |")
+        markdown_table.append(
+            "| " + " | ".join(escape_pipe(cell) for cell in rows[0]) + " |"
+        )
 
         # Add separator row
         markdown_table.append("| " + " | ".join(["---"] * len(rows[0])) + " |")
@@ -70,7 +75,9 @@ class CsvConverter(DocumentConverter):
                 row.append("")
             # Truncate if row has more columns than header
             row = row[: len(rows[0])]
-            markdown_table.append("| " + " | ".join(row) + " |")
+            markdown_table.append(
+                "| " + " | ".join(escape_pipe(cell) for cell in row) + " |"
+            )
 
         result = "\n".join(markdown_table)
 

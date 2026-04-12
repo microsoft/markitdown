@@ -1,5 +1,4 @@
 import json
-import locale
 import subprocess
 from typing import Any, BinaryIO, Union
 
@@ -45,8 +44,6 @@ def exiftool_metadata(
             text=False,
         ).stdout
 
-        return json.loads(
-            output.decode(locale.getpreferredencoding(False)),
-        )[0]
+        return json.loads(output.decode("utf-8"))[0]
     finally:
         file_stream.seek(cur_pos)

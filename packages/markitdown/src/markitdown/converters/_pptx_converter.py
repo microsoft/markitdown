@@ -160,7 +160,7 @@ class PptxConverter(DocumentConverter):
                     md_content += self._convert_chart_to_markdown(shape.chart)
 
                 # Text areas
-                elif shape.has_text_frame:
+                if shape.has_text_frame:
                     if shape == title:
                         md_content += "# " + shape.text.lstrip() + "\n"
                     else:
