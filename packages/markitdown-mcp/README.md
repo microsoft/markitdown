@@ -37,12 +37,12 @@ markitdown-mcp --http --host 127.0.0.1 --port 3001
 
 ## Running in Docker
 
-The `markitdown-mcp` Docker image is available on Docker Hub as `mcp/markitdown`:
+To run `markitdown-mcp` in Docker, build the Docker image using the provided Dockerfile:
 ```bash
-docker pull mcp/markitdown
+docker build -t mcp/markitdown .
 ```
 
-Run it using:
+And run it using:
 ```bash
 docker run -it --rm mcp/markitdown
 ```
@@ -52,12 +52,12 @@ This will be sufficient for remote URIs. To access local files, you need to moun
 docker run -it --rm -v /home/user/data:/workdir mcp/markitdown
 ```
 
-Alternatively, you can build the Docker image locally using the provided Dockerfile:
-```bash
-docker build -t mcp/markitdown .
-```
-
 Once mounted, all files under data will be accessible under `/workdir` in the container. For example, if you have a file `example.txt` in `/home/user/data`, it will be accessible in the container at `/workdir/example.txt`.
+
+Alternatively, you can pull the published Docker image directly from Docker Hub:
+```bash
+docker pull mcp/markitdown
+```
 
 ## Accessing from Claude Desktop
 
