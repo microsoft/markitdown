@@ -1,24 +1,22 @@
 #!/usr/bin/env python3 -m pytest
+import base64
 import os
 import time
-import pytest
-import base64
-
 from pathlib import Path
 
+import pytest
+
 if __name__ == "__main__":
-    from _test_vectors import GENERAL_TEST_VECTORS, DATA_URI_TEST_VECTORS
+    from _test_vectors import DATA_URI_TEST_VECTORS, GENERAL_TEST_VECTORS
 else:
-    from ._test_vectors import GENERAL_TEST_VECTORS, DATA_URI_TEST_VECTORS
+    from ._test_vectors import DATA_URI_TEST_VECTORS, GENERAL_TEST_VECTORS
 
 from markitdown import (
     MarkItDown,
     StreamInfo,
 )
 
-skip_remote = (
-    True if os.environ.get("GITHUB_ACTIONS") else False
-)  # Don't run these tests in CI
+skip_remote = bool(os.environ.get("GITHUB_ACTIONS"))  # Don't run these tests in CI
 
 TEST_FILES_DIR = os.path.join(os.path.dirname(__file__), "test_files")
 TEST_FILES_URL = "https://raw.githubusercontent.com/microsoft/markitdown/refs/heads/main/packages/markitdown/tests/test_files"

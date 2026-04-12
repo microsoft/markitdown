@@ -1,11 +1,11 @@
-import sys
 import io
 import re
-from typing import BinaryIO, Any
+import sys
+from typing import Any, BinaryIO
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
+from .._exceptions import MISSING_DEPENDENCY_MESSAGE, MissingDependencyException
 from .._stream_info import StreamInfo
-from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 
 # Pattern for MasterFormat-style partial numbering (e.g., ".1", ".2", ".10")
 PARTIAL_NUMBERING_PATTERN = re.compile(r"^\.\d+$")
@@ -96,12 +96,17 @@ def _to_markdown_table(table: list[list[str]], include_separator: bool = True) -
         return ""
 
     # Column widths
-    col_widths = [max(len(str(cell)) for cell in col) for col in zip(*table)]
+    col_widths = [
+        max(len(str(cell)) for cell in col) for col in zip(*table, strict=False)
+    ]
 
     def fmt_row(row: list[str]) -> str:
         return (
             "|"
-            + "|".join(str(cell).ljust(width) for cell, width in zip(row, col_widths))
+            + "|".join(
+                str(cell).ljust(width)
+                for cell, width in zip(row, col_widths, strict=False)
+            )
             + "|"
         )
 
@@ -530,9 +535,7 @@ class PdfConverter(DocumentConverter):
                     extension=".pdf",
                     feature="pdf",
                 )
-            ) from _dependency_exc_info[1].with_traceback(
-                _dependency_exc_info[2]
-            )  # type: ignore[union-attr]
+            ) from _dependency_exc_info[1].with_traceback(_dependency_exc_info[2])  # type: ignore[union-attr]
 
         assert isinstance(file_stream, io.IOBase)
 

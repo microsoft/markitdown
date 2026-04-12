@@ -1,34 +1,32 @@
 #!/usr/bin/env python3 -m pytest
-import os
-import time
-import pytest
-import subprocess
 import locale
-from typing import List
+import os
+import subprocess
+import time
+
+import pytest
 
 if __name__ == "__main__":
     from _test_vectors import (
-        GENERAL_TEST_VECTORS,
         DATA_URI_TEST_VECTORS,
+        GENERAL_TEST_VECTORS,
         FileTestVector,
     )
 else:
     from ._test_vectors import (
-        GENERAL_TEST_VECTORS,
         DATA_URI_TEST_VECTORS,
+        GENERAL_TEST_VECTORS,
         FileTestVector,
     )
 
-skip_remote = (
-    True if os.environ.get("GITHUB_ACTIONS") else False
-)  # Don't run these tests in CI
+skip_remote = bool(os.environ.get("GITHUB_ACTIONS"))  # Don't run these tests in CI
 
 TEST_FILES_DIR = os.path.join(os.path.dirname(__file__), "test_files")
 TEST_FILES_URL = "https://raw.githubusercontent.com/microsoft/markitdown/refs/heads/main/packages/markitdown/tests/test_files"
 
 
 # Prepare CLI test vectors (remove vectors that require mockig the url)
-CLI_TEST_VECTORS: List[FileTestVector] = []
+CLI_TEST_VECTORS: list[FileTestVector] = []
 for test_vector in GENERAL_TEST_VECTORS:
     if test_vector.url is not None:
         continue
@@ -83,7 +81,7 @@ def test_output_to_file(shared_tmp_dir, test_vector) -> None:
     assert result.returncode == 0, f"CLI exited with error: {result.stderr}"
     assert os.path.exists(output_file), f"Output file not created: {output_file}"
 
-    with open(output_file, "r") as f:
+    with open(output_file) as f:
         output_data = f.read()
         for test_string in test_vector.must_include:
             assert test_string in output_data
@@ -115,9 +113,9 @@ def test_input_from_stdin_without_hints(shared_tmp_dir, test_vector) -> None:
     )
 
     stdout = result.stdout.decode(locale.getpreferredencoding())
-    assert (
-        result.returncode == 0
-    ), f"CLI exited with error: {result.stderr.decode('utf-8')}"
+    assert result.returncode == 0, (
+        f"CLI exited with error: {result.stderr.decode('utf-8')}"
+    )
     for test_string in test_vector.must_include:
         assert test_string in stdout
     for test_string in test_vector.must_not_include:
@@ -170,7 +168,7 @@ def test_output_to_file_with_data_uris(shared_tmp_dir, test_vector) -> None:
     assert result.returncode == 0, f"CLI exited with error: {result.stderr}"
     assert os.path.exists(output_file), f"Output file not created: {output_file}"
 
-    with open(output_file, "r") as f:
+    with open(output_file) as f:
         output_data = f.read()
         for test_string in test_vector.must_include:
             assert test_string in output_data

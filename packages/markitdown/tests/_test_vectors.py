@@ -1,15 +1,14 @@
 import dataclasses
-from typing import List
 
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
-class FileTestVector(object):
+class FileTestVector:
     filename: str
     mimetype: str | None
     charset: str | None
     url: str | None
-    must_include: List[str]
-    must_not_include: List[str]
+    must_include: list[str]
+    must_not_include: list[str]
 
 
 GENERAL_TEST_VECTORS = [

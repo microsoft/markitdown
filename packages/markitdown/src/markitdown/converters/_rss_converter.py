@@ -1,11 +1,12 @@
-from defusedxml import minidom
+from typing import Any, BinaryIO
 from xml.dom.minidom import Document, Element
-from typing import BinaryIO, Any, Union
-from bs4 import BeautifulSoup
 
-from ._markdownify import _CustomMarkdownify
-from .._stream_info import StreamInfo
+from bs4 import BeautifulSoup
+from defusedxml import minidom
+
 from .._base_converter import DocumentConverter, DocumentConverterResult
+from .._stream_info import StreamInfo
+from ._markdownify import _CustomMarkdownify
 
 PRECISE_MIME_TYPE_PREFIXES = [
     "application/rss",
@@ -176,9 +177,7 @@ class RssConverter(DocumentConverter):
         except BaseException as _:
             return content
 
-    def _get_data_by_tag_name(
-        self, element: Element, tag_name: str
-    ) -> Union[str, None]:
+    def _get_data_by_tag_name(self, element: Element, tag_name: str) -> str | None:
         """Get data from first child element with the given tag name.
         Returns None when no such element is found.
         """
@@ -186,7 +185,6 @@ class RssConverter(DocumentConverter):
         if not nodes:
             return None
         fc = nodes[0].firstChild
-        if fc:
-            if hasattr(fc, "data"):
-                return fc.data
+        if fc and hasattr(fc, "data"):
+            return fc.data
         return None

@@ -4,14 +4,14 @@ Registers OCR-enhanced converters with priority-based replacement strategy.
 """
 
 from typing import Any
+
 from markitdown import MarkItDown
 
+from ._docx_converter_with_ocr import DocxConverterWithOCR
 from ._ocr_service import LLMVisionOCRService
 from ._pdf_converter_with_ocr import PdfConverterWithOCR
-from ._docx_converter_with_ocr import DocxConverterWithOCR
 from ._pptx_converter_with_ocr import PptxConverterWithOCR
 from ._xlsx_converter_with_ocr import XlsxConverterWithOCR
-
 
 __plugin_interface_version__ = 1
 

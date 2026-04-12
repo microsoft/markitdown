@@ -1,10 +1,10 @@
 from typing import Any, BinaryIO
 
+from .._base_converter import DocumentConverter, DocumentConverterResult
+from .._exceptions import MissingDependencyException
+from .._stream_info import StreamInfo
 from ._exiftool import exiftool_metadata
 from ._transcribe_audio import transcribe_audio
-from .._base_converter import DocumentConverter, DocumentConverterResult
-from .._stream_info import StreamInfo
-from .._exceptions import MissingDependencyException
 
 ACCEPTED_MIME_TYPE_PREFIXES = [
     "audio/x-wav",

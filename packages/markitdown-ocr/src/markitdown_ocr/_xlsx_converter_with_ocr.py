@@ -5,14 +5,15 @@ Extracts images from Excel spreadsheets and performs OCR while maintaining cell 
 
 import io
 import sys
-from typing import Any, BinaryIO, Optional
+from typing import Any, BinaryIO
 
-from markitdown.converters import HtmlConverter
 from markitdown import DocumentConverter, DocumentConverterResult, StreamInfo
 from markitdown._exceptions import (
-    MissingDependencyException,
     MISSING_DEPENDENCY_MESSAGE,
+    MissingDependencyException,
 )
+from markitdown.converters import HtmlConverter
+
 from ._ocr_service import LLMVisionOCRService
 
 # Try loading dependencies
@@ -30,7 +31,7 @@ class XlsxConverterWithOCR(DocumentConverter):
     Extracts images with their cell positions and performs OCR.
     """
 
-    def __init__(self, ocr_service: Optional[LLMVisionOCRService] = None):
+    def __init__(self, ocr_service: LLMVisionOCRService | None = None):
         super().__init__()
         self._html_converter = HtmlConverter()
         self.ocr_service = ocr_service
@@ -47,12 +48,9 @@ class XlsxConverterWithOCR(DocumentConverter):
         if extension == ".xlsx":
             return True
 
-        if mimetype.startswith(
+        return mimetype.startswith(
             "application/vnd.openxmlformats-officedocument.spreadsheetml"
-        ):
-            return True
-
-        return False
+        )
 
     def convert(
         self,
@@ -72,7 +70,7 @@ class XlsxConverterWithOCR(DocumentConverter):
             )  # type: ignore[union-attr]
 
         # Get OCR service if available (from kwargs or instance)
-        ocr_service: Optional[LLMVisionOCRService] = (
+        ocr_service: LLMVisionOCRService | None = (
             kwargs.get("ocr_service") or self.ocr_service
         )
 

@@ -6,15 +6,16 @@ Extracts images from Word documents and performs OCR while maintaining context.
 import io
 import re
 import sys
-from typing import Any, BinaryIO, Optional
+from typing import Any, BinaryIO
 
-from markitdown.converters import HtmlConverter
-from markitdown.converter_utils.docx.pre_process import pre_process_docx
 from markitdown import DocumentConverterResult, StreamInfo
 from markitdown._exceptions import (
-    MissingDependencyException,
     MISSING_DEPENDENCY_MESSAGE,
+    MissingDependencyException,
 )
+from markitdown.converter_utils.docx.pre_process import pre_process_docx
+from markitdown.converters import HtmlConverter
+
 from ._ocr_service import LLMVisionOCRService
 
 # Try loading dependencies
@@ -36,7 +37,7 @@ class DocxConverterWithOCR(HtmlConverter):
     Maintains document flow while extracting text from images inline.
     """
 
-    def __init__(self, ocr_service: Optional[LLMVisionOCRService] = None):
+    def __init__(self, ocr_service: LLMVisionOCRService | None = None):
         super().__init__()
         self._html_converter = HtmlConverter()
         self.ocr_service = ocr_service
@@ -53,12 +54,9 @@ class DocxConverterWithOCR(HtmlConverter):
         if extension == ".docx":
             return True
 
-        if mimetype.startswith(
+        return mimetype.startswith(
             "application/vnd.openxmlformats-officedocument.wordprocessingml"
-        ):
-            return True
-
-        return False
+        )
 
     def convert(
         self,
@@ -73,12 +71,10 @@ class DocxConverterWithOCR(HtmlConverter):
                     extension=".docx",
                     feature="docx",
                 )
-            ) from _dependency_exc_info[1].with_traceback(
-                _dependency_exc_info[2]
-            )  # type: ignore[union-attr]
+            ) from _dependency_exc_info[1].with_traceback(_dependency_exc_info[2])  # type: ignore[union-attr]
 
         # Get OCR service if available (from kwargs or instance)
-        ocr_service: Optional[LLMVisionOCRService] = (
+        ocr_service: LLMVisionOCRService | None = (
             kwargs.get("ocr_service") or self.ocr_service
         )
 
@@ -116,7 +112,7 @@ class DocxConverterWithOCR(HtmlConverter):
             return DocumentConverterResult(markdown=md)
         else:
             # Standard conversion without OCR
-            style_map = kwargs.get("style_map", None)
+            style_map = kwargs.get("style_map")
             pre_process_stream = pre_process_docx(file_stream)
             return self._html_converter.convert_string(
                 mammoth.convert_to_html(pre_process_stream, style_map=style_map).value,

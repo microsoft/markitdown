@@ -1,7 +1,9 @@
 import csv
 import io
-from typing import BinaryIO, Any
+from typing import Any, BinaryIO
+
 from charset_normalizer import from_bytes
+
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
 

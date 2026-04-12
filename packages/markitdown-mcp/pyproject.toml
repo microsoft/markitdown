@@ -67,3 +67,6 @@ exclude_lines = [
 
 [tool.hatch.build.targets.sdist]
 only-include = ["src/markitdown_mcp"]
+
+[tool.uv.sources]
+markitdown = { workspace = true }

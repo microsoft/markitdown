@@ -1,11 +1,10 @@
 import base64
 import os
-from typing import Tuple, Dict
+from urllib.parse import unquote_to_bytes, urlparse
 from urllib.request import url2pathname
-from urllib.parse import urlparse, unquote_to_bytes
 
 
-def file_uri_to_path(file_uri: str) -> Tuple[str | None, str]:
+def file_uri_to_path(file_uri: str) -> tuple[str | None, str]:
     """Convert a file URI to a local file path"""
     parsed = urlparse(file_uri)
     if parsed.scheme != "file":
@@ -16,7 +15,7 @@ def file_uri_to_path(file_uri: str) -> Tuple[str | None, str]:
     return netloc, path
 
 
-def parse_data_uri(uri: str) -> Tuple[str | None, Dict[str, str], bytes]:
+def parse_data_uri(uri: str) -> tuple[str | None, dict[str, str], bytes]:
     if not uri.startswith("data:"):
         raise ValueError("Not a data URI")
 
@@ -38,7 +37,7 @@ def parse_data_uri(uri: str) -> Tuple[str | None, Dict[str, str], bytes]:
         # First part is the mime type
         mime_type = parts.pop(0)
 
-    attributes: Dict[str, str] = {}
+    attributes: dict[str, str] = {}
     for part in parts:
         # Handle key=value pairs in the middle
         if "=" in part:

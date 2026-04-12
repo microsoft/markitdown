@@ -1,5 +1,6 @@
 import io
-from typing import Any, BinaryIO, Optional
+from typing import Any, BinaryIO
+
 from bs4 import BeautifulSoup
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
@@ -71,7 +72,7 @@ class HtmlConverter(DocumentConverter):
         )
 
     def convert_string(
-        self, html_content: str, *, url: Optional[str] = None, **kwargs
+        self, html_content: str, *, url: str | None = None, **kwargs
     ) -> DocumentConverterResult:
         """
         Non-standard convenience method to convert a string to markdown.

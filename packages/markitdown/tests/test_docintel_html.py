@@ -1,9 +1,10 @@
 import io
+
+from markitdown._stream_info import StreamInfo
 from markitdown.converters._doc_intel_converter import (
     DocumentIntelligenceConverter,
     DocumentIntelligenceFileType,
 )
-from markitdown._stream_info import StreamInfo
 
 
 def _make_converter(file_types):

@@ -1,8 +1,8 @@
 import re
-import markdownify
-
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import quote, unquote, urlparse, urlunparse
+
+import markdownify
 
 
 class _CustomMarkdownify(markdownify.MarkdownConverter):
@@ -26,13 +26,12 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         n: int,
         el: Any,
         text: str,
-        convert_as_inline: Optional[bool] = False,
+        convert_as_inline: bool | None = False,
         **kwargs,
     ) -> str:
         """Same as usual, but be sure to start with a new line"""
-        if not convert_as_inline:
-            if not re.search(r"^\n", text):
-                return "\n" + super().convert_hn(n, el, text, convert_as_inline)  # type: ignore
+        if not convert_as_inline and not re.search(r"^\n", text):
+            return "\n" + super().convert_hn(n, el, text, convert_as_inline)  # type: ignore
 
         return super().convert_hn(n, el, text, convert_as_inline)  # type: ignore
 
@@ -40,7 +39,7 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         self,
         el: Any,
         text: str,
-        convert_as_inline: Optional[bool] = False,
+        convert_as_inline: bool | None = False,
         **kwargs,
     ):
         """Same as usual converter, but removes Javascript links and escapes URIs."""
@@ -58,11 +57,17 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         if href:
             try:
                 parsed_url = urlparse(href)  # type: ignore
-                if parsed_url.scheme and parsed_url.scheme.lower() not in ["http", "https", "file"]:  # type: ignore
-                    return "%s%s%s" % (prefix, text, suffix)
-                href = urlunparse(parsed_url._replace(path=quote(unquote(parsed_url.path))))  # type: ignore
+                if parsed_url.scheme and parsed_url.scheme.lower() not in [
+                    "http",
+                    "https",
+                    "file",
+                ]:  # type: ignore
+                    return f"{prefix}{text}{suffix}"
+                href = urlunparse(
+                    parsed_url._replace(path=quote(unquote(parsed_url.path)))
+                )  # type: ignore
             except ValueError:  # It's not clear if this ever gets thrown
-                return "%s%s%s" % (prefix, text, suffix)
+                return f"{prefix}{text}{suffix}"
 
         # For the replacement see #29: text nodes underscores are escaped
         if (
@@ -72,21 +77,18 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
             and not self.options["default_title"]
         ):
             # Shortcut syntax
-            return "<%s>" % href
+            return f"<{href}>"
         if self.options["default_title"] and not title:
             title = href
-        title_part = ' "%s"' % title.replace('"', r"\"") if title else ""
-        return (
-            "%s[%s](%s%s)%s" % (prefix, text, href, title_part, suffix)
-            if href
-            else text
-        )
+        escaped_title = title.replace('"', r"\"")
+        title_part = f' "{escaped_title}"' if title else ""
+        return f"{prefix}[{text}]({href}{title_part}{suffix})" if href else text
 
     def convert_img(
         self,
         el: Any,
         text: str,
-        convert_as_inline: Optional[bool] = False,
+        convert_as_inline: bool | None = False,
         **kwargs,
     ) -> str:
         """Same as usual converter, but removes data URIs"""
@@ -94,7 +96,8 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         alt = el.attrs.get("alt", None) or ""
         src = el.attrs.get("src", None) or el.attrs.get("data-src", None) or ""
         title = el.attrs.get("title", None) or ""
-        title_part = ' "%s"' % title.replace('"', r"\"") if title else ""
+        escaped_title = title.replace('"', r"\"")
+        title_part = f' "{escaped_title}"' if title else ""
         # Remove all line breaks from alt
         alt = alt.replace("\n", " ")
         if (
@@ -107,13 +110,13 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         if src.startswith("data:") and not self.options["keep_data_uris"]:
             src = src.split(",")[0] + "..."
 
-        return "![%s](%s%s)" % (alt, src, title_part)
+        return f"![{alt}]({src}{title_part})"
 
     def convert_input(
         self,
         el: Any,
         text: str,
-        convert_as_inline: Optional[bool] = False,
+        convert_as_inline: bool | None = False,
         **kwargs,
     ) -> str:
         """Convert checkboxes to Markdown [x]/[ ] syntax."""

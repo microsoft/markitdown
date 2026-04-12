@@ -20,11 +20,11 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+from markitdown import StreamInfo  # noqa: E402
 from markitdown_ocr._ocr_service import OCRResult  # noqa: E402
 from markitdown_ocr._pdf_converter_with_ocr import (  # noqa: E402
     PdfConverterWithOCR,
 )
-from markitdown import StreamInfo  # noqa: E402
 
 TEST_DATA_DIR = Path(__file__).parent / "ocr_test_data"
 
@@ -212,10 +212,10 @@ def test_pdf_scanned_fallback_format(svc: MockOCRService) -> None:
         with open(path, "rb") as f:
             md = converter._ocr_full_pages(io.BytesIO(f.read()), svc)
 
-    expected = "## Page 1\n\n\n" "*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*"
-    assert (
-        md == expected
-    ), f"_ocr_full_pages must produce:\n{expected!r}\nActual:\n{md!r}"
+    expected = "## Page 1\n\n\n*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*"
+    assert md == expected, (
+        f"_ocr_full_pages must produce:\n{expected!r}\nActual:\n{md!r}"
+    )
 
 
 # ---------------------------------------------------------------------------

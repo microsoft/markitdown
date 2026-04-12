@@ -1,18 +1,17 @@
-import sys
 import base64
-import os
-import io
-import re
+import contextlib
 import html
+import io
+import os
+import re
+import sys
+from typing import Any, BinaryIO
 
-from typing import BinaryIO, Any
-from operator import attrgetter
-
+from .._base_converter import DocumentConverter, DocumentConverterResult
+from .._exceptions import MISSING_DEPENDENCY_MESSAGE, MissingDependencyException
+from .._stream_info import StreamInfo
 from ._html_converter import HtmlConverter
 from ._llm_caption import llm_caption
-from .._base_converter import DocumentConverter, DocumentConverterResult
-from .._stream_info import StreamInfo
-from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 
 # Try loading optional (but in this case, required) dependencies
 # Save reporting of any exceptions for later
@@ -72,24 +71,19 @@ class PptxConverter(DocumentConverter):
                     extension=".pptx",
                     feature="pptx",
                 )
-            ) from _dependency_exc_info[
-                1
-            ].with_traceback(  # type: ignore[union-attr]
+            ) from _dependency_exc_info[1].with_traceback(  # type: ignore[union-attr]
                 _dependency_exc_info[2]
             )
 
         # Perform the conversion
         presentation = pptx.Presentation(file_stream)
         md_content = ""
-        slide_num = 0
-        for slide in presentation.slides:
-            slide_num += 1
-
+        for slide_num, slide in enumerate(presentation.slides, start=1):
             md_content += f"\n\n<!-- Slide number: {slide_num} -->\n"
 
             title = slide.shapes.title
 
-            def get_shape_content(shape, **kwargs):
+            def get_shape_content(shape, _title=title, **kwargs):
                 nonlocal md_content
                 # Pictures
                 if self._is_picture(shape):
@@ -116,7 +110,7 @@ class PptxConverter(DocumentConverter):
                         image_stream = io.BytesIO(shape.image.blob)
 
                         # Caption the image
-                        try:
+                        with contextlib.suppress(Exception):
                             llm_description = llm_caption(
                                 image_stream,
                                 image_stream_info,
@@ -124,16 +118,10 @@ class PptxConverter(DocumentConverter):
                                 model=llm_model,
                                 prompt=kwargs.get("llm_prompt"),
                             )
-                        except Exception:
-                            # Unable to generate a description
-                            pass
 
                     # Also grab any description embedded in the deck
-                    try:
+                    with contextlib.suppress(Exception):
                         alt_text = shape._element._nvXxPr.cNvPr.attrib.get("descr", "")
-                    except Exception:
-                        # Unable to get alt text
-                        pass
 
                     # Prepare the alt, escaping any special characters
                     alt_text = "\n".join([llm_description, alt_text]) or shape.name
@@ -161,7 +149,7 @@ class PptxConverter(DocumentConverter):
 
                 # Text areas
                 elif shape.has_text_frame:
-                    if shape == title:
+                    if shape == _title:
                         md_content += "# " + shape.text.lstrip() + "\n"
                     else:
                         md_content += shape.text + "\n"
@@ -200,17 +188,13 @@ class PptxConverter(DocumentConverter):
         return DocumentConverterResult(markdown=md_content.strip())
 
     def _is_picture(self, shape):
-        if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.PICTURE:
-            return True
-        if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.PLACEHOLDER:
-            if hasattr(shape, "image"):
-                return True
-        return False
+        return shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.PICTURE or (
+            shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.PLACEHOLDER
+            and hasattr(shape, "image")
+        )
 
     def _is_table(self, shape):
-        if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.TABLE:
-            return True
-        return False
+        return shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.TABLE
 
     def _convert_table_to_markdown(self, table, **kwargs):
         # Write the table as HTML, then convert it to Markdown

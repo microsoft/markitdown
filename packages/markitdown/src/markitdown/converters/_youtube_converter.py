@@ -1,9 +1,10 @@
 import json
-import time
 import re
+import time
+from typing import Any, BinaryIO
+from urllib.parse import parse_qs, unquote, urlparse
+
 import bs4
-from typing import Any, BinaryIO, Dict, List, Union
-from urllib.parse import parse_qs, urlparse, unquote
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
@@ -78,7 +79,7 @@ class YouTubeConverter(DocumentConverter):
         soup = bs4.BeautifulSoup(file_stream, "html.parser", from_encoding=encoding)
 
         # Read the meta tags
-        metadata: Dict[str, str] = {}
+        metadata: dict[str, str] = {}
 
         if soup.title and soup.title.string:
             metadata["title"] = soup.title.string
@@ -170,9 +171,7 @@ class YouTubeConverter(DocumentConverter):
                     )
 
                     if transcript:
-                        transcript_text = " ".join(
-                            [part.text for part in transcript]
-                        )  # type: ignore
+                        transcript_text = " ".join([part.text for part in transcript])  # type: ignore
                 except Exception as e:
                     # No transcript available
                     if len(languages) == 1:
@@ -198,17 +197,17 @@ class YouTubeConverter(DocumentConverter):
 
     def _get(
         self,
-        metadata: Dict[str, str],
-        keys: List[str],
-        default: Union[str, None] = None,
-    ) -> Union[str, None]:
+        metadata: dict[str, str],
+        keys: list[str],
+        default: str | None = None,
+    ) -> str | None:
         """Get first non-empty value from metadata matching given keys."""
         for k in keys:
             if k in metadata:
                 return metadata[k]
         return default
 
-    def _findKey(self, json: Any, key: str) -> Union[str, None]:  # TODO: Fix json type
+    def _findKey(self, json: Any, key: str) -> str | None:  # TODO: Fix json type
         """Recursively search for a key in nested dictionary/list structures."""
         if isinstance(json, list):
             for elm in json:

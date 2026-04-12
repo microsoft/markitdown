@@ -1,7 +1,7 @@
 import json
 import locale
 import subprocess
-from typing import Any, BinaryIO, Union
+from typing import Any, BinaryIO
 
 
 def _parse_version(version: str) -> tuple:
@@ -11,7 +11,7 @@ def _parse_version(version: str) -> tuple:
 def exiftool_metadata(
     file_stream: BinaryIO,
     *,
-    exiftool_path: Union[str, None],
+    exiftool_path: str | None,
 ) -> Any:  # Need a better type for json data
     # Nothing to do
     if not exiftool_path:

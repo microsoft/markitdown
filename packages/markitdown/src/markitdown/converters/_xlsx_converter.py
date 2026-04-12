@@ -1,16 +1,17 @@
 import sys
-from typing import BinaryIO, Any
-from ._html_converter import HtmlConverter
+from typing import Any, BinaryIO
+
 from .._base_converter import DocumentConverter, DocumentConverterResult
-from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+from .._exceptions import MISSING_DEPENDENCY_MESSAGE, MissingDependencyException
 from .._stream_info import StreamInfo
+from ._html_converter import HtmlConverter
 
 # Try loading optional (but in this case, required) dependencies
 # Save reporting of any exceptions for later
 _xlsx_dependency_exc_info = None
 try:
-    import pandas as pd
     import openpyxl  # noqa: F401
+    import pandas as pd
 except ImportError:
     _xlsx_dependency_exc_info = sys.exc_info()
 
@@ -74,9 +75,7 @@ class XlsxConverter(DocumentConverter):
                     extension=".xlsx",
                     feature="xlsx",
                 )
-            ) from _xlsx_dependency_exc_info[
-                1
-            ].with_traceback(  # type: ignore[union-attr]
+            ) from _xlsx_dependency_exc_info[1].with_traceback(  # type: ignore[union-attr]
                 _xlsx_dependency_exc_info[2]
             )
 
@@ -136,9 +135,7 @@ class XlsConverter(DocumentConverter):
                     extension=".xls",
                     feature="xls",
                 )
-            ) from _xls_dependency_exc_info[
-                1
-            ].with_traceback(  # type: ignore[union-attr]
+            ) from _xls_dependency_exc_info[1].with_traceback(  # type: ignore[union-attr]
                 _xls_dependency_exc_info[2]
             )
 

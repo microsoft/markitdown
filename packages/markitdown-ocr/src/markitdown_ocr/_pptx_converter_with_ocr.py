@@ -5,16 +5,15 @@ Already has LLM-based image description, this enhances it with traditional OCR f
 
 import io
 import sys
-from typing import Any, BinaryIO, Optional
+from typing import Any, BinaryIO
 
-from typing import BinaryIO, Any, Optional
-
-from markitdown.converters import HtmlConverter
 from markitdown import DocumentConverter, DocumentConverterResult, StreamInfo
 from markitdown._exceptions import (
-    MissingDependencyException,
     MISSING_DEPENDENCY_MESSAGE,
+    MissingDependencyException,
 )
+from markitdown.converters import HtmlConverter
+
 from ._ocr_service import LLMVisionOCRService
 
 _dependency_exc_info = None
@@ -27,7 +26,7 @@ except ImportError:
 class PptxConverterWithOCR(DocumentConverter):
     """Enhanced PPTX Converter with OCR fallback."""
 
-    def __init__(self, ocr_service: Optional[LLMVisionOCRService] = None):
+    def __init__(self, ocr_service: LLMVisionOCRService | None = None):
         super().__init__()
         self._html_converter = HtmlConverter()
         self.ocr_service = ocr_service
@@ -44,12 +43,9 @@ class PptxConverterWithOCR(DocumentConverter):
         if extension == ".pptx":
             return True
 
-        if mimetype.startswith(
+        return mimetype.startswith(
             "application/vnd.openxmlformats-officedocument.presentationml"
-        ):
-            return True
-
-        return False
+        )
 
     def convert(
         self,
@@ -64,27 +60,23 @@ class PptxConverterWithOCR(DocumentConverter):
                     extension=".pptx",
                     feature="pptx",
                 )
-            ) from _dependency_exc_info[1].with_traceback(
-                _dependency_exc_info[2]
-            )  # type: ignore[union-attr]
+            ) from _dependency_exc_info[1].with_traceback(_dependency_exc_info[2])  # type: ignore[union-attr]
 
         # Get OCR service (from kwargs or instance)
-        ocr_service: Optional[LLMVisionOCRService] = (
+        ocr_service: LLMVisionOCRService | None = (
             kwargs.get("ocr_service") or self.ocr_service
         )
         llm_client = kwargs.get("llm_client")
 
         presentation = pptx.Presentation(file_stream)
         md_content = ""
-        slide_num = 0
 
-        for slide in presentation.slides:
-            slide_num += 1
+        for slide_num, slide in enumerate(presentation.slides, start=1):
             md_content += f"\\n\\n<!-- Slide number: {slide_num} -->\\n"
 
             title = slide.shapes.title
 
-            def get_shape_content(shape, **kwargs):
+            def get_shape_content(shape, _title=title, **kwargs):
                 nonlocal md_content
 
                 # Pictures
@@ -147,7 +139,7 @@ class PptxConverterWithOCR(DocumentConverter):
 
                 # Text areas
                 elif shape.has_text_frame:
-                    if shape == title:
+                    if shape == _title:
                         md_content += "# " + shape.text.lstrip() + "\\n"
                     else:
                         md_content += shape.text + "\\n"
@@ -186,17 +178,13 @@ class PptxConverterWithOCR(DocumentConverter):
         return DocumentConverterResult(markdown=md_content.strip())
 
     def _is_picture(self, shape):
-        if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.PICTURE:
-            return True
-        if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.PLACEHOLDER:
-            if hasattr(shape, "image"):
-                return True
-        return False
+        return shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.PICTURE or (
+            shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.PLACEHOLDER
+            and hasattr(shape, "image")
+        )
 
     def _is_table(self, shape):
-        if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.TABLE:
-            return True
-        return False
+        return shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.TABLE
 
     def _convert_table_to_markdown(self, table, **kwargs):
         import html

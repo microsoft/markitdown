@@ -1,0 +1,33 @@
+[tool.uv.workspace]
+members = [
+    "packages/markitdown",
+    "packages/markitdown-mcp",
+    "packages/markitdown-ocr",
+    "packages/markitdown-sample-plugin",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "SIM", # flake8-simplify
+]
+ignore = [
+    "E501", # line too long (handled by formatter)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["markitdown", "markitdown_mcp", "markitdown_ocr", "markitdown_sample_plugin"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

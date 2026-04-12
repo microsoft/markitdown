@@ -1,7 +1,8 @@
 import sys
+from typing import Any, BinaryIO
 
-from typing import BinaryIO, Any
 from charset_normalizer import from_bytes
+
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
 

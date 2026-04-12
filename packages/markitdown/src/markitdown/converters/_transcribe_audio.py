@@ -1,6 +1,7 @@
 import io
 import sys
 from typing import BinaryIO
+
 from .._exceptions import MissingDependencyException
 
 # Try loading optional (but in this case, required) dependencies
@@ -13,8 +14,8 @@ try:
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=DeprecationWarning)
         warnings.filterwarnings("ignore", category=SyntaxWarning)
-        import speech_recognition as sr
         import pydub
+        import speech_recognition as sr
 except ImportError:
     # Preserve the error and stack trace for later
     _dependency_exc_info = sys.exc_info()
@@ -25,9 +26,7 @@ def transcribe_audio(file_stream: BinaryIO, *, audio_format: str = "wav") -> str
     if _dependency_exc_info is not None:
         raise MissingDependencyException(
             "Speech transcription requires installing MarkItdown with the [audio-transcription] optional dependencies. E.g., `pip install markitdown[audio-transcription]` or `pip install markitdown[all]`"
-        ) from _dependency_exc_info[
-            1
-        ].with_traceback(  # type: ignore[union-attr]
+        ) from _dependency_exc_info[1].with_traceback(  # type: ignore[union-attr]
             _dependency_exc_info[2]
         )
 

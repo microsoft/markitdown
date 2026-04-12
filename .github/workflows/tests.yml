@@ -4,15 +4,18 @@ on: [pull_request]
 jobs:
   tests:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-python@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version: |
-            3.10
-            3.11
-            3.12
-      - name: Install Hatch
-        run: pipx install hatch
+          enable-cache: true
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: uv sync --all-packages --all-extras
       - name: Run tests
-        run: cd packages/markitdown; hatch test
+        run: uv run --python ${{ matrix.python-version }} pytest packages/markitdown/tests

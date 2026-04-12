@@ -3,6 +3,7 @@
 
 import os
 import re
+
 import pytest
 
 from markitdown import MarkItDown
@@ -254,21 +255,21 @@ class TestPdfTableExtraction:
             assert pos != -1, f"Section '{name}' not found in output"
 
         # Verify correct order
-        assert (
-            positions["header"] < positions["first_table"]
-        ), "Header should come before first table"
-        assert (
-            positions["first_table"] < positions["variance_analysis"]
-        ), "First table should come before Variance Analysis"
-        assert (
-            positions["variance_analysis"] < positions["extended_review"]
-        ), "Variance Analysis should come before Extended Review"
-        assert (
-            positions["extended_review"] < positions["second_table"]
-        ), "Extended Review should come before second table"
-        assert (
-            positions["second_table"] < positions["recommendations"]
-        ), "Second table should come before Recommendations"
+        assert positions["header"] < positions["first_table"], (
+            "Header should come before first table"
+        )
+        assert positions["first_table"] < positions["variance_analysis"], (
+            "First table should come before Variance Analysis"
+        )
+        assert positions["variance_analysis"] < positions["extended_review"], (
+            "Variance Analysis should come before Extended Review"
+        )
+        assert positions["extended_review"] < positions["second_table"], (
+            "Extended Review should come before second table"
+        )
+        assert positions["second_table"] < positions["recommendations"], (
+            "Second table should come before Recommendations"
+        )
 
     def test_borderless_table_no_duplication(self, markitdown):
         """Test that borderless table content is not duplicated excessively."""
@@ -286,9 +287,9 @@ class TestPdfTableExtraction:
         # SKU-8847 appears in both tables, plus possibly once in summary text
         sku_count = text_content.count("SKU-8847")
         # Should appear at most 4 times (2 tables + minor text references), not more
-        assert (
-            sku_count <= 4
-        ), f"SKU-8847 appears too many times ({sku_count}), suggests duplication issue"
+        assert sku_count <= 4, (
+            f"SKU-8847 appears too many times ({sku_count}), suggests duplication issue"
+        )
 
     def test_borderless_table_correct_position(self, markitdown):
         """Test that tables appear in correct positions relative to text."""
@@ -312,9 +313,9 @@ class TestPdfTableExtraction:
         assert product_code_pos != -1, "Product Code should be found"
         assert variance_pos != -1, "Variance Analysis should be found"
 
-        assert (
-            header_pos < product_code_pos < variance_pos
-        ), "Product data should appear between header and Variance Analysis"
+        assert header_pos < product_code_pos < variance_pos, (
+            "Product data should appear between header and Variance Analysis"
+        )
 
         # Second table content should appear after "Extended Inventory Review"
         extended_review_pos = text_content.find("Extended Inventory Review:")
@@ -332,7 +333,9 @@ class TestPdfTableExtraction:
             if category_after_review != -1:
                 assert (
                     extended_review_pos < category_after_review < recommendations_pos
-                ), "Extended review table should appear between Extended Inventory Review and Recommendations"
+                ), (
+                    "Extended review table should appear between Extended Inventory Review and Recommendations"
+                )
 
     def test_receipt_pdf_extraction(self, markitdown):
         """Test extraction of receipt PDF (no tables, formatted text).
@@ -470,27 +473,27 @@ class TestPdfTableExtraction:
             assert pos != -1, f"Section '{name}' not found in output"
 
         # Verify correct order
-        assert (
-            positions["store_header"] < positions["transaction"]
-        ), "Store header should come before transaction"
-        assert (
-            positions["transaction"] < positions["first_item"]
-        ), "Transaction should come before items"
-        assert (
-            positions["first_item"] < positions["subtotal"]
-        ), "Items should come before subtotal"
-        assert (
-            positions["subtotal"] < positions["total"]
-        ), "Subtotal should come before total"
-        assert (
-            positions["total"] < positions["payment"]
-        ), "Total should come before payment"
-        assert (
-            positions["payment"] < positions["rewards"]
-        ), "Payment should come before rewards"
-        assert (
-            positions["rewards"] < positions["return_policy"]
-        ), "Rewards should come before return policy"
+        assert positions["store_header"] < positions["transaction"], (
+            "Store header should come before transaction"
+        )
+        assert positions["transaction"] < positions["first_item"], (
+            "Transaction should come before items"
+        )
+        assert positions["first_item"] < positions["subtotal"], (
+            "Items should come before subtotal"
+        )
+        assert positions["subtotal"] < positions["total"], (
+            "Subtotal should come before total"
+        )
+        assert positions["total"] < positions["payment"], (
+            "Total should come before payment"
+        )
+        assert positions["payment"] < positions["rewards"], (
+            "Payment should come before rewards"
+        )
+        assert positions["rewards"] < positions["return_policy"], (
+            "Rewards should come before return policy"
+        )
 
     def test_multipage_invoice_extraction(self, markitdown):
         """Test extraction of multipage invoice PDF with form-style layout.
@@ -533,29 +536,29 @@ class TestPdfTableExtraction:
         # Note: cells may have padding spaces for column alignment
         import re
 
-        assert re.search(
-            r"\| Insured name\s*\|", text_content
-        ), "Insured name should be in its own cell"
-        assert re.search(
-            r"\| Gabriel Diaz\s*\|", text_content
-        ), "Gabriel Diaz should be in its own cell"
-        assert re.search(
-            r"\| Year\s*\|", text_content
-        ), "Year label should be in its own cell"
-        assert re.search(
-            r"\| 2022\s*\|", text_content
-        ), "Year value should be in its own cell"
+        assert re.search(r"\| Insured name\s*\|", text_content), (
+            "Insured name should be in its own cell"
+        )
+        assert re.search(r"\| Gabriel Diaz\s*\|", text_content), (
+            "Gabriel Diaz should be in its own cell"
+        )
+        assert re.search(r"\| Year\s*\|", text_content), (
+            "Year label should be in its own cell"
+        )
+        assert re.search(r"\| 2022\s*\|", text_content), (
+            "Year value should be in its own cell"
+        )
 
         # Validate table structure for estimate totals
-        assert (
-            re.search(r"\| Hours\s*\|", text_content) or "Hours |" in text_content
-        ), "Hours column header should be present"
-        assert (
-            re.search(r"\| Rate\s*\|", text_content) or "Rate |" in text_content
-        ), "Rate column header should be present"
-        assert (
-            re.search(r"\| Cost\s*\|", text_content) or "Cost |" in text_content
-        ), "Cost column header should be present"
+        assert re.search(r"\| Hours\s*\|", text_content) or "Hours |" in text_content, (
+            "Hours column header should be present"
+        )
+        assert re.search(r"\| Rate\s*\|", text_content) or "Rate |" in text_content, (
+            "Rate column header should be present"
+        )
+        assert re.search(r"\| Cost\s*\|", text_content) or "Cost |" in text_content, (
+            "Cost column header should be present"
+        )
 
         # Validate numeric values are extracted
         assert "2,100" in text_content, "Parts cost should be extracted"
@@ -570,9 +573,9 @@ class TestPdfTableExtraction:
 
         # Validate disclaimer text is NOT in table format (long paragraph)
         # The disclaimer should be extracted as plain text, not pipe-separated
-        assert (
-            "preliminary estimate" in text_content.lower()
-        ), "Disclaimer text should be present"
+        assert "preliminary estimate" in text_content.lower(), (
+            "Disclaimer text should be present"
+        )
 
     def test_academic_pdf_extraction(self, markitdown):
         """Test extraction of academic paper PDF (scientific document).
@@ -607,24 +610,24 @@ class TestPdfTableExtraction:
         assert len(text_content) > 1000, "Academic PDF should have substantial content"
 
         # Scientific documents should NOT have tables or pipe characters
-        assert (
-            "|" not in text_content
-        ), "Scientific document should not contain pipe characters (no tables)"
+        assert "|" not in text_content, (
+            "Scientific document should not contain pipe characters (no tables)"
+        )
 
         # Verify no markdown tables were extracted
         tables = extract_markdown_tables(text_content)
-        assert (
-            len(tables) == 0
-        ), f"Scientific document should have no tables, found {len(tables)}"
+        assert len(tables) == 0, (
+            f"Scientific document should have no tables, found {len(tables)}"
+        )
 
         # Verify text is properly formatted with spaces between words
         # Check that common phrases are NOT joined together (which would indicate bad extraction)
-        assert (
-            "Largelanguagemodels" not in text_content
-        ), "Text should have proper spacing, not joined words"
-        assert (
-            "multiagentconversations" not in text_content.lower()
-        ), "Text should have proper spacing between words"
+        assert "Largelanguagemodels" not in text_content, (
+            "Text should have proper spacing, not joined words"
+        )
+        assert "multiagentconversations" not in text_content.lower(), (
+            "Text should have proper spacing between words"
+        )
 
     def test_scanned_pdf_handling(self, markitdown):
         """Test handling of scanned/image-based PDF (no text layer).
@@ -641,15 +644,15 @@ class TestPdfTableExtraction:
         result = markitdown.convert(pdf_path)
 
         # Scanned PDFs without OCR have no text layer, so extraction should be empty
-        assert (
-            result is not None
-        ), "Converter should return a result even for scanned PDFs"
+        assert result is not None, (
+            "Converter should return a result even for scanned PDFs"
+        )
         assert result.text_content is not None, "text_content should not be None"
 
         # Verify extraction is empty (no text layer in scanned PDF)
-        assert (
-            result.text_content.strip() == ""
-        ), f"Scanned PDF should have empty extraction, got: '{result.text_content[:100]}...'"
+        assert result.text_content.strip() == "", (
+            f"Scanned PDF should have empty extraction, got: '{result.text_content[:100]}...'"
+        )
 
     def test_movie_theater_booking_pdf_extraction(self, markitdown):
         """Test extraction of movie theater booking PDF with complex tables.
@@ -743,7 +746,7 @@ class TestPdfFullOutputComparison:
         result = markitdown.convert(pdf_path)
         actual_output = result.text_content
 
-        with open(expected_path, "r", encoding="utf-8") as f:
+        with open(expected_path, encoding="utf-8") as f:
             expected_output = f.read()
 
         # Compare outputs
@@ -772,9 +775,9 @@ class TestPdfFullOutputComparison:
 
         # Check table structure
         table_rows = [line for line in actual_lines if line.startswith("|")]
-        assert (
-            len(table_rows) > 15
-        ), f"Should have >15 table rows, got {len(table_rows)}"
+        assert len(table_rows) > 15, (
+            f"Should have >15 table rows, got {len(table_rows)}"
+        )
 
     def test_sparse_borderless_table_full_output(self, markitdown):
         """Test complete output for SPARSE borderless table PDF."""
@@ -796,7 +799,7 @@ class TestPdfFullOutputComparison:
         result = markitdown.convert(pdf_path)
         actual_output = result.text_content
 
-        with open(expected_path, "r", encoding="utf-8") as f:
+        with open(expected_path, encoding="utf-8") as f:
             expected_output = f.read()
 
         # Compare outputs
@@ -838,7 +841,7 @@ class TestPdfFullOutputComparison:
         result = markitdown.convert(pdf_path)
         actual_output = result.text_content
 
-        with open(expected_path, "r", encoding="utf-8") as f:
+        with open(expected_path, encoding="utf-8") as f:
             expected_output = f.read()
 
         # Compare outputs
@@ -884,7 +887,7 @@ class TestPdfFullOutputComparison:
         result = markitdown.convert(pdf_path)
         actual_output = result.text_content
 
-        with open(expected_path, "r", encoding="utf-8") as f:
+        with open(expected_path, encoding="utf-8") as f:
             expected_output = f.read()
 
         # Compare outputs
@@ -921,7 +924,7 @@ class TestPdfFullOutputComparison:
         result = markitdown.convert(pdf_path)
         actual_output = result.text_content
 
-        with open(expected_path, "r", encoding="utf-8") as f:
+        with open(expected_path, encoding="utf-8") as f:
             expected_output = f.read()
 
         # Compare outputs
@@ -935,9 +938,9 @@ class TestPdfFullOutputComparison:
         )
 
         # Academic paper should not have pipe separators
-        assert (
-            actual_output.count("|") == 0
-        ), "Academic paper should not have pipe separators"
+        assert actual_output.count("|") == 0, (
+            "Academic paper should not have pipe separators"
+        )
 
         # Validate critical sections
         for section in [
@@ -968,14 +971,14 @@ class TestPdfFullOutputComparison:
         result = markitdown.convert(pdf_path)
         actual_output = result.text_content
 
-        with open(expected_path, "r", encoding="utf-8") as f:
+        with open(expected_path, encoding="utf-8") as f:
             expected_output = f.read()
 
         # Both should be empty (scanned PDF with no text layer)
         assert actual_output.strip() == "", "Scanned PDF should produce empty output"
-        assert (
-            expected_output.strip() == ""
-        ), "Expected output should be empty for scanned PDF"
+        assert expected_output.strip() == "", (
+            "Expected output should be empty for scanned PDF"
+        )
 
 
 class TestPdfTableMarkdownFormat:
@@ -1032,9 +1035,9 @@ class TestPdfTableMarkdownFormat:
 
         # Check that at least some rows have multiple columns (pipes)
         multi_col_rows = [row for row in table_rows if row.count("|") >= 3]
-        assert (
-            len(multi_col_rows) > 5
-        ), f"Should have rows with multiple columns, found {len(multi_col_rows)}"
+        assert len(multi_col_rows) > 5, (
+            f"Should have rows with multiple columns, found {len(multi_col_rows)}"
+        )
 
 
 class TestPdfTableStructureConsistency:
@@ -1084,9 +1087,9 @@ class TestPdfTableStructureConsistency:
             line for line in lines if line.startswith("|") and line.endswith("|")
         ]
 
-        assert (
-            len(pipe_rows) > 10
-        ), f"Should have multiple pipe-separated rows, found {len(pipe_rows)}"
+        assert len(pipe_rows) > 10, (
+            f"Should have multiple pipe-separated rows, found {len(pipe_rows)}"
+        )
 
         # Check that some rows have multiple columns
         multi_col_rows = [row for row in pipe_rows if row.count("|") >= 4]
@@ -1108,9 +1111,9 @@ class TestPdfTableStructureConsistency:
         # (it's formatted text, not tabular data)
         # If tables are extracted, they should be minimal/empty
         total_table_rows = sum(len(t) for t in tables)
-        assert (
-            total_table_rows < 5
-        ), f"Receipt should not have significant tables, found {total_table_rows} rows"
+        assert total_table_rows < 5, (
+            f"Receipt should not have significant tables, found {total_table_rows} rows"
+        )
 
     def test_scanned_pdf_no_tables(self, markitdown):
         """Test that scanned PDF has empty extraction and no tables."""
@@ -1124,9 +1127,9 @@ class TestPdfTableStructureConsistency:
         result = markitdown.convert(pdf_path)
 
         # Scanned PDF with no text layer should have empty extraction
-        assert (
-            result.text_content.strip() == ""
-        ), "Scanned PDF should have empty extraction"
+        assert result.text_content.strip() == "", (
+            "Scanned PDF should have empty extraction"
+        )
 
         tables = extract_markdown_tables(result.text_content)
 
@@ -1161,15 +1164,15 @@ class TestPdfTableStructureConsistency:
 
                 # Verify each row has at least one column (pipe-separated content)
                 for row_idx, row in enumerate(table):
-                    assert (
-                        len(row) >= 1
-                    ), f"{pdf_file}: Table {table_idx}, row {row_idx} has no columns"
+                    assert len(row) >= 1, (
+                        f"{pdf_file}: Table {table_idx}, row {row_idx} has no columns"
+                    )
 
                     # Verify the row has non-empty content
                     row_content = " ".join(cell.strip() for cell in row)
-                    assert (
-                        len(row_content.strip()) > 0
-                    ), f"{pdf_file}: Table {table_idx}, row {row_idx} is empty"
+                    assert len(row_content.strip()) > 0, (
+                        f"{pdf_file}: Table {table_idx}, row {row_idx} is empty"
+                    )
 
     def test_borderless_table_data_integrity(self, markitdown):
         """Test that borderless table extraction preserves data integrity."""

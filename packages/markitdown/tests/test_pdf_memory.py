@@ -12,9 +12,9 @@ import gc
 import io
 import os
 import tracemalloc
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import patch, MagicMock
 
 from markitdown import MarkItDown
 
@@ -123,11 +123,10 @@ class TestPdfMemoryOptimization:
         num_pages = 50
         pages = [_make_plain_page() for _ in range(num_pages)]
 
-        with patch(
-            "markitdown.converters._pdf_converter.pdfplumber"
-        ) as mock_pdfplumber, patch(
-            "markitdown.converters._pdf_converter.pdfminer"
-        ) as mock_pdfminer:
+        with (
+            patch("markitdown.converters._pdf_converter.pdfplumber") as mock_pdfplumber,
+            patch("markitdown.converters._pdf_converter.pdfminer") as mock_pdfminer,
+        ):
             mock_pdfplumber.open.side_effect = _mock_pdfplumber_open(pages)
             mock_pdfminer.high_level.extract_text.return_value = "Plain text content"
 
@@ -152,11 +151,10 @@ class TestPdfMemoryOptimization:
         num_pages = 30
         pages = [_make_plain_page() for _ in range(num_pages)]
 
-        with patch(
-            "markitdown.converters._pdf_converter.pdfplumber"
-        ) as mock_pdfplumber, patch(
-            "markitdown.converters._pdf_converter.pdfminer"
-        ) as mock_pdfminer:
+        with (
+            patch("markitdown.converters._pdf_converter.pdfplumber") as mock_pdfplumber,
+            patch("markitdown.converters._pdf_converter.pdfminer") as mock_pdfminer,
+        ):
             mock_pdfplumber.open.side_effect = _mock_pdfplumber_open(pages)
             mock_pdfminer.high_level.extract_text.return_value = "text"
 
@@ -170,9 +168,9 @@ class TestPdfMemoryOptimization:
             )
 
         for i, page in enumerate(pages):
-            assert (
-                page.close.called
-            ), f"page.close() was NOT called on plain-text page {i}"
+            assert page.close.called, (
+                f"page.close() was NOT called on plain-text page {i}"
+            )
 
     def test_mixed_pdf_uses_form_extraction_per_page(self):
         """In a mixed PDF, form pages get table extraction while plain pages don't.
@@ -209,15 +207,15 @@ class TestPdfMemoryOptimization:
 
         # Form pages (0,2,4) should have extract_words called
         for i in [0, 2, 4]:
-            assert pages[
-                i
-            ].extract_words.called, f"extract_words not called on form page {i}"
+            assert pages[i].extract_words.called, (
+                f"extract_words not called on form page {i}"
+            )
 
         # Result should contain table content from form pages
         assert result.text_content is not None
-        assert (
-            "|" in result.text_content
-        ), "Expected markdown table pipes in output from form-style pages"
+        assert "|" in result.text_content, (
+            "Expected markdown table pipes in output from form-style pages"
+        )
 
     def test_only_one_pdfplumber_open_call(self):
         """Verify pdfplumber.open is called exactly once (single pass)."""
@@ -263,9 +261,9 @@ class TestPdfMemoryOptimization:
             pdf_path = os.path.join(TEST_FILES_DIR, "test.pdf")
             md.convert(pdf_path)
 
-        assert (
-            close_call_count > 0
-        ), "page.close() was never called during PDF conversion"
+        assert close_call_count > 0, (
+            "page.close() was never called during PDF conversion"
+        )
 
 
 def _generate_table_pdf(num_pages: int) -> bytes:
