@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "markitdown-api"
+dynamic = ["version"]
+description = "FastAPI HTTP service wrapping MarkItDown file-to-Markdown conversion"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+  { name = "MarkItDown Contributors" },
+]
+dependencies = [
+  "fastapi>=0.111",
+  "uvicorn[standard]",
+  "python-multipart",
+  "markitdown[all]",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "httpx",  # required by TestClient
+]
+
+[project.scripts]
+markitdown-api = "markitdown_api.__main__:main"
+
+[tool.hatch.version]
+path = "src/markitdown_api/__about__.py"
