@@ -53,7 +53,12 @@ class YouTubeConverter(DocumentConverter):
         url = unquote(url)
         url = url.replace(r"\?", "?").replace(r"\=", "=")
 
-        if not url.startswith("https://www.youtube.com/watch?"):
+        # Check for various YouTube URL patterns
+        if not (
+            url.startswith("https://www.youtube.com/watch?")
+            or url.startswith("https://youtu.be/")
+            or url.startswith("https://www.youtube.com/shorts/")
+        ):
             # Not a YouTube URL
             return False
 
@@ -66,6 +71,30 @@ class YouTubeConverter(DocumentConverter):
 
         # Not HTML content
         return False
+
+    def _extract_video_id(self, url: str) -> Union[str, None]:
+        """Extract YouTube video ID from various URL formats."""
+        parsed_url = urlparse(url)
+        
+        # youtube.com/watch?v=VIDEO_ID
+        if parsed_url.path == "/watch":
+            params = parse_qs(parsed_url.query)
+            if "v" in params:
+                return params["v"][0]
+        
+        # youtu.be/VIDEO_ID
+        if parsed_url.netloc == "youtu.be":
+            video_id = parsed_url.path.lstrip("/")
+            if video_id:
+                return video_id
+        
+        # youtube.com/shorts/VIDEO_ID
+        if "/shorts/" in parsed_url.path:
+            video_id = parsed_url.path.split("/shorts/")[1].split("/")[0]
+            if video_id:
+                return video_id
+        
+        return None
 
     def convert(
         self,
@@ -147,10 +176,8 @@ class YouTubeConverter(DocumentConverter):
         if IS_YOUTUBE_TRANSCRIPT_CAPABLE:
             ytt_api = YouTubeTranscriptApi()
             transcript_text = ""
-            parsed_url = urlparse(stream_info.url)  # type: ignore
-            params = parse_qs(parsed_url.query)  # type: ignore
-            if "v" in params and params["v"][0]:
-                video_id = str(params["v"][0])
+            # Extract video ID using helper method
+            video_id = self._extract_video_id(stream_info.url)  # type: ignore
                 transcript_list = ytt_api.list(video_id)
                 languages = ["en"]
                 for transcript in transcript_list:
