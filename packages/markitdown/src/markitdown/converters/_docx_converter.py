@@ -25,7 +25,7 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ]
 
-ACCEPTED_FILE_EXTENSIONS = [".docx"]
+ACCEPTED_FILE_EXTENSIONS = [".docx", ".doc"]
 
 
 class DocxConverter(HtmlConverter):
