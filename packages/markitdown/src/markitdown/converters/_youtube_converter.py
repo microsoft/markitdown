@@ -6,6 +6,33 @@ from typing import Any, BinaryIO, Dict, List, Union
 from urllib.parse import parse_qs, urlparse, unquote
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
+
+
+def _extract_youtube_video_id(url: str) -> str:
+    """Extract video ID from various YouTube URL formats.
+    
+    Supports:
+    - https://www.youtube.com/watch?v=VIDEO_ID
+    - https://youtu.be/VIDEO_ID
+    - https://www.youtube.com/shorts/VIDEO_ID
+    """
+    parsed = urlparse(url)
+    path = parsed.path.lstrip("/")
+    
+    # Check for youtu.be short URLs: /VIDEO_ID
+    if parsed.netloc == "youtu.be":
+        return path
+    
+    # Check for shorts URLs: /shorts/VIDEO_ID  
+    if path.startswith("shorts/"):
+        return path.replace("shorts/", "")
+    
+    # Check for standard watch URLs: ?v=VIDEO_ID
+    params = parse_qs(parsed.query)
+    if "v" in params and params["v"]:
+        return params["v"][0]
+    
+    return ""
 from .._stream_info import StreamInfo
 
 # Optional YouTube transcription support
@@ -53,7 +80,15 @@ class YouTubeConverter(DocumentConverter):
         url = unquote(url)
         url = url.replace(r"\?", "?").replace(r"\=", "=")
 
-        if not url.startswith("https://www.youtube.com/watch?"):
+        # Check for valid YouTube URL formats
+        # - https://www.youtube.com/watch?v=...
+        # - https://youtu.be/...
+        # - https://www.youtube.com/shorts/...
+        if not (
+            url.startswith("https://www.youtube.com/watch?")
+            or url.startswith("https://youtu.be/")
+            or url.startswith("https://www.youtube.com/shorts/")
+        ):
             # Not a YouTube URL
             return False
 
@@ -147,10 +182,8 @@ class YouTubeConverter(DocumentConverter):
         if IS_YOUTUBE_TRANSCRIPT_CAPABLE:
             ytt_api = YouTubeTranscriptApi()
             transcript_text = ""
-            parsed_url = urlparse(stream_info.url)  # type: ignore
-            params = parse_qs(parsed_url.query)  # type: ignore
-            if "v" in params and params["v"][0]:
-                video_id = str(params["v"][0])
+            video_id = _extract_youtube_video_id(stream_info.url)  # type: ignore
+            if video_id:
                 transcript_list = ytt_api.list(video_id)
                 languages = ["en"]
                 for transcript in transcript_list:
