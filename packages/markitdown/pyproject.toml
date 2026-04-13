@@ -45,7 +45,7 @@ all = [
   "olefile",
   "pydub",
   "SpeechRecognition",
-  "youtube-transcript-api~=1.0.0",
+  "youtube-transcript-api>=1.2.3",
   "azure-ai-documentintelligence",
   "azure-identity",
 ]
@@ -56,7 +56,7 @@ xls = ["pandas", "xlrd"]
 pdf = ["pdfminer.six>=20251230", "pdfplumber>=0.11.9"]
 outlook = ["olefile"]
 audio-transcription = ["pydub", "SpeechRecognition"]
-youtube-transcription = ["youtube-transcript-api"]
+youtube-transcription = ["youtube-transcript-api>=1.2.3"]
 az-doc-intel = ["azure-ai-documentintelligence", "azure-identity"]
 
 [project.urls]
