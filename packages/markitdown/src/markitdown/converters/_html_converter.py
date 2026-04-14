@@ -48,6 +48,31 @@ class HtmlConverter(DocumentConverter):
         encoding = "utf-8" if stream_info.charset is None else stream_info.charset
         soup = BeautifulSoup(file_stream, "html.parser", from_encoding=encoding)
 
+        # Extract page metadata (OG tags, description, author) before stripping
+        include_metadata = kwargs.get("include_html_metadata", False)
+        metadata_lines = []
+        if include_metadata:
+            meta_fields = {
+                "og:title": None,
+                "og:description": None,
+                "og:site_name": None,
+                "author": None,
+                "description": None,
+                "keywords": None,
+            }
+            for meta in soup.find_all("meta"):
+                prop = meta.get("property") or meta.get("name") or ""
+                content = meta.get("content", "")
+                if prop.lower() in meta_fields and content:
+                    meta_fields[prop.lower()] = content
+
+            if any(meta_fields.values()):
+                metadata_lines.append("---")
+                for k, v in meta_fields.items():
+                    if v:
+                        metadata_lines.append(f"{k}: {v}")
+                metadata_lines.append("---\n")
+
         # Remove javascript and style blocks
         for script in soup(["script", "style"]):
             script.extract()
@@ -64,6 +89,9 @@ class HtmlConverter(DocumentConverter):
 
         # remove leading and trailing \n
         webpage_text = webpage_text.strip()
+
+        if metadata_lines:
+            webpage_text = "\n".join(metadata_lines) + "\n" + webpage_text
 
         return DocumentConverterResult(
             markdown=webpage_text,

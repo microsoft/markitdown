@@ -5,6 +5,15 @@ from charset_normalizer import from_bytes
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
 
+
+def _escape_cell(value: str) -> str:
+    """Escape pipe characters and strip newlines inside CSV cells to keep Markdown table valid."""
+    # Replace literal pipe chars to avoid breaking table columns
+    value = value.replace("|", "\\|")
+    # Collapse newlines to a space so single-cell multi-line values don't break rows
+    value = value.replace("\r\n", " ").replace("\n", " ").replace("\r", " ")
+    return value
+
 ACCEPTED_MIME_TYPE_PREFIXES = [
     "text/csv",
     "application/csv",
@@ -57,20 +66,23 @@ class CsvConverter(DocumentConverter):
         # Create markdown table
         markdown_table = []
 
-        # Add header row
-        markdown_table.append("| " + " | ".join(rows[0]) + " |")
+        # Determine column count from header
+        col_count = len(rows[0])
+
+        # Add header row (escape special chars)
+        markdown_table.append("| " + " | ".join(_escape_cell(c) for c in rows[0]) + " |")
 
         # Add separator row
-        markdown_table.append("| " + " | ".join(["---"] * len(rows[0])) + " |")
+        markdown_table.append("| " + " | ".join(["---"] * col_count) + " |")
 
         # Add data rows
         for row in rows[1:]:
             # Make sure row has the same number of columns as header
-            while len(row) < len(rows[0]):
+            while len(row) < col_count:
                 row.append("")
             # Truncate if row has more columns than header
-            row = row[: len(rows[0])]
-            markdown_table.append("| " + " | ".join(row) + " |")
+            row = row[:col_count]
+            markdown_table.append("| " + " | ".join(_escape_cell(c) for c in row) + " |")
 
         result = "\n".join(markdown_table)
 
