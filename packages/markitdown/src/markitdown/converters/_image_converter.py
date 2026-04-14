@@ -1,6 +1,7 @@
 from typing import BinaryIO, Any, Union
 import base64
 import mimetypes
+from warnings import warn
 from ._exiftool import exiftool_metadata
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
@@ -45,9 +46,22 @@ class ImageConverter(DocumentConverter):
         md_content = ""
 
         # Add metadata
-        metadata = exiftool_metadata(
-            file_stream, exiftool_path=kwargs.get("exiftool_path")
-        )
+        _exiftool_path = kwargs.get("exiftool_path")
+        try:
+            metadata = exiftool_metadata(
+                file_stream, exiftool_path=_exiftool_path
+            )
+        except RuntimeError as e:
+            # exiftool not available or version check failed
+            warn(
+                "ExifTool is not available for image metadata extraction. "
+                "To enable, install exiftool and either: "
+                "(1) Add it to your PATH, or "
+                "(2) Set the EXIFTOOL_PATH environment variable, or "
+                "(3) Pass exiftool_path=<path> to MarkItDown(). "
+                f"Error: {e}"
+            )
+            metadata = {}
 
         if metadata:
             for f in [
