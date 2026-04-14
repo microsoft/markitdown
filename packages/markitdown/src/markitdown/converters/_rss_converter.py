@@ -115,11 +115,15 @@ class RssConverter(DocumentConverter):
             entry_summary = self._get_data_by_tag_name(entry, "summary")
             entry_updated = self._get_data_by_tag_name(entry, "updated")
             entry_content = self._get_data_by_tag_name(entry, "content")
+            # For Atom, <link> uses href attribute
+            entry_link = self._get_link_href(entry)
 
             if entry_title:
                 md_text += f"\n## {entry_title}\n"
             if entry_updated:
                 md_text += f"Updated on: {entry_updated}\n"
+            if entry_link:
+                md_text += f"**Link:** [{entry_link}]({entry_link})\n"
             if entry_summary:
                 md_text += self._parse_content(entry_summary)
             if entry_content:
@@ -152,11 +156,15 @@ class RssConverter(DocumentConverter):
             description = self._get_data_by_tag_name(item, "description")
             pubDate = self._get_data_by_tag_name(item, "pubDate")
             content = self._get_data_by_tag_name(item, "content:encoded")
+            # For RSS, <link> uses text node
+            link = self._get_data_by_tag_name(item, "link")
 
             if title:
                 md_text += f"\n## {title}\n"
             if pubDate:
                 md_text += f"Published on: {pubDate}\n"
+            if link:
+                md_text += f"**Link:** [{link}]({link})\n"
             if description:
                 md_text += self._parse_content(description)
             if content:
@@ -175,6 +183,26 @@ class RssConverter(DocumentConverter):
             return _CustomMarkdownify(**self._kwargs).convert_soup(soup)
         except BaseException as _:
             return content
+
+    def _get_link_href(
+        self, element: Element
+    ) -> Union[str, None]:
+        """Get the href attribute from <link> element (for Atom feeds).
+        Falls back to text content if no href found.
+        """
+        nodes = element.getElementsByTagName("link")
+        if not nodes:
+            return None
+        node = nodes[0]
+        # Atom uses href attribute
+        href = node.getAttribute("href") if hasattr(node, "getAttribute") else None
+        if href:
+            return href
+        # RSS uses text content
+        fc = node.firstChild
+        if fc and hasattr(fc, "data") and fc.data:
+            return fc.data
+        return None
 
     def _get_data_by_tag_name(
         self, element: Element, tag_name: str

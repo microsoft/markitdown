@@ -10,6 +10,9 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
     "audio/x-wav",
     "audio/mpeg",
     "video/mp4",
+    "audio/ogg",
+    "audio/flac",
+    "audio/aac",
 ]
 
 ACCEPTED_FILE_EXTENSIONS = [
@@ -17,6 +20,9 @@ ACCEPTED_FILE_EXTENSIONS = [
     ".mp3",
     ".m4a",
     ".mp4",
+    ".ogg",
+    ".flac",
+    ".aac",
 ]
 
 

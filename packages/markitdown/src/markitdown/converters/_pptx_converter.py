@@ -253,7 +253,7 @@ class PptxConverter(DocumentConverter):
             for row in data:
                 markdown_table.append("| " + " | ".join(map(str, row)) + " |")
             header = markdown_table[0]
-            separator = "|" + "|".join(["---"] * len(data[0])) + "|"
+            separator = "| " + " | ".join(["---"] * len(data[0])) + " |"
             return md + "\n".join([header, separator] + markdown_table[1:])
         except ValueError as e:
             # Handle the specific error for unsupported chart types

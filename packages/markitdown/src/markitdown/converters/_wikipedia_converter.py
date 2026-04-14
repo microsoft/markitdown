@@ -62,6 +62,13 @@ class WikipediaConverter(DocumentConverter):
         for script in soup(["script", "style"]):
             script.extract()
 
+        # Optionally strip Wikipedia infoboxes and navboxes
+        strip_infoboxes = kwargs.get("strip_wikipedia_infoboxes", True)
+        if strip_infoboxes:
+            for cls in ["infobox", "wikitable", "navbox", "metadata"]:
+                for el in soup.find_all(class_=cls):
+                    el.extract()
+
         # Print only the main content
         body_elm = soup.find("div", {"id": "mw-content-text"})
         title_elm = soup.find("span", {"class": "mw-page-title-main"})

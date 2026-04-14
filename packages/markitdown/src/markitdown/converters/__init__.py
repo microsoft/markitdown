@@ -26,6 +26,9 @@ from ._csv_converter import CsvConverter
 from ._toml_converter import TomlConverter
 from ._sitemap_converter import SitemapConverter
 from ._env_converter import EnvConverter
+from ._yaml_converter import YamlConverter
+from ._markdown_stats_converter import get_document_stats
+from ._requirements_converter import RequirementsConverter
 
 __all__ = [
     "PlainTextConverter",
@@ -51,4 +54,7 @@ __all__ = [
     "TomlConverter",
     "SitemapConverter",
     "EnvConverter",
+    "YamlConverter",
+    "get_document_stats",
+    "RequirementsConverter",
 ]

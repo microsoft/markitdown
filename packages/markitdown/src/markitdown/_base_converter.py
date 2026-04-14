@@ -1,4 +1,4 @@
-from typing import Any, BinaryIO, Optional
+from typing import Any, BinaryIO, Dict, Optional
 from ._stream_info import StreamInfo
 
 
@@ -37,6 +37,11 @@ class DocumentConverterResult:
     def __str__(self) -> str:
         """Return the converted Markdown text."""
         return self.markdown
+
+    def stats(self) -> Dict[str, int]:
+        """Return statistics about this document's Markdown content."""
+        from .converters._markdown_stats_converter import get_document_stats
+        return get_document_stats(self.markdown)
 
 
 class DocumentConverter:

@@ -42,6 +42,8 @@ from .converters import (
     TomlConverter,
     SitemapConverter,
     EnvConverter,
+    YamlConverter,
+    RequirementsConverter,
 )
 
 from ._base_converter import DocumentConverter, DocumentConverterResult
@@ -208,6 +210,8 @@ class MarkItDown:
             self.register_converter(TomlConverter())
             self.register_converter(SitemapConverter())
             self.register_converter(EnvConverter())
+            self.register_converter(YamlConverter())
+            self.register_converter(RequirementsConverter())
 
             # Register Document Intelligence converter at the top of the stack if endpoint is provided
             docintel_endpoint = kwargs.get("docintel_endpoint")
