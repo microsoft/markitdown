@@ -186,6 +186,26 @@ result = md.convert("test.xlsx")
 print(result.text_content)
 ```
 
+#### Using LLM Client for Enhanced Image Descriptions
+
+MarkItDown can use LLM clients (like OpenAI) to generate descriptions for images in documents:
+
+```python
+from markitdown import MarkItDown
+from openai import OpenAI
+
+client = OpenAI()
+md = MarkItDown(
+    llm_client=client,
+    llm_model="gpt-4o",
+    llm_prompt="Describe the image in detail for a blind person."
+)
+result = md.convert("document_with_images.pptx")
+print(result.text_content)
+```
+
+This is especially useful for PowerPoint files and images where you want AI-generated descriptions of visual content.
+
 Document Intelligence conversion in Python:
 
 ```python
