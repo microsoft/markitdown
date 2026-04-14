@@ -26,7 +26,7 @@ MarkItDown currently supports the conversion from:
 - HTML
 - Text-based formats (CSV, JSON, XML)
 - ZIP files (iterates over contents)
-- Youtube URLs
+- YouTube URLs
 - EPubs
 - ... and more!
 
