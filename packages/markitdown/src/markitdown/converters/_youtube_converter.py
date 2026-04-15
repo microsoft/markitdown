@@ -34,6 +34,49 @@ ACCEPTED_FILE_EXTENSIONS = [
 ]
 
 
+# Hosts we treat as YouTube. Each entry covers schemes http/https and an
+# optional leading "www." / "m." so mobile and short links work too.
+_YOUTUBE_HOSTS = {
+    "www.youtube.com",
+    "youtube.com",
+    "m.youtube.com",
+    "music.youtube.com",
+    "youtu.be",
+}
+
+
+def _extract_video_id(url: str) -> str | None:
+    """Return the 11-character video id for any supported YouTube URL shape.
+
+    Accepts the canonical watch URL (``/watch?v=...``), the short form
+    (``youtu.be/<id>``), Shorts (``/shorts/<id>``), embed (``/embed/<id>``),
+    and live (``/live/<id>``). Returns ``None`` for anything else so the
+    caller can fall back to the regular HTML converter.
+    """
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return None
+    host = (parsed.hostname or "").lower()
+    if host not in _YOUTUBE_HOSTS:
+        return None
+    # youtu.be/<id>
+    if host == "youtu.be":
+        vid = parsed.path.lstrip("/").split("/", 1)[0]
+        return vid or None
+    # /watch?v=<id>
+    if parsed.path == "/watch":
+        qs = parse_qs(parsed.query)
+        v = qs.get("v", [""])[0]
+        return v or None
+    # /shorts/<id>, /embed/<id>, /live/<id>
+    for prefix in ("/shorts/", "/embed/", "/live/"):
+        if parsed.path.startswith(prefix):
+            vid = parsed.path[len(prefix):].split("/", 1)[0]
+            return vid or None
+    return None
+
+
 class YouTubeConverter(DocumentConverter):
     """Handle YouTube specially, focusing on the video title, description, and transcript."""
 
@@ -53,8 +96,8 @@ class YouTubeConverter(DocumentConverter):
         url = unquote(url)
         url = url.replace(r"\?", "?").replace(r"\=", "=")
 
-        if not url.startswith("https://www.youtube.com/watch?"):
-            # Not a YouTube URL
+        if _extract_video_id(url) is None:
+            # Not a YouTube URL we can handle
             return False
 
         if extension in ACCEPTED_FILE_EXTENSIONS:
@@ -147,10 +190,10 @@ class YouTubeConverter(DocumentConverter):
         if IS_YOUTUBE_TRANSCRIPT_CAPABLE:
             ytt_api = YouTubeTranscriptApi()
             transcript_text = ""
-            parsed_url = urlparse(stream_info.url)  # type: ignore
-            params = parse_qs(parsed_url.query)  # type: ignore
-            if "v" in params and params["v"][0]:
-                video_id = str(params["v"][0])
+            raw_url = stream_info.url or ""
+            raw_url = unquote(raw_url).replace(r"\?", "?").replace(r"\=", "=")
+            video_id = _extract_video_id(raw_url)
+            if video_id:
                 transcript_list = ytt_api.list(video_id)
                 languages = ["en"]
                 for transcript in transcript_list:
