@@ -104,10 +104,12 @@ class RssConverter(DocumentConverter):
         Returns None if the feed type is not recognized or something goes wrong.
         """
         root = doc.getElementsByTagName("feed")[0]
-        title = self._get_data_by_tag_name(root, "title")
-        subtitle = self._get_data_by_tag_name(root, "subtitle")
+        title = self._get_direct_child_data(root, "title")
+        subtitle = self._get_direct_child_data(root, "subtitle")
         entries = root.getElementsByTagName("entry")
-        md_text = f"# {title}\n"
+        md_text = ""
+        if title:
+            md_text = f"# {title}\n"
         if subtitle:
             md_text += f"{subtitle}\n"
         for entry in entries:
@@ -140,9 +142,10 @@ class RssConverter(DocumentConverter):
         if not channel_list:
             raise ValueError("No channel found in RSS feed")
         channel = channel_list[0]
-        channel_title = self._get_data_by_tag_name(channel, "title")
-        channel_description = self._get_data_by_tag_name(channel, "description")
+        channel_title = self._get_direct_child_data(channel, "title")
+        channel_description = self._get_direct_child_data(channel, "description")
         items = channel.getElementsByTagName("item")
+        md_text = ""
         if channel_title:
             md_text = f"# {channel_title}\n"
         if channel_description:
@@ -189,4 +192,27 @@ class RssConverter(DocumentConverter):
         if fc:
             if hasattr(fc, "data"):
                 return fc.data
+        return None
+
+    def _get_direct_child_data(
+        self, element: Element, tag_name: str
+    ) -> Union[str, None]:
+        """Get data from first *direct* child element with the given tag name.
+
+        Unlike _get_data_by_tag_name which uses getElementsByTagName (recursive
+        descent into all descendants), this method only searches immediate child
+        elements. This prevents item/entry metadata from leaking into
+        channel/feed-level fields.
+
+        Returns None when no such element is found.
+        """
+        for child in element.childNodes:
+            if (
+                child.nodeType == child.ELEMENT_NODE
+                and child.tagName == tag_name
+            ):
+                fc = child.firstChild
+                if fc and hasattr(fc, "data"):
+                    return fc.data
+                return None
         return None
