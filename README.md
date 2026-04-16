@@ -5,7 +5,7 @@
 [![Built by AutoGen Team](https://img.shields.io/badge/Built%20by-AutoGen%20Team-blue)](https://github.com/microsoft/autogen)
 
 > [!TIP]
-> MarkItDown now offers an MCP (Model Context Protocol) server for integration with LLM applications like Claude Desktop. See [markitdown-mcp](https://github.com/microsoft/markitdown/tree/main/packages/markitdown-mcp) for more information.
+> MarkItDown now offers an MCP (Model Context Protocol) server for integration with LLM applications like Claude Desktop. See [markitdown_mcp](https://github.com/microsoft/markitdown/tree/main/packages/markitdown-mcp) for more information.
 
 > [!IMPORTANT]
 > Breaking changes between 0.0.1 to 0.1.0:
@@ -185,6 +185,26 @@ md = MarkItDown(enable_plugins=False) # Set to True to enable plugins
 result = md.convert("test.xlsx")
 print(result.text_content)
 ```
+
+#### Using LLM Client for Enhanced Image Descriptions
+
+MarkItDown can use LLM clients (like OpenAI) to generate descriptions for images in documents:
+
+```python
+from markitdown import MarkItDown
+from openai import OpenAI
+
+client = OpenAI()
+md = MarkItDown(
+    llm_client=client,
+    llm_model="gpt-4o",
+    llm_prompt="Describe the image in detail for a blind person."
+)
+result = md.convert("document_with_images.pptx")
+print(result.text_content)
+```
+
+This is especially useful for PowerPoint files and images where you want AI-generated descriptions of visual content.
 
 Document Intelligence conversion in Python:
 
