@@ -110,7 +110,7 @@ class ZipConverter(DocumentConverter):
                         md_content += result.markdown + "\n\n"
                 except UnsupportedFormatException:
                     pass
-                except FileConversionException:
-                    pass
+                except FileConversionException as e:
+                    md_content += f"## File: {name}\n\n> ⚠️ Could not convert file: {name} — {e}\n\n"
 
         return DocumentConverterResult(markdown=md_content.strip())
