@@ -53,7 +53,12 @@ class YouTubeConverter(DocumentConverter):
         url = unquote(url)
         url = url.replace(r"\?", "?").replace(r"\=", "=")
 
-        if not url.startswith("https://www.youtube.com/watch?"):
+        # Check for YouTube URLs: standard, short, and Shorts
+        if not (
+            url.startswith("https://www.youtube.com/watch?")
+            or url.startswith("https://youtu.be/")
+            or url.startswith("https://www.youtube.com/shorts/")
+        ):
             # Not a YouTube URL
             return False
 
