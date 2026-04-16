@@ -5,7 +5,7 @@
 [![Built by AutoGen Team](https://img.shields.io/badge/Built%20by-AutoGen%20Team-blue)](https://github.com/microsoft/autogen)
 
 > [!TIP]
-> MarkItDown now offers an MCP (Model Context Protocol) server for integration with LLM applications like Claude Desktop. See [markitdown-mcp](https://github.com/microsoft/markitdown/tree/main/packages/markitdown-mcp) for more information.
+> MarkItDown now offers an MCP (Model Context Protocol) server for integration with LLM applications like Claude Desktop. See [markitdown_mcp](https://github.com/microsoft/markitdown/tree/main/packages/markitdown-mcp) for more information.
 
 > [!IMPORTANT]
 > Breaking changes between 0.0.1 to 0.1.0:
@@ -244,28 +244,63 @@ You can help by looking at issues or helping review PRs. Any issue or PR is welc
 
 ### Running Tests and Checks
 
-- Navigate to the MarkItDown package:
+This section provides detailed instructions for setting up your development environment and running tests.
 
+#### Prerequisites
+
+- **Python 3.10+**: MarkItDown requires Python 3.10 or higher.
+- **uv (recommended)**: For faster package management. Install via:
   ```sh
-  cd packages/markitdown
+  curl -LsSf https://astral.sh/uv/install.sh | sh
   ```
 
-- Install `hatch` in your environment and run tests:
+#### Option 1: Using uv (Recommended)
 
-  ```sh
-  pip install hatch  # Other ways of installing hatch: https://hatch.pypa.io/dev/install/
-  hatch shell
-  hatch test
-  ```
 
-  (Alternative) Use the Devcontainer which has all the dependencies installed:
+```sh
+uv venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+uv pip install -e 'packages/markitdown[all]'
+hatch shell
+hatch test
+pre-commit run --all-files
+```
 
-  ```sh
-  # Reopen the project in Devcontainer and run:
-  hatch test
-  ```
+#### Option 2: Using pip/venv
 
-- Run pre-commit checks before submitting a PR: `pre-commit run --all-files`
+```sh
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+pip install -e 'packages/markitdown[all]'
+hatch shell
+hatch test
+```
+
+#### Option 3: Using Devcontainer
+
+1. Open the project in VS Code
+2. Click "Reopen in Container" when prompted
+3. Run `hatch test`
+
+#### Running Tests
+
+```sh
+hatch shell
+hatch test          # Run all tests
+hatch test -t        # Run with verbose output
+```
+
+#### Running Pre-commit Checks
+
+```sh
+pre-commit run --all-files
+pre-commit install
+```
+
+#### Common Issues
+
+- **Missing dependencies**: Run `pip install -e 'packages/markitdown[all]'`
+- **Test failures**: Check the test output for specific errors
 
 ### Contributing 3rd-party Plugins
 
