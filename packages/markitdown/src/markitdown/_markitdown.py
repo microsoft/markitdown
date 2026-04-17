@@ -5,9 +5,10 @@ import sys
 import shutil
 import traceback
 import io
+import glob
 from dataclasses import dataclass
 from importlib.metadata import entry_points
-from typing import Any, List, Dict, Optional, Union, BinaryIO
+from typing import Any, List, Dict, Optional, Union, BinaryIO, Tuple
 from pathlib import Path
 from urllib.parse import urlparse
 from warnings import warn
@@ -781,3 +782,187 @@ class MarkItDown:
             return codecs.lookup(charset).name
         except LookupError:
             return charset
+
+    def convert_directory(
+        self,
+        source_dir: Union[str, Path],
+        output_dir: Union[str, Path],
+        *,
+        extensions: Optional[List[str]] = None,
+        recursive: bool = False,
+        keep_data_uris: bool = False,
+        **kwargs: Any,
+    ) -> List[Tuple[str, DocumentConverterResult]]:
+        """
+        Convert all supported files in a directory to markdown.
+        
+        Args:
+            source_dir: Directory containing files to convert
+            output_dir: Directory to save converted markdown files
+            extensions: List of file extensions to include (e.g., ['.pdf', '.docx']). If None, includes all supported files.
+            recursive: Whether to search subdirectories recursively
+            keep_data_uris: Whether to keep data URIs in the output
+            **kwargs: Additional arguments passed to convert() method
+            
+        Returns:
+            List of tuples containing (output_file_path, conversion_result) for each converted file
+            
+        Raises:
+            ValueError: If source_dir doesn't exist or output_dir can't be created
+        """
+        source_dir = Path(source_dir)
+        output_dir = Path(output_dir)
+        
+        if not source_dir.exists():
+            raise ValueError(f"Source directory does not exist: {source_dir}")
+        
+        if not source_dir.is_dir():
+            raise ValueError(f"Source path is not a directory: {source_dir}")
+        
+        # Create output directory if it doesn't exist
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Find files to convert
+        files_to_convert = self._find_files(
+            source_dir, extensions=extensions, recursive=recursive
+        )
+        
+        if not files_to_convert:
+            return []
+        
+        results = []
+        total_files = len(files_to_convert)
+        
+        for i, file_path in enumerate(files_to_convert, 1):
+            try:
+                # Generate output filename
+                output_filename = file_path.stem + ".md"
+                output_path = output_dir / output_filename
+                
+                # Convert the file
+                result = self.convert(
+                    file_path, keep_data_uris=keep_data_uris, **kwargs
+                )
+                
+                # Write output file
+                with open(output_path, "w", encoding="utf-8") as f:
+                    f.write(result.markdown)
+                
+                results.append((str(output_path), result))
+                
+                # Print progress (can be made configurable)
+                print(f"[{i}/{total_files}] Converted: {file_path.name} -> {output_filename}")
+                
+            except Exception as e:
+                print(f"[{i}/{total_files}] Failed to convert {file_path.name}: {e}")
+                # Continue with other files
+                continue
+        
+        return results
+
+    def convert_batch(
+        self,
+        file_list: List[Union[str, Path]],
+        output_dir: Union[str, Path],
+        *,
+        keep_data_uris: bool = False,
+        **kwargs: Any,
+    ) -> List[Tuple[str, DocumentConverterResult]]:
+        """
+        Convert a list of specific files to markdown.
+        
+        Args:
+            file_list: List of file paths to convert
+            output_dir: Directory to save converted markdown files
+            keep_data_uris: Whether to keep data URIs in the output
+            **kwargs: Additional arguments passed to convert() method
+            
+        Returns:
+            List of tuples containing (output_file_path, conversion_result) for each converted file
+        """
+        output_dir = Path(output_dir)
+        
+        # Create output directory if it doesn't exist
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        results = []
+        total_files = len(file_list)
+        
+        for i, file_path in enumerate(file_list, 1):
+            file_path = Path(file_path)
+            
+            try:
+                if not file_path.exists():
+                    print(f"[{i}/{total_files}] File not found: {file_path}")
+                    continue
+                
+                if not file_path.is_file():
+                    print(f"[{i}/{total_files}] Path is not a file: {file_path}")
+                    continue
+                
+                # Generate output filename
+                output_filename = file_path.stem + ".md"
+                output_path = output_dir / output_filename
+                
+                # Convert the file
+                result = self.convert(
+                    file_path, keep_data_uris=keep_data_uris, **kwargs
+                )
+                
+                # Write output file
+                with open(output_path, "w", encoding="utf-8") as f:
+                    f.write(result.markdown)
+                
+                results.append((str(output_path), result))
+                
+                # Print progress
+                print(f"[{i}/{total_files}] Converted: {file_path.name} -> {output_filename}")
+                
+            except Exception as e:
+                print(f"[{i}/{total_files}] Failed to convert {file_path.name}: {e}")
+                # Continue with other files
+                continue
+        
+        return results
+
+    def _find_files(
+        self,
+        directory: Path,
+        *,
+        extensions: Optional[List[str]] = None,
+        recursive: bool = False,
+    ) -> List[Path]:
+        """
+        Find files in directory matching given extensions.
+        
+        Args:
+            directory: Directory to search
+            extensions: List of file extensions to include (e.g., ['.pdf', '.docx'])
+            recursive: Whether to search subdirectories recursively
+            
+        Returns:
+            List of file paths
+        """
+        files = []
+        
+        # Normalize extensions
+        if extensions is not None:
+            extensions = [ext.lower() if ext.startswith(".") else f".{ext.lower()}" 
+                          for ext in extensions]
+        
+        # Search pattern
+        if recursive:
+            pattern = "**/*"
+        else:
+            pattern = "*"
+        
+        for file_path in directory.glob(pattern):
+            if file_path.is_file():
+                # Check extension filter
+                if extensions is not None:
+                    if file_path.suffix.lower() not in extensions:
+                        continue
+                
+                files.append(file_path)
+        
+        return sorted(files)
