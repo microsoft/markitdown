@@ -179,6 +179,18 @@ def test_stream_info_operations() -> None:
     assert updated_stream_info.url == "url.1"
 
 
+def test_convert_text_file_redetects_charset_after_ascii_prefix(tmp_path) -> None:
+    """Late non-ASCII bytes should not fail when the initial stream sniff looks ASCII."""
+
+    file_path = tmp_path / "utf8-after-ascii-prefix.txt"
+    expected_text = ("A" * 4100) + " café\n"
+    file_path.write_bytes(expected_text.encode("utf-8"))
+
+    result = MarkItDown().convert(str(file_path))
+
+    assert result.markdown == expected_text
+
+
 def test_data_uris() -> None:
     # Test basic parsing of data URIs
     data_uri = "data:text/plain;base64,SGVsbG8sIFdvcmxkIQ=="
