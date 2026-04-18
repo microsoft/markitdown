@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: MIT
 import argparse
 import sys
+import logging
 import codecs
 from textwrap import dedent
 from importlib.metadata import entry_points
@@ -225,8 +226,10 @@ def main():
     else:
         markitdown = MarkItDown(enable_plugins=args.use_plugins)
 
-    # Handle batch processing
+    # Configure logging for batch processing to show progress
     if args.batch is not None:
+        logging.basicConfig(level=logging.INFO, format='%(message)s')
+        
         # Parse extensions
         extensions = None
         if args.extensions is not None:
@@ -282,7 +285,7 @@ def _handle_output(args, result: DocumentConverterResult):
 
 
 def _exit_with_error(message: str):
-    print(message)
+    print(message, file=sys.stderr)
     sys.exit(1)
 
 

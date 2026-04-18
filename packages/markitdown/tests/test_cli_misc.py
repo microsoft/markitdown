@@ -92,7 +92,7 @@ def test_batch_conversion_missing_output_dir():
         )
         
         assert result.returncode != 0, "CLI should have failed"
-        assert "--output-dir is required when using --batch" in result.stdout
+        assert "--output-dir is required when using --batch" in result.stderr
 
 
 def test_batch_conversion_with_filename():
@@ -113,7 +113,7 @@ def test_batch_conversion_with_filename():
         )
         
         assert result.returncode != 0, "CLI should have failed"
-        assert "Cannot specify both --batch and a filename" in result.stdout
+        assert "Cannot specify both --batch and a filename" in result.stderr
 
 
 def test_batch_conversion_recursive():
@@ -137,7 +137,7 @@ def test_batch_conversion_recursive():
         assert result.returncode == 0, f"CLI exited with error: {result.stderr}"
         assert "Successfully converted 2 files" in result.stdout
         assert (output_dir / "test.md").exists()
-        assert (output_dir / "sub_test.md").exists()
+        assert (output_dir / "subdir" / "sub_test.md").exists()
 
 
 def test_batch_conversion_empty_directory():
@@ -170,7 +170,7 @@ def test_batch_conversion_nonexistent_directory():
         )
         
         assert result.returncode != 0, "CLI should have failed"
-        assert "Batch conversion failed" in result.stdout
+        assert "Batch conversion failed" in result.stderr
 
 
 if __name__ == "__main__":

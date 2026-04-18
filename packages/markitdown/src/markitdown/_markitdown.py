@@ -5,7 +5,7 @@ import sys
 import shutil
 import traceback
 import io
-import glob
+import logging
 from dataclasses import dataclass
 from importlib.metadata import entry_points
 from typing import Any, List, Dict, Optional, Union, BinaryIO, Tuple
@@ -835,9 +835,17 @@ class MarkItDown:
         
         for i, file_path in enumerate(files_to_convert, 1):
             try:
-                # Generate output filename
-                output_filename = file_path.stem + ".md"
-                output_path = output_dir / output_filename
+                # Generate output filename, preserving relative path for recursive mode
+                if recursive:
+                    # Preserve relative path structure
+                    relative_path = file_path.relative_to(source_dir)
+                    output_path = output_dir / relative_path.with_suffix('.md')
+                    # Create parent directories if needed
+                    output_path.parent.mkdir(parents=True, exist_ok=True)
+                else:
+                    # Flat structure for non-recursive mode
+                    output_filename = file_path.stem + ".md"
+                    output_path = output_dir / output_filename
                 
                 # Convert the file
                 result = self.convert(
@@ -850,11 +858,13 @@ class MarkItDown:
                 
                 results.append((str(output_path), result))
                 
-                # Print progress (can be made configurable)
-                print(f"[{i}/{total_files}] Converted: {file_path.name} -> {output_filename}")
+                # Log progress
+                logger = logging.getLogger(__name__)
+                logger.info(f"[{i}/{total_files}] Converted: {file_path.name} -> {output_path.relative_to(output_dir)}")
                 
             except Exception as e:
-                print(f"[{i}/{total_files}] Failed to convert {file_path.name}: {e}")
+                logger = logging.getLogger(__name__)
+                logger.error(f"[{i}/{total_files}] Failed to convert {file_path.name}: {e}")
                 # Continue with other files
                 continue
         
@@ -893,11 +903,13 @@ class MarkItDown:
             
             try:
                 if not file_path.exists():
-                    print(f"[{i}/{total_files}] File not found: {file_path}")
+                    logger = logging.getLogger(__name__)
+                    logger.warning(f"[{i}/{total_files}] File not found: {file_path}")
                     continue
                 
                 if not file_path.is_file():
-                    print(f"[{i}/{total_files}] Path is not a file: {file_path}")
+                    logger = logging.getLogger(__name__)
+                    logger.warning(f"[{i}/{total_files}] Path is not a file: {file_path}")
                     continue
                 
                 # Generate output filename
@@ -915,11 +927,13 @@ class MarkItDown:
                 
                 results.append((str(output_path), result))
                 
-                # Print progress
-                print(f"[{i}/{total_files}] Converted: {file_path.name} -> {output_filename}")
+                # Log progress
+                logger = logging.getLogger(__name__)
+                logger.info(f"[{i}/{total_files}] Converted: {file_path.name} -> {output_filename}")
                 
             except Exception as e:
-                print(f"[{i}/{total_files}] Failed to convert {file_path.name}: {e}")
+                logger = logging.getLogger(__name__)
+                logger.error(f"[{i}/{total_files}] Failed to convert {file_path.name}: {e}")
                 # Continue with other files
                 continue
         

@@ -87,7 +87,7 @@ def test_convert_directory_recursive():
         # Verify both files were converted
         assert len(results) == 2
         assert (output_dir / "test.md").exists()
-        assert (output_dir / "sub_test.md").exists()
+        assert (output_dir / "subdir" / "sub_test.md").exists()
 
 
 def test_convert_directory_non_recursive():
