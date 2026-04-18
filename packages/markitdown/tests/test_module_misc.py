@@ -14,6 +14,7 @@ from markitdown import (
     FileConversionException,
     StreamInfo,
 )
+from markitdown.converters import YouTubeConverter
 
 # This file contains module tests that are not directly tested by the FileTestVectors.
 # This includes things like helper functions and runtime conversion options
@@ -177,6 +178,38 @@ def test_stream_info_operations() -> None:
     assert updated_stream_info.charset == "charset.7"
     assert updated_stream_info.local_path == "local_path.1"
     assert updated_stream_info.url == "url.1"
+
+
+@pytest.mark.parametrize(
+    ("url", "video_id"),
+    [
+        ("https://www.youtube.com/watch?v=V2qZ_lgxTzg", "V2qZ_lgxTzg"),
+        ("https://youtu.be/V2qZ_lgxTzg", "V2qZ_lgxTzg"),
+        ("https://www.youtube.com/shorts/V2qZ_lgxTzg", "V2qZ_lgxTzg"),
+        ("https://www.youtube.com/embed/V2qZ_lgxTzg", "V2qZ_lgxTzg"),
+    ],
+)
+def test_youtube_converter_extracts_supported_video_ids(
+    url: str, video_id: str
+) -> None:
+    converter = YouTubeConverter()
+    assert converter._get_video_id(url) == video_id
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://www.youtube.com/watch?v=V2qZ_lgxTzg",
+        "https://youtu.be/V2qZ_lgxTzg",
+        "https://www.youtube.com/shorts/V2qZ_lgxTzg",
+    ],
+)
+def test_youtube_converter_accepts_supported_url_formats(url: str) -> None:
+    converter = YouTubeConverter()
+    assert converter.accepts(
+        io.BytesIO(b"<html></html>"),
+        StreamInfo(url=url, extension=".html"),
+    )
 
 
 def test_data_uris() -> None:
