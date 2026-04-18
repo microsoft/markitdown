@@ -109,7 +109,7 @@ class ImageConverter(DocumentConverter):
         cur_pos = file_stream.tell()
         try:
             base64_image = base64.b64encode(file_stream.read()).decode("utf-8")
-        except Exception as e:
+        except Exception:
             return None
         finally:
             file_stream.seek(cur_pos)

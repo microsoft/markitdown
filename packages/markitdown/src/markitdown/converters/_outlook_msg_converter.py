@@ -63,7 +63,7 @@ class OutlookMsgConverter(DocumentConverter):
                     "__properties_version1.0" in toc
                     and "__recip_version1.0_#00000000" in toc
                 )
-        except Exception as e:
+        except Exception:
             pass
         finally:
             file_stream.seek(cur_pos)
