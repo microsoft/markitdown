@@ -37,6 +37,24 @@ ACCEPTED_FILE_EXTENSIONS = [
 class YouTubeConverter(DocumentConverter):
     """Handle YouTube specially, focusing on the video title, description, and transcript."""
 
+    def _get_video_id(self, url: str) -> Union[str, None]:
+        """Extract a YouTube video ID from supported URL formats."""
+        parsed_url = urlparse(url)
+        hostname = parsed_url.netloc.lower()
+        path_parts = [part for part in parsed_url.path.split("/") if part]
+
+        if hostname in {"youtu.be", "www.youtu.be"}:
+            return path_parts[0] if path_parts else None
+
+        if hostname in {"youtube.com", "www.youtube.com", "m.youtube.com"}:
+            if path_parts[:1] == ["watch"]:
+                params = parse_qs(parsed_url.query)
+                return params.get("v", [None])[0]
+            if path_parts[:1] in (["shorts"], ["embed"]):
+                return path_parts[1] if len(path_parts) > 1 else None
+
+        return None
+
     def accepts(
         self,
         file_stream: BinaryIO,
@@ -53,7 +71,7 @@ class YouTubeConverter(DocumentConverter):
         url = unquote(url)
         url = url.replace(r"\?", "?").replace(r"\=", "=")
 
-        if not url.startswith("https://www.youtube.com/watch?"):
+        if not self._get_video_id(url):
             # Not a YouTube URL
             return False
 
@@ -147,10 +165,8 @@ class YouTubeConverter(DocumentConverter):
         if IS_YOUTUBE_TRANSCRIPT_CAPABLE:
             ytt_api = YouTubeTranscriptApi()
             transcript_text = ""
-            parsed_url = urlparse(stream_info.url)  # type: ignore
-            params = parse_qs(parsed_url.query)  # type: ignore
-            if "v" in params and params["v"][0]:
-                video_id = str(params["v"][0])
+            video_id = self._get_video_id(stream_info.url or "")
+            if video_id:
                 transcript_list = ytt_api.list(video_id)
                 languages = ["en"]
                 for transcript in transcript_list:
