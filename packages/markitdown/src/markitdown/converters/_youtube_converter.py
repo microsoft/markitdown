@@ -2,12 +2,13 @@ import json
 import time
 import re
 import bs4
+import logging
 from typing import Any, BinaryIO, Dict, List, Union
 from urllib.parse import parse_qs, urlparse, unquote
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
-
+logger = logging.getLogger(__name__) 
 # Optional YouTube transcription support
 try:
     # Suppress some warnings on library import
@@ -112,7 +113,7 @@ class YouTubeConverter(DocumentConverter):
                             metadata["description"] = str(attrdesc.get("content", ""))
                     break
         except Exception as e:
-            print(f"Error extracting description: {e}")
+            logger.warning(f"Error extracting description: {e}")          
             pass
 
         # Start preparing the page
@@ -176,7 +177,7 @@ class YouTubeConverter(DocumentConverter):
                 except Exception as e:
                     # No transcript available
                     if len(languages) == 1:
-                        print(f"Error fetching transcript: {e}")
+                        logger.warning(f"Error fetching transcript: {e}")
                     else:
                         # Translate transcript into first kwarg
                         transcript = (
@@ -230,7 +231,7 @@ class YouTubeConverter(DocumentConverter):
             try:
                 return operation()  # Attempt the operation
             except Exception as e:
-                print(f"Attempt {attempt + 1} failed: {e}")
+                logger.warning(f"Attempt {attempt + 1} failed: {e}")
                 if attempt < retries - 1:
                     time.sleep(delay)  # Wait before retrying
                 attempt += 1
