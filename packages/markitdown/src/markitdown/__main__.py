@@ -212,7 +212,13 @@ def _handle_output(args, result: DocumentConverterResult):
         # in the markdown output, and also handles the case where
         # sys.stdout.encoding is None (e.g. when stdout is a raw pipe).
         if hasattr(sys.stdout, "buffer"):
-            sys.stdout.buffer.write(result.markdown.encode("utf-8"))
+            data = result.markdown.encode("utf-8")
+            # `print()` (used in the fallback branch and previously here) appends
+            # a trailing newline, so preserve that behavior to keep output
+            # parity for downstream tools that expect a final newline.
+            if not data.endswith(b"\n"):
+                data += b"\n"
+            sys.stdout.buffer.write(data)
             sys.stdout.buffer.flush()
         else:
             encoding = sys.stdout.encoding or "utf-8"
