@@ -355,13 +355,20 @@ class DocConverter(DocumentConverter):
         # Convert double-newlines to paragraph breaks; single newlines to spaces
         # so that the output reads as clean Markdown paragraphs.
         lines = text.splitlines()
-        md_lines: list[str] = []
+        paragraphs: list[str] = []
+        current_paragraph: list[str] = []
         for line in lines:
             stripped = line.strip()
-            md_lines.append(stripped)
+            if stripped:
+                current_paragraph.append(stripped)
+            elif current_paragraph:
+                paragraphs.append(" ".join(current_paragraph))
+                current_paragraph = []
 
-        markdown = "\n".join(md_lines).strip()
+        if current_paragraph:
+            paragraphs.append(" ".join(current_paragraph))
 
+        markdown = "\n\n".join(paragraphs).strip()
         # Collapse 3+ consecutive blank lines into 2
         import re
         markdown = re.sub(r"\n{3,}", "\n\n", markdown)
