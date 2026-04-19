@@ -10,7 +10,6 @@ Dependency group: "doc"
 """
 
 import sys
-import io
 import struct
 from typing import Any, BinaryIO
 
