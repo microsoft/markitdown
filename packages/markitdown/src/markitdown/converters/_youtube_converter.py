@@ -8,7 +8,8 @@ from urllib.parse import parse_qs, urlparse, unquote
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
-logger = logging.getLogger(__name__) 
+
+logger = logging.getLogger(__name__)
 # Optional YouTube transcription support
 try:
     # Suppress some warnings on library import
@@ -113,7 +114,7 @@ class YouTubeConverter(DocumentConverter):
                             metadata["description"] = str(attrdesc.get("content", ""))
                     break
         except Exception as e:
-            logger.warning(f"Error extracting description: {e}")          
+            logger.warning(f"Error extracting description: {e}")
             pass
 
         # Start preparing the page
