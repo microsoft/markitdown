@@ -292,16 +292,27 @@ class DocConverter(DocumentConverter):
             if mimetype.startswith(prefix):
                 return True
 
-        # Brute-force sniff: OLE files start with the magic bytes D0 CF 11 E0
+        # Brute-force sniff: OLE files start with the magic bytes D0 CF 11 E0.
+        # Because many formats share the OLE container, only accept an
+        # unknown-extension OLE file if we can confirm it contains the
+        # WordDocument stream.
         cur_pos = file_stream.tell()
         try:
             header = file_stream.read(8)
             if header[:8] == b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1":
-                # It's an OLE file – could be .doc, .xls, .ppt, .msg, …
-                # Accept only if extension/mime already matched above, OR if
-                # extension is unknown (empty), to avoid stealing .xls/.ppt etc.
-                if not extension or extension == ".doc":
+                if extension == ".doc":
                     return True
+
+                if not extension and olefile is not None:
+                    try:
+                        file_stream.seek(0)
+                        if olefile.isOleFile(file_stream):
+                            file_stream.seek(0)
+                            with olefile.OleFileIO(file_stream) as ole:
+                                if ole.exists("WordDocument"):
+                                    return True
+                    except Exception:
+                        pass
         finally:
             file_stream.seek(cur_pos)
 
