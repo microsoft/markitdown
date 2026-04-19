@@ -76,8 +76,12 @@ class YouTubeConverter(DocumentConverter):
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
         # Parse the stream
-        encoding = "utf-8" if stream_info.charset is None else stream_info.charset
-        soup = bs4.BeautifulSoup(file_stream, "html.parser", from_encoding=encoding)
+        encoding = (
+            "utf-8" if stream_info.charset is None else stream_info.charset
+        )
+        soup = bs4.BeautifulSoup(
+            file_stream, "html.parser", from_encoding=encoding
+        )
 
         # Read the meta tags
         metadata: Dict[str, str] = {}
@@ -109,9 +113,13 @@ class YouTubeConverter(DocumentConverter):
                     match = re.search(r"var ytInitialData = ({.*?});", content)
                     if match:
                         data = json.loads(match.group(1))
-                        attrdesc = self._findKey(data, "attributedDescriptionBodyText")
+                        attrdesc = self._findKey(
+                            data, "attributedDescriptionBodyText"
+                        )
                         if attrdesc and isinstance(attrdesc, dict):
-                            metadata["description"] = str(attrdesc.get("content", ""))
+                            metadata["description"] = str(
+                                attrdesc.get("content", "")
+                            )
                     break
         except Exception as e:
             logger.warning(f"Error extracting description: {e}")
@@ -186,7 +194,9 @@ class YouTubeConverter(DocumentConverter):
                             .translate(youtube_transcript_languages[0])
                             .fetch()
                         )
-                        transcript_text = " ".join([part.text for part in transcript])
+                        transcript_text = " ".join(
+                            [part.text for part in transcript]
+                        )
             if transcript_text:
                 webpage_text += f"\n### Transcript\n{transcript_text}\n"
 
@@ -210,7 +220,9 @@ class YouTubeConverter(DocumentConverter):
                 return metadata[k]
         return default
 
-    def _findKey(self, json: Any, key: str) -> Union[str, None]:  # TODO: Fix json type
+    def _findKey(
+        self, json: Any, key: str
+    ) -> Union[str, None]:  # TODO: Fix json type
         """Recursively search for a key in nested dictionary/list structures."""
         if isinstance(json, list):
             for elm in json:
