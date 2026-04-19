@@ -2,7 +2,7 @@ name: Build & Deploy (Azure Container Apps)
 
 on:
   push:
-    branches: [main]
+    branches: [main, azure]
   workflow_dispatch:
     inputs:
       resource_group:
