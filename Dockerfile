@@ -22,6 +22,7 @@ WORKDIR /app
 COPY . /app
 RUN pip --no-cache-dir install \
     /app/packages/markitdown[all] \
+    /app/packages/markitdown-https-server \
     /app/packages/markitdown-sample-plugin
 
 # Default USERID and GROUPID
@@ -30,4 +31,5 @@ ARG GROUPID=nogroup
 
 USER $USERID:$GROUPID
 
-ENTRYPOINT [ "markitdown" ]
+EXPOSE 8000
+ENTRYPOINT [ "markitdown-https-server" ]

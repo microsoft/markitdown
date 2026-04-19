@@ -56,28 +56,32 @@ async def convert(file: UploadFile = File(...)) -> PlainTextResponse:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Run an HTTPS server that converts uploaded files to Markdown using markitdown."
+        description="Run a server that converts uploaded files to Markdown using markitdown."
     )
-    parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=3443)
+    parser.add_argument("--host", default="0.0.0.0")
+    parser.add_argument("--port", type=int, default=8000)
     parser.add_argument(
         "--certfile",
-        required=True,
         help="Path to TLS certificate (PEM).",
     )
     parser.add_argument(
         "--keyfile",
-        required=True,
         help="Path to TLS private key (PEM).",
     )
     args = parser.parse_args()
 
-    certfile = os.path.abspath(args.certfile)
-    keyfile = os.path.abspath(args.keyfile)
-    if not os.path.exists(certfile):
-        raise SystemExit(f"--certfile not found: {certfile}")
-    if not os.path.exists(keyfile):
-        raise SystemExit(f"--keyfile not found: {keyfile}")
+    certfile = None
+    keyfile = None
+    if args.certfile or args.keyfile:
+        if not (args.certfile and args.keyfile):
+            raise SystemExit("Both --certfile and --keyfile must be provided to enable TLS.")
+
+        certfile = os.path.abspath(args.certfile)
+        keyfile = os.path.abspath(args.keyfile)
+        if not os.path.exists(certfile):
+            raise SystemExit(f"--certfile not found: {certfile}")
+        if not os.path.exists(keyfile):
+            raise SystemExit(f"--keyfile not found: {keyfile}")
 
     uvicorn.run(
         "markitdown_https_server.__main__:app",
