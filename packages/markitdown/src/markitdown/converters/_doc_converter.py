@@ -5,7 +5,7 @@ This converter uses the `olefile` library (already an optional dependency of mar
 for Outlook .msg support) to parse the OLE container and extract text from the
 WordDocument stream using the binary Word format specification.
 
-Dependency group: "doc" (or add to "docx")
+Dependency group: "doc"
   pip install markitdown[doc]
 """
 
