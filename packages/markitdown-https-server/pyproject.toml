@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "markitdown-https-server"
+dynamic = ["version"]
+description = "An HTTPS server that converts uploaded files to Markdown using markitdown."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+  { name = "MarkItDown Contributors" },
+]
+dependencies = [
+  "fastapi>=0.110.0",
+  "uvicorn[standard]>=0.27.0",
+  "python-multipart>=0.0.9",
+  "markitdown[all]>=0.1.1,<0.2.0",
+]
+
+[tool.hatch.version]
+path = "src/markitdown_https_server/__about__.py"
+
+[project.scripts]
+markitdown-https-server = "markitdown_https_server.__main__:main"
+
+[tool.hatch.build.targets.sdist]
+only-include = ["src/markitdown_https_server"]
