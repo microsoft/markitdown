@@ -335,17 +335,24 @@ class DocConverter(DocumentConverter):
         # Ensure we read from the beginning
         file_stream.seek(0)
 
+        extracted_with_structured_parser = False
         try:
             text = _extract_text_from_doc(file_stream)
-        except Exception:
+            extracted_with_structured_parser = True
+        except Exception as structured_exc:
             # Fall back to dumb scan on any parse error
             file_stream.seek(0)
             try:
                 text = _fallback_text_extraction(file_stream)
-            except Exception:
-                text = ""
+            except Exception as fallback_exc:
+                raise ValueError("Failed to extract text from .doc file") from fallback_exc
 
-        if not text:
+            # If we only reached the fallback path, empty text does not confirm
+            # that the input was a valid Word .doc with no extractable content.
+            if not text:
+                raise ValueError("Failed to extract text from .doc file") from structured_exc
+
+        if not text and extracted_with_structured_parser:
             return DocumentConverterResult(markdown="", title=None)
 
         # Convert double-newlines to paragraph breaks; single newlines to spaces
