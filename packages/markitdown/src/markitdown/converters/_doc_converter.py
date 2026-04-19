@@ -299,9 +299,6 @@ class DocConverter(DocumentConverter):
         try:
             header = file_stream.read(8)
             if header[:8] == b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1":
-                if extension == ".doc":
-                    return True
-
                 if not extension and olefile is not None:
                     try:
                         file_stream.seek(0)
