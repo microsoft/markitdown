@@ -1,0 +1,113 @@
+name: Build & Deploy (Azure Container Apps)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      resource_group:
+        description: Azure resource group name (overrides secret if set)
+        required: false
+        type: string
+      enable_plugins:
+        description: Set MARKITDOWN_ENABLE_PLUGINS=true in the app
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+env:
+  # Prefer workflow input, then secret. Keep name consistent with referenced pipeline style.
+  RESOURCE_GROUP: ${{ inputs.resource_group || secrets.AZURE_RESOURCE_GROUP }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # One ACR per resource group (create-or-reuse) to keep costs down.
+      - name: Ensure shared ACR exists
+        run: |
+          if [ -z "${{ env.RESOURCE_GROUP }}" ]; then
+            echo "RESOURCE_GROUP is required (set secret AZURE_RESOURCE_GROUP or workflow input resource_group)."
+            exit 1
+          fi
+
+          ACR_NAME=$(echo "${{ env.RESOURCE_GROUP }}" | tr -d '-')acr
+          echo "Shared ACR name: $ACR_NAME"
+
+          az acr show --name "$ACR_NAME" --resource-group "${{ env.RESOURCE_GROUP }}" 2>/dev/null \
+            || az acr create \
+                 --name "$ACR_NAME" \
+                 --resource-group "${{ env.RESOURCE_GROUP }}" \
+                 --sku Basic \
+                 --admin-enabled true
+
+          ACR_SERVER=$(az acr show --name "$ACR_NAME" --resource-group "${{ env.RESOURCE_GROUP }}" --query loginServer -o tsv)
+          ACR_USERNAME=$(az acr credential show --name "$ACR_NAME" --query username -o tsv)
+          ACR_PASSWORD=$(az acr credential show --name "$ACR_NAME" --query 'passwords[0].value' -o tsv)
+
+          echo "ACR_NAME=$ACR_NAME" >> $GITHUB_ENV
+          echo "ACR_SERVER=$ACR_SERVER" >> $GITHUB_ENV
+          echo "ACR_USERNAME=$ACR_USERNAME" >> $GITHUB_ENV
+          echo "ACR_PASSWORD=$ACR_PASSWORD" >> $GITHUB_ENV
+
+      - name: Log in to ACR
+        run: |
+          TOKEN=$(az acr login --name "${{ env.ACR_NAME }}" --expose-token --output tsv --query accessToken)
+          docker login "${{ env.ACR_SERVER }}" -u 00000000-0000-0000-0000-000000000000 -p "$TOKEN"
+
+      - name: Build and push image
+        run: |
+          IMAGE_TAG="${{ env.ACR_SERVER }}/markitdown-https-server:${{ github.sha }}"
+          docker build -t "$IMAGE_TAG" .
+          docker push "$IMAGE_TAG"
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+
+      - name: Deploy infrastructure + app
+        id: deploy
+        uses: azure/arm-deploy@v2
+        with:
+          scope: resourcegroup
+          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          resourceGroupName: ${{ env.RESOURCE_GROUP }}
+          template: infra/main.bicep
+          parameters: >-
+            containerImage=${{ env.IMAGE_TAG }}
+            containerPort=8000
+            enablePlugins=${{ inputs.enable_plugins || 'false' }}
+            acrLoginServer=${{ env.ACR_SERVER }}
+            acrUsername=${{ env.ACR_USERNAME }}
+            acrPassword=${{ env.ACR_PASSWORD }}
+          failOnStdErr: false
+
+      - name: Wait for app to be ready
+        run: |
+          FQDN="${{ steps.deploy.outputs.containerAppFqdn }}"
+          if [ -z "$FQDN" ]; then
+            echo "Missing containerAppFqdn output from deployment."
+            exit 1
+          fi
+          echo "Waiting for https://$FQDN/healthz ..."
+          for i in $(seq 1 30); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://$FQDN/healthz" || true)
+            if [ "$STATUS" = "200" ]; then
+              echo "App is healthy!"
+              exit 0
+            fi
+            echo "Attempt $i: HTTP $STATUS – retrying in 10s..."
+            sleep 10
+          done
+          echo "App did not become healthy in time"
+          exit 1
