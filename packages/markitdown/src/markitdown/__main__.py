@@ -206,12 +206,14 @@ def _handle_output(args, result: DocumentConverterResult):
         with open(args.output, "w", encoding="utf-8") as f:
             f.write(result.markdown)
     else:
-        # Handle stdout encoding errors more gracefully
-        print(
-            result.markdown.encode(sys.stdout.encoding, errors="replace").decode(
-                sys.stdout.encoding
-            )
-        )
+        # Write UTF-8 bytes directly to stdout's underlying buffer to avoid
+        # encoding errors on Windows (cp1252, gbk, etc.) and piped stdout
+        # where sys.stdout.encoding may be limited or None.
+        if hasattr(sys.stdout, "buffer"):
+            sys.stdout.buffer.write(result.markdown.encode("utf-8"))
+        else:
+            # Fallback for unusual stdout configurations
+            print(result.markdown, encoding="utf-8", errors="replace")
 
 
 def _exit_with_error(message: str):
