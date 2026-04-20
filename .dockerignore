@@ -1,2 +1,7 @@
-*
-!packages/
+.venv/
+__pycache__/
+*.pyc
+.git/
+dist/
+build/
+.pytest_cache/
