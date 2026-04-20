@@ -1,6 +1,4 @@
 import sys
-import io
-from warnings import warn
 
 from typing import BinaryIO, Any
 

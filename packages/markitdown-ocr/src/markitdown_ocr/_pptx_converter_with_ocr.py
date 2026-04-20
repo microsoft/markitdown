@@ -7,7 +7,6 @@ import io
 import sys
 from typing import Any, BinaryIO, Optional
 
-from typing import BinaryIO, Any, Optional
 
 from markitdown.converters import HtmlConverter
 from markitdown import DocumentConverter, DocumentConverterResult, StreamInfo
