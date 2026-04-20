@@ -107,6 +107,10 @@ def validate_strings(result, expected_strings, exclude_strings=None):
             assert string not in text_content
 
 
+def registered_converter_names(markitdown):
+    return [type(registration.converter).__name__ for registration in markitdown._converters]
+
+
 def test_stream_info_operations() -> None:
     """Test operations performed on StreamInfo objects."""
 
@@ -506,6 +510,27 @@ def test_markitdown_llm_parameters() -> None:
     assert messages[0]["content"][0]["text"] == test_prompt
 
 
+def test_markitdown_disabled_converters() -> None:
+    markitdown = MarkItDown(
+        disabled_converters=["ZipConverter", "AudioConverter"],
+    )
+
+    converter_names = registered_converter_names(markitdown)
+    assert "ZipConverter" not in converter_names
+    assert "AudioConverter" not in converter_names
+    assert "PlainTextConverter" in converter_names
+    assert "PdfConverter" in converter_names
+
+
+def test_enable_builtins_with_disabled_converters() -> None:
+    markitdown = MarkItDown(enable_builtins=False)
+    markitdown.enable_builtins(disabled_converters=["PdfConverter"])
+
+    converter_names = registered_converter_names(markitdown)
+    assert "PdfConverter" not in converter_names
+    assert "PlainTextConverter" in converter_names
+
+
 @pytest.mark.skipif(
     skip_llm,
     reason="do not run llm tests without a key",
@@ -546,6 +571,8 @@ if __name__ == "__main__":
         test_doc_rlink,
         test_markitdown_exiftool,
         test_markitdown_llm_parameters,
+        test_markitdown_disabled_converters,
+        test_enable_builtins_with_disabled_converters,
         test_markitdown_llm,
     ]:
         print(f"Running {test.__name__}...", end="")
