@@ -94,6 +94,39 @@ You can also pipe content:
 cat path-to-file.pdf | markitdown
 ```
 
+#### Batch Conversion
+
+Convert all supported files in a directory:
+
+```bash
+markitdown path-to-directory/ --output-dir output/
+```
+
+By default, subdirectories are processed recursively. The output directory preserves the original folder structure with `.md` files alongside converted content.
+
+Limit to specific file types:
+
+```bash
+markitdown reports/ --output-dir output/ --extensions pdf,docx,xlsx
+```
+
+Disable recursive processing:
+
+```bash
+markitdown reports/ --output-dir output/ --no-recursive
+```
+
+#### Batch Conversion (Python API)
+
+```python
+from markitdown import MarkItDown
+
+md = MarkItDown()
+result = md.convert_batch("./reports", extensions=[".pdf", ".docx"], recursive=True)
+for item in result:
+    print(f"{item.source}: {'OK' if item.success else item.error}")
+```
+
 ### Optional Dependencies
 MarkItDown has optional dependencies for activating various file formats. Earlier in this document, we installed all optional dependencies with the `[all]` option. However, you can also install them individually for more control. For example:
 

@@ -7,6 +7,8 @@ from ._markitdown import (
     MarkItDown,
     PRIORITY_SPECIFIC_FILE_FORMAT,
     PRIORITY_GENERIC_FILE_FORMAT,
+    BatchResult,
+    BatchItemResult,
 )
 from ._base_converter import DocumentConverterResult, DocumentConverter
 from ._stream_info import StreamInfo
@@ -23,6 +25,8 @@ __all__ = [
     "MarkItDown",
     "DocumentConverter",
     "DocumentConverterResult",
+    "BatchResult",
+    "BatchItemResult",
     "MarkItDownException",
     "MissingDependencyException",
     "FailedConversionAttempt",

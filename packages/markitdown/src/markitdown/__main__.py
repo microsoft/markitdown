@@ -2,8 +2,10 @@
 #
 # SPDX-License-Identifier: MIT
 import argparse
+import os
 import sys
 import codecs
+from pathlib import Path
 from textwrap import dedent
 from importlib.metadata import entry_points
 from .__about__ import __version__
@@ -41,6 +43,14 @@ def main():
                 OR
 
                 markitdown example.pdf > example.md
+
+            BATCH CONVERSION:
+
+                markitdown path/to/docs/ --output-dir ./converted/
+
+                OR with extension filter and non-recursive
+
+                markitdown path/to/docs/ --output-dir ./converted/ --extensions pdf,docx --no-recursive
             """
         ).strip(),
     )
@@ -108,6 +118,24 @@ def main():
         "--keep-data-uris",
         action="store_true",
         help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
+    )
+
+    parser.add_argument(
+        "--output-dir",
+        help="Output directory for batch conversion. When the input is a directory, "
+        "converted files are written here preserving the directory structure.",
+    )
+
+    parser.add_argument(
+        "--extensions",
+        help="Comma-separated list of file extensions to include in batch conversion "
+        "(e.g., pdf,docx,pptx). If not provided, all files are attempted.",
+    )
+
+    parser.add_argument(
+        "--no-recursive",
+        action="store_true",
+        help="Do not process subdirectories when converting a directory.",
     )
 
     parser.add_argument("filename", nargs="?")
@@ -192,12 +220,84 @@ def main():
             stream_info=stream_info,
             keep_data_uris=args.keep_data_uris,
         )
+    elif os.path.isdir(args.filename):
+        # Batch directory mode
+        _handle_batch(args, markitdown)
+        return
     else:
         result = markitdown.convert(
             args.filename, stream_info=stream_info, keep_data_uris=args.keep_data_uris
         )
 
     _handle_output(args, result)
+
+
+def _handle_batch(args, markitdown: MarkItDown):
+    """Handle batch directory conversion."""
+    source_dir = args.filename
+
+    if args.output_dir is None:
+        _exit_with_error(
+            "An --output-dir is required when converting a directory."
+        )
+
+    output_dir = Path(args.output_dir)
+    source_path = Path(source_dir).resolve()
+
+    # Parse extensions filter
+    extensions = None
+    if args.extensions:
+        extensions = [
+            ext.strip() for ext in args.extensions.split(",") if ext.strip()
+        ]
+
+    recursive = not args.no_recursive
+
+    def progress(file_path: str, current: int, total: int):
+        print(
+            f"[{current + 1}/{total}] Converting: {file_path}",
+            file=sys.stderr,
+        )
+
+    batch_result = markitdown.convert_batch(
+        source_dir,
+        extensions=extensions,
+        recursive=recursive,
+        on_error="continue",
+        progress_callback=progress,
+        keep_data_uris=args.keep_data_uris,
+    )
+
+    # Write output files
+    for item in batch_result:
+        if not item.success:
+            print(
+                f"  ERROR: {item.source_path}: {item.error}",
+                file=sys.stderr,
+            )
+            continue
+
+        # Compute relative path from source dir to preserve structure
+        rel_path = Path(item.source_path).resolve().relative_to(source_path)
+        out_path = output_dir / (str(rel_path) + ".md")
+
+        # Ensure the output subdirectory exists
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(out_path, "w", encoding="utf-8") as f:
+            f.write(item.result.markdown)
+
+    # Print summary
+    total = len(batch_result)
+    succeeded = len(batch_result.succeeded)
+    failed = len(batch_result.failed)
+    print(
+        f"\nBatch complete: {succeeded}/{total} succeeded, {failed} failed.",
+        file=sys.stderr,
+    )
+
+    if failed > 0:
+        sys.exit(1)
 
 
 def _handle_output(args, result: DocumentConverterResult):
