@@ -1,9 +1,12 @@
 # MarkItDown
 
-> [!IMPORTANT]
+> [!TIP]
 > MarkItDown is a Python package and command-line utility for converting various files to Markdown (e.g., for indexing, text analysis, etc). 
 >
 > For more information, and full documentation, see the project [README.md](https://github.com/microsoft/markitdown) on GitHub.
+
+> [!IMPORTANT]
+> MarkItDown performs I/O with the privileges of the current process. Like open() or requests.get(), it will access resources that the process itself can access. Sanitize your inputs in untrusted environments, and call the narrowest `convert_*` function needed for your use case (e.g., `convert_stream()`, or `convert_local()`). See the [Security Considerations](https://github.com/microsoft/markitdown#security-considerations) section of the documentation for more information.
 
 ## Installation
 
