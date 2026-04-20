@@ -1,0 +1,130 @@
+# CodeBoarding Ignore File
+# Add patterns here for files and directories that should be excluded from CodeBoarding analysis.
+# Use the same format as .gitignore (gitignore syntax / gitwildmatch patterns).
+#
+# To stop ignoring a pattern, prefix it with ! (e.g., !important_file.txt)
+#
+# NOTE: The following are ALWAYS excluded (not configurable):
+#   - Hidden directories (starting with .)
+#   - .git/, .codeboarding/, node_modules/, __pycache__/
+#   - Build output: build/, dist/, coverage/
+#
+# This file is automatically loaded by CodeBoarding analysis tools to exclude
+# specified paths from code analysis, architecture generation, and other processing.
+
+# ============================================================================
+# Ignored directories (customizable — remove lines to include them)
+# ============================================================================
+
+# Python virtual environments
+venv/
+env/
+*.egg-info/
+
+# Java (Maven/Gradle) and Rust (Cargo) build output. Both ecosystems
+# produce a top-level ``target/`` directory full of compiled artifacts —
+# kept here as well as in ``_ALWAYS_IGNORED_DIRS`` so users who customize
+# their ``.codeboardingignore`` continue to skip it even after edits.
+target/
+bin/
+out/
+
+# .NET / C# build output
+obj/
+
+# Go
+vendor/
+testdata/
+
+# PHP
+cache/
+
+# Custom
+temp/
+repos/
+runs/
+
+# ============================================================================
+# Test and infrastructure files
+# ============================================================================
+
+# Test directories
+**/__tests__/**
+**/tests/**
+**/test/**
+**/__test__/**
+**/testing/**
+**/testutil/**
+
+# Java/Kotlin test directories (Maven/Gradle structure)
+**/src/test/**
+**/src/testFixtures/**
+**/src/integration-test/**
+**/src/jmh/**
+**/src/contractTest/**
+**/osgi-tests/**
+
+# Test files by naming convention
+*.test.*
+*.spec.*
+*_test.*
+*test_*.py
+test_*.py
+*Test.java
+*IT.java
+*Test.kt
+*IT.kt
+*Tests.java
+
+# Mock, fixture, and stub directories
+**/__mocks__/**
+**/mocks/**
+**/fixtures/**
+**/fixture/**
+**/stubs/**
+**/stub/**
+**/fakes/**
+**/fake/**
+
+# E2E and integration test directories
+**/e2e/**
+**/integration-tests/**
+**/integration_test*/**
+
+# ============================================================================
+# Non-production code
+# ============================================================================
+
+# Example and documentation code
+**/examples/**
+**/documentation/examples/**
+
+# Generated code
+*.pb.go
+**/generated_parser*
+
+# Java/Kotlin metadata files
+module-info.java
+
+# ============================================================================
+# Build artifacts and minified files
+# ============================================================================
+
+*.bundle.js
+*.bundle.js.map
+*.min.js
+*.min.css
+*.chunk.js
+*.chunk.js.map
+
+# ============================================================================
+# Build tool configs and infrastructure
+# ============================================================================
+
+esbuild*
+webpack*
+rollup*
+vite.config.*
+gulpfile*
+gruntfile*
+*.config.*

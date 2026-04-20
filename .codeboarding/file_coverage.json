@@ -1,0 +1,248 @@
+{
+  "version": 1,
+  "generated_at": "2026-04-20T05:46:16.301773+00:00",
+  "analyzed_files": [
+    "packages/markitdown-mcp/src/markitdown_mcp/__about__.py",
+    "packages/markitdown-mcp/src/markitdown_mcp/__init__.py",
+    "packages/markitdown-mcp/src/markitdown_mcp/__main__.py",
+    "packages/markitdown-ocr/src/markitdown_ocr/__about__.py",
+    "packages/markitdown-ocr/src/markitdown_ocr/__init__.py",
+    "packages/markitdown-ocr/src/markitdown_ocr/_docx_converter_with_ocr.py",
+    "packages/markitdown-ocr/src/markitdown_ocr/_ocr_service.py",
+    "packages/markitdown-ocr/src/markitdown_ocr/_pdf_converter_with_ocr.py",
+    "packages/markitdown-ocr/src/markitdown_ocr/_plugin.py",
+    "packages/markitdown-ocr/src/markitdown_ocr/_pptx_converter_with_ocr.py",
+    "packages/markitdown-ocr/src/markitdown_ocr/_xlsx_converter_with_ocr.py",
+    "packages/markitdown-sample-plugin/src/markitdown_sample_plugin/__about__.py",
+    "packages/markitdown-sample-plugin/src/markitdown_sample_plugin/__init__.py",
+    "packages/markitdown-sample-plugin/src/markitdown_sample_plugin/_plugin.py",
+    "packages/markitdown/src/markitdown/__about__.py",
+    "packages/markitdown/src/markitdown/__init__.py",
+    "packages/markitdown/src/markitdown/__main__.py",
+    "packages/markitdown/src/markitdown/_base_converter.py",
+    "packages/markitdown/src/markitdown/_exceptions.py",
+    "packages/markitdown/src/markitdown/_markitdown.py",
+    "packages/markitdown/src/markitdown/_stream_info.py",
+    "packages/markitdown/src/markitdown/_uri_utils.py",
+    "packages/markitdown/src/markitdown/converter_utils/__init__.py",
+    "packages/markitdown/src/markitdown/converter_utils/docx/__init__.py",
+    "packages/markitdown/src/markitdown/converter_utils/docx/math/__init__.py",
+    "packages/markitdown/src/markitdown/converter_utils/docx/math/latex_dict.py",
+    "packages/markitdown/src/markitdown/converter_utils/docx/math/omml.py",
+    "packages/markitdown/src/markitdown/converter_utils/docx/pre_process.py",
+    "packages/markitdown/src/markitdown/converters/__init__.py",
+    "packages/markitdown/src/markitdown/converters/_audio_converter.py",
+    "packages/markitdown/src/markitdown/converters/_bing_serp_converter.py",
+    "packages/markitdown/src/markitdown/converters/_csv_converter.py",
+    "packages/markitdown/src/markitdown/converters/_doc_intel_converter.py",
+    "packages/markitdown/src/markitdown/converters/_docx_converter.py",
+    "packages/markitdown/src/markitdown/converters/_epub_converter.py",
+    "packages/markitdown/src/markitdown/converters/_exiftool.py",
+    "packages/markitdown/src/markitdown/converters/_html_converter.py",
+    "packages/markitdown/src/markitdown/converters/_image_converter.py",
+    "packages/markitdown/src/markitdown/converters/_ipynb_converter.py",
+    "packages/markitdown/src/markitdown/converters/_llm_caption.py",
+    "packages/markitdown/src/markitdown/converters/_markdownify.py",
+    "packages/markitdown/src/markitdown/converters/_outlook_msg_converter.py",
+    "packages/markitdown/src/markitdown/converters/_pdf_converter.py",
+    "packages/markitdown/src/markitdown/converters/_plain_text_converter.py",
+    "packages/markitdown/src/markitdown/converters/_pptx_converter.py",
+    "packages/markitdown/src/markitdown/converters/_rss_converter.py",
+    "packages/markitdown/src/markitdown/converters/_transcribe_audio.py",
+    "packages/markitdown/src/markitdown/converters/_wikipedia_converter.py",
+    "packages/markitdown/src/markitdown/converters/_xlsx_converter.py",
+    "packages/markitdown/src/markitdown/converters/_youtube_converter.py",
+    "packages/markitdown/src/markitdown/converters/_zip_converter.py"
+  ],
+  "not_analyzed_files": [
+    {
+      "path": "CODE_OF_CONDUCT.md",
+      "reason": "other"
+    },
+    {
+      "path": "Dockerfile",
+      "reason": "other"
+    },
+    {
+      "path": "README.md",
+      "reason": "other"
+    },
+    {
+      "path": "SECURITY.md",
+      "reason": "other"
+    },
+    {
+      "path": "SUPPORT.md",
+      "reason": "other"
+    },
+    {
+      "path": "packages/markitdown/README.md",
+      "reason": "other"
+    },
+    {
+      "path": "packages/markitdown/ThirdPartyNotices.md",
+      "reason": "other"
+    },
+    {
+      "path": "packages/markitdown/pyproject.toml",
+      "reason": "other"
+    },
+    {
+      "path": "packages/markitdown/tests/__init__.py",
+      "reason": "codeboardingignore"
+    },
+    {
+      "path": "packages/markitdown/tests/_test_vectors.py",
+      "reason": "codeboardingignore"
+    },
+    {
+      "path": "packages/markitdown/tests/test_cli_misc.py",
+      "reason": "codeboardingignore"
+    },
+    {
+      "path": "packages/markitdown/tests/test_cli_vectors.py",
+      "reason": "codeboardingignore"
+    },
+    {
+      "path": "packages/markitdown/tests/test_docintel_html.py",
+      "reason": "codeboardingignore"
+    },
+    {
+      "path": "packages/markitdown/tests/test_files/expected_outputs/MEDRPT-2024-PAT-3847_medical_report_scan.md",
+      "reason": "codeboardingignore"
+    },
+    {
+      "path": "packages/markitdown/tests/test_files/expected_outputs/RECEIPT-2024-TXN-98765_retail_purchase.md",
+      "reason": "codeboardingignore"
+    },
+    {
+      "path": "packages/markitdown/tests/test_files/expected_outputs/REPAIR-2022-INV-001_multipage.md",
+      "reason": "codeboardingignore"
+    },
+    {
+      "path": "packages/markitdown/tests/test_files/expected_outputs/SPARSE-2024-INV-1234_borderless_table.md",
+      "reason": "codeboardingignore"
+    },
+    {
+      "path": "packages/markitdown/tests/test_files/expected_outputs/movie-theater-booking-2024.md",
+      "reason": "codeboardingignore"
+    },
+    {
+      "path": "packages/markitdown/tests/test_files/expected_outputs/test.md",
+      "reason": "codeboardingignore"
+    },
+    {
+      "path": "packages/markitdown/tests/test_files/test.json",
+      "reason": "codeboardingignore"
+    },
+    {
+      "path": "packages/markitdown/tests/test_files/test_blog.html",
+      "reason": "codeboardingignore"
+    },
+    {
+      "path": "packages/markitdown/tests/test_files/test_notebook.ipynb",
+      "reason": "codeboardingignore"
+    },
+    {
+      "path": "packages/markitdown/tests/test_files/test_rss.xml",
+      "reason": "codeboardingignore"
+    },
+    {
+      "path": "packages/markitdown/tests/test_files/test_serp.html",
+      "reason": "codeboardingignore"
+    },
+    {
+      "path": "packages/markitdown/tests/test_files/test_wikipedia.html",
+      "reason": "codeboardingignore"
+    },
+    {
+      "path": "packages/markitdown/tests/test_module_misc.py",
+      "reason": "codeboardingignore"
+    },
+    {
+      "path": "packages/markitdown/tests/test_module_vectors.py",
+      "reason": "codeboardingignore"
+    },
+    {
+      "path": "packages/markitdown/tests/test_pdf_masterformat.py",
+      "reason": "codeboardingignore"
+    },
+    {
+      "path": "packages/markitdown/tests/test_pdf_memory.py",
+      "reason": "codeboardingignore"
+    },
+    {
+      "path": "packages/markitdown/tests/test_pdf_tables.py",
+      "reason": "codeboardingignore"
+    },
+    {
+      "path": "packages/markitdown-mcp/Dockerfile",
+      "reason": "other"
+    },
+    {
+      "path": "packages/markitdown-mcp/README.md",
+      "reason": "other"
+    },
+    {
+      "path": "packages/markitdown-mcp/pyproject.toml",
+      "reason": "other"
+    },
+    {
+      "path": "packages/markitdown-mcp/tests/__init__.py",
+      "reason": "codeboardingignore"
+    },
+    {
+      "path": "packages/markitdown-ocr/README.md",
+      "reason": "other"
+    },
+    {
+      "path": "packages/markitdown-ocr/pyproject.toml",
+      "reason": "other"
+    },
+    {
+      "path": "packages/markitdown-ocr/tests/__init__.py",
+      "reason": "codeboardingignore"
+    },
+    {
+      "path": "packages/markitdown-ocr/tests/test_docx_converter.py",
+      "reason": "codeboardingignore"
+    },
+    {
+      "path": "packages/markitdown-ocr/tests/test_pdf_converter.py",
+      "reason": "codeboardingignore"
+    },
+    {
+      "path": "packages/markitdown-ocr/tests/test_pptx_converter.py",
+      "reason": "codeboardingignore"
+    },
+    {
+      "path": "packages/markitdown-ocr/tests/test_xlsx_converter.py",
+      "reason": "codeboardingignore"
+    },
+    {
+      "path": "packages/markitdown-sample-plugin/README.md",
+      "reason": "other"
+    },
+    {
+      "path": "packages/markitdown-sample-plugin/pyproject.toml",
+      "reason": "other"
+    },
+    {
+      "path": "packages/markitdown-sample-plugin/tests/__init__.py",
+      "reason": "codeboardingignore"
+    },
+    {
+      "path": "packages/markitdown-sample-plugin/tests/test_sample_plugin.py",
+      "reason": "codeboardingignore"
+    }
+  ],
+  "summary": {
+    "total_files": 96,
+    "analyzed": 51,
+    "not_analyzed": 45,
+    "not_analyzed_by_reason": {
+      "other": 15,
+      "codeboardingignore": 30
+    }
+  }
+}
