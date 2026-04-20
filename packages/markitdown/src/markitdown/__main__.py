@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: MIT
 import argparse
 import sys
+import logging
 import codecs
 from textwrap import dedent
 from importlib.metadata import entry_points
@@ -41,6 +42,14 @@ def main():
                 OR
 
                 markitdown example.pdf > example.md
+
+                OR for batch conversion
+
+                markitdown --batch /path/to/documents --output-dir /path/to/output
+
+                OR with file filtering
+
+                markitdown --batch /path/to/documents --output-dir /path/to/output --extensions pdf,docx --recursive
             """
         ).strip(),
     )
@@ -110,6 +119,30 @@ def main():
         help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
     )
 
+    parser.add_argument(
+        "--batch",
+        metavar="DIRECTORY",
+        help="Convert all supported files in a directory to markdown.",
+    )
+
+    parser.add_argument(
+        "--output-dir",
+        metavar="DIRECTORY",
+        help="Output directory for batch conversion. Required when using --batch.",
+    )
+
+    parser.add_argument(
+        "--extensions",
+        metavar="EXTENSIONS",
+        help="Comma-separated list of file extensions to include in batch conversion (e.g., 'pdf,docx,xlsx').",
+    )
+
+    parser.add_argument(
+        "--recursive",
+        action="store_true",
+        help="Search subdirectories recursively when using --batch.",
+    )
+
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
 
@@ -172,13 +205,20 @@ def main():
             )
         sys.exit(0)
 
+    # Validate batch processing arguments
+    if args.batch is not None:
+        if args.output_dir is None:
+            _exit_with_error("--output-dir is required when using --batch.")
+        if args.filename is not None:
+            _exit_with_error("Cannot specify both --batch and a filename.")
+
     if args.use_docintel:
         if args.endpoint is None:
             _exit_with_error(
                 "Document Intelligence Endpoint is required when using Document Intelligence."
             )
-        elif args.filename is None:
-            _exit_with_error("Filename is required when using Document Intelligence.")
+        elif args.filename is None and args.batch is None:
+            _exit_with_error("Filename or --batch is required when using Document Intelligence.")
 
         markitdown = MarkItDown(
             enable_plugins=args.use_plugins, docintel_endpoint=args.endpoint
@@ -186,6 +226,36 @@ def main():
     else:
         markitdown = MarkItDown(enable_plugins=args.use_plugins)
 
+    # Configure logging for batch processing to show progress
+    if args.batch is not None:
+        logging.basicConfig(level=logging.INFO, format='%(message)s')
+        
+        # Parse extensions
+        extensions = None
+        if args.extensions is not None:
+            extensions = [ext.strip() for ext in args.extensions.split(",")]
+            extensions = [ext for ext in extensions if ext]  # Remove empty strings
+
+        try:
+            results = markitdown.convert_directory(
+                source_dir=args.batch,
+                output_dir=args.output_dir,
+                extensions=extensions,
+                recursive=args.recursive,
+                keep_data_uris=args.keep_data_uris,
+            )
+            
+            if not results:
+                print("No files were converted.")
+            else:
+                print(f"\nSuccessfully converted {len(results)} files to {args.output_dir}")
+                
+        except Exception as e:
+            _exit_with_error(f"Batch conversion failed: {e}")
+        
+        sys.exit(0)
+
+    # Handle single file processing
     if args.filename is None:
         result = markitdown.convert_stream(
             sys.stdin.buffer,
@@ -215,7 +285,7 @@ def _handle_output(args, result: DocumentConverterResult):
 
 
 def _exit_with_error(message: str):
-    print(message)
+    print(message, file=sys.stderr)
     sys.exit(1)
 
 
