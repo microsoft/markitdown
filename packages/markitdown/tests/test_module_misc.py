@@ -14,6 +14,8 @@ from markitdown import (
     FileConversionException,
     StreamInfo,
 )
+from markitdown._base_converter import DocumentConverter
+from markitdown.converters import ImageConverter
 
 # This file contains module tests that are not directly tested by the FileTestVectors.
 # This includes things like helper functions and runtime conversion options
@@ -430,6 +432,33 @@ def test_exceptions() -> None:
         )
     assert len(exc_info.value.attempts) == 1
     assert type(exc_info.value.attempts[0].converter).__name__ == "PptxConverter"
+
+
+def test_empty_image_fallback_does_not_mask_prior_failure() -> None:
+    class FailingPngConverter(DocumentConverter):
+        def accepts(self, file_stream, stream_info, **kwargs):
+            return (stream_info.extension or "").lower() == ".png"
+
+        def convert(self, file_stream, stream_info, **kwargs):
+            raise RuntimeError("docintel analyze failed")
+
+    markitdown = MarkItDown(enable_builtins=False)
+    markitdown.register_converter(ImageConverter())
+    markitdown.register_converter(FailingPngConverter())
+
+    with pytest.raises(FileConversionException) as exc_info:
+        markitdown.convert_stream(
+            io.BytesIO(b"not-a-real-png"),
+            stream_info=StreamInfo(
+                extension=".png",
+                filename="sample.png",
+                mimetype="image/png",
+            ),
+        )
+
+    assert len(exc_info.value.attempts) == 1
+    assert type(exc_info.value.attempts[0].converter).__name__ == "FailingPngConverter"
+    assert "docintel analyze failed" in str(exc_info.value)
 
 
 @pytest.mark.skipif(
