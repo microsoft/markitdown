@@ -432,6 +432,29 @@ def test_exceptions() -> None:
     assert type(exc_info.value.attempts[0].converter).__name__ == "PptxConverter"
 
 
+def test_converter_failure_does_not_raise_unboundlocalerror() -> None:
+    class BrokenPdfConverter:
+        def accepts(self, file_stream, stream_info, **kwargs):
+            return stream_info.extension == ".pdf"
+
+        def convert(self, file_stream, stream_info, **kwargs):
+            raise RuntimeError("broken converter")
+
+    markitdown = MarkItDown(enable_builtins=False, enable_plugins=False)
+    markitdown.register_converter(BrokenPdfConverter())
+
+    with pytest.raises(FileConversionException) as exc_info:
+        markitdown._convert(
+            file_stream=io.BytesIO(b"%PDF-broken"),
+            stream_info_guesses=[
+                StreamInfo(extension=".pdf", mimetype="application/pdf")
+            ],
+        )
+
+    assert len(exc_info.value.attempts) == 1
+    assert type(exc_info.value.attempts[0].converter).__name__ == "BrokenPdfConverter"
+
+
 @pytest.mark.skipif(
     skip_exiftool,
     reason="do not run if exiftool is not installed",
