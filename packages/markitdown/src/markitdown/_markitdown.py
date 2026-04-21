@@ -5,9 +5,9 @@ import sys
 import shutil
 import traceback
 import io
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from importlib.metadata import entry_points
-from typing import Any, List, Dict, Optional, Union, BinaryIO
+from typing import Any, Callable, List, Dict, Optional, Union, BinaryIO
 from pathlib import Path
 from urllib.parse import urlparse
 from warnings import warn
@@ -88,6 +88,37 @@ class ConverterRegistration:
 
     converter: DocumentConverter
     priority: float
+
+
+@dataclass(kw_only=True)
+class BatchItemResult:
+    """The result of converting a single file in a batch operation."""
+
+    source_path: str
+    success: bool
+    result: Optional[DocumentConverterResult] = None
+    error: Optional[Exception] = None
+
+
+@dataclass(kw_only=True)
+class BatchResult:
+    """The result of a batch conversion operation."""
+
+    items: List[BatchItemResult] = field(default_factory=list)
+
+    @property
+    def succeeded(self) -> List[BatchItemResult]:
+        return [item for item in self.items if item.success]
+
+    @property
+    def failed(self) -> List[BatchItemResult]:
+        return [item for item in self.items if not item.success]
+
+    def __len__(self) -> int:
+        return len(self.items)
+
+    def __iter__(self):
+        return iter(self.items)
 
 
 class MarkItDown:
@@ -298,6 +329,99 @@ class MarkItDown:
             raise TypeError(
                 f"Invalid source type: {type(source)}. Expected str, requests.Response, BinaryIO."
             )
+
+    def convert_batch(
+        self,
+        source_dir: Union[str, Path],
+        *,
+        extensions: Optional[List[str]] = None,
+        recursive: bool = True,
+        on_error: str = "continue",
+        progress_callback: Optional[Callable[[str, int, int], None]] = None,
+        **kwargs: Any,
+    ) -> "BatchResult":
+        """
+        Convert all supported files in a directory to Markdown.
+
+        Args:
+            - source_dir: Path to the directory containing files to convert.
+            - extensions: Optional list of file extensions to include (e.g., [".pdf", ".docx"]).
+                          If None, all files are attempted.
+            - recursive: If True (default), process subdirectories recursively.
+            - on_error: Error handling mode. "continue" (default) skips failed files,
+                        "raise" stops on first error.
+            - progress_callback: Optional callback called for each file with
+                                 (file_path, current_index, total_count).
+            - kwargs: Additional arguments passed to each convert() call.
+
+        Returns:
+            - BatchResult: Contains results for each file (success or error).
+        """
+        source_path = Path(source_dir)
+        if not source_path.is_dir():
+            raise NotADirectoryError(
+                f"Source path is not a directory: {source_dir}"
+            )
+
+        if on_error not in ("continue", "raise"):
+            raise ValueError(
+                f"Invalid on_error mode: {on_error!r}. Must be 'continue' or 'raise'."
+            )
+
+        # Normalize extensions
+        normalized_extensions: Optional[List[str]] = None
+        if extensions is not None:
+            normalized_extensions = []
+            for ext in extensions:
+                ext = ext.strip().lower()
+                if not ext.startswith("."):
+                    ext = "." + ext
+                normalized_extensions.append(ext)
+
+        # Discover files
+        if recursive:
+            all_files = sorted(source_path.rglob("*"))
+        else:
+            all_files = sorted(source_path.glob("*"))
+
+        # Filter to files only (not directories) and apply extension filter
+        files_to_convert = []
+        for f in all_files:
+            if not f.is_file():
+                continue
+            if normalized_extensions is not None:
+                if f.suffix.lower() not in normalized_extensions:
+                    continue
+            files_to_convert.append(f)
+
+        total = len(files_to_convert)
+        batch_result = BatchResult()
+
+        for idx, file_path in enumerate(files_to_convert):
+            if progress_callback is not None:
+                progress_callback(str(file_path), idx, total)
+
+            try:
+                result = self.convert_local(str(file_path), **kwargs)
+                batch_result.items.append(
+                    BatchItemResult(
+                        source_path=str(file_path),
+                        success=True,
+                        result=result,
+                    )
+                )
+            except Exception as e:
+                if on_error == "raise":
+                    raise
+                batch_result.items.append(
+                    BatchItemResult(
+                        source_path=str(file_path),
+                        success=False,
+                        error=e,
+                    )
+                )
+
+        return batch_result
 
     def convert_local(
         self,
