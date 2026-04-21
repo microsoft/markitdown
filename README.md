@@ -28,7 +28,7 @@ MarkItDown currently supports the conversion from:
 
 Markdown is extremely close to plain text, with minimal markup or formatting, but still
 provides a way to represent important document structure. Mainstream LLMs, such as
-OpenAI's GPT-4o, natively "_speak_" Markdown, and often incorporate Markdown into their
+OpenAI's GPT-5.4, natively "_speak_" Markdown, and often incorporate Markdown into their
 responses unprompted. This suggests that they have been trained on vast amounts of
 Markdown-formatted text, and understand it well. As a side benefit, Markdown conventions
 are also highly token-efficient.
@@ -148,7 +148,7 @@ from openai import OpenAI
 md = MarkItDown(
     enable_plugins=True,
     llm_client=OpenAI(),
-    llm_model="gpt-4o",
+    llm_model="gpt-5.4",
 )
 result = md.convert("document_with_images.pdf")
 print(result.text_content)
@@ -197,7 +197,7 @@ from markitdown import MarkItDown
 from openai import OpenAI
 
 client = OpenAI()
-md = MarkItDown(llm_client=client, llm_model="gpt-4o", llm_prompt="optional custom prompt")
+md = MarkItDown(llm_client=client, llm_model="gpt-5.4", llm_prompt="optional custom prompt")
 result = md.convert("example.jpg")
 print(result.text_content)
 ```
