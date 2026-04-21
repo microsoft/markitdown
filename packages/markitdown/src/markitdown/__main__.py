@@ -8,6 +8,7 @@ from textwrap import dedent
 from importlib.metadata import entry_points
 from .__about__ import __version__
 from ._markitdown import MarkItDown, StreamInfo, DocumentConverterResult
+from . import converters as _converters_module
 
 
 def main():
@@ -110,6 +111,25 @@ def main():
         help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
     )
 
+    parser.add_argument(
+        "--disable-converter",
+        dest="disabled_converters",
+        action="append",
+        metavar="CONVERTER",
+        default=[],
+        help=(
+            "Disable a built-in converter by class name (e.g. ZipConverter, AudioConverter). "
+            "May be repeated to disable multiple converters. "
+            "Use --list-converters to see available converter names."
+        ),
+    )
+
+    parser.add_argument(
+        "--list-converters",
+        action="store_true",
+        help="List the names of all built-in converters and exit.",
+    )
+
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
 
@@ -172,6 +192,28 @@ def main():
             )
         sys.exit(0)
 
+    if args.list_converters:
+        # List built-in converter class names, then exit
+        print("Built-in MarkItDown converters:\n")
+        for name in sorted(_converters_module.__all__):
+            if not name.endswith("FileType"):  # skip enums
+                print(f"  {name}")
+        print(
+            "\nUse --disable-converter <NAME> to exclude a converter.\n"
+        )
+        sys.exit(0)
+
+    # Resolve --disable-converter names to actual classes
+    disabled_converter_types = []
+    for name in args.disabled_converters:
+        cls = getattr(_converters_module, name, None)
+        if cls is None:
+            _exit_with_error(
+                f"Unknown converter: {name!r}. "
+                "Use --list-converters to see valid converter names."
+            )
+        disabled_converter_types.append(cls)
+
     if args.use_docintel:
         if args.endpoint is None:
             _exit_with_error(
@@ -181,10 +223,15 @@ def main():
             _exit_with_error("Filename is required when using Document Intelligence.")
 
         markitdown = MarkItDown(
-            enable_plugins=args.use_plugins, docintel_endpoint=args.endpoint
+            enable_plugins=args.use_plugins,
+            docintel_endpoint=args.endpoint,
+            disabled_converters=disabled_converter_types,
         )
     else:
-        markitdown = MarkItDown(enable_plugins=args.use_plugins)
+        markitdown = MarkItDown(
+            enable_plugins=args.use_plugins,
+            disabled_converters=disabled_converter_types,
+        )
 
     if args.filename is None:
         result = markitdown.convert_stream(

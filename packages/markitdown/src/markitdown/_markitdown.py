@@ -7,7 +7,7 @@ import traceback
 import io
 from dataclasses import dataclass
 from importlib.metadata import entry_points
-from typing import Any, List, Dict, Optional, Union, BinaryIO
+from typing import Any, FrozenSet, Iterable, List, Dict, Optional, Tuple, Type, Union, BinaryIO
 from pathlib import Path
 from urllib.parse import urlparse
 from warnings import warn
@@ -99,10 +99,27 @@ class MarkItDown:
         *,
         enable_builtins: Union[None, bool] = None,
         enable_plugins: Union[None, bool] = None,
+        disabled_converters: Optional[Iterable[Type[DocumentConverter]]] = None,
         **kwargs,
     ):
         self._builtins_enabled = False
         self._plugins_enabled = False
+
+        # Validate and store the set of disabled converter types.
+        # Each element must be a subclass of DocumentConverter.
+        if disabled_converters is None:
+            self._disabled_converter_types: FrozenSet[Type[DocumentConverter]] = (
+                frozenset()
+            )
+        else:
+            _disabled: List[Type[DocumentConverter]] = list(disabled_converters)
+            for t in _disabled:
+                if not (isinstance(t, type) and issubclass(t, DocumentConverter)):
+                    raise TypeError(
+                        f"disabled_converters must contain DocumentConverter subclasses, "
+                        f"got {t!r}"
+                    )
+            self._disabled_converter_types = frozenset(_disabled)
 
         requests_session = kwargs.get("requests_session")
         if requests_session is None:
@@ -178,30 +195,50 @@ class MarkItDown:
             # Register converters for successful browsing operations
             # Later registrations are tried first / take higher priority than earlier registrations
             # To this end, the most specific converters should appear below the most generic converters
-            self.register_converter(
-                PlainTextConverter(), priority=PRIORITY_GENERIC_FILE_FORMAT
-            )
-            self.register_converter(
-                ZipConverter(markitdown=self), priority=PRIORITY_GENERIC_FILE_FORMAT
-            )
-            self.register_converter(
-                HtmlConverter(), priority=PRIORITY_GENERIC_FILE_FORMAT
-            )
-            self.register_converter(RssConverter())
-            self.register_converter(WikipediaConverter())
-            self.register_converter(YouTubeConverter())
-            self.register_converter(BingSerpConverter())
-            self.register_converter(DocxConverter())
-            self.register_converter(XlsxConverter())
-            self.register_converter(XlsConverter())
-            self.register_converter(PptxConverter())
-            self.register_converter(AudioConverter())
-            self.register_converter(ImageConverter())
-            self.register_converter(IpynbConverter())
-            self.register_converter(PdfConverter())
-            self.register_converter(OutlookMsgConverter())
-            self.register_converter(EpubConverter())
-            self.register_converter(CsvConverter())
+            _disabled = self._disabled_converter_types
+
+            if PlainTextConverter not in _disabled:
+                self.register_converter(
+                    PlainTextConverter(), priority=PRIORITY_GENERIC_FILE_FORMAT
+                )
+            if ZipConverter not in _disabled:
+                self.register_converter(
+                    ZipConverter(markitdown=self), priority=PRIORITY_GENERIC_FILE_FORMAT
+                )
+            if HtmlConverter not in _disabled:
+                self.register_converter(
+                    HtmlConverter(), priority=PRIORITY_GENERIC_FILE_FORMAT
+                )
+            if RssConverter not in _disabled:
+                self.register_converter(RssConverter())
+            if WikipediaConverter not in _disabled:
+                self.register_converter(WikipediaConverter())
+            if YouTubeConverter not in _disabled:
+                self.register_converter(YouTubeConverter())
+            if BingSerpConverter not in _disabled:
+                self.register_converter(BingSerpConverter())
+            if DocxConverter not in _disabled:
+                self.register_converter(DocxConverter())
+            if XlsxConverter not in _disabled:
+                self.register_converter(XlsxConverter())
+            if XlsConverter not in _disabled:
+                self.register_converter(XlsConverter())
+            if PptxConverter not in _disabled:
+                self.register_converter(PptxConverter())
+            if AudioConverter not in _disabled:
+                self.register_converter(AudioConverter())
+            if ImageConverter not in _disabled:
+                self.register_converter(ImageConverter())
+            if IpynbConverter not in _disabled:
+                self.register_converter(IpynbConverter())
+            if PdfConverter not in _disabled:
+                self.register_converter(PdfConverter())
+            if OutlookMsgConverter not in _disabled:
+                self.register_converter(OutlookMsgConverter())
+            if EpubConverter not in _disabled:
+                self.register_converter(EpubConverter())
+            if CsvConverter not in _disabled:
+                self.register_converter(CsvConverter())
 
             # Register Document Intelligence converter at the top of the stack if endpoint is provided
             docintel_endpoint = kwargs.get("docintel_endpoint")
@@ -248,6 +285,22 @@ class MarkItDown:
             self._plugins_enabled = True
         else:
             warn("Plugins converters are already enabled.", RuntimeWarning)
+
+    @property
+    def converters(self) -> Tuple[ConverterRegistration, ...]:
+        """
+        Return a read-only snapshot of the currently registered converters,
+        ordered from highest to lowest priority (lowest numeric value first).
+        """
+        return tuple(sorted(self._converters, key=lambda r: r.priority))
+
+    @property
+    def disabled_converters(self) -> FrozenSet[Type[DocumentConverter]]:
+        """
+        Return the frozenset of built-in converter types that were excluded at
+        construction time via the ``disabled_converters`` parameter.
+        """
+        return self._disabled_converter_types
 
     def convert(
         self,

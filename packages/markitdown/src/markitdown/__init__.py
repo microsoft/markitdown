@@ -5,6 +5,7 @@
 from .__about__ import __version__
 from ._markitdown import (
     MarkItDown,
+    ConverterRegistration,
     PRIORITY_SPECIFIC_FILE_FORMAT,
     PRIORITY_GENERIC_FILE_FORMAT,
 )
@@ -21,6 +22,7 @@ from ._exceptions import (
 __all__ = [
     "__version__",
     "MarkItDown",
+    "ConverterRegistration",
     "DocumentConverter",
     "DocumentConverterResult",
     "MarkItDownException",
