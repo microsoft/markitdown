@@ -1,5 +1,6 @@
 import sys
 import base64
+import mimetypes
 import os
 import io
 import re
@@ -10,6 +11,7 @@ from operator import attrgetter
 
 from ._html_converter import HtmlConverter
 from ._llm_caption import llm_caption
+from ..converter_utils.images import resolve_images_dir
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
@@ -79,9 +81,19 @@ class PptxConverter(DocumentConverter):
             )
 
         # Perform the conversion
+        save_images = kwargs.get("save_images", False)
+        if save_images:
+            actual_images_dir, md_images_prefix = resolve_images_dir(
+                save_images, stream_info, "pptx"
+            )
+        else:
+            actual_images_dir = None
+            md_images_prefix = None
+
         presentation = pptx.Presentation(file_stream)
         md_content = ""
         slide_num = 0
+        img_count = 0
         for slide in presentation.slides:
             slide_num += 1
 
@@ -140,8 +152,18 @@ class PptxConverter(DocumentConverter):
                     alt_text = re.sub(r"[\r\n\[\]]", " ", alt_text)
                     alt_text = re.sub(r"\s+", " ", alt_text).strip()
 
-                    # If keep_data_uris is True, use base64 encoding for images
-                    if kwargs.get("keep_data_uris", False):
+                    # Emit the image reference
+                    if actual_images_dir:
+                        nonlocal img_count
+                        img_count += 1
+                        content_type = shape.image.content_type or "image/png"
+                        ext = mimetypes.guess_extension(content_type) or ".png"
+                        ext = {".jpe": ".jpg", ".jpeg": ".jpg"}.get(ext, ext)
+                        img_filename = f"image_{img_count}{ext}"
+                        with open(os.path.join(actual_images_dir, img_filename), "wb") as f:
+                            f.write(shape.image.blob)
+                        md_content += f"\n![{alt_text}]({md_images_prefix}/{img_filename})\n"
+                    elif kwargs.get("keep_data_uris", False):
                         blob = shape.image.blob
                         content_type = shape.image.content_type or "image/png"
                         b64_string = base64.b64encode(blob).decode("utf-8")
