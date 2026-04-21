@@ -580,7 +580,7 @@ class MarkItDown:
                 # Add the list of converters for nested processing
                 _kwargs["_parent_converters"] = self._converters
 
-                # Add legaxy kwargs
+                # Add legacy kwargs
                 if stream_info is not None:
                     if stream_info.extension is not None:
                         _kwargs["file_extension"] = stream_info.extension
