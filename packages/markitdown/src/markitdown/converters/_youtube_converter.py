@@ -53,7 +53,10 @@ class YouTubeConverter(DocumentConverter):
         url = unquote(url)
         url = url.replace(r"\?", "?").replace(r"\=", "=")
 
-        if not url.startswith("https://www.youtube.com/watch?"):
+        if not (
+            url.startswith("https://www.youtube.com/watch?")
+            or url.startswith("https://youtu.be/")
+        ):
             # Not a YouTube URL
             return False
 
@@ -148,10 +151,17 @@ class YouTubeConverter(DocumentConverter):
             ytt_api = YouTubeTranscriptApi()
             transcript_text = ""
             parsed_url = urlparse(stream_info.url)  # type: ignore
-            params = parse_qs(parsed_url.query)  # type: ignore
-            if "v" in params and params["v"][0]:
-                video_id = str(params["v"][0])
-                transcript_list = ytt_api.list(video_id)
+
+            video_id = ""
+            if parsed_url.hostname == "youtu.be":
+                video_id = parsed_url.path.lstrip("/")
+            else:
+                params = parse_qs(parsed_url.query)  # type: ignore
+                if "v" in params and params["v"][0]:
+                    video_id = str(params["v"][0])
+
+            if video_id:
+                transcript_list = ytt_api.list_transcripts(video_id)
                 languages = ["en"]
                 for transcript in transcript_list:
                     languages.append(transcript.language_code)
@@ -162,17 +172,23 @@ class YouTubeConverter(DocumentConverter):
                     )
                     # Retry the transcript fetching operation
                     transcript = self._retry_operation(
-                        lambda: ytt_api.fetch(
-                            video_id, languages=youtube_transcript_languages
-                        ),
+                        lambda: transcript_list.find_transcript(
+                            youtube_transcript_languages
+                        ).fetch(),
                         retries=3,  # Retry 3 times
                         delay=2,  # 2 seconds delay between retries
                     )
 
                     if transcript:
-                        transcript_text = " ".join(
-                            [part.text for part in transcript]
-                        )  # type: ignore
+                        # Version 1.x of youtube-transcript-api returns a list of FetchedTranscript objects
+                        # that use attribute access (snip.text) rather than dictionary access (part["text"]).
+                        # To support both, we check if the first element is a dictionary.
+                        if isinstance(transcript[0], dict):
+                            transcript_text = " ".join(
+                                [part["text"] for part in transcript]
+                            )
+                        else:
+                            transcript_text = " ".join([part.text for part in transcript])
                 except Exception as e:
                     # No transcript available
                     if len(languages) == 1:
@@ -184,7 +200,13 @@ class YouTubeConverter(DocumentConverter):
                             .translate(youtube_transcript_languages[0])
                             .fetch()
                         )
-                        transcript_text = " ".join([part.text for part in transcript])
+                        if transcript:
+                            if isinstance(transcript[0], dict):
+                                transcript_text = " ".join(
+                                    [part["text"] for part in transcript]
+                                )
+                            else:
+                                transcript_text = " ".join([part.text for part in transcript])
             if transcript_text:
                 webpage_text += f"\n### Transcript\n{transcript_text}\n"
 
