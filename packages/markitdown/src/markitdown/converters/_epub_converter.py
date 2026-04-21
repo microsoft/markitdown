@@ -1,4 +1,5 @@
 import os
+import posixpath
 import zipfile
 from defusedxml import minidom
 from xml.dom.minidom import Document
@@ -92,7 +93,7 @@ class EpubConverter(HtmlConverter):
                 opf_path.split("/")[:-1]
             )  # Get base directory of content.opf
             spine = [
-                f"{base_path}/{manifest[item_id]}" if base_path else manifest[item_id]
+                self._resolve_archive_path(base_path, manifest[item_id])
                 for item_id in spine_order
                 if item_id in manifest
             ]
@@ -128,6 +129,11 @@ class EpubConverter(HtmlConverter):
             return DocumentConverterResult(
                 markdown="\n\n".join(markdown_content), title=metadata["title"]
             )
+
+    def _resolve_archive_path(self, base_path: str, href: str) -> str:
+        """Resolve manifest hrefs relative to the OPF directory inside the ZIP archive."""
+        normalized = posixpath.normpath(posixpath.join(base_path, href))
+        return normalized.removeprefix("./")
 
     def _get_text_from_node(self, dom: Document, tag_name: str) -> str | None:
         """Convenience function to extract a single occurrence of a tag (e.g., title)."""
