@@ -53,7 +53,12 @@ class YouTubeConverter(DocumentConverter):
         url = unquote(url)
         url = url.replace(r"\?", "?").replace(r"\=", "=")
 
-        if not url.startswith("https://www.youtube.com/watch?"):
+        parsed = urlparse(url)
+        hostname = parsed.hostname or ""
+
+        is_youtube = hostname in ("www.youtube.com", "youtube.com") and parsed.path.startswith("/watch") or hostname == "youtu.be"
+
+        if not is_youtube:
             # Not a YouTube URL
             return False
 
@@ -149,8 +154,14 @@ class YouTubeConverter(DocumentConverter):
             transcript_text = ""
             parsed_url = urlparse(stream_info.url)  # type: ignore
             params = parse_qs(parsed_url.query)  # type: ignore
-            if "v" in params and params["v"][0]:
+            video_id = None
+            hostname = parsed_url.hostname or ""
+            if hostname == "youtu.be":
+                # Short URL format: youtu.be/<video_id>
+                video_id = parsed_url.path.lstrip("/").split("/", 1)[0] or None
+            elif "v" in params and params["v"][0]:
                 video_id = str(params["v"][0])
+            if video_id:
                 transcript_list = ytt_api.list(video_id)
                 languages = ["en"]
                 for transcript in transcript_list:

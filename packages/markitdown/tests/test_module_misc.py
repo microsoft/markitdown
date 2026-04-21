@@ -14,6 +14,7 @@ from markitdown import (
     FileConversionException,
     StreamInfo,
 )
+from markitdown.converters._youtube_converter import YouTubeConverter
 
 # This file contains module tests that are not directly tested by the FileTestVectors.
 # This includes things like helper functions and runtime conversion options
@@ -379,6 +380,42 @@ def test_doc_rlink() -> None:
         os.remove(rlink_file_path)
 
 
+def test_youtube_converter_accepts() -> None:
+    """Test that YouTubeConverter accepts both standard and short YouTube URLs."""
+    converter = YouTubeConverter()
+    empty_stream = io.BytesIO(b"")
+
+    # Standard watch URL should be accepted
+    assert converter.accepts(
+        empty_stream,
+        StreamInfo(mimetype="text/html", url="https://www.youtube.com/watch?v=abc123"),
+    )
+
+    # Short youtu.be URL should be accepted
+    assert converter.accepts(
+        empty_stream,
+        StreamInfo(mimetype="text/html", url="https://youtu.be/abc123"),
+    )
+
+    # Short youtu.be URL with extra params should be accepted
+    assert converter.accepts(
+        empty_stream,
+        StreamInfo(mimetype="text/html", url="https://youtu.be/abc123?si=xyz"),
+    )
+
+    # Non-YouTube URL should not be accepted
+    assert not converter.accepts(
+        empty_stream,
+        StreamInfo(mimetype="text/html", url="https://www.example.com/watch?v=abc"),
+    )
+
+    # youtube.com without /watch should not be accepted
+    assert not converter.accepts(
+        empty_stream,
+        StreamInfo(mimetype="text/html", url="https://www.youtube.com/channel/abc"),
+    )
+
+
 @pytest.mark.skipif(
     skip_remote,
     reason="do not run tests that query external urls",
@@ -540,6 +577,7 @@ if __name__ == "__main__":
         test_file_uris,
         test_docx_comments,
         test_input_as_strings,
+        test_youtube_converter_accepts,
         test_markitdown_remote,
         test_speech_transcription,
         test_exceptions,
