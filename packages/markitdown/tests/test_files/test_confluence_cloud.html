@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Design Decisions - Confluence</title>
+</head>
+<body>
+  <!-- Noise that must be stripped -->
+  <div id="navigation">
+    <a href="/wiki">Home</a> / <a href="/wiki/spaces/ENG">Engineering</a>
+  </div>
+  <div id="breadcrumbs">Engineering &gt; Design Decisions</div>
+  <div id="header">Header chrome</div>
+  <div class="ia-fixed-sidebar">Sidebar content</div>
+  <div id="likes-and-labels-container">12 likes</div>
+  <div id="comments-section">
+    <div class="comment">A comment that should not appear.</div>
+  </div>
+
+  <!-- Main content that must be preserved -->
+  <div id="main-content">
+    <h1 id="title-text">Design Decisions</h1>
+    <div class="wiki-content">
+      <h2>Overview</h2>
+      <p>This page documents key <strong>architecture</strong> decisions.</p>
+      <h2>Goals</h2>
+      <ul>
+        <li>Simplicity</li>
+        <li>Reliability</li>
+        <li>Extensibility</li>
+      </ul>
+      <h2>Decision Log</h2>
+      <table>
+        <tr><th>Decision</th><th>Status</th></tr>
+        <tr><td>Use Python</td><td>Accepted</td></tr>
+        <tr><td>Use REST API</td><td>Accepted</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div id="footer">Footer chrome</div>
+</body>
+</html>
