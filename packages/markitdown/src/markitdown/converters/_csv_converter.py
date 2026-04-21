@@ -54,23 +54,29 @@ class CsvConverter(DocumentConverter):
         if not rows:
             return DocumentConverterResult(markdown="")
 
+        def escape_cell(value: str) -> str:
+            # Escape pipes and collapse newlines so a single cell can't break
+            # the surrounding markdown table layout.
+            return value.replace("\\", "\\\\").replace("|", "\\|").replace("\r\n", " ").replace("\n", " ").replace("\r", " ")
+
         # Create markdown table
         markdown_table = []
+        header = [escape_cell(c) for c in rows[0]]
 
         # Add header row
-        markdown_table.append("| " + " | ".join(rows[0]) + " |")
+        markdown_table.append("| " + " | ".join(header) + " |")
 
         # Add separator row
-        markdown_table.append("| " + " | ".join(["---"] * len(rows[0])) + " |")
+        markdown_table.append("| " + " | ".join(["---"] * len(header)) + " |")
 
         # Add data rows
         for row in rows[1:]:
             # Make sure row has the same number of columns as header
-            while len(row) < len(rows[0]):
+            while len(row) < len(header):
                 row.append("")
             # Truncate if row has more columns than header
-            row = row[: len(rows[0])]
-            markdown_table.append("| " + " | ".join(row) + " |")
+            row = row[: len(header)]
+            markdown_table.append("| " + " | ".join(escape_cell(c) for c in row) + " |")
 
         result = "\n".join(markdown_table)
 
