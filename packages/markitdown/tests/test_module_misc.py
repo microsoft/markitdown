@@ -506,6 +506,25 @@ def test_markitdown_llm_parameters() -> None:
     assert messages[0]["content"][0]["text"] == test_prompt
 
 
+def test_markitdown_pptx_handles_none_text() -> None:
+    import pptx.text.text
+
+    original_text = pptx.text.text.TextFrame.text
+
+    def _patched_text(self):
+        value = original_text.fget(self)
+        return None if value == "World" else value
+
+    try:
+        pptx.text.text.TextFrame.text = property(_patched_text)
+        result = MarkItDown().convert(os.path.join(TEST_FILES_DIR, "test.pptx"))
+    finally:
+        pptx.text.text.TextFrame.text = original_text
+
+    assert "### Notes:" in result.text_content
+    assert "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation" in result.text_content
+
+
 @pytest.mark.skipif(
     skip_llm,
     reason="do not run llm tests without a key",
@@ -546,6 +565,7 @@ if __name__ == "__main__":
         test_doc_rlink,
         test_markitdown_exiftool,
         test_markitdown_llm_parameters,
+        test_markitdown_pptx_handles_none_text,
         test_markitdown_llm,
     ]:
         print(f"Running {test.__name__}...", end="")
