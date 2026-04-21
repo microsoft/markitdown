@@ -43,6 +43,7 @@ all = [
   "pdfminer.six>=20251230",
   "pdfplumber>=0.11.9",
   "olefile",
+  "pyOneNote",
   "pydub",
   "SpeechRecognition",
   "youtube-transcript-api~=1.0.0",
@@ -55,6 +56,7 @@ xlsx = ["pandas", "openpyxl"]
 xls = ["pandas", "xlrd"]
 pdf = ["pdfminer.six>=20251230", "pdfplumber>=0.11.9"]
 outlook = ["olefile"]
+onenote = ["pyOneNote", "olefile"]
 audio-transcription = ["pydub", "SpeechRecognition"]
 youtube-transcription = ["youtube-transcript-api"]
 az-doc-intel = ["azure-ai-documentintelligence", "azure-identity"]

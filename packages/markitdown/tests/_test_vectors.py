@@ -234,6 +234,17 @@ GENERAL_TEST_VECTORS = [
         ],
         must_not_include=[],
     ),
+    FileTestVector(
+        filename="test.one",
+        mimetype="application/msonenote",
+        charset=None,
+        url=None,
+        must_include=[
+            "This is a test OneNote document.",
+            "It contains some sample text for testing purposes.",
+        ],
+        must_not_include=[],
+    ),
 ]
 
 

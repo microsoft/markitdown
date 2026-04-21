@@ -16,6 +16,9 @@ import magika
 import charset_normalizer
 import codecs
 
+# Register OneNote MIME type extension for .one files
+mimetypes.add_type("application/onenote", ".one", strict=False)
+
 from ._stream_info import StreamInfo
 from ._uri_utils import parse_data_uri, file_uri_to_path
 
@@ -39,6 +42,7 @@ from .converters import (
     EpubConverter,
     DocumentIntelligenceConverter,
     CsvConverter,
+    OneNoteConverter,
 )
 
 from ._base_converter import DocumentConverter, DocumentConverterResult
@@ -202,6 +206,7 @@ class MarkItDown:
             self.register_converter(OutlookMsgConverter())
             self.register_converter(EpubConverter())
             self.register_converter(CsvConverter())
+            self.register_converter(OneNoteConverter())
 
             # Register Document Intelligence converter at the top of the stack if endpoint is provided
             docintel_endpoint = kwargs.get("docintel_endpoint")
