@@ -1,8 +1,8 @@
 #!/usr/bin/env python3 -m pytest
-# NOTE: importing from private module until Task 3 exports BatchConversionResult publicly
 import os
 import concurrent.futures
-from markitdown._base_converter import BatchConversionResult, DocumentConverterResult
+from markitdown._base_converter import DocumentConverterResult
+from markitdown import BatchConversionResult
 
 TEST_FILES_DIR = os.path.join(os.path.dirname(__file__), "test_files")
 
@@ -117,3 +117,8 @@ def test_convert_batch_workers_param():
     results = list(md.convert_batch(sources, workers=1))
     assert len(results) == 2
     assert all(r.success for r in results)
+
+
+def test_batch_result_public_import():
+    from markitdown import BatchConversionResult as BCR
+    assert BCR is BatchConversionResult
