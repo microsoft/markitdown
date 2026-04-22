@@ -55,6 +55,7 @@ xlsx = ["pandas", "openpyxl"]
 xls = ["pandas", "xlrd"]
 pdf = ["pdfminer.six>=20251230", "pdfplumber>=0.11.9"]
 outlook = ["olefile"]
+chm = ["pychm"]
 audio-transcription = ["pydub", "SpeechRecognition"]
 youtube-transcription = ["youtube-transcript-api"]
 az-doc-intel = ["azure-ai-documentintelligence", "azure-identity"]
@@ -72,6 +73,9 @@ markitdown = "markitdown.__main__:main"
 
 [tool.hatch.envs.default]
 features = ["all"]
+
+[tool.pytest.ini_options]
+pythonpath = "src"
 
 [tool.hatch.envs.hatch-test]
 features = ["all"]
