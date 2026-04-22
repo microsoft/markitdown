@@ -1,4 +1,5 @@
 import os
+import re
 import zipfile
 from defusedxml import minidom
 from xml.dom.minidom import Document
@@ -87,15 +88,21 @@ class EpubConverter(HtmlConverter):
             spine_items = opf_dom.getElementsByTagName("itemref")
             spine_order = [item.getAttribute("idref") for item in spine_items]
 
-            # Convert spine order to actual file paths
-            base_path = "/".join(
-                opf_path.split("/")[:-1]
-            )  # Get base directory of content.opf
-            spine = [
-                f"{base_path}/{manifest[item_id]}" if base_path else manifest[item_id]
-                for item_id in spine_order
-                if item_id in manifest
-            ]
+            # Get base directory of content.opf
+            base_path = "/".join(opf_path.split("/")[:-1]) if opf_path.rfind("/") > 0 else ""
+            
+            # Convert spine order to actual file paths with proper relative path resolution
+            spine = []
+            for item_id in spine_order:
+                if item_id not in manifest:
+                    continue
+                href = manifest[item_id]
+                # Handle relative paths like "../Text/chapter1.xhtml"
+                if base_path:
+                    resolved_path = os.path.normpath(f"{base_path}/{href}").replace("\\", "/")
+                else:
+                    resolved_path = href
+                spine.append(resolved_path)
 
             # Extract and convert the content
             markdown_content: List[str] = []
