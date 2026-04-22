@@ -34,6 +34,38 @@ ACCEPTED_FILE_EXTENSIONS = [
 ]
 
 
+def _extract_youtube_video_id(url: str) -> Union[str, None]:
+    """Extract the YouTube video ID from a full or short YouTube URL.
+
+    Handles:
+      - https://www.youtube.com/watch?v=VIDEO_ID
+      - https://youtu.be/VIDEO_ID
+      - https://www.youtube.com/shorts/VIDEO_ID
+    Returns the video ID string, or None if the URL is not a recognised
+    YouTube video URL.
+    """
+    parsed = urlparse(url)
+    host = parsed.netloc.lower()
+
+    if host in ("youtu.be",):
+        # Short URL: video ID is the first path segment
+        path = parsed.path.lstrip("/")
+        video_id = path.split("/")[0]
+        return video_id if video_id else None
+
+    if host in ("www.youtube.com", "youtube.com", "m.youtube.com"):
+        if parsed.path.startswith("/watch"):
+            params = parse_qs(parsed.query)
+            ids = params.get("v")
+            return ids[0] if ids else None
+        if parsed.path.startswith("/shorts/"):
+            # /shorts/VIDEO_ID
+            video_id = parsed.path[len("/shorts/"):].split("/")[0]
+            return video_id if video_id else None
+
+    return None
+
+
 class YouTubeConverter(DocumentConverter):
     """Handle YouTube specially, focusing on the video title, description, and transcript."""
 
@@ -45,6 +77,9 @@ class YouTubeConverter(DocumentConverter):
     ) -> bool:
         """
         Make sure we're dealing with HTML content *from* YouTube.
+
+        Accepts full watch URLs (youtube.com/watch?v=…), short URLs
+        (youtu.be/…), and Shorts URLs (youtube.com/shorts/…).
         """
         url = stream_info.url or ""
         mimetype = (stream_info.mimetype or "").lower()
@@ -53,8 +88,8 @@ class YouTubeConverter(DocumentConverter):
         url = unquote(url)
         url = url.replace(r"\?", "?").replace(r"\=", "=")
 
-        if not url.startswith("https://www.youtube.com/watch?"):
-            # Not a YouTube URL
+        # Require a recognisable YouTube video URL with a valid video ID.
+        if _extract_youtube_video_id(url) is None:
             return False
 
         if extension in ACCEPTED_FILE_EXTENSIONS:
@@ -147,10 +182,10 @@ class YouTubeConverter(DocumentConverter):
         if IS_YOUTUBE_TRANSCRIPT_CAPABLE:
             ytt_api = YouTubeTranscriptApi()
             transcript_text = ""
-            parsed_url = urlparse(stream_info.url)  # type: ignore
-            params = parse_qs(parsed_url.query)  # type: ignore
-            if "v" in params and params["v"][0]:
-                video_id = str(params["v"][0])
+            # Extract video ID using the shared helper so that short URLs
+            # (youtu.be/…) and Shorts (youtube.com/shorts/…) are supported.
+            video_id = _extract_youtube_video_id(stream_info.url or "")  # type: ignore
+            if video_id:
                 transcript_list = ytt_api.list(video_id)
                 languages = ["en"]
                 for transcript in transcript_list:
