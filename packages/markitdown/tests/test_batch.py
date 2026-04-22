@@ -66,7 +66,6 @@ def test_convert_batch_on_error_collect():
 
 
 def test_convert_batch_on_error_raise():
-    import pytest
     from markitdown import MarkItDown
     md = MarkItDown()
     sources = [os.path.join(TEST_FILES_DIR, "nonexistent_file_xyz.docx")]

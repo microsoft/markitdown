@@ -323,9 +323,12 @@ class MarkItDown:
         if on_error not in ("collect", "raise"):
             raise ValueError(f"on_error must be 'collect' or 'raise', got {on_error!r}")
 
+        if executor is not None and workers is not None:
+            warn("workers is ignored when an executor is provided", stacklevel=2)
+
         own_executor = executor is None
         _executor = executor or concurrent.futures.ThreadPoolExecutor(
-            max_workers=workers or min(32, (os.cpu_count() or 1) + 4)
+            max_workers=workers if workers is not None else min(32, (os.cpu_count() or 1) + 4)
         )
 
         try:
@@ -347,7 +350,7 @@ class MarkItDown:
                     yield BatchConversionResult(source=source, result=future.result())
         finally:
             if own_executor:
-                _executor.shutdown(wait=False, cancel_futures=True)
+                _executor.shutdown(wait=True, cancel_futures=True)
 
     def convert_local(
         self,
