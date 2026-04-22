@@ -280,6 +280,13 @@ class PdfConverterWithOCR(DocumentConverter):
                             text_content = page.extract_text() or ""
                             if text_content.strip():
                                 markdown_content.append(text_content.strip())
+                            else:
+                                # Scanned page with no image objects or text layer:
+                                # render the whole page and OCR it, so it doesn't
+                                # silently vanish from the output.
+                                page_ocr = self._ocr_page(page, ocr_service)
+                                if page_ocr:
+                                    markdown_content.append(page_ocr)
                     else:
                         # No OCR, just extract text
                         text_content = page.extract_text() or ""
@@ -336,6 +343,27 @@ class PdfConverterWithOCR(DocumentConverter):
         images.sort(key=lambda x: x["y_pos"])
 
         return images
+
+    def _ocr_page(self, page: Any, ocr_service: LLMVisionOCRService) -> str:
+        """
+        Render a single pdfplumber page to PNG and run OCR on it.
+
+        Returns a formatted OCR block, a 'no text' marker if OCR is empty,
+        or an error marker if rendering/OCR raises.
+        """
+        try:
+            page_img = page.to_image(resolution=300)
+            img_stream = io.BytesIO()
+            page_img.original.save(img_stream, format="PNG")
+            img_stream.seek(0)
+
+            ocr_result = ocr_service.extract_text(img_stream)
+            text = (ocr_result.text or "").strip()
+            if text:
+                return f"*[Image OCR]\n{text}\n[End OCR]*"
+            return "*[No text could be extracted from this page]*"
+        except Exception as e:
+            return f"*[Error processing page {page.page_number}: {str(e)}]*"
 
     def _ocr_full_pages(
         self, pdf_bytes: io.BytesIO, ocr_service: LLMVisionOCRService
