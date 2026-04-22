@@ -1,6 +1,10 @@
 #!/usr/bin/env python3 -m pytest
 # NOTE: importing from private module until Task 3 exports BatchConversionResult publicly
+import os
+import concurrent.futures
 from markitdown._base_converter import BatchConversionResult, DocumentConverterResult
+
+TEST_FILES_DIR = os.path.join(os.path.dirname(__file__), "test_files")
 
 
 def test_batch_result_success_true():
@@ -25,12 +29,6 @@ def test_batch_result_defaults():
     assert r.result is None
     assert r.error is None
     assert r.success is True
-
-
-import os
-import concurrent.futures
-
-TEST_FILES_DIR = os.path.join(os.path.dirname(__file__), "test_files")
 
 
 def test_convert_batch_basic():

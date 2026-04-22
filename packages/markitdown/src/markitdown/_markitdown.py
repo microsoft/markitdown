@@ -312,7 +312,9 @@ class MarkItDown:
         """Convert multiple sources concurrently, yielding results in completion order.
 
         Args:
-            sources: Iterable of inputs accepted by convert().
+            sources: Iterable of inputs accepted by convert(). Consumed eagerly —
+                all sources are submitted to the thread pool before any result is
+                yielded. Not safe with infinite iterables.
             on_error: "collect" wraps errors and continues; "raise" re-raises the first error.
             workers: Thread count when no executor is provided. Defaults to min(32, cpu_count+4).
             executor: If provided, used directly; caller owns its lifecycle.
@@ -342,8 +344,6 @@ class MarkItDown:
                 exc = future.exception()
                 if exc is not None:
                     if on_error == "raise":
-                        for f in future_to_source:
-                            f.cancel()
                         raise exc
                     yield BatchConversionResult(source=source, error=exc)
                 else:
