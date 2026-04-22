@@ -274,6 +274,55 @@ def test_docx_equations() -> None:
     assert block_equations, "No block equations found in the document."
 
 
+def test_fix_zip_name_casing() -> None:
+    """Test that _fix_zip_name_casing patches local file headers with case-mismatched names.
+
+    Some .docx files produced by certain tools have inconsistent casing between the zip
+    central directory and local file headers (e.g. 'customXml/item2.xml' in the central
+    directory vs 'customXML/item2.xml' in the local header). This causes Python's zipfile
+    module to raise BadZipFile. The fix patches the local headers to match the central
+    directory before the zip is opened for real processing. See issue #1812.
+    """
+    import struct
+    import zipfile
+    from io import BytesIO
+
+    from markitdown.converter_utils.docx.pre_process import _fix_zip_name_casing
+
+    # Build a valid zip in memory with two entries
+    buf = BytesIO()
+    with zipfile.ZipFile(buf, mode="w") as zf:
+        zf.writestr("customXml/item1.xml", b"<root/>")
+        zf.writestr("customXml/item2.xml", b"<root/>")
+    raw = bytearray(buf.getvalue())
+
+    # Patch the local file header of the second entry to use 'customXML' (capital L)
+    # so it mismatches the central directory entry 'customXml/item2.xml'.
+    # In a zip file the local file headers come before the central directory, so the
+    # FIRST occurrence of 'customXml/item2.xml' in the raw bytes is the local header
+    # we want to corrupt; the SECOND occurrence is the central directory entry which
+    # we intentionally leave unchanged (it remains authoritative).
+    target_local = b"customXml/item2.xml"
+    replacement_local = b"customXML/item2.xml"
+    idx = raw.find(target_local)
+    assert idx != -1, "Test setup: could not find target local header in zip bytes"
+    raw[idx : idx + len(target_local)] = replacement_local
+
+    # Verify the raw zip now raises BadZipFile when we try to read the patched entry
+    with zipfile.ZipFile(BytesIO(bytes(raw)), mode="r") as zf:
+        zf.read("customXml/item1.xml")  # this one is fine
+        with pytest.raises(zipfile.BadZipFile):
+            zf.read("customXml/item2.xml")  # this raises due to local header mismatch
+
+    # Apply the fix
+    fixed = _fix_zip_name_casing(BytesIO(bytes(raw)))
+
+    # After fixing, both entries should be readable without error
+    with zipfile.ZipFile(fixed, mode="r") as zf:
+        assert zf.read("customXml/item1.xml") == b"<root/>"
+        assert zf.read("customXml/item2.xml") == b"<root/>"
+
+
 def test_input_as_strings() -> None:
     markitdown = MarkItDown()
 

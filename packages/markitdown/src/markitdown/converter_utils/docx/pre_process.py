@@ -1,3 +1,4 @@
+import struct
 import zipfile
 from io import BytesIO
 from typing import BinaryIO
@@ -115,6 +116,49 @@ def _pre_process_math(content: bytes) -> bytes:
     return str(soup).encode()
 
 
+def _fix_zip_name_casing(input_docx: BinaryIO) -> BinaryIO:
+    """
+    Fixes case mismatches between zip central directory and local file headers.
+
+    Some .docx files produced by certain tools have inconsistent casing between the zip
+    central directory (e.g. ``customXml/item2.xml``) and local file headers
+    (e.g. ``customXML/item2.xml``).  Python's ``zipfile`` module strictly validates this
+    and raises ``BadZipFile``.  The central directory is authoritative per the zip spec,
+    so this function patches any mismatched local headers in memory before the zip is
+    opened for real.  Only entries whose names differ solely in case (and therefore have
+    the same byte length) are touched.
+
+    Args:
+        input_docx (BinaryIO): A binary input stream representing the DOCX file.
+
+    Returns:
+        BinaryIO: A patched ``BytesIO`` if any entries were fixed, otherwise the original
+        stream rewound to the start.
+    """
+    input_docx.seek(0)
+    raw = bytearray(input_docx.read())
+    patched = False
+    try:
+        with zipfile.ZipFile(BytesIO(bytes(raw)), mode="r") as zf:
+            for info in zf.infolist():
+                offset = info.header_offset
+                if raw[offset : offset + 4] != b"PK\x03\x04":
+                    continue
+                fname_len = struct.unpack_from("<H", raw, offset + 26)[0]
+                local_name = bytes(raw[offset + 30 : offset + 30 + fname_len])
+                central_name = info.filename.encode("utf-8")
+                if local_name != central_name and len(local_name) == len(central_name):
+                    raw[offset + 30 : offset + 30 + fname_len] = central_name
+                    patched = True
+    except zipfile.BadZipFile:
+        input_docx.seek(0)
+        return input_docx
+    if patched:
+        return BytesIO(bytes(raw))
+    input_docx.seek(0)
+    return input_docx
+
+
 def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
     """
     Pre-processes a DOCX file with provided steps.
@@ -129,6 +173,7 @@ def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
     Returns:
         BinaryIO: A binary output stream representing the processed DOCX file.
     """
+    input_docx = _fix_zip_name_casing(input_docx)
     output_docx = BytesIO()
     # The files that need to be pre-processed from .docx
     pre_process_enable_files = [
