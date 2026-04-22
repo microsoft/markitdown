@@ -76,6 +76,11 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         if self.options["default_title"] and not title:
             title = href
         title_part = ' "%s"' % title.replace('"', r"\"") if title else ""
+        # Escape [ and ] in link text per CommonMark §6.1; otherwise inner
+        # brackets cause nested-link ambiguity and renderers like GitHub
+        # silently truncate the text at the first unescaped ']' (#1302).
+        if href:
+            text = text.replace("[", r"\[").replace("]", r"\]")
         return (
             "%s[%s](%s%s)%s" % (prefix, text, href, title_part, suffix)
             if href
@@ -97,6 +102,8 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         title_part = ' "%s"' % title.replace('"', r"\"") if title else ""
         # Remove all line breaks from alt
         alt = alt.replace("\n", " ")
+        # Escape [ and ] in alt text for the same reason as convert_a (#1302).
+        alt = alt.replace("[", r"\[").replace("]", r"\]")
         if (
             convert_as_inline
             and el.parent.name not in self.options["keep_inline_images_in"]
