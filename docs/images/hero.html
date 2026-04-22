@@ -1,0 +1,789 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MarkItDown — README hero</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+  :root {
+    --bg:         #0b0d12;
+    --surface:    #12151c;
+    --surface-2:  #181c25;
+    --panel:      #0f1218;
+    --ink:        #e8ecf3;
+    --ink-2:      #c3c9d4;
+    --muted:      #7a8393;
+    --muted-2:    #4d5566;
+    --border:     #232833;
+    --border-2:   #2e3441;
+
+    --accent:     #4f9dff;   /* azure — MS-adjacent but softer */
+    --accent-2:   #2f7de0;
+    --accent-soft:rgba(79,157,255,0.10);
+    --accent-ring:rgba(79,157,255,0.28);
+
+    --md:         #7ee787;   /* markdown green (GitHub) */
+    --warn:       #f2cc60;
+    --plum:       #c792ea;
+    --coral:      #ff7b72;
+
+    --font-display: 'Inter', system-ui, -apple-system, Segoe UI, sans-serif;
+    --font-mono:    'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #05070a; }
+  body {
+    display: grid; place-items: center;
+    min-height: 100vh;
+    font-family: var(--font-display);
+    color: var(--ink);
+  }
+
+  /* ---------- stage ---------- */
+  .stage {
+    width: 1200px; height: 675px;
+    background:
+      radial-gradient(ellipse 60% 45% at 12% -5%, rgba(79,157,255,0.18) 0%, transparent 55%),
+      radial-gradient(ellipse 70% 50% at 100% 108%, rgba(126,231,135,0.08) 0%, transparent 60%),
+      linear-gradient(180deg, #0c0f15 0%, #0a0c11 100%);
+    position: relative;
+    overflow: hidden;
+    box-shadow:
+      0 60px 140px -20px rgba(0,0,0,0.8),
+      0 0 0 1px rgba(255,255,255,0.04);
+  }
+  /* dot grid */
+  .stage::before {
+    content: "";
+    position: absolute; inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(255,255,255,0.04) 1px, transparent 1.3px);
+    background-size: 24px 24px;
+  }
+  .stage > * { position: relative; z-index: 3; }
+
+  /* ---------- header ---------- */
+  .header {
+    position: absolute; top: 28px; left: 40px; right: 40px;
+    display: flex; align-items: center; justify-content: space-between;
+    z-index: 50;
+  }
+  .brand {
+    display: inline-flex; align-items: center; gap: 11px;
+    font-family: var(--font-mono);
+    font-size: 13px; font-weight: 600;
+    letter-spacing: 0.01em;
+    color: var(--ink);
+    padding: 7px 14px 7px 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  .brand .mk {
+    width: 24px; height: 24px;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+    color: #061021;
+    display: grid; place-items: center;
+    border-radius: 6px;
+    font-family: var(--font-mono);
+    font-size: 13px; font-weight: 800;
+    letter-spacing: -0.04em;
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .tagline {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+  .tagline .slash { color: var(--accent); opacity: 0.85; margin-right: 8px; }
+  .step-ind {
+    display: flex; align-items: center; gap: 12px;
+    padding: 7px 13px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  .step-ind .num {
+    font-family: var(--font-mono);
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .step-ind .num::before { content: "SCENE"; color: var(--muted-2); margin-right: 6px; font-weight: 500; }
+  .step-ind .num .cur   { color: var(--accent); font-size: 12px; font-weight: 700; }
+  .step-ind .num .slash { color: var(--muted-2); margin: 0 3px; }
+  .step-ind .bar {
+    width: 96px; height: 2px;
+    background: var(--border);
+    border-radius: 2px;
+    position: relative; overflow: hidden;
+  }
+  .step-ind .bar-fill {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    width: 0;
+    background: linear-gradient(90deg, var(--accent-2), var(--accent));
+    box-shadow: 0 0 6px var(--accent-ring);
+    transition: width .55s cubic-bezier(.3,.7,.3,1);
+  }
+
+  /* ---------- hero title ---------- */
+  .hero {
+    position: absolute;
+    top: 84px; left: 40px; right: 40px;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 46px;
+    letter-spacing: -0.028em;
+    line-height: 1.06;
+    color: var(--ink);
+    z-index: 40;
+    min-height: 56px;
+  }
+  .hero .slot {
+    display: inline-block;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity .5s cubic-bezier(.3,.7,.3,1), transform .5s cubic-bezier(.3,.7,.3,1);
+    max-width: 100%;
+  }
+  .hero .slot.in { opacity: 1; transform: translateY(0); }
+  .hero b { color: var(--accent); font-weight: 700; }
+
+  /* ---------- scene container ---------- */
+  .scenes {
+    position: absolute; inset: 170px 40px 72px 40px;
+    z-index: 5;
+  }
+  .scene {
+    position: absolute; inset: 0;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity .5s cubic-bezier(.3,.7,.3,1), transform .5s cubic-bezier(.3,.7,.3,1);
+    pointer-events: none;
+  }
+  .scene.in { opacity: 1; transform: translateY(0); }
+
+  /* ---------- scene 1: wordmark ---------- */
+  .s1 {
+    display: grid; place-items: center;
+    padding-bottom: 40px;
+  }
+  .wordmark {
+    display: flex; flex-direction: column; align-items: center; gap: 20px;
+  }
+  .wordmark .big {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 108px;
+    letter-spacing: -0.045em;
+    line-height: 1;
+    color: var(--ink);
+    display: flex; align-items: baseline;
+  }
+  .wordmark .big .it {
+    color: var(--accent);
+    font-style: italic;
+    font-weight: 800;
+    margin: 0 2px;
+  }
+  .wordmark .sub {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .wordmark .sub .dot { width: 4px; height: 4px; background: var(--accent); border-radius: 50%; }
+
+  /* ---------- scene 2: format fan ---------- */
+  .s2 {
+    display: flex; align-items: center; justify-content: center; gap: 36px;
+  }
+  .arrow-flow {
+    display: flex; align-items: center; gap: 28px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--muted);
+    pointer-events: none;
+  }
+  .arrow-flow .ar {
+    width: 72px; height: 2px; background: linear-gradient(90deg, var(--muted-2), var(--accent));
+    position: relative;
+  }
+  .arrow-flow .ar::after {
+    content: ""; position: absolute; right: -2px; top: 50%;
+    transform: translateY(-50%);
+    border-left: 7px solid var(--accent);
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+  }
+  .format-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 76px);
+    grid-template-rows: repeat(3, 56px);
+    gap: 10px;
+    justify-content: center;
+    align-content: center;
+    width: 520px;
+  }
+  .fchip {
+    display: grid; place-items: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-2);
+    letter-spacing: 0.02em;
+    position: relative;
+    opacity: 0;
+    transform: scale(.85);
+    transition: opacity .35s, transform .35s cubic-bezier(.3,.7,.3,1), border-color .3s, background .3s;
+  }
+  .fchip.in { opacity: 1; transform: scale(1); }
+  .fchip.hot { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+  .fchip .tag {
+    position: absolute; top: -6px; right: -6px;
+    font-size: 8px; padding: 2px 4px;
+    background: var(--accent); color: #051021;
+    border-radius: 3px;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+    opacity: 0;
+  }
+  .fchip.hot .tag { opacity: 1; }
+
+  .md-target {
+    width: 140px; height: 140px;
+    display: grid; place-items: center;
+    background: linear-gradient(135deg, rgba(126,231,135,0.12), rgba(126,231,135,0.03));
+    border: 1px solid rgba(126,231,135,0.28);
+    border-radius: 14px;
+    color: var(--md);
+    font-family: var(--font-mono);
+    font-size: 38px;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    position: relative;
+  }
+  .md-target::after {
+    content: ".md";
+    position: absolute;
+    bottom: 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--md);
+    opacity: 0.75;
+    letter-spacing: 0.04em;
+  }
+  .md-target .hash { line-height: 1; margin-top: -12px; }
+
+  /* ---------- scene 3: terminal ---------- */
+  .s3 {
+    display: grid;
+    grid-template-columns: 1fr;
+    place-items: center;
+  }
+  .term {
+    width: 820px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px -20px rgba(0,0,0,0.6);
+    font-family: var(--font-mono);
+    font-size: 15px;
+  }
+  .term .bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+  }
+  .term .bar .d {
+    width: 11px; height: 11px; border-radius: 50%;
+    background: #3a4050;
+  }
+  .term .bar .d.r { background: #ff5f57; }
+  .term .bar .d.y { background: #febc2e; }
+  .term .bar .d.g { background: #28c840; }
+  .term .bar .ttl {
+    margin-left: 14px;
+    font-size: 11.5px;
+    color: var(--muted);
+    letter-spacing: 0.03em;
+  }
+  .term .body {
+    padding: 20px 22px;
+    min-height: 280px;
+    line-height: 1.55;
+  }
+  .term .ln { display: block; color: var(--ink-2); white-space: pre; }
+  .term .ln .prompt { color: var(--md); font-weight: 600; margin-right: 8px; }
+  .term .ln .cmd { color: var(--ink); }
+  .term .ln .flag { color: var(--plum); }
+  .term .ln .arg { color: var(--warn); }
+  .term .ln.muted { color: var(--muted); }
+  .term .ln.ok { color: var(--md); }
+  .term .cursor {
+    display: inline-block; width: 9px; height: 17px;
+    background: var(--accent);
+    vertical-align: text-bottom;
+    margin-left: 2px;
+    animation: blink 1s steps(2) infinite;
+  }
+  .term .spin {
+    display: inline-block; width: 13px; height: 13px;
+    border-radius: 50%;
+    border: 2px solid var(--muted-2);
+    border-top-color: var(--accent);
+    animation: spin .8s linear infinite;
+    vertical-align: -2px;
+    margin-right: 10px;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---------- scene 4: markdown output ---------- */
+  .s4 {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 20px;
+    align-items: center;
+  }
+  .doc-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 22px 26px;
+    height: 360px;
+    overflow: hidden;
+    position: relative;
+  }
+  .doc-card .card-hdr {
+    display: flex; align-items: center; gap: 10px;
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .doc-card .card-hdr .dotd {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--coral);
+  }
+  .doc-card.out .card-hdr .dotd { background: var(--md); }
+
+  /* Input (rendered PDF-ish) */
+  .pdf-look { font-family: 'Times New Roman', serif; color: #2a2a2a; }
+  .pdf-look .h { font-weight: 700; font-size: 16px; margin-bottom: 8px; color: #0a0a0a; }
+  .pdf-look .p { font-size: 12px; line-height: 1.5; color: #3a3a3a; margin-bottom: 8px; }
+  .pdf-look .tbl {
+    display: grid;
+    grid-template-columns: 1fr 60px 60px;
+    gap: 2px;
+    background: #d4d4d4;
+    padding: 2px;
+    font-size: 11px;
+    margin-top: 6px;
+  }
+  .pdf-look .tbl div { background: #f7f7f4; padding: 4px 8px; color: #222; }
+  .pdf-look .tbl .th { background: #e8e6df; font-weight: 600; }
+  .doc-card.in {
+    background: #f8f6f0;
+    border-color: #d4d1c7;
+  }
+  .doc-card.in .card-hdr { color: #6b6550; border-color: #d4d1c7; }
+  .doc-card.in .card-hdr .dotd { background: var(--coral); }
+
+  /* Output (markdown) */
+  .md-look { font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--ink-2); }
+  .md-look .mh { color: var(--md); }
+  .md-look .mt { color: var(--ink); }
+  .md-look .ma { color: var(--accent); }
+  .md-look .mp { color: var(--plum); }
+  .md-look .mm { color: var(--muted); }
+  .md-look .row { display: block; white-space: pre; opacity: 0; transform: translateX(-6px);
+    transition: opacity .3s, transform .3s; }
+  .md-look .row.in { opacity: 1; transform: translateX(0); }
+
+  .arrow-big {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    pointer-events: none;
+  }
+  .arrow-big .line {
+    width: 2px; height: 30px;
+    background: linear-gradient(180deg, transparent, var(--border-2));
+  }
+  .arrow-big .chev {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    display: grid; place-items: center;
+    color: var(--ink-2);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .arrow-big .line.b {
+    background: linear-gradient(180deg, var(--border-2), transparent);
+  }
+
+  /* ---------- scene 5: install/outro ---------- */
+  .s5 {
+    display: grid; place-items: center;
+    text-align: center;
+  }
+  .outro {
+    display: flex; flex-direction: column; align-items: center; gap: 28px;
+  }
+  .install-box {
+    display: inline-flex; align-items: center; gap: 14px;
+    padding: 18px 28px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-family: var(--font-mono);
+    font-size: 19px;
+    font-weight: 500;
+    color: var(--ink);
+    box-shadow: 0 20px 60px -20px rgba(0,0,0,0.5);
+  }
+  .install-box .cp { color: var(--md); font-weight: 700; }
+  .install-box .st { color: var(--accent); }
+  .install-box .cpy {
+    margin-left: 6px;
+    padding: 4px 10px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 10.5px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+  }
+  .outro .stars {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    display: flex; align-items: center; gap: 18px;
+  }
+  .outro .stars .chip {
+    padding: 5px 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+  }
+  .outro .stars .chip b { color: var(--accent); font-weight: 700; }
+
+  /* ---------- footer ---------- */
+  .footer {
+    position: absolute;
+    bottom: 22px; left: 40px; right: 40px;
+    display: flex; align-items: center; justify-content: space-between;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted-2);
+    letter-spacing: 0.08em;
+    z-index: 50;
+  }
+  .footer .url { color: var(--muted); }
+  .footer .url b { color: var(--ink-2); font-weight: 600; }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <!-- header -->
+    <div class="header">
+      <div class="brand"><span class="mk">M</span> markitdown</div>
+      <div class="tagline"><span class="slash">/</span>Any document → Markdown for your LLM</div>
+      <div class="step-ind">
+        <span class="num"><span class="cur" id="cur">01</span><span class="slash">/</span>05</span>
+        <div class="bar"><div class="bar-fill" id="bar"></div></div>
+      </div>
+    </div>
+
+    <!-- hero headline -->
+    <h1 class="hero"><span class="slot" id="hero">Any document. <b>Markdown, instantly.</b></span></h1>
+
+    <!-- scenes -->
+    <div class="scenes">
+      <!-- scene 1: wordmark -->
+      <div class="scene s1" id="scene1">
+        <div class="wordmark">
+          <div class="big">Mark<span class="it">It</span>Down</div>
+          <div class="sub"><span>PDF</span><span class="dot"></span><span>DOCX</span><span class="dot"></span><span>XLSX</span><span class="dot"></span><span>PPTX</span><span class="dot"></span><span>+14 more</span></div>
+        </div>
+      </div>
+
+      <!-- scene 2: formats → markdown -->
+      <div class="scene s2" id="scene2">
+        <div class="format-grid" id="fgrid"></div>
+        <div class="arrow-flow"><div class="ar"></div></div>
+        <div class="md-target"><span class="hash">#</span></div>
+      </div>
+
+
+
+      <!-- scene 3: terminal -->
+      <div class="scene s3" id="scene3">
+        <div class="term">
+          <div class="bar">
+            <span class="d r"></span><span class="d y"></span><span class="d g"></span>
+            <span class="ttl">~ / projects / quarterly-report</span>
+          </div>
+          <div class="body" id="termbody">
+            <span class="ln"><span class="prompt">$</span><span class="cmd" id="tcmd"></span><span class="cursor" id="tcur"></span></span>
+            <span class="ln muted" id="tspin" style="opacity:0; margin-top: 10px;"><span class="spin"></span>Converting report.pdf · extracting structure · preserving tables…</span>
+            <span class="ln ok" id="tdone" style="opacity:0; margin-top: 10px;">✓ Done in 0.42s  →  report.md  ·  2,184 tokens  ·  structure preserved</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- scene 4: before/after -->
+      <div class="scene s4" id="scene4">
+        <div class="doc-card in">
+          <div class="card-hdr"><span class="dotd"></span>report.pdf  ·  binary</div>
+          <div class="pdf-look">
+            <div class="h">Q4 2025 Revenue Summary</div>
+            <div class="p">Cloud ARR expanded across all three regions, with strongest growth in EMEA driven by enterprise migrations.</div>
+            <div class="tbl">
+              <div class="th">Region</div><div class="th">ARR</div><div class="th">YoY</div>
+              <div>Americas</div><div>$48.2M</div><div>+22%</div>
+              <div>EMEA</div><div>$31.7M</div><div>+41%</div>
+              <div>APAC</div><div>$19.4M</div><div>+18%</div>
+            </div>
+          </div>
+        </div>
+        <div class="arrow-big"><div class="line"></div><div class="chev">→</div><div class="line b"></div></div>
+        <div class="doc-card out">
+          <div class="card-hdr"><span class="dotd"></span>report.md  ·  ready for LLM</div>
+          <div class="md-look" id="mdlook">
+            <span class="row"><span class="mh"># Q4 2025 Revenue Summary</span></span>
+            <span class="row"> </span>
+            <span class="row"><span class="mt">Cloud ARR expanded across all three</span></span>
+            <span class="row"><span class="mt">regions, with strongest growth in EMEA.</span></span>
+            <span class="row"> </span>
+            <span class="row"><span class="mm">| Region   | ARR    | YoY  |</span></span>
+            <span class="row"><span class="mm">|----------|--------|------|</span></span>
+            <span class="row"><span class="mt">| Americas | </span><span class="ma">$48.2M</span><span class="mt"> | </span><span class="mp">+22%</span><span class="mt"> |</span></span>
+            <span class="row"><span class="mt">| EMEA     | </span><span class="ma">$31.7M</span><span class="mt"> | </span><span class="mp">+41%</span><span class="mt"> |</span></span>
+            <span class="row"><span class="mt">| APAC     | </span><span class="ma">$19.4M</span><span class="mt"> | </span><span class="mp">+18%</span><span class="mt"> |</span></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- scene 5: install / outro -->
+      <div class="scene s5" id="scene5">
+        <div class="outro">
+          <div class="install-box">
+            <span class="cp">$</span>
+            <span>pip install <span class="st">'markitdown[all]'</span></span>
+            <span class="cpy">COPY</span>
+          </div>
+          <div class="stars">
+            <span class="chip"><b>★ 113.9k</b> stars</span>
+            <span class="chip">18 formats</span>
+            <span class="chip">MCP · OCR · plugins</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- footer -->
+    <div class="footer">
+      <div class="url">github.com/<b>microsoft/markitdown</b></div>
+      <div>v0.1.5  ·  MIT  ·  AutoGen team</div>
+    </div>
+  </div>
+
+<script>
+/* ---------- timeline ---------- */
+const TIMELINE = {
+  // scene starts (ms)
+  s1: 0,
+  s2: 3200,
+  s3: 7000,
+  s4: 12000,
+  s5: 16800,
+  loopPauseAt: 20000,
+};
+
+const HEROES = [
+  { at: 0,      html: 'Any document. <b>Markdown, instantly.</b>' },
+  { at: 3200,   html: '18 formats in. <b>Markdown out.</b>' },
+  { at: 7000,   html: 'One command. <b>Zero ceremony.</b>' },
+  { at: 12000,  html: 'Tables, headings, lists. <b>Preserved.</b>' },
+  { at: 16800,  html: 'Ready for your LLM. <b>pip-installable.</b>' },
+];
+
+const FORMATS = [
+  'PDF','DOCX','XLSX','PPTX','HTML','CSV',
+  'EPUB','MSG','MP3','WAV','JPG','PNG',
+  'JSON','XML','IPYNB','RSS','YT','ZIP'
+];
+
+/* ---------- helpers ---------- */
+let animTimers = [];
+function schedule(t, fn) { animTimers.push(setTimeout(fn, t)); }
+function clearAll() { animTimers.forEach(clearTimeout); animTimers = []; }
+
+function showScene(n) {
+  for (let i = 1; i <= 5; i++) {
+    document.getElementById('scene' + i).classList.toggle('in', i === n);
+  }
+  document.getElementById('cur').textContent = String(n).padStart(2, '0');
+  document.getElementById('bar').style.width = (n * 20) + '%';
+}
+
+function setHero(html) {
+  const el = document.getElementById('hero');
+  el.classList.remove('in');
+  setTimeout(() => {
+    el.innerHTML = html;
+    // force reflow then fade in
+    void el.offsetWidth;
+    el.classList.add('in');
+  }, 160);
+}
+
+/* ---------- scene builders ---------- */
+function buildFormats() {
+  const g = document.getElementById('fgrid');
+  g.innerHTML = '';
+  FORMATS.forEach((f, i) => {
+    const d = document.createElement('div');
+    d.className = 'fchip';
+    d.innerHTML = f + '<span class="tag">IN</span>';
+    g.appendChild(d);
+  });
+}
+
+function runScene2() {
+  const chips = document.querySelectorAll('#fgrid .fchip');
+  chips.forEach(c => { c.classList.remove('in','hot'); });
+  chips.forEach((c, i) => {
+    schedule(i * 55, () => c.classList.add('in'));
+  });
+  // pulse a rotating "hot" chip
+  let idx = 0;
+  const pulse = () => {
+    chips.forEach(c => c.classList.remove('hot'));
+    chips[idx % chips.length].classList.add('hot');
+    idx += 3;
+  };
+  schedule(1200, pulse);
+  schedule(1700, pulse);
+  schedule(2200, pulse);
+  schedule(2700, pulse);
+  schedule(3200, () => chips.forEach(c => c.classList.remove('hot')));
+}
+
+function typeText(el, text, speed, done) {
+  let i = 0;
+  const step = () => {
+    if (i <= text.length) {
+      el.textContent = text.slice(0, i);
+      i++;
+      animTimers.push(setTimeout(step, speed));
+    } else if (done) done();
+  };
+  step();
+}
+
+function runScene3() {
+  const cmd = document.getElementById('tcmd');
+  const spin = document.getElementById('tspin');
+  const done = document.getElementById('tdone');
+  cmd.textContent = '';
+  spin.style.opacity = 0;
+  done.style.opacity = 0;
+  document.getElementById('tcur').style.opacity = 1;
+  schedule(300, () => {
+    typeText(cmd, ' markitdown quarterly-report.pdf > report.md', 38, () => {
+      schedule(400, () => {
+        document.getElementById('tcur').style.opacity = 0;
+        spin.style.opacity = 1;
+      });
+      schedule(2200, () => {
+        spin.style.opacity = 0.55;
+      });
+      schedule(2600, () => {
+        spin.style.display = 'none';
+        done.style.opacity = 1;
+      });
+    });
+  });
+}
+
+function runScene4() {
+  const rows = document.querySelectorAll('#mdlook .row');
+  rows.forEach(r => r.classList.remove('in'));
+  rows.forEach((r, i) => {
+    schedule(200 + i * 180, () => r.classList.add('in'));
+  });
+}
+
+/* ---------- master loop ---------- */
+function runLoop() {
+  clearAll();
+  // reset
+  document.getElementById('tspin').style.display = 'inline';
+
+  // scene 1
+  showScene(1);
+  setHero(HEROES[0].html);
+
+  // scene 2
+  schedule(TIMELINE.s2, () => {
+    showScene(2);
+    setHero(HEROES[1].html);
+    runScene2();
+  });
+
+  // scene 3
+  schedule(TIMELINE.s3, () => {
+    showScene(3);
+    setHero(HEROES[2].html);
+    runScene3();
+  });
+
+  // scene 4
+  schedule(TIMELINE.s4, () => {
+    showScene(4);
+    setHero(HEROES[3].html);
+    runScene4();
+  });
+
+  // scene 5
+  schedule(TIMELINE.s5, () => {
+    showScene(5);
+    setHero(HEROES[4].html);
+  });
+
+  // loop
+  schedule(TIMELINE.loopPauseAt, runLoop);
+}
+
+buildFormats();
+// fade the initial hero in
+setTimeout(() => document.getElementById('hero').classList.add('in'), 50);
+window.runLoop = runLoop;
+runLoop();
+</script>
+</body>
+</html>
