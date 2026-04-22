@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from typing import Any, BinaryIO, Optional
 from ._stream_info import StreamInfo
 
@@ -40,13 +39,23 @@ class DocumentConverterResult:
         return self.markdown
 
 
-@dataclass
 class BatchConversionResult:
-    """Result of a single conversion within a convert_batch() call."""
+    """Result of a single conversion within a convert_batch() call.
 
-    source: Any  # The original input passed to convert_batch()
-    result: Optional["DocumentConverterResult"] = None
-    error: Optional[Exception] = None
+    Note: `success` returns True when no error is set. `result` may still be
+    None if `success` is True and no conversion output was produced.
+    """
+
+    def __init__(
+        self,
+        source: Any,
+        *,
+        result: Optional["DocumentConverterResult"] = None,
+        error: Optional[Exception] = None,
+    ):
+        self.source = source
+        self.result = result
+        self.error = error
 
     @property
     def success(self) -> bool:

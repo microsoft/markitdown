@@ -1,4 +1,5 @@
-import pytest
+#!/usr/bin/env python3 -m pytest
+# NOTE: importing from private module until Task 3 exports BatchConversionResult publicly
 from markitdown._base_converter import BatchConversionResult, DocumentConverterResult
 
 
