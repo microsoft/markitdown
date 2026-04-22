@@ -532,6 +532,24 @@ def test_markitdown_llm() -> None:
     validate_strings(result, PPTX_TEST_STRINGS)
 
 
+def test_html_link_text_bracket_escaping() -> None:
+    """Brackets in <a> text and <img> alt must be backslash-escaped so
+    downstream Markdown parsers don't mis-parse them as nested / reference-
+    style links (issue #1302)."""
+    markitdown = MarkItDown()
+
+    html = (
+        b"<html><body><p>"
+        b'See <a href="https://example.com/">Learn [GPT]</a> and '
+        b'<img src="https://example.com/x.png" alt="Alt [with] brackets"/>.'
+        b"</p></body></html>"
+    )
+    result = markitdown.convert_stream(io.BytesIO(html), file_extension=".html")
+
+    assert r"[Learn \[GPT\]](https://example.com/)" in result.text_content
+    assert r"![Alt \[with\] brackets](https://example.com/x.png)" in result.text_content
+
+
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     for test in [
@@ -547,6 +565,7 @@ if __name__ == "__main__":
         test_markitdown_exiftool,
         test_markitdown_llm_parameters,
         test_markitdown_llm,
+        test_html_link_text_bracket_escaping,
     ]:
         print(f"Running {test.__name__}...", end="")
         test()
