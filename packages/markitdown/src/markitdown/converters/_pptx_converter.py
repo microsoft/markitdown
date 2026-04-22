@@ -6,10 +6,9 @@ import re
 import html
 
 from typing import BinaryIO, Any
-from operator import attrgetter
 
 from ._html_converter import HtmlConverter
-from ._llm_caption import llm_caption
+from .._llm_caption import llm_caption
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
