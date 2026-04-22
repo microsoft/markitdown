@@ -53,7 +53,16 @@ class YouTubeConverter(DocumentConverter):
         url = unquote(url)
         url = url.replace(r"\?", "?").replace(r"\=", "=")
 
-        if not url.startswith("https://www.youtube.com/watch?"):
+        # Check for full YouTube URLs
+        if url.startswith("https://www.youtube.com/watch?"):
+            pass  # Standard watch URL
+        # Check for short URLs (youtu.be/...)
+        elif url.startswith("https://youtu.be/"):
+            pass  # Short URL
+        # Check for short videos (youtube.com/shorts/...)
+        elif url.startswith("https://www.youtube.com/shorts/"):
+            pass  # Short video URL
+        else:
             # Not a YouTube URL
             return False
 
@@ -148,9 +157,27 @@ class YouTubeConverter(DocumentConverter):
             ytt_api = YouTubeTranscriptApi()
             transcript_text = ""
             parsed_url = urlparse(stream_info.url)  # type: ignore
-            params = parse_qs(parsed_url.query)  # type: ignore
-            if "v" in params and params["v"][0]:
-                video_id = str(params["v"][0])
+            video_id = None
+
+            # Extract video ID from different YouTube URL formats
+            url = stream_info.url or ""  # type: ignore
+            if "youtu.be/" in url:
+                # Short URL format: https://youtu.be/VIDEO_ID
+                match = re.search(r'youtu\.be/([^?\s]+)', url)
+                if match:
+                    video_id = match.group(1)
+            elif "/shorts/" in url:
+                # Shorts format: https://www.youtube.com/shorts/VIDEO_ID
+                match = re.search(r'/shorts/([^?\s]+)', url)
+                if match:
+                    video_id = match.group(1)
+            else:
+                # Standard format: https://www.youtube.com/watch?v=VIDEO_ID
+                params = parse_qs(parsed_url.query)  # type: ignore
+                if "v" in params and params["v"][0]:
+                    video_id = str(params["v"][0])
+
+            if video_id:
                 transcript_list = ytt_api.list(video_id)
                 languages = ["en"]
                 for transcript in transcript_list:
