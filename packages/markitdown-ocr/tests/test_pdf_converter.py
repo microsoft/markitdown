@@ -190,6 +190,22 @@ def test_pdf_scanned_report(svc: MockOCRService) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Mixed text + scanned pages: a page with neither image objects nor a text
+# layer must still be OCR'd inline rather than silently dropped.
+# Regression test for microsoft/markitdown#1791.
+# ---------------------------------------------------------------------------
+
+
+def test_pdf_text_then_blank_page_is_ocred(svc: MockOCRService) -> None:
+    expected = (
+        "## Page 1\n\n\n"
+        "First page content, extracted as text.\n\n\n"
+        f"## Page 2\n\n\n{_OCR_BLOCK}"
+    )
+    assert _convert("pdf_text_then_blank.pdf", svc) == expected
+
+
+# ---------------------------------------------------------------------------
 # Scanned PDF fallback path (pdfplumber finds no text → full-page OCR)
 # ---------------------------------------------------------------------------
 
