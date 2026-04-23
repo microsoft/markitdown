@@ -23,6 +23,13 @@ MarkItDown currently supports the conversion from:
 - Youtube URLs
 - EPubs
 - ... and more!
+- 
+> **Tip:** For batch processing multiple files, you can use a simple shell loop:
+> ```bash
+> for file in *.pdf; do markitdown "$file" > "${file%.pdf}.md"; done
+> ```
+
+
 
 ## Why Markdown?
 
