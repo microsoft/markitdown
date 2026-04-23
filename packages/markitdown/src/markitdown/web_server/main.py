@@ -2,10 +2,13 @@ import os
 import io
 import uuid
 import asyncio
+import warnings
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 from pathlib import Path
 from dataclasses import dataclass, field
+
+warnings.filterwarnings("ignore", message="Couldn't find ffmpeg or avconv")
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
