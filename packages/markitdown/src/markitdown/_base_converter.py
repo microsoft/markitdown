@@ -50,18 +50,18 @@ class DocumentConverter:
     ) -> bool:
         """
         Return a quick determination on if the converter should attempt converting the document.
-        This is primarily based `stream_info` (typically, `stream_info.mimetype`, `stream_info.extension`).
-        In cases where the data is retrieved via HTTP, the `steam_info.url` might also be referenced to
+        This is primarily based on `stream_info` (typically, `stream_info.mimetype`, `stream_info.extension`).
+        In cases where the data is retrieved via HTTP, the `stream_info.url` might also be referenced to
         make a determination (e.g., special converters for Wikipedia, YouTube etc).
-        Finally, it is conceivable that the `stream_info.filename` might be used to in cases
+        Finally, it is conceivable that the `stream_info.filename` might be used in cases
         where the filename is well-known (e.g., `Dockerfile`, `Makefile`, etc)
 
         NOTE: The method signature is designed to match that of the convert() method. This provides some
         assurance that, if accepts() returns True, the convert() method will also be able to handle the document.
 
         IMPORTANT: In rare cases, (e.g., OutlookMsgConverter) we need to read more from the stream to make a final
-        determination. Read operations inevitably advances the position in file_stream. In these case, the position
-        MUST be reset it MUST be reset before returning. This is because the convert() method may be called immediately
+        determination. Read operations inevitably advance the position in file_stream. In these cases, the position
+        MUST be reset before returning. This is because the convert() method may be called immediately
         after accepts(), and will expect the file_stream to be at the original position.
 
         E.g.,
