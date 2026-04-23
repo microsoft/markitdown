@@ -20,6 +20,7 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Python :: Implementation :: PyPy",
 ]
@@ -45,7 +46,7 @@ all = [
   "olefile",
   "pydub",
   "SpeechRecognition",
-  "youtube-transcript-api~=1.0.0",
+  "youtube-transcript-api>=1.0.0",
   "azure-ai-documentintelligence",
   "azure-identity",
 ]
