@@ -217,6 +217,12 @@ def main():
         return
 
     # Batch mode
+    if args.output:
+        _exit_with_error("--output is only valid for single-file conversion.")
+
+    if args.output_dir:
+        os.makedirs(args.output_dir, exist_ok=True)
+
     on_error = "raise" if args.fail_fast else "collect"
     exit_code = 0
     try:
@@ -233,14 +239,13 @@ def main():
                     file=sys.stderr,
                 )
                 exit_code = 1
-            elif args.output_dir:
-                os.makedirs(args.output_dir, exist_ok=True)
+            elif args.output_dir and batch_result.result is not None:
                 source_name = os.path.basename(str(batch_result.source))
                 out_path = os.path.join(args.output_dir, source_name + ".md")
                 with open(out_path, "w", encoding="utf-8") as f:
                     f.write(batch_result.result.markdown)
                 print(f"Converted: {batch_result.source} -> {out_path}", file=sys.stderr)
-            else:
+            elif batch_result.result is not None:
                 print(f"\n--- {batch_result.source} ---\n")
                 print(
                     batch_result.result.markdown.encode(

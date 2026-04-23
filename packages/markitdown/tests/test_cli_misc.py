@@ -66,6 +66,7 @@ def test_cli_multi_file_fail_fast():
     result = subprocess.run(
         [
             "python", "-m", "markitdown",
+            os.path.join(TEST_FILES_DIR, "test.docx"),
             os.path.join(TEST_FILES_DIR, "nonexistent_xyz.pdf"),
             "--fail-fast",
         ],
