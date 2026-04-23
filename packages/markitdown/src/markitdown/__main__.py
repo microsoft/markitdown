@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: MIT
 import argparse
+import os
 import sys
 import codecs
 from textwrap import dedent
@@ -19,28 +20,20 @@ def main():
             """
             SYNTAX:
 
-                markitdown <OPTIONAL: FILENAME>
+                markitdown <OPTIONAL: FILENAME [FILENAME ...]>
                 If FILENAME is empty, markitdown reads from stdin.
 
-            EXAMPLE:
+            EXAMPLES:
 
                 markitdown example.pdf
 
-                OR
+                markitdown file1.pdf file2.docx file3.html
 
                 cat example.pdf | markitdown
 
-                OR
-
-                markitdown < example.pdf
-
-                OR to save to a file use
-
                 markitdown example.pdf -o example.md
 
-                OR
-
-                markitdown example.pdf > example.md
+                markitdown file1.pdf file2.docx --output-dir ./output/
             """
         ).strip(),
     )
@@ -56,7 +49,12 @@ def main():
     parser.add_argument(
         "-o",
         "--output",
-        help="Output file name. If not provided, output is written to stdout.",
+        help="Output file name. Only valid for single-file conversion.",
+    )
+
+    parser.add_argument(
+        "--output-dir",
+        help="Output directory for batch conversion. Each file is written to <dir>/<filename>.md.",
     )
 
     parser.add_argument(
@@ -110,7 +108,20 @@ def main():
         help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
     )
 
-    parser.add_argument("filename", nargs="?")
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        help="Number of parallel threads for batch conversion.",
+    )
+
+    parser.add_argument(
+        "--fail-fast",
+        action="store_true",
+        help="Abort batch conversion on the first error (default: collect errors and continue).",
+    )
+
+    parser.add_argument("filename", nargs="*")
     args = parser.parse_args()
 
     # Parse the extension hint
@@ -156,7 +167,6 @@ def main():
         )
 
     if args.list_plugins:
-        # List installed plugins, then exit
         print("Installed MarkItDown 3rd-party Plugins:\n")
         plugin_entry_points = list(entry_points(group="markitdown.plugin"))
         if len(plugin_entry_points) == 0:
@@ -177,7 +187,7 @@ def main():
             _exit_with_error(
                 "Document Intelligence Endpoint is required when using Document Intelligence."
             )
-        elif args.filename is None:
+        elif not args.filename:
             _exit_with_error("Filename is required when using Document Intelligence.")
 
         markitdown = MarkItDown(
@@ -186,18 +196,62 @@ def main():
     else:
         markitdown = MarkItDown(enable_plugins=args.use_plugins)
 
-    if args.filename is None:
+    # Stdin mode
+    if not args.filename:
         result = markitdown.convert_stream(
             sys.stdin.buffer,
             stream_info=stream_info,
             keep_data_uris=args.keep_data_uris,
         )
-    else:
-        result = markitdown.convert(
-            args.filename, stream_info=stream_info, keep_data_uris=args.keep_data_uris
-        )
+        _handle_output(args, result)
+        return
 
-    _handle_output(args, result)
+    # Single-file mode (preserves original behaviour exactly)
+    if len(args.filename) == 1 and args.output_dir is None:
+        result = markitdown.convert(
+            args.filename[0],
+            stream_info=stream_info,
+            keep_data_uris=args.keep_data_uris,
+        )
+        _handle_output(args, result)
+        return
+
+    # Batch mode
+    on_error = "raise" if args.fail_fast else "collect"
+    exit_code = 0
+    try:
+        for batch_result in markitdown.convert_batch(
+            args.filename,
+            on_error=on_error,
+            workers=args.workers,
+            stream_info=stream_info,
+            keep_data_uris=args.keep_data_uris,
+        ):
+            if not batch_result.success:
+                print(
+                    f"Error converting {batch_result.source}: {batch_result.error}",
+                    file=sys.stderr,
+                )
+                exit_code = 1
+            elif args.output_dir:
+                os.makedirs(args.output_dir, exist_ok=True)
+                source_name = os.path.basename(str(batch_result.source))
+                out_path = os.path.join(args.output_dir, source_name + ".md")
+                with open(out_path, "w", encoding="utf-8") as f:
+                    f.write(batch_result.result.markdown)
+                print(f"Converted: {batch_result.source} -> {out_path}", file=sys.stderr)
+            else:
+                print(f"\n--- {batch_result.source} ---\n")
+                print(
+                    batch_result.result.markdown.encode(
+                        sys.stdout.encoding, errors="replace"
+                    ).decode(sys.stdout.encoding)
+                )
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        exit_code = 1
+
+    sys.exit(exit_code)
 
 
 def _handle_output(args, result: DocumentConverterResult):
