@@ -5,15 +5,19 @@ import shutil
 import uuid
 import asyncio
 import warnings
+import zipfile
+import io
+import base64
 from datetime import datetime
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 from pathlib import Path
 from dataclasses import dataclass, field, asdict
+from urllib.parse import unquote, urlparse
 
 warnings.filterwarnings("ignore", message="Couldn't find ffmpeg or avconv")
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Form
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -274,6 +278,173 @@ def format_github_list(list_text: str) -> str:
     return '\n'.join(formatted) + '\n'
 
 
+def sanitize_filename(filename: str) -> str:
+    filename = unquote(filename)
+    filename = re.sub(r'[<>:"/\\|?*]', '_', filename)
+    filename = filename.strip('. ')
+    if not filename:
+        filename = 'file'
+    return filename
+
+
+def extract_images_from_pptx(file_path: Path, task_images_dir: Path) -> List[Dict]:
+    extracted_images = []
+    try:
+        import pptx
+        from pptx.enum.shapes import MSO_SHAPE_TYPE
+        
+        prs = pptx.Presentation(str(file_path))
+        image_counter = 0
+        
+        for slide_num, slide in enumerate(prs.slides, 1):
+            for shape in slide.shapes:
+                if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
+                    try:
+                        image_counter += 1
+                        image = shape.image
+                        image_filename = image.filename or f"image_{slide_num}_{image_counter}"
+                        image_ext = os.path.splitext(image_filename)[1] or '.png'
+                        safe_name = sanitize_filename(os.path.splitext(image_filename)[0])
+                        new_filename = f"{safe_name}_{image_counter}{image_ext}"
+                        new_img_path = task_images_dir / new_filename
+                        
+                        with open(new_img_path, 'wb') as f:
+                            f.write(image.blob)
+                        
+                        extracted_images.append({
+                            'original_name': image_filename,
+                            'saved_name': new_filename,
+                            'relative_path': f"images/{new_filename}",
+                            'slide_num': slide_num
+                        })
+                    except Exception:
+                        continue
+                
+                elif shape.shape_type == MSO_SHAPE_TYPE.GROUP:
+                    try:
+                        for subshape in shape.shapes:
+                            if hasattr(subshape, 'shape_type') and subshape.shape_type == MSO_SHAPE_TYPE.PICTURE:
+                                try:
+                                    image_counter += 1
+                                    image = subshape.image
+                                    image_filename = image.filename or f"image_{slide_num}_{image_counter}"
+                                    image_ext = os.path.splitext(image_filename)[1] or '.png'
+                                    safe_name = sanitize_filename(os.path.splitext(image_filename)[0])
+                                    new_filename = f"{safe_name}_{image_counter}{image_ext}"
+                                    new_img_path = task_images_dir / new_filename
+                                    
+                                    with open(new_img_path, 'wb') as f:
+                                        f.write(image.blob)
+                                    
+                                    extracted_images.append({
+                                        'original_name': image_filename,
+                                        'saved_name': new_filename,
+                                        'relative_path': f"images/{new_filename}",
+                                        'slide_num': slide_num
+                                    })
+                                except Exception:
+                                    continue
+                    except Exception:
+                        continue
+    except ImportError:
+        pass
+    except Exception:
+        pass
+    
+    return extracted_images
+
+
+def extract_images_from_docx(file_path: Path, task_images_dir: Path) -> List[Dict]:
+    extracted_images = []
+    try:
+        from docx import Document
+        from docx.oxml.ns import qn
+        from docx.oxml import OxmlElement
+        
+        doc = Document(str(file_path))
+        image_counter = 0
+        
+        for rel in doc.part.rels.values():
+            if "image" in rel.target_ref:
+                try:
+                    image_counter += 1
+                    image_part = rel.target_part
+                    image_ext = os.path.splitext(rel.target_ref)[1] or '.png'
+                    image_filename = os.path.basename(rel.target_ref)
+                    safe_name = sanitize_filename(os.path.splitext(image_filename)[0])
+                    new_filename = f"{safe_name}_{image_counter}{image_ext}"
+                    new_img_path = task_images_dir / new_filename
+                    
+                    with open(new_img_path, 'wb') as f:
+                        f.write(image_part.blob)
+                    
+                    extracted_images.append({
+                        'original_name': image_filename,
+                        'saved_name': new_filename,
+                        'relative_path': f"images/{new_filename}",
+                    })
+                except Exception:
+                    continue
+    except ImportError:
+        pass
+    except Exception:
+        pass
+    
+    return extracted_images
+
+
+def extract_images_from_html(markdown: str, task_images_dir: Path) -> Tuple[str, List[Dict]]:
+    extracted_images = []
+    result = markdown
+    image_counter = 0
+    
+    data_uri_pattern = r'!\[([^\]]*)\]\((data:image/[^;]+;base64,([^)]+))\)'
+    
+    matches = list(re.finditer(data_uri_pattern, markdown))
+    
+    for match in reversed(matches):
+        try:
+            alt_text = match.group(1)
+            full_data_uri = match.group(2)
+            base64_data = match.group(3)
+            start, end = match.span()
+            
+            mime_type = full_data_uri.split(';')[0].replace('data:', '')
+            ext_map = {
+                'image/png': '.png',
+                'image/jpeg': '.jpg',
+                'image/jpg': '.jpg',
+                'image/gif': '.gif',
+                'image/bmp': '.bmp',
+                'image/webp': '.webp',
+            }
+            image_ext = ext_map.get(mime_type, '.png')
+            
+            image_counter += 1
+            safe_name = sanitize_filename(alt_text) if alt_text else 'image'
+            new_filename = f"{safe_name}_{image_counter}{image_ext}"
+            new_img_path = task_images_dir / new_filename
+            
+            image_data = base64.b64decode(base64_data)
+            with open(new_img_path, 'wb') as f:
+                f.write(image_data)
+            
+            extracted_images.append({
+                'original_name': f"base64_image_{image_counter}",
+                'saved_name': new_filename,
+                'relative_path': f"images/{new_filename}",
+            })
+            
+            relative_url = f"images/{new_filename}"
+            replacement = f"![{alt_text}]({relative_url})"
+            result = result[:start] + replacement + result[end:]
+            
+        except Exception:
+            continue
+    
+    return result, extracted_images
+
+
 def load_history() -> List[Dict]:
     if not HISTORY_FILE.exists():
         return []
@@ -316,41 +487,80 @@ def add_to_history(progress: ConversionProgress):
     save_history(history)
 
 
-def extract_and_save_images(markdown: str, task_id: str) -> tuple:
-    img_pattern = r'!\[([^\]]*)\]\(([^)]+)\)'
+def extract_and_save_images(
+    markdown: str, 
+    task_id: str, 
+    file_path: Optional[Path] = None,
+    options: Optional[ConversionOptions] = None
+) -> Tuple[str, List[str]]:
     images = []
     result = markdown
     
     task_images_dir = IMAGES_DIR / task_id
     task_images_dir.mkdir(exist_ok=True)
     
-    matches = list(re.finditer(img_pattern, markdown))
+    if options and options.extract_images:
+        if file_path:
+            file_ext = file_path.suffix.lower()
+            
+            if file_ext == '.pptx':
+                extracted = extract_images_from_pptx(file_path, task_images_dir)
+                for img in extracted:
+                    images.append(img['relative_path'])
+            
+            elif file_ext == '.docx':
+                extracted = extract_images_from_docx(file_path, task_images_dir)
+                for img in extracted:
+                    images.append(img['relative_path'])
+        
+        result, base64_images = extract_images_from_html(result, task_images_dir)
+        for img in base64_images:
+            if img['relative_path'] not in images:
+                images.append(img['relative_path'])
+    
+    img_pattern = r'!\[([^\]]*)\]\(([^)]+)\)'
+    matches = list(re.finditer(img_pattern, result))
+    
+    image_name_map = {}
+    for img_info in images:
+        img_name = os.path.basename(img_info)
+        image_name_map[img_name] = img_info
     
     for match in reversed(matches):
         alt_text = match.group(1)
         img_path = match.group(2)
         start, end = match.span()
         
-        if img_path.startswith(('http://', 'https://', 'data:')):
+        if img_path.startswith(('http://', 'https://')):
+            continue
+        
+        if img_path.startswith('data:'):
+            continue
+        
+        img_name = os.path.basename(img_path)
+        
+        if img_name in image_name_map:
+            relative_path = image_name_map[img_name]
+            api_url = f"/api/images/{task_id}/{img_name}"
+            replacement = f"![{alt_text}]({api_url})"
+            result = result[:start] + replacement + result[end:]
             continue
         
         original_img_path = Path(img_path)
-        new_img_name = f"{uuid.uuid4()}{original_img_path.suffix or '.png'}"
-        new_img_path = task_images_dir / new_img_name
-        
-        try:
-            source_path = Path(original_img_path)
-            if source_path.exists():
-                shutil.copy2(source_path, new_img_path)
-                images.append(f"images/{task_id}/{new_img_name}")
-            else:
+        if original_img_path.is_absolute() and original_img_path.exists():
+            new_img_name = f"{uuid.uuid4()}{original_img_path.suffix or '.png'}"
+            new_img_path = task_images_dir / new_img_name
+            
+            try:
+                shutil.copy2(original_img_path, new_img_path)
+                relative_path = f"images/{new_img_name}"
+                images.append(relative_path)
+                
+                api_url = f"/api/images/{task_id}/{new_img_name}"
+                replacement = f"![{alt_text}]({api_url})"
+                result = result[:start] + replacement + result[end:]
+            except Exception:
                 continue
-        except Exception:
-            continue
-        
-        relative_url = f"/api/images/{task_id}/{new_img_name}"
-        replacement = f"![{alt_text}]({relative_url})"
-        result = result[:start] + replacement + result[end:]
     
     return result, images
 
@@ -382,7 +592,12 @@ async def convert_file_task(task_id: str, file_path: Path, filename: str, option
         progress.progress = 70
         
         if options.extract_images:
-            content, extracted_images = extract_and_save_images(content, task_id)
+            content, extracted_images = extract_and_save_images(
+                content, 
+                task_id, 
+                file_path,
+                options
+            )
             progress.images = extracted_images
         
         progress.progress = 80
@@ -574,8 +789,41 @@ async def get_progress(task_id: str):
     )
 
 
+def create_zip_package(task_id: str, progress: ConversionProgress) -> io.BytesIO:
+    zip_buffer = io.BytesIO()
+    
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        result_path = RESULT_DIR / progress.result
+        if result_path.exists():
+            with open(result_path, 'r', encoding='utf-8') as f:
+                md_content = f.read()
+            
+            md_content = re.sub(
+                r'!\[([^\]]*)\]\(/api/images/[^/]+/([^)]+)\)',
+                r'![\1](images/\2)',
+                md_content
+            )
+            
+            original_filename = Path(progress.filename).stem
+            safe_filename = sanitize_filename(original_filename)
+            md_filename = f"{safe_filename}.md"
+            
+            zip_file.writestr(md_filename, md_content.encode('utf-8'))
+        
+        task_images_dir = IMAGES_DIR / task_id
+        if task_images_dir.exists():
+            for img_file in task_images_dir.iterdir():
+                if img_file.is_file():
+                    img_filename = sanitize_filename(img_file.name)
+                    arcname = f"images/{img_filename}"
+                    zip_file.write(str(img_file), arcname)
+    
+    zip_buffer.seek(0)
+    return zip_buffer
+
+
 @app.get("/api/download/{task_id}")
-async def download_result(task_id: str):
+async def download_result(task_id: str, format: str = "auto"):
     if task_id not in conversion_tasks:
         raise HTTPException(status_code=404, detail="Task not found")
     
@@ -589,14 +837,50 @@ async def download_result(task_id: str):
     if not result_path.exists():
         raise HTTPException(status_code=404, detail="Result file not found")
     
-    original_filename = Path(progress.filename).stem
-    download_filename = f"{original_filename}.md"
+    has_images = progress.images and len(progress.images) > 0
     
-    return FileResponse(
-        path=str(result_path),
-        media_type="text/markdown",
-        filename=download_filename,
-    )
+    if format == "zip" or (format == "auto" and has_images):
+        zip_buffer = create_zip_package(task_id, progress)
+        
+        original_filename = Path(progress.filename).stem
+        safe_filename = sanitize_filename(original_filename)
+        download_filename = f"{safe_filename}.zip"
+        
+        return StreamingResponse(
+            io.BytesIO(zip_buffer.getvalue()),
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": f"attachment; filename*=UTF-8''{download_filename}"
+            }
+        )
+    else:
+        with open(result_path, 'r', encoding='utf-8') as f:
+            md_content = f.read()
+        
+        md_content = re.sub(
+            r'!\[([^\]]*)\]\(/api/images/[^/]+/([^)]+)\)',
+            r'![\1](images/\2)',
+            md_content
+        )
+        
+        original_filename = Path(progress.filename).stem
+        safe_filename = sanitize_filename(original_filename)
+        download_filename = f"{safe_filename}.md"
+        
+        temp_md_path = RESULT_DIR / f"{task_id}_download.md"
+        with open(temp_md_path, 'w', encoding='utf-8') as f:
+            f.write(md_content)
+        
+        return FileResponse(
+            path=str(temp_md_path),
+            media_type="text/markdown",
+            filename=download_filename,
+        )
+
+
+@app.get("/api/download/{task_id}/zip")
+async def download_result_zip(task_id: str):
+    return await download_result(task_id, format="zip")
 
 
 @app.get("/api/result/{task_id}")

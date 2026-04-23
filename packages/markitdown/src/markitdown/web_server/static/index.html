@@ -1234,6 +1234,39 @@
             poll();
         }
 
+        function parseMarkdownToHtml(markdown, taskId) {
+            let html = escapeHtml(markdown);
+            
+            html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, src) => {
+                let imgSrc = src.trim();
+                
+                if (imgSrc.startsWith('/api/images/')) {
+                    imgSrc = imgSrc;
+                } else if (imgSrc.startsWith('images/') && taskId) {
+                    const imgName = imgSrc.replace('images/', '');
+                    imgSrc = `/api/images/${taskId}/${imgName}`;
+                }
+                
+                return `<img src="${imgSrc}" alt="${alt}" style="max-width: 100%; height: auto; border-radius: 8px; margin: 16px 0;" loading="lazy">`;
+            });
+            
+            html = html
+                .replace(/^### (.*$)/gim, '<h3 style="margin-top: 24px; margin-bottom: 12px; color: #f1f5f9; font-weight: 600;">$1</h3>')
+                .replace(/^## (.*$)/gim, '<h2 style="margin-top: 28px; margin-bottom: 16px; color: #f1f5f9; font-weight: 600;">$1</h2>')
+                .replace(/^# (.*$)/gim, '<h1 style="margin-top: 32px; margin-bottom: 20px; color: #f1f5f9; font-weight: 700;">$1</h1>')
+                .replace(/\*\*\*(.*?)\*\*\*/gim, '<strong><em>$1</em></strong>')
+                .replace(/\*\*(.*?)\*\*/gim, '<strong style="color: #f1f5f9;">$1</strong>')
+                .replace(/\*(.*?)\*/gim, '<em>$1</em>')
+                .replace(/`([^`]+)`/gim, '<code style="background: rgba(99, 102, 241, 0.2); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #06b6d4;">$1</code>')
+                .replace(/^- (.*$)/gim, '<li style="margin-bottom: 8px; color: #94a3b8;">• $1</li>')
+                .replace(/^\d+\. (.*$)/gim, '<li style="margin-bottom: 8px; color: #94a3b8;">$1</li>')
+                .replace(/^> (.*$)/gim, '<blockquote style="border-left: 3px solid #6366f1; padding-left: 16px; margin: 16px 0; color: #94a3b8; font-style: italic;">$1</blockquote>')
+                .replace(/\n\n/g, '</p><p style="margin-bottom: 16px; color: #94a3b8; line-height: 1.7;">')
+                .replace(/\n/g, '<br>');
+            
+            return `<p style="margin-bottom: 16px; color: #94a3b8; line-height: 1.7;">${html}</p>`;
+        }
+
         async function previewTask(taskId) {
             try {
                 const response = await fetch(`/api/result/${taskId}`);
@@ -1246,22 +1279,8 @@
                 previewContent = data.content;
                 previewTitle.textContent = data.filename;
                 
-                let htmlContent = escapeHtml(data.content);
-                htmlContent = htmlContent
-                    .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-                    .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-                    .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-                    .replace(/\*\*\*(.*?)\*\*\*/gim, '<strong><em>$1</em></strong>')
-                    .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
-                    .replace(/\*(.*?)\*/gim, '<em>$1</em>')
-                    .replace(/`([^`]+)`/gim, '<code>$1</code>')
-                    .replace(/^- (.*$)/gim, '<li>$1</li>')
-                    .replace(/^\d+\. (.*$)/gim, '<li>$1</li>')
-                    .replace(/^> (.*$)/gim, '<blockquote>$1</blockquote>')
-                    .replace(/\n\n/g, '</p><p>')
-                    .replace(/\n/g, '<br>');
-                
-                previewContentEl.innerHTML = `<p>${htmlContent}</p>`;
+                const htmlContent = parseMarkdownToHtml(data.content, taskId);
+                previewContentEl.innerHTML = htmlContent;
                 previewModal.classList.remove('hidden');
                 
             } catch (error) {
@@ -1282,18 +1301,49 @@
                 const a = document.createElement('a');
                 a.href = url;
                 
-                const task = tasks.get(taskId);
-                if (task) {
-                    const filename = task.filename.split('.').slice(0, -1).join('.') + '.md';
-                    a.download = filename;
+                const contentType = response.headers.get('Content-Type') || '';
+                const contentDisposition = response.headers.get('Content-Disposition') || '';
+                
+                let filename = '';
+                
+                if (contentDisposition) {
+                    const filenameMatch = contentDisposition.match(/filename\*=UTF-8''(.+)/i);
+                    if (filenameMatch) {
+                        filename = decodeURIComponent(filenameMatch[1]);
+                    } else {
+                        const simpleMatch = contentDisposition.match(/filename="?([^"]+)"?/i);
+                        if (simpleMatch) {
+                            filename = simpleMatch[1];
+                        }
+                    }
                 }
+                
+                if (!filename) {
+                    const task = tasks.get(taskId);
+                    if (task) {
+                        const baseName = task.filename.split('.').slice(0, -1).join('.');
+                        if (contentType.includes('zip') || contentType.includes('application/zip')) {
+                            filename = `${baseName}.zip`;
+                        } else {
+                            filename = `${baseName}.md`;
+                        }
+                    } else {
+                        if (contentType.includes('zip') || contentType.includes('application/zip')) {
+                            filename = 'download.zip';
+                        } else {
+                            filename = 'download.md';
+                        }
+                    }
+                }
+                
+                a.download = filename;
                 
                 document.body.appendChild(a);
                 a.click();
                 window.URL.revokeObjectURL(url);
                 document.body.removeChild(a);
                 
-                showToast('下载已开始', 'success');
+                showToast(`下载已开始: ${filename}`, 'success');
                 
             } catch (error) {
                 showToast(error.message, 'error');

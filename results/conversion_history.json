@@ -1,5 +1,36 @@
 [
   {
+    "task_id": "6557a2b5-c650-4d70-8a6e-591bec25bf5a",
+    "filename": "本周工作.pptx",
+    "status": "completed",
+    "created_at": "2026-04-23T18:50:08.408541",
+    "completed_at": "2026-04-23T18:50:08.665472",
+    "output_format": "standard",
+    "images_extracted": true,
+    "images": [
+      "images/image_1.jpeg",
+      "images/image_2.png",
+      "images/image_3.png",
+      "images/image_4.png",
+      "images/image_5.png",
+      "images/image_6.png"
+    ],
+    "file_size": 941513,
+    "result_file": "6557a2b5-c650-4d70-8a6e-591bec25bf5a.md"
+  },
+  {
+    "task_id": "1b56fafa-99a8-4003-8701-aecd03358d1a",
+    "filename": "文本信息处理与机器翻译课程总结报告.docx",
+    "status": "completed",
+    "created_at": "2026-04-23T18:50:01.615846",
+    "completed_at": "2026-04-23T18:50:01.879264",
+    "output_format": "standard",
+    "images_extracted": true,
+    "images": [],
+    "file_size": 24507,
+    "result_file": "1b56fafa-99a8-4003-8701-aecd03358d1a.md"
+  },
+  {
     "task_id": "f3f0320b-89db-4819-a035-c646e2b83b12",
     "filename": "Feature decoupling and regeneration towards wifi-based human activity recognition.pdf",
     "status": "completed",
