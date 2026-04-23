@@ -17,7 +17,7 @@ from urllib.parse import unquote, quote, urlparse
 warnings.filterwarnings("ignore", message="Couldn't find ffmpeg or avconv")
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Form
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -1003,8 +1003,7 @@ def replace_api_path_with_relative(match: re.Match) -> str:
     """
     alt_text = match.group(1)
     encoded_filename = match.group(2)
-    decoded_filename = unquote(encoded_filename)
-    safe_filename = sanitize_filename(decoded_filename)
+    safe_filename = sanitize_filename(encoded_filename)
     return f"![{alt_text}](images/{safe_filename})"
 
 
@@ -1033,8 +1032,7 @@ def create_zip_package(task_id: str, progress: ConversionProgress) -> io.BytesIO
         if task_images_dir.exists():
             for img_file in task_images_dir.iterdir():
                 if img_file.is_file():
-                    img_filename = sanitize_filename(img_file.name)
-                    arcname = f"images/{img_filename}"
+                    arcname = f"images/{img_file.name}"
                     zip_file.write(str(img_file), arcname)
     
     zip_buffer.seek(0)
@@ -1065,11 +1063,13 @@ async def download_result(task_id: str, format: str = "auto"):
         safe_filename = sanitize_filename(original_filename)
         download_filename = f"{safe_filename}.zip"
         
-        return StreamingResponse(
-            io.BytesIO(zip_buffer.getvalue()),
+        zip_data = zip_buffer.getvalue()
+        
+        return Response(
+            content=zip_data,
             media_type="application/zip",
             headers={
-                "Content-Disposition": f"attachment; filename*=UTF-8''{download_filename}"
+                "Content-Disposition": f"attachment; filename*=UTF-8''{quote(download_filename, safe='')}"
             }
         )
     else:

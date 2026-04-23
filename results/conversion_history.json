@@ -1,5 +1,42 @@
 [
   {
+    "task_id": "628d0289-b26b-4e72-a466-403102d4a92f",
+    "filename": "本周工作.pptx",
+    "status": "completed",
+    "created_at": "2026-04-23T20:08:44.623627",
+    "completed_at": "2026-04-23T20:08:44.999433",
+    "output_format": "standard",
+    "images_extracted": true,
+    "images": [
+      "images/image_1.jpeg",
+      "images/image_2.png",
+      "images/image_3.png",
+      "images/image_4.png",
+      "images/image_5.png",
+      "images/image_6.png",
+      "images/image_1.png",
+      "images/image_2.png",
+      "images/image_3.png",
+      "images/image_4.png",
+      "images/image_5.png",
+      "images/1_6.jpg"
+    ],
+    "file_size": 941513,
+    "result_file": "628d0289-b26b-4e72-a466-403102d4a92f.md"
+  },
+  {
+    "task_id": "eadc78c0-9906-4180-add1-523697fd4e36",
+    "filename": "本周工作.pptx",
+    "status": "completed",
+    "created_at": "2026-04-23T20:08:33.937301",
+    "completed_at": "2026-04-23T20:08:34.365948",
+    "output_format": "standard",
+    "images_extracted": false,
+    "images": [],
+    "file_size": 941513,
+    "result_file": "eadc78c0-9906-4180-add1-523697fd4e36.md"
+  },
+  {
     "task_id": "2778d35e-17c9-455a-8919-453990153901",
     "filename": "本周工作.pptx",
     "status": "completed",
