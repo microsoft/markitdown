@@ -1,5 +1,93 @@
 [
   {
+    "task_id": "2778d35e-17c9-455a-8919-453990153901",
+    "filename": "本周工作.pptx",
+    "status": "completed",
+    "created_at": "2026-04-23T19:49:44.107628",
+    "completed_at": "2026-04-23T19:49:44.478757",
+    "output_format": "standard",
+    "images_extracted": true,
+    "images": [
+      "images/image_1.jpeg",
+      "images/image_2.png",
+      "images/image_3.png",
+      "images/image_4.png",
+      "images/image_5.png",
+      "images/image_6.png",
+      "images/image_1.png",
+      "images/image_2.png",
+      "images/image_3.png",
+      "images/image_4.png",
+      "images/image_5.png",
+      "images/1_6.jpg"
+    ],
+    "file_size": 941513,
+    "result_file": "2778d35e-17c9-455a-8919-453990153901.md"
+  },
+  {
+    "task_id": "00e85494-45c1-4d0c-9a4c-22d034cc1709",
+    "filename": "Feature decoupling and regeneration towards wifi-based human activity recognition.pdf",
+    "status": "completed",
+    "created_at": "2026-04-23T19:48:42.816699",
+    "completed_at": "2026-04-23T19:48:58.796718",
+    "output_format": "standard",
+    "images_extracted": true,
+    "images": [],
+    "file_size": 1274106,
+    "result_file": "00e85494-45c1-4d0c-9a4c-22d034cc1709.md"
+  },
+  {
+    "task_id": "7edb8042-750f-48fc-9c6d-24e012b1db88",
+    "filename": "index.html",
+    "status": "completed",
+    "created_at": "2026-04-23T19:48:22.443809",
+    "completed_at": "2026-04-23T19:48:22.644471",
+    "output_format": "standard",
+    "images_extracted": true,
+    "images": [],
+    "file_size": 10151,
+    "result_file": "7edb8042-750f-48fc-9c6d-24e012b1db88.md"
+  },
+  {
+    "task_id": "4062502a-84a6-4af5-a05a-7bd4be269fb4",
+    "filename": "本周工作.pptx",
+    "status": "completed",
+    "created_at": "2026-04-23T19:47:15.628435",
+    "completed_at": "2026-04-23T19:47:16.023472",
+    "output_format": "standard",
+    "images_extracted": true,
+    "images": [
+      "images/image_1.jpeg",
+      "images/image_2.png",
+      "images/image_3.png",
+      "images/image_4.png",
+      "images/image_5.png",
+      "images/image_6.png",
+      "images/image_1.png",
+      "images/image_2.png",
+      "images/image_3.png",
+      "images/image_4.png",
+      "images/image_5.png",
+      "images/1_6.jpg"
+    ],
+    "file_size": 941513,
+    "result_file": "4062502a-84a6-4af5-a05a-7bd4be269fb4.md"
+  },
+  {
+    "task_id": "9325a8cb-c1bd-456e-92f9-f67d23dae795",
+    "filename": "文本信息处理与机器翻译课程总结报告.docx",
+    "status": "completed",
+    "created_at": "2026-04-23T19:47:08.692291",
+    "completed_at": "2026-04-23T19:47:08.889138",
+    "output_format": "standard",
+    "images_extracted": true,
+    "images": [
+      "images/1_1.jpg"
+    ],
+    "file_size": 97335,
+    "result_file": "9325a8cb-c1bd-456e-92f9-f67d23dae795.md"
+  },
+  {
     "task_id": "75561601-bb87-4957-a8d0-ecce428ca639",
     "filename": "组会4.13.pptx",
     "status": "completed",

@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any, Tuple
 from pathlib import Path
 from dataclasses import dataclass, field, asdict
-from urllib.parse import unquote, urlparse
+from urllib.parse import unquote, quote, urlparse
 
 warnings.filterwarnings("ignore", message="Couldn't find ffmpeg or avconv")
 
@@ -50,8 +50,8 @@ RESULT_DIR = Path("results")
 IMAGES_DIR = Path("results/images")
 HISTORY_FILE = Path("results/conversion_history.json")
 UPLOAD_DIR.mkdir(exist_ok=True)
-RESULT_DIR.mkdir(exist_ok=True)
-IMAGES_DIR.mkdir(exist_ok=True)
+RESULT_DIR.mkdir(parents=True, exist_ok=True)
+IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 
 
 conversion_tasks: Dict[str, Any] = {}
@@ -324,7 +324,7 @@ def extract_all_images_from_pptx(file_path: Path, task_images_dir: Path, task_id
                             'original_name': image_filename,
                             'saved_name': new_filename,
                             'relative_path': f"images/{new_filename}",
-                            'api_path': f"/api/images/{task_id}/{new_filename}",
+                            'api_path': f"/api/images/{task_id}/{quote(new_filename, safe='')}",
                             'slide_num': slide_num,
                             'index': image_counter
                         }
@@ -361,7 +361,7 @@ def extract_all_images_from_pptx(file_path: Path, task_images_dir: Path, task_id
                                         'original_name': image_filename,
                                         'saved_name': new_filename,
                                         'relative_path': f"images/{new_filename}",
-                                        'api_path': f"/api/images/{task_id}/{new_filename}",
+                                        'api_path': f"/api/images/{task_id}/{quote(new_filename, safe='')}",
                                         'slide_num': slide_num,
                                         'index': image_counter
                                     }
@@ -414,7 +414,7 @@ def extract_all_images_from_docx(file_path: Path, task_images_dir: Path, task_id
                         'original_name': image_filename,
                         'saved_name': new_filename,
                         'relative_path': f"images/{new_filename}",
-                        'api_path': f"/api/images/{task_id}/{new_filename}",
+                        'api_path': f"/api/images/{task_id}/{quote(new_filename, safe='')}",
                         'index': image_counter
                     }
                     extracted_images.append(img_info)
@@ -476,7 +476,7 @@ def extract_base64_images(markdown: str, task_images_dir: Path, task_id: str) ->
                 'original_name': f"base64_image_{image_counter}",
                 'saved_name': new_filename,
                 'relative_path': f"images/{new_filename}",
-                'api_path': f"/api/images/{task_id}/{new_filename}",
+                'api_path': f"/api/images/{task_id}/{quote(new_filename, safe='')}",
                 'index': image_counter
             }
             extracted_images.append(img_info)
@@ -514,6 +514,23 @@ def find_all_image_references(markdown: str) -> List[Dict]:
     return references
 
 
+def normalize_image_name(name: str) -> str:
+    """
+    标准化图片名称，用于匹配
+    - 解码 URL 编码
+    - 移除特殊字符
+    - 统一为小写
+    """
+    if not name:
+        return ''
+    
+    name = unquote(name)
+    name = os.path.basename(name)
+    name = os.path.splitext(name)[0]
+    name = re.sub(r'[\W_]+', '', name)
+    return name.lower()
+
+
 def smart_match_images(image_references: List[Dict], extracted_images: List[Dict], md_images: List[Dict]) -> Dict:
     """
     智能匹配图片引用
@@ -522,30 +539,55 @@ def smart_match_images(image_references: List[Dict], extracted_images: List[Dict
     matches = {}
     
     placeholder_map = {}
+    normalized_placeholder_map = {}
+    
     for ref in image_references:
         placeholder_name = ref.get('placeholder_name', '')
-        placeholder_map[placeholder_name.lower()] = ref.get('image_info')
+        img_info = ref.get('image_info')
+        
+        if img_info:
+            placeholder_map[placeholder_name.lower()] = img_info
+            
+            normalized_name = normalize_image_name(placeholder_name)
+            if normalized_name:
+                normalized_placeholder_map[normalized_name] = img_info
+            
+            saved_name = img_info.get('saved_name', '')
+            if saved_name:
+                placeholder_map[saved_name.lower()] = img_info
+                normalized_saved = normalize_image_name(saved_name)
+                if normalized_saved:
+                    normalized_placeholder_map[normalized_saved] = img_info
+            
+            original_name = img_info.get('original_name', '')
+            if original_name:
+                placeholder_map[original_name.lower()] = img_info
+                normalized_original = normalize_image_name(original_name)
+                if normalized_original:
+                    normalized_placeholder_map[normalized_original] = img_info
     
     for i, md_img in enumerate(md_images):
         md_path = md_img['path']
+        
+        if md_path.startswith('/api/images/'):
+            continue
+        
         md_filename = os.path.basename(md_path).lower()
         
         if md_filename in placeholder_map:
             matches[i] = placeholder_map[md_filename]
             continue
         
-        for ref in image_references:
-            img_info = ref.get('image_info', {})
-            saved_name = img_info.get('saved_name', '').lower()
-            original_name = img_info.get('original_name', '').lower()
-            
-            if md_filename == saved_name or md_filename == original_name:
-                matches[i] = img_info
-                break
+        normalized_md = normalize_image_name(md_path)
+        if normalized_md and normalized_md in normalized_placeholder_map:
+            matches[i] = normalized_placeholder_map[normalized_md]
+            continue
     
     for i, md_img in enumerate(md_images):
         if i not in matches and i < len(extracted_images):
-            matches[i] = extracted_images[i]
+            md_path = md_img['path']
+            if not md_path.startswith('/api/images/'):
+                matches[i] = extracted_images[i]
     
     return matches
 
@@ -736,7 +778,12 @@ async def convert_file_task(task_id: str, file_path: Path, filename: str, option
         await asyncio.sleep(0.1)
         
         progress.progress = 30
-        result = markitdown_instance.convert(str(file_path))
+        
+        convert_kwargs = {}
+        if options and options.extract_images:
+            convert_kwargs["keep_data_uris"] = True
+        
+        result = markitdown_instance.convert(str(file_path), **convert_kwargs)
         
         progress.progress = 60
         content = result.text_content
@@ -950,6 +997,17 @@ async def get_progress(task_id: str):
     )
 
 
+def replace_api_path_with_relative(match: re.Match) -> str:
+    """
+    替换 API 路径为相对路径，并解码 URL 编码的文件名
+    """
+    alt_text = match.group(1)
+    encoded_filename = match.group(2)
+    decoded_filename = unquote(encoded_filename)
+    safe_filename = sanitize_filename(decoded_filename)
+    return f"![{alt_text}](images/{safe_filename})"
+
+
 def create_zip_package(task_id: str, progress: ConversionProgress) -> io.BytesIO:
     zip_buffer = io.BytesIO()
     
@@ -961,7 +1019,7 @@ def create_zip_package(task_id: str, progress: ConversionProgress) -> io.BytesIO
             
             md_content = re.sub(
                 r'!\[([^\]]*)\]\(/api/images/[^/]+/([^)]+)\)',
-                r'![\1](images/\2)',
+                replace_api_path_with_relative,
                 md_content
             )
             
@@ -1020,7 +1078,7 @@ async def download_result(task_id: str, format: str = "auto"):
         
         md_content = re.sub(
             r'!\[([^\]]*)\]\(/api/images/[^/]+/([^)]+)\)',
-            r'![\1](images/\2)',
+            replace_api_path_with_relative,
             md_content
         )
         
@@ -1352,9 +1410,4 @@ static_dir = Path(__file__).parent / "static"
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
-images_abs_dir = Path(__file__).parent.parent.parent.parent.parent / IMAGES_DIR
-if not images_abs_dir.exists():
-    images_abs_dir = IMAGES_DIR
-    
-if images_abs_dir.exists():
-    app.mount("/images", StaticFiles(directory=str(images_abs_dir)), name="extracted_images")
+app.mount("/images", StaticFiles(directory=str(IMAGES_DIR)), name="extracted_images")
