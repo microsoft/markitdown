@@ -96,6 +96,35 @@ def _replace_equations(tag: Tag):
         raise ValueError(f"Not supported tag: {tag.name}")
 
 
+def _pre_process_superscript(content: bytes) -> bytes:
+    """
+    Pre-processes superscript content in a DOCX XML file by wrapping it with <sup> tags.
+
+    Args:
+        content (bytes): The XML content of the DOCX file as bytes.
+
+    Returns:
+        bytes: The processed content with superscripts wrapped in <sup> tags, encoded as bytes.
+    """
+    soup = BeautifulSoup(content.decode(), features="xml")
+    # Find all 'w:r' (run) elements
+    for run_tag in soup.find_all("w:r"):
+        # Check if this run has superscript properties
+        run_properties = run_tag.find("w:rPr")
+        if run_properties:
+            vert_align = run_properties.find("w:vertAlign", {"w:val": "superscript"})
+            if vert_align:
+                # If it's a superscript, find the text content and wrap it
+                text_tag = run_tag.find("w:t")
+                if text_tag and text_tag.string:
+                    # Create a new <sup> tag and move the text content into it
+                    sup_tag = soup.new_tag("sup")
+                    sup_tag.string = text_tag.string
+                    text_tag.string = "" # Clear the original text
+                    text_tag.append(sup_tag) # Append the <sup> tag to the w:t tag
+    return str(soup).encode()
+
+
 def _pre_process_math(content: bytes) -> bytes:
     """
     Pre-processes the math content in a DOCX -> XML file by converting OMML (Office Math Markup Language) elements to LaTeX.
@@ -145,6 +174,7 @@ def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
                     try:
                         # Pre-process the content
                         updated_content = _pre_process_math(content)
+                        updated_content = _pre_process_superscript(updated_content) # Add this line
                         # In the future, if there are more pre-processing steps, they can be added here
                         zip_output.writestr(name, updated_content)
                     except Exception:
