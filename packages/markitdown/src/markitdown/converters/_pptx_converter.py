@@ -219,10 +219,14 @@ class PptxConverter(DocumentConverter):
         for row in table.rows:
             html_table += "<tr>"
             for cell in row.cells:
+                # Escape cell text: html.escape handles <, >, &, etc.
+                # Pipe characters (|) are also escaped to prevent breaking
+                # the markdown table structure after HTML-to-Markdown conversion.
+                escaped_text = html.escape(cell.text).replace("|", "\|")
                 if first_row:
-                    html_table += "<th>" + html.escape(cell.text) + "</th>"
+                    html_table += "<th>" + escaped_text + "</th>"
                 else:
-                    html_table += "<td>" + html.escape(cell.text) + "</td>"
+                    html_table += "<td>" + escaped_text + "</td>"
             html_table += "</tr>"
             first_row = False
         html_table += "</table></body></html>"
