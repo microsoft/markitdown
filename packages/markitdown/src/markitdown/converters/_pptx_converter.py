@@ -162,9 +162,9 @@ class PptxConverter(DocumentConverter):
                 # Text areas
                 elif shape.has_text_frame:
                     if shape == title:
-                        md_content += "# " + shape.text.lstrip() + "\n"
+                        md_content += "# " + (shape.text or "").lstrip() + "\n"
                     else:
-                        md_content += shape.text + "\n"
+                        md_content += (shape.text or "") + "\n"
 
                 # Group Shapes
                 if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.GROUP:
@@ -194,7 +194,7 @@ class PptxConverter(DocumentConverter):
                 md_content += "\n\n### Notes:\n"
                 notes_frame = slide.notes_slide.notes_text_frame
                 if notes_frame is not None:
-                    md_content += notes_frame.text
+                    md_content += (notes_frame.text or "")
                 md_content = md_content.strip()
 
         return DocumentConverterResult(markdown=md_content.strip())
