@@ -39,6 +39,8 @@ from .converters import (
     EpubConverter,
     DocumentIntelligenceConverter,
     CsvConverter,
+    WeChatMPConverter,
+    XTwitterConverter,
 )
 
 from ._base_converter import DocumentConverter, DocumentConverterResult
@@ -187,6 +189,8 @@ class MarkItDown:
             self.register_converter(
                 HtmlConverter(), priority=PRIORITY_GENERIC_FILE_FORMAT
             )
+            self.register_converter(WeChatMPConverter())
+            self.register_converter(XTwitterConverter())
             self.register_converter(RssConverter())
             self.register_converter(WikipediaConverter())
             self.register_converter(YouTubeConverter())

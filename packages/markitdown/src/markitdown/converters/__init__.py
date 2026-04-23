@@ -23,6 +23,8 @@ from ._doc_intel_converter import (
 )
 from ._epub_converter import EpubConverter
 from ._csv_converter import CsvConverter
+from ._wechat_mp_converter import WeChatMPConverter
+from ._xtwitter_converter import XTwitterConverter
 
 __all__ = [
     "PlainTextConverter",
@@ -45,4 +47,6 @@ __all__ = [
     "DocumentIntelligenceFileType",
     "EpubConverter",
     "CsvConverter",
+    "WeChatMPConverter",
+    "XTwitterConverter",
 ]
