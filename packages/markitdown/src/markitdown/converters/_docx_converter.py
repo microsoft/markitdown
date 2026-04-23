@@ -75,7 +75,13 @@ class DocxConverter(HtmlConverter):
                 _dependency_exc_info[2]
             )
 
-        style_map = kwargs.get("style_map", None)
+        style_map = kwargs.pop("style_map", None)
+        include_comments = kwargs.pop("include_comments", False)
+
+        if include_comments:
+            comment_style = "comment-reference => sup"
+            style_map = (style_map + "\n" + comment_style) if style_map else comment_style
+
         pre_process_stream = pre_process_docx(file_stream)
         return self._html_converter.convert_string(
             mammoth.convert_to_html(pre_process_stream, style_map=style_map).value,
