@@ -34,7 +34,7 @@ class WikipediaConverter(DocumentConverter):
         mimetype = (stream_info.mimetype or "").lower()
         extension = (stream_info.extension or "").lower()
 
-        if not re.search(r"^https?:\/\/[a-zA-Z]{2,3}\.wikipedia.org\/", url):
+        if not re.search(r"^https?:\/\/[a-zA-Z0-9-]+\.wikipedia\.org\/", url):
             # Not a Wikipedia URL
             return False
 
