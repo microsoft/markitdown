@@ -525,7 +525,7 @@ class MarkItDown:
 
         # Read into BytesIO
         buffer = io.BytesIO()
-        for chunk in response.iter_content(chunk_size=512):
+        for chunk in response.iter_content(chunk_size=65536):
             buffer.write(chunk)
         buffer.seek(0)
 
