@@ -1,0 +1,1532 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MarkItDown - 文件转Markdown</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
+        
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #8b5cf6;
+            --accent: #06b6d4;
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --bg-card-hover: #334155;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --border-color: #334155;
+            --success: #22c55e;
+            --error: #ef4444;
+            --warning: #f59e0b;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, var(--bg-dark) 0%, #1a1a2e 50%, var(--bg-dark) 100%);
+            min-height: 100vh;
+            color: var(--text-primary);
+            overflow-x: hidden;
+        }
+        
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        .glass {
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(51, 65, 85, 0.5);
+        }
+        
+        .glass-hover {
+            transition: all 0.3s ease;
+        }
+        
+        .glass-hover:hover {
+            background: rgba(51, 65, 85, 0.9);
+            border-color: rgba(99, 102, 241, 0.5);
+            box-shadow: 0 0 30px rgba(99, 102, 241, 0.2);
+        }
+        
+        .gradient-text {
+            background: linear-gradient(135deg, var(--primary), var(--secondary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .glow-border {
+            position: relative;
+        }
+        
+        .glow-border::before {
+            content: '';
+            position: absolute;
+            inset: -2px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary), var(--accent));
+            border-radius: inherit;
+            z-index: -1;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .glow-border:hover::before {
+            opacity: 1;
+        }
+        
+        .upload-zone {
+            border: 2px dashed var(--border-color);
+            transition: all 0.3s ease;
+        }
+        
+        .upload-zone.drag-over {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.1);
+            box-shadow: 0 0 50px rgba(99, 102, 241, 0.2);
+        }
+        
+        .progress-bar {
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            transition: width 0.3s ease;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            background: linear-gradient(135deg, var(--primary-dark), var(--secondary));
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+            transform: translateY(-1px);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, var(--success), #16a34a);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-success:hover {
+            box-shadow: 0 0 20px rgba(34, 197, 94, 0.4);
+            transform: translateY(-1px);
+        }
+        
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-outline:hover {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.1);
+        }
+        
+        .pulse-dot {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .slide-in {
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .markdown-preview {
+            font-family: 'Inter', sans-serif;
+            line-height: 1.7;
+        }
+        
+        .markdown-preview h1, .markdown-preview h2, .markdown-preview h3 {
+            color: var(--text-primary);
+            margin-top: 1.5em;
+            margin-bottom: 0.5em;
+            font-weight: 600;
+        }
+        
+        .markdown-preview h1 { font-size: 1.5em; }
+        .markdown-preview h2 { font-size: 1.25em; }
+        .markdown-preview h3 { font-size: 1.1em; }
+        
+        .markdown-preview p {
+            margin-bottom: 1em;
+            color: var(--text-secondary);
+        }
+        
+        .markdown-preview code {
+            background: rgba(99, 102, 241, 0.2);
+            padding: 0.2em 0.4em;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9em;
+            color: var(--accent);
+        }
+        
+        .markdown-preview pre {
+            background: rgba(15, 23, 42, 0.8);
+            padding: 1em;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin-bottom: 1em;
+            border: 1px solid var(--border-color);
+        }
+        
+        .markdown-preview pre code {
+            background: none;
+            padding: 0;
+        }
+        
+        .markdown-preview ul, .markdown-preview ol {
+            margin-bottom: 1em;
+            padding-left: 1.5em;
+            color: var(--text-secondary);
+        }
+        
+        .markdown-preview li {
+            margin-bottom: 0.5em;
+        }
+        
+        .markdown-preview blockquote {
+            border-left: 3px solid var(--primary);
+            padding-left: 1em;
+            margin-bottom: 1em;
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+        
+        .markdown-preview table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1em;
+        }
+        
+        .markdown-preview th, .markdown-preview td {
+            border: 1px solid var(--border-color);
+            padding: 0.5em 1em;
+            text-align: left;
+        }
+        
+        .markdown-preview th {
+            background: rgba(99, 102, 241, 0.1);
+        }
+        
+        .markdown-preview a {
+            color: var(--accent);
+            text-decoration: underline;
+        }
+        
+        .scrollbar-thin::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        
+        .scrollbar-thin::-webkit-scrollbar-track {
+            background: var(--bg-dark);
+            border-radius: 3px;
+        }
+        
+        .scrollbar-thin::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 3px;
+        }
+        
+        .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+        
+        .modal-overlay {
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(10px);
+        }
+        
+        .status-pending { color: var(--warning); }
+        .status-converting { color: var(--primary); }
+        .status-completed { color: var(--success); }
+        .status-error { color: var(--error); }
+        
+        .checkbox-custom {
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border: 2px solid var(--border-color);
+            border-radius: 4px;
+            background: transparent;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s ease;
+        }
+        
+        .checkbox-custom:checked {
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+        
+        .checkbox-custom:checked::after {
+            content: '';
+            position: absolute;
+            left: 5px;
+            top: 2px;
+            width: 5px;
+            height: 10px;
+            border: solid white;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+        }
+        
+        .radio-custom {
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border: 2px solid var(--border-color);
+            border-radius: 50%;
+            background: transparent;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s ease;
+        }
+        
+        .radio-custom:checked {
+            border-color: var(--primary);
+        }
+        
+        .radio-custom:checked::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 8px;
+            height: 8px;
+            background: var(--primary);
+            border-radius: 50%;
+        }
+        
+        .option-card {
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px;
+            transition: all 0.3s ease;
+        }
+        
+        .option-card:hover {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.05);
+        }
+        
+        .option-card.selected {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.1);
+        }
+        
+        .tab-btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+        
+        .tab-btn:hover {
+            color: var(--text-primary);
+            background: rgba(99, 102, 241, 0.1);
+        }
+        
+        .tab-btn.active {
+            color: white;
+            background: var(--primary);
+        }
+        
+        .stats-card {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1));
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 12px;
+            padding: 16px;
+        }
+        
+        .history-item {
+            transition: all 0.3s ease;
+        }
+        
+        .history-item:hover {
+            background: rgba(99, 102, 241, 0.05);
+        }
+        
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        
+        .badge-success {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+        }
+        
+        .badge-warning {
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+        }
+        
+        .badge-error {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+        
+        .badge-info {
+            background: rgba(6, 182, 212, 0.2);
+            color: #06b6d4;
+        }
+        
+        .divider {
+            height: 1px;
+            background: var(--border-color);
+            margin: 16px 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="app" class="min-h-screen">
+        <header class="glass border-b border-slate-700/50 sticky top-0 z-50">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-cyan-500 flex items-center justify-center">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h1 class="text-xl font-bold gradient-text">MarkItDown</h1>
+                            <p class="text-xs text-slate-400 mono">文件转 Markdown 转换器</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button id="showHistoryBtn" class="btn-outline px-4 py-2 rounded-lg text-sm text-slate-300 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            历史记录
+                        </button>
+                        <button id="showCacheBtn" class="btn-outline px-4 py-2 rounded-lg text-sm text-slate-300 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/>
+                            </svg>
+                            缓存管理
+                        </button>
+                        <button id="showFormatsBtn" class="btn-outline px-4 py-2 rounded-lg text-sm text-slate-300 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            支持格式
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <section id="uploadSection" class="mb-8">
+                <div id="uploadZone" class="upload-zone glass rounded-2xl p-12 text-center cursor-pointer glass-hover">
+                    <input type="file" id="fileInput" multiple class="hidden" accept=".pdf,.docx,.doc,.xlsx,.xls,.pptx,.ppt,.html,.htm,.csv,.txt,.md,.json,.jpg,.jpeg,.png,.gif,.bmp,.mp3,.wav,.m4a,.flac,.epub,.zip,.msg,.ipynb,.xml">
+                    <div class="flex flex-col items-center gap-4">
+                        <div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 flex items-center justify-center">
+                            <svg class="w-10 h-10 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h2 class="text-xl font-semibold text-white mb-2">拖拽文件到此处或点击上传</h2>
+                            <p class="text-slate-400 text-sm">支持多文件批量上传，支持 PDF、Word、Excel、PPT、HTML 等格式</p>
+                        </div>
+                        <button id="uploadBtn" class="btn-primary px-6 py-3 rounded-xl text-white font-medium flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                            </svg>
+                            选择文件
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="optionsPanel" class="glass rounded-2xl p-6 mt-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold text-white flex items-center gap-2">
+                            <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            </svg>
+                            转换选项
+                        </h3>
+                        <button id="toggleOptionsBtn" class="btn-outline px-3 py-1.5 rounded-lg text-sm text-slate-300">
+                            展开
+                        </button>
+                    </div>
+                    
+                    <div id="optionsContent" class="space-y-6">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-3">输出格式</label>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <label class="option-card cursor-pointer flex items-center gap-3" id="formatStandard">
+                                    <input type="radio" name="outputFormat" value="standard" class="radio-custom" checked>
+                                    <div>
+                                        <div class="text-sm font-medium text-white">标准 Markdown</div>
+                                        <div class="text-xs text-slate-400">通用 Markdown 格式，兼容性好</div>
+                                    </div>
+                                </label>
+                                <label class="option-card cursor-pointer flex items-center gap-3" id="formatGithub">
+                                    <input type="radio" name="outputFormat" value="github" class="radio-custom">
+                                    <div>
+                                        <div class="text-sm font-medium text-white">GitHub Markdown</div>
+                                        <div class="text-xs text-slate-400">针对 GitHub 优化的格式</div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="divider"></div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-3">内容优化</label>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <label class="option-card cursor-pointer flex items-center gap-3">
+                                    <input type="checkbox" id="extractImages" class="checkbox-custom">
+                                    <div>
+                                        <div class="text-sm font-medium text-white">提取图片</div>
+                                        <div class="text-xs text-slate-400">将文档中的图片保存为独立文件</div>
+                                    </div>
+                                </label>
+                                <label class="option-card cursor-pointer flex items-center gap-3">
+                                    <input type="checkbox" id="optimizeTables" class="checkbox-custom">
+                                    <div>
+                                        <div class="text-sm font-medium text-white">优化表格</div>
+                                        <div class="text-xs text-slate-400">自动对齐表格列，提升可读性</div>
+                                    </div>
+                                </label>
+                                <label class="option-card cursor-pointer flex items-center gap-3">
+                                    <input type="checkbox" id="optimizeCodeBlocks" class="checkbox-custom">
+                                    <div>
+                                        <div class="text-sm font-medium text-white">优化代码块</div>
+                                        <div class="text-xs text-slate-400">统一代码块缩进和格式</div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="tasksSection" class="mb-8 hidden">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold text-white">转换任务</h2>
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm text-slate-400" id="taskStats"></span>
+                        <button id="clearCompletedBtn" class="btn-outline px-3 py-1.5 rounded-lg text-sm text-slate-300 hidden">
+                            清除已完成
+                        </button>
+                    </div>
+                </div>
+                <div id="tasksList" class="space-y-4">
+                </div>
+            </section>
+        </main>
+
+        <div id="previewModal" class="fixed inset-0 z-50 hidden">
+            <div class="modal-overlay absolute inset-0" id="previewOverlay"></div>
+            <div class="absolute inset-4 sm:inset-8 lg:inset-16 glass rounded-2xl overflow-hidden flex flex-col">
+                <div class="flex items-center justify-between px-6 py-4 border-b border-slate-700/50">
+                    <div class="flex items-center gap-3">
+                        <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                        </svg>
+                        <h3 class="font-semibold text-white" id="previewTitle">预览</h3>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button id="copyPreviewBtn" class="btn-outline px-4 py-2 rounded-lg text-sm text-slate-300 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                            </svg>
+                            复制
+                        </button>
+                        <button id="closePreviewBtn" class="btn-outline p-2 rounded-lg">
+                            <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div id="previewContent" class="flex-1 overflow-auto p-6 scrollbar-thin markdown-preview">
+                </div>
+            </div>
+        </div>
+
+        <div id="formatsModal" class="fixed inset-0 z-50 hidden">
+            <div class="modal-overlay absolute inset-0" id="formatsOverlay"></div>
+            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg glass rounded-2xl p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-lg font-semibold text-white">支持的文件格式</h3>
+                    <button id="closeFormatsBtn" class="btn-outline p-2 rounded-lg">
+                        <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <div id="formatsList" class="space-y-4">
+                </div>
+            </div>
+        </div>
+
+        <div id="historyModal" class="fixed inset-0 z-50 hidden">
+            <div class="modal-overlay absolute inset-0" id="historyOverlay"></div>
+            <div class="absolute inset-4 sm:inset-8 lg:inset-16 glass rounded-2xl overflow-hidden flex flex-col">
+                <div class="flex items-center justify-between px-6 py-4 border-b border-slate-700/50">
+                    <div class="flex items-center gap-3">
+                        <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <h3 class="font-semibold text-white">转换历史记录</h3>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button id="clearAllHistoryBtn" class="btn-outline px-4 py-2 rounded-lg text-sm text-red-400 hover:text-red-300 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                            清空全部
+                        </button>
+                        <button id="closeHistoryBtn" class="btn-outline p-2 rounded-lg">
+                            <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div id="historyContent" class="flex-1 overflow-auto p-6 scrollbar-thin">
+                    <div class="text-center text-slate-400 py-8">
+                        <svg class="w-12 h-12 mx-auto mb-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <p>暂无转换历史</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="cacheModal" class="fixed inset-0 z-50 hidden">
+            <div class="modal-overlay absolute inset-0" id="cacheOverlay"></div>
+            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg glass rounded-2xl p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center gap-3">
+                        <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/>
+                        </svg>
+                        <h3 class="font-semibold text-white">缓存管理</h3>
+                    </div>
+                    <button id="closeCacheBtn" class="btn-outline p-2 rounded-lg">
+                        <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <div id="cacheStats" class="space-y-4 mb-6">
+                    <div class="stats-card">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-slate-400">上传文件</span>
+                            <span class="text-sm font-medium text-white" id="cacheUploadCount">0 个文件</span>
+                        </div>
+                        <div class="text-xs text-slate-500 mt-1" id="cacheUploadSize">0 B</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-slate-400">转换结果</span>
+                            <span class="text-sm font-medium text-white" id="cacheResultCount">0 个文件</span>
+                        </div>
+                        <div class="text-xs text-slate-500 mt-1" id="cacheResultSize">0 B</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-slate-400">提取图片</span>
+                            <span class="text-sm font-medium text-white" id="cacheImageCount">0 个文件</span>
+                        </div>
+                        <div class="text-xs text-slate-500 mt-1" id="cacheImageSize">0 B</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-slate-400">历史记录</span>
+                            <span class="text-sm font-medium text-white" id="cacheHistoryCount">0 条</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex gap-3">
+                    <button id="refreshCacheStatsBtn" class="btn-outline px-4 py-2 rounded-lg text-sm text-slate-300 flex-1 flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        刷新
+                    </button>
+                    <button id="clearCacheBtn" class="btn-primary px-4 py-2 rounded-lg text-sm text-white flex-1 flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                        清空缓存
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="toastContainer" class="fixed top-20 right-4 z-50 space-y-2">
+        </div>
+    </div>
+
+    <script>
+        const tasks = new Map();
+        let previewContent = '';
+
+        const uploadZone = document.getElementById('uploadZone');
+        const fileInput = document.getElementById('fileInput');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const tasksSection = document.getElementById('tasksSection');
+        const tasksList = document.getElementById('tasksList');
+        const taskStats = document.getElementById('taskStats');
+        const clearCompletedBtn = document.getElementById('clearCompletedBtn');
+        const previewModal = document.getElementById('previewModal');
+        const previewOverlay = document.getElementById('previewOverlay');
+        const previewTitle = document.getElementById('previewTitle');
+        const previewContentEl = document.getElementById('previewContent');
+        const closePreviewBtn = document.getElementById('closePreviewBtn');
+        const copyPreviewBtn = document.getElementById('copyPreviewBtn');
+        const formatsModal = document.getElementById('formatsModal');
+        const formatsOverlay = document.getElementById('formatsOverlay');
+        const closeFormatsBtn = document.getElementById('closeFormatsBtn');
+        const showFormatsBtn = document.getElementById('showFormatsBtn');
+        const formatsList = document.getElementById('formatsList');
+        const toastContainer = document.getElementById('toastContainer');
+        
+        const historyModal = document.getElementById('historyModal');
+        const historyOverlay = document.getElementById('historyOverlay');
+        const closeHistoryBtn = document.getElementById('closeHistoryBtn');
+        const showHistoryBtn = document.getElementById('showHistoryBtn');
+        const historyContent = document.getElementById('historyContent');
+        const clearAllHistoryBtn = document.getElementById('clearAllHistoryBtn');
+        
+        const cacheModal = document.getElementById('cacheModal');
+        const cacheOverlay = document.getElementById('cacheOverlay');
+        const closeCacheBtn = document.getElementById('closeCacheBtn');
+        const showCacheBtn = document.getElementById('showCacheBtn');
+        const refreshCacheStatsBtn = document.getElementById('refreshCacheStatsBtn');
+        const clearCacheBtn = document.getElementById('clearCacheBtn');
+        
+        const toggleOptionsBtn = document.getElementById('toggleOptionsBtn');
+        const optionsContent = document.getElementById('optionsContent');
+        const formatStandard = document.getElementById('formatStandard');
+        const formatGithub = document.getElementById('formatGithub');
+        const extractImagesCheckbox = document.getElementById('extractImages');
+        const optimizeTablesCheckbox = document.getElementById('optimizeTables');
+        const optimizeCodeBlocksCheckbox = document.getElementById('optimizeCodeBlocks');
+
+        const formatCategories = [
+            {
+                name: '文档格式',
+                icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+                formats: ['PDF (.pdf)', 'Word (.docx, .doc)', 'Excel (.xlsx, .xls)', 'PowerPoint (.pptx, .ppt)', 'ePub (.epub)']
+            },
+            {
+                name: '网页与数据',
+                icon: 'M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9',
+                formats: ['HTML (.html, .htm)', 'CSV (.csv)', 'JSON (.json)', 'XML (.xml)']
+            },
+            {
+                name: '多媒体',
+                icon: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z',
+                formats: ['图片 (.jpg, .jpeg, .png, .gif, .bmp)', '音频 (.mp3, .wav, .m4a, .flac)']
+            },
+            {
+                name: '其他格式',
+                icon: 'M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4',
+                formats: ['纯文本 (.txt, .md)', 'Outlook邮件 (.msg)', 'Jupyter Notebook (.ipynb)', '压缩包 (.zip)']
+            }
+        ];
+
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            const colors = {
+                success: 'bg-green-500/20 border-green-500/50 text-green-300',
+                error: 'bg-red-500/20 border-red-500/50 text-red-300',
+                info: 'bg-indigo-500/20 border-indigo-500/50 text-indigo-300',
+                warning: 'bg-yellow-500/20 border-yellow-500/50 text-yellow-300'
+            };
+            const icons = {
+                success: 'M5 13l4 4L19 7',
+                error: 'M6 18L18 6M6 6l12 12',
+                info: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+                warning: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z'
+            };
+            
+            toast.className = `glass border ${colors[type]} px-4 py-3 rounded-xl flex items-center gap-3 slide-in`;
+            toast.innerHTML = `
+                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${icons[type]}"/>
+                </svg>
+                <span class="text-sm">${message}</span>
+            `;
+            
+            toastContainer.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(20px)';
+                toast.style.transition = 'all 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function getFileIcon(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            const icons = {
+                pdf: 'M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z',
+                docx: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+                doc: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+                xlsx: 'M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z',
+                xls: 'M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z',
+                pptx: 'M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z',
+                ppt: 'M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z',
+                html: 'M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4',
+                htm: 'M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4',
+                csv: 'M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+                txt: 'M4 6h16M4 12h16M4 18h7',
+                md: 'M4 6h16M4 10h16M4 14h16M4 18h16',
+                json: 'M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4',
+                xml: 'M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4',
+                jpg: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z',
+                jpeg: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z',
+                png: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z',
+                gif: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z',
+                bmp: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z',
+                mp3: 'M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3',
+                wav: 'M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3',
+                m4a: 'M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3',
+                flac: 'M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3',
+                epub: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
+                zip: 'M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4',
+                msg: 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
+                ipynb: 'M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4'
+            };
+            return icons[ext] || 'M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z';
+        }
+
+        function getStatusIcon(status) {
+            const icons = {
+                pending: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
+                converting: 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15',
+                completed: 'M5 13l4 4L19 7',
+                error: 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
+            };
+            return icons[status] || icons.pending;
+        }
+
+        function getStatusText(status) {
+            const texts = {
+                pending: '等待中',
+                converting: '转换中',
+                completed: '已完成',
+                error: '失败'
+            };
+            return texts[status] || status;
+        }
+
+        function updateTaskStats() {
+            const total = tasks.size;
+            const completed = Array.from(tasks.values()).filter(t => t.status === 'completed').length;
+            const converting = Array.from(tasks.values()).filter(t => t.status === 'converting').length;
+            const errors = Array.from(tasks.values()).filter(t => t.status === 'error').length;
+            
+            let statsText = `共 ${total} 个文件`;
+            if (converting > 0) statsText += ` · ${converting} 个转换中`;
+            if (completed > 0) statsText += ` · ${completed} 个已完成`;
+            if (errors > 0) statsText += ` · ${errors} 个失败`;
+            
+            taskStats.textContent = statsText;
+            
+            if (completed > 0 || errors > 0) {
+                clearCompletedBtn.classList.remove('hidden');
+            } else {
+                clearCompletedBtn.classList.add('hidden');
+            }
+        }
+
+        function renderTask(task) {
+            const el = document.createElement('div');
+            el.id = `task-${task.task_id}`;
+            el.className = 'glass rounded-xl p-4 slide-in';
+            
+            const isCompleted = task.status === 'completed';
+            const isError = task.status === 'error';
+            const isConverting = task.status === 'converting';
+            const isPending = task.status === 'pending';
+            
+            el.innerHTML = `
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-xl bg-slate-800/50 flex items-center justify-center flex-shrink-0">
+                        <svg class="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${getFileIcon(task.filename)}"/>
+                        </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between mb-1">
+                            <h4 class="text-sm font-medium text-white truncate">${task.filename}</h4>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs status-${task.status} flex items-center gap-1">
+                                    ${isConverting ? '<span class="w-2 h-2 bg-indigo-400 rounded-full pulse-dot"></span>' : ''}
+                                    <svg class="w-4 h-4 ${isConverting ? 'animate-spin' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${getStatusIcon(task.status)}"/>
+                                    </svg>
+                                    ${getStatusText(task.status)}
+                                </span>
+                            </div>
+                        </div>
+                        ${isConverting || isPending ? `
+                        <div class="h-1.5 bg-slate-700/50 rounded-full overflow-hidden">
+                            <div class="progress-bar h-full rounded-full transition-all duration-300" style="width: ${task.progress}%"></div>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-1">${task.progress}%</p>
+                        ` : ''}
+                        ${isError ? `
+                        <p class="text-xs text-red-400 mt-1 bg-red-500/10 px-2 py-1 rounded">${task.error_message || '转换失败'}</p>
+                        ` : ''}
+                    </div>
+                    ${isCompleted ? `
+                    <div class="flex items-center gap-2">
+                        <button class="btn-outline px-3 py-2 rounded-lg text-sm text-slate-300 hover:text-cyan-300 preview-btn" data-task-id="${task.task_id}">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                            </svg>
+                        </button>
+                        <button class="btn-success px-3 py-2 rounded-lg text-sm text-white download-btn" data-task-id="${task.task_id}">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                            </svg>
+                        </button>
+                    </div>
+                    ` : ''}
+                </div>
+            `;
+            
+            return el;
+        }
+
+        function addTaskToList(task) {
+            const existingEl = document.getElementById(`task-${task.task_id}`);
+            if (existingEl) {
+                const newEl = renderTask(task);
+                existingEl.replaceWith(newEl);
+            } else {
+                tasksList.appendChild(renderTask(task));
+            }
+            
+            if (tasks.size > 0) {
+                tasksSection.classList.remove('hidden');
+            }
+            
+            updateTaskStats();
+        }
+
+        function getConversionOptions() {
+            const outputFormat = document.querySelector('input[name="outputFormat"]:checked')?.value || 'standard';
+            return {
+                output_format: outputFormat,
+                extract_images: extractImagesCheckbox?.checked || false,
+                optimize_tables: optimizeTablesCheckbox?.checked || false,
+                optimize_code_blocks: optimizeCodeBlocksCheckbox?.checked || false
+            };
+        }
+
+        async function uploadFiles(files) {
+            const formData = new FormData();
+            const options = getConversionOptions();
+            
+            for (const file of files) {
+                formData.append('files', file);
+            }
+            
+            formData.append('output_format', options.output_format);
+            formData.append('extract_images', options.extract_images);
+            formData.append('optimize_tables', options.optimize_tables);
+            formData.append('optimize_code_blocks', options.optimize_code_blocks);
+            
+            try {
+                const response = await fetch('/api/upload/batch', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.detail || '上传失败');
+                }
+                
+                const data = await response.json();
+                
+                for (const task of data.tasks) {
+                    tasks.set(task.task_id, {
+                        ...task,
+                        progress: 0,
+                        options: options
+                    });
+                    addTaskToList(tasks.get(task.task_id));
+                    pollTaskProgress(task.task_id);
+                }
+                
+                showToast(`已添加 ${data.tasks.length} 个文件到转换队列`, 'success');
+                
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+        
+        function formatDateTime(isoString) {
+            if (!isoString) return '-';
+            const date = new Date(isoString);
+            return date.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+        
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        function getStatusBadgeClass(status) {
+            switch (status) {
+                case 'completed': return 'badge-success';
+                case 'error': return 'badge-error';
+                case 'converting': return 'badge-warning';
+                default: return 'badge-info';
+            }
+        }
+        
+        async function loadHistory() {
+            try {
+                const response = await fetch('/api/history');
+                if (!response.ok) {
+                    throw new Error('获取历史记录失败');
+                }
+                
+                const history = await response.json();
+                
+                if (history.length === 0) {
+                    historyContent.innerHTML = `
+                        <div class="text-center text-slate-400 py-8">
+                            <svg class="w-12 h-12 mx-auto mb-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <p>暂无转换历史</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                historyContent.innerHTML = `
+                    <div class="space-y-3">
+                        ${history.map(item => `
+                            <div class="history-item glass rounded-xl p-4 flex items-center gap-4">
+                                <div class="w-10 h-10 rounded-xl bg-slate-800/50 flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${getFileIcon(item.filename)}"/>
+                                    </svg>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center justify-between mb-1">
+                                        <h4 class="text-sm font-medium text-white truncate">${item.filename}</h4>
+                                        <span class="badge ${getStatusBadgeClass(item.status)}">${getStatusText(item.status)}</span>
+                                    </div>
+                                    <div class="flex items-center gap-4 text-xs text-slate-400">
+                                        <span>${formatDateTime(item.created_at)}</span>
+                                        <span>${formatFileSize(item.file_size)}</span>
+                                        <span class="badge ${item.output_format === 'github' ? 'badge-info' : 'badge-success'}">${item.output_format === 'github' ? 'GitHub' : '标准'} MD</span>
+                                        ${item.images_extracted ? '<span class="badge badge-info">已提取图片</span>' : ''}
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    ${item.status === 'completed' ? `
+                                        <button class="btn-outline px-3 py-1.5 rounded-lg text-xs text-slate-300 hover:text-cyan-300 history-preview-btn" data-task-id="${item.task_id}">
+                                            预览
+                                        </button>
+                                        <button class="btn-outline px-3 py-1.5 rounded-lg text-xs text-slate-300 hover:text-green-300 history-download-btn" data-task-id="${item.task_id}">
+                                            下载
+                                        </button>
+                                    ` : ''}
+                                    <button class="btn-outline px-3 py-1.5 rounded-lg text-xs text-red-400 hover:text-red-300 history-delete-btn" data-task-id="${item.task_id}">
+                                        删除
+                                    </button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+        
+        async function loadCacheStats() {
+            try {
+                const response = await fetch('/api/cache/stats');
+                if (!response.ok) {
+                    throw new Error('获取缓存统计失败');
+                }
+                
+                const stats = await response.json();
+                
+                document.getElementById('cacheUploadCount').textContent = `${stats.uploads.count} 个文件`;
+                document.getElementById('cacheUploadSize').textContent = stats.uploads.size_formatted;
+                document.getElementById('cacheResultCount').textContent = `${stats.results.count} 个文件`;
+                document.getElementById('cacheResultSize').textContent = stats.results.size_formatted;
+                document.getElementById('cacheImageCount').textContent = `${stats.images.count} 个文件`;
+                document.getElementById('cacheImageSize').textContent = stats.images.size_formatted;
+                document.getElementById('cacheHistoryCount').textContent = `${stats.history_count} 条`;
+                
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+        
+        async function deleteHistoryItem(taskId) {
+            try {
+                const response = await fetch(`/api/history/${taskId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (!response.ok) {
+                    throw new Error('删除失败');
+                }
+                
+                showToast('已删除', 'success');
+                await loadHistory();
+                
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+        
+        async function clearAllHistory() {
+            if (!confirm('确定要清空所有历史记录吗？此操作不可恢复。')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/history', {
+                    method: 'DELETE'
+                });
+                
+                if (!response.ok) {
+                    throw new Error('清空失败');
+                }
+                
+                const data = await response.json();
+                showToast(`已清空 ${data.items_cleared} 条历史记录`, 'success');
+                await loadHistory();
+                
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+        
+        async function clearAllCache() {
+            if (!confirm('确定要清空所有缓存吗？此操作将删除所有上传文件、转换结果和提取的图片。')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/cache/clear', {
+                    method: 'POST'
+                });
+                
+                if (!response.ok) {
+                    throw new Error('清空缓存失败');
+                }
+                
+                const data = await response.json();
+                showToast(`已清空缓存：上传 ${data.uploads_cleared} 个，结果 ${data.results_cleared} 个，图片 ${data.images_cleared} 个`, 'success');
+                await loadCacheStats();
+                
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        async function pollTaskProgress(taskId) {
+            const poll = async () => {
+                try {
+                    const response = await fetch(`/api/progress/${taskId}`);
+                    
+                    if (!response.ok) {
+                        return;
+                    }
+                    
+                    const data = await response.json();
+                    const task = tasks.get(taskId);
+                    
+                    if (task) {
+                        task.status = data.status;
+                        task.progress = data.progress;
+                        task.error_message = data.error_message;
+                        addTaskToList(task);
+                    }
+                    
+                    if (data.status === 'converting' || data.status === 'pending') {
+                        setTimeout(poll, 1000);
+                    }
+                    
+                } catch (error) {
+                    console.error('Polling error:', error);
+                }
+            };
+            
+            poll();
+        }
+
+        async function previewTask(taskId) {
+            try {
+                const response = await fetch(`/api/result/${taskId}`);
+                
+                if (!response.ok) {
+                    throw new Error('无法获取预览内容');
+                }
+                
+                const data = await response.json();
+                previewContent = data.content;
+                previewTitle.textContent = data.filename;
+                
+                let htmlContent = escapeHtml(data.content);
+                htmlContent = htmlContent
+                    .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+                    .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+                    .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+                    .replace(/\*\*\*(.*?)\*\*\*/gim, '<strong><em>$1</em></strong>')
+                    .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
+                    .replace(/\*(.*?)\*/gim, '<em>$1</em>')
+                    .replace(/`([^`]+)`/gim, '<code>$1</code>')
+                    .replace(/^- (.*$)/gim, '<li>$1</li>')
+                    .replace(/^\d+\. (.*$)/gim, '<li>$1</li>')
+                    .replace(/^> (.*$)/gim, '<blockquote>$1</blockquote>')
+                    .replace(/\n\n/g, '</p><p>')
+                    .replace(/\n/g, '<br>');
+                
+                previewContentEl.innerHTML = `<p>${htmlContent}</p>`;
+                previewModal.classList.remove('hidden');
+                
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        async function downloadTask(taskId) {
+            try {
+                const response = await fetch(`/api/download/${taskId}`);
+                
+                if (!response.ok) {
+                    throw new Error('下载失败');
+                }
+                
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                
+                const task = tasks.get(taskId);
+                if (task) {
+                    const filename = task.filename.split('.').slice(0, -1).join('.') + '.md';
+                    a.download = filename;
+                }
+                
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                showToast('下载已开始', 'success');
+                
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        uploadZone.addEventListener('click', (e) => {
+            if (e.target === uploadBtn || uploadBtn.contains(e.target)) {
+                return;
+            }
+            fileInput.click();
+        });
+
+        uploadBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                uploadFiles(Array.from(e.target.files));
+                fileInput.value = '';
+            }
+        });
+
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('drag-over');
+        });
+
+        uploadZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('drag-over');
+        });
+
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('drag-over');
+            
+            const files = Array.from(e.dataTransfer.files).filter(f => f.size > 0);
+            if (files.length > 0) {
+                uploadFiles(files);
+            }
+        });
+
+        tasksList.addEventListener('click', (e) => {
+            const previewBtn = e.target.closest('.preview-btn');
+            const downloadBtn = e.target.closest('.download-btn');
+            
+            if (previewBtn) {
+                const taskId = previewBtn.dataset.taskId;
+                previewTask(taskId);
+            }
+            
+            if (downloadBtn) {
+                const taskId = downloadBtn.dataset.taskId;
+                downloadTask(taskId);
+            }
+        });
+
+        clearCompletedBtn.addEventListener('click', () => {
+            const tasksToRemove = [];
+            for (const [taskId, task] of tasks) {
+                if (task.status === 'completed' || task.status === 'error') {
+                    tasksToRemove.push(taskId);
+                    const el = document.getElementById(`task-${taskId}`);
+                    if (el) {
+                        el.style.opacity = '0';
+                        el.style.transform = 'translateX(20px)';
+                        el.style.transition = 'all 0.3s ease';
+                        setTimeout(() => el.remove(), 300);
+                    }
+                }
+            }
+            
+            for (const taskId of tasksToRemove) {
+                tasks.delete(taskId);
+            }
+            
+            if (tasks.size === 0) {
+                tasksSection.classList.add('hidden');
+            }
+            
+            updateTaskStats();
+            showToast('已清除已完成的任务', 'info');
+        });
+
+        closePreviewBtn.addEventListener('click', () => {
+            previewModal.classList.add('hidden');
+        });
+
+        previewOverlay.addEventListener('click', () => {
+            previewModal.classList.add('hidden');
+        });
+
+        copyPreviewBtn.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(previewContent);
+                showToast('已复制到剪贴板', 'success');
+            } catch (error) {
+                showToast('复制失败', 'error');
+            }
+        });
+
+        showFormatsBtn.addEventListener('click', () => {
+            formatsList.innerHTML = formatCategories.map(cat => `
+                <div class="glass rounded-xl p-4">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500/20 to-purple-500/20 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${cat.icon}"/>
+                            </svg>
+                        </div>
+                        <h4 class="font-medium text-white">${cat.name}</h4>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        ${cat.formats.map(f => `<span class="px-2 py-1 bg-slate-800/50 rounded text-xs text-slate-300">${f}</span>`).join('')}
+                    </div>
+                </div>
+            `).join('');
+            
+            formatsModal.classList.remove('hidden');
+        });
+
+        closeFormatsBtn.addEventListener('click', () => {
+            formatsModal.classList.add('hidden');
+        });
+
+        formatsOverlay.addEventListener('click', () => {
+            formatsModal.classList.add('hidden');
+        });
+
+        if (toggleOptionsBtn && optionsContent) {
+            let optionsExpanded = true;
+            
+            toggleOptionsBtn.addEventListener('click', () => {
+                optionsExpanded = !optionsExpanded;
+                if (optionsExpanded) {
+                    optionsContent.style.display = 'block';
+                    toggleOptionsBtn.textContent = '收起';
+                } else {
+                    optionsContent.style.display = 'none';
+                    toggleOptionsBtn.textContent = '展开';
+                }
+            });
+        }
+        
+        function updateFormatSelection() {
+            const selectedValue = document.querySelector('input[name="outputFormat"]:checked')?.value;
+            if (formatStandard) {
+                formatStandard.classList.toggle('selected', selectedValue === 'standard');
+            }
+            if (formatGithub) {
+                formatGithub.classList.toggle('selected', selectedValue === 'github');
+            }
+        }
+        
+        document.querySelectorAll('input[name="outputFormat"]').forEach(radio => {
+            radio.addEventListener('change', updateFormatSelection);
+        });
+        
+        updateFormatSelection();
+        
+        showHistoryBtn.addEventListener('click', async () => {
+            await loadHistory();
+            historyModal.classList.remove('hidden');
+        });
+        
+        closeHistoryBtn.addEventListener('click', () => {
+            historyModal.classList.add('hidden');
+        });
+        
+        historyOverlay.addEventListener('click', () => {
+            historyModal.classList.add('hidden');
+        });
+        
+        clearAllHistoryBtn.addEventListener('click', clearAllHistory);
+        
+        historyContent.addEventListener('click', async (e) => {
+            const previewBtn = e.target.closest('.history-preview-btn');
+            const downloadBtn = e.target.closest('.history-download-btn');
+            const deleteBtn = e.target.closest('.history-delete-btn');
+            
+            if (previewBtn) {
+                const taskId = previewBtn.dataset.taskId;
+                await previewTask(taskId);
+            }
+            
+            if (downloadBtn) {
+                const taskId = downloadBtn.dataset.taskId;
+                await downloadTask(taskId);
+            }
+            
+            if (deleteBtn) {
+                const taskId = deleteBtn.dataset.taskId;
+                await deleteHistoryItem(taskId);
+            }
+        });
+        
+        showCacheBtn.addEventListener('click', async () => {
+            await loadCacheStats();
+            cacheModal.classList.remove('hidden');
+        });
+        
+        closeCacheBtn.addEventListener('click', () => {
+            cacheModal.classList.add('hidden');
+        });
+        
+        cacheOverlay.addEventListener('click', () => {
+            cacheModal.classList.add('hidden');
+        });
+        
+        refreshCacheStatsBtn.addEventListener('click', async () => {
+            await loadCacheStats();
+            showToast('缓存统计已刷新', 'success');
+        });
+        
+        clearCacheBtn.addEventListener('click', clearAllCache);
+        
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                previewModal.classList.add('hidden');
+                formatsModal.classList.add('hidden');
+                historyModal.classList.add('hidden');
+                cacheModal.classList.add('hidden');
+            }
+        });
+    </script>
+</body>
+</html>

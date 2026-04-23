@@ -1,0 +1,26 @@
+[
+  {
+    "task_id": "f3f0320b-89db-4819-a035-c646e2b83b12",
+    "filename": "Feature decoupling and regeneration towards wifi-based human activity recognition.pdf",
+    "status": "completed",
+    "created_at": "2026-04-23T18:37:19.318052",
+    "completed_at": "2026-04-23T18:37:33.586298",
+    "output_format": "standard",
+    "images_extracted": true,
+    "images": [],
+    "file_size": 1274106,
+    "result_file": "f3f0320b-89db-4819-a035-c646e2b83b12.md"
+  },
+  {
+    "task_id": "0378086e-6833-4ca3-afdd-c8300bbd3dd0",
+    "filename": "本周工作.pptx",
+    "status": "completed",
+    "created_at": "2026-04-23T18:35:07.782493",
+    "completed_at": "2026-04-23T18:35:08.090304",
+    "output_format": "github",
+    "images_extracted": true,
+    "images": [],
+    "file_size": 941513,
+    "result_file": "0378086e-6833-4ca3-afdd-c8300bbd3dd0.md"
+  }
+]
