@@ -53,7 +53,12 @@ class YouTubeConverter(DocumentConverter):
         url = unquote(url)
         url = url.replace(r"\?", "?").replace(r"\=", "=")
 
-        if not url.startswith("https://www.youtube.com/watch?"):
+        # Accept standard watch URLs, short URLs, and youtu.be short URLs
+        if not (
+            url.startswith("https://www.youtube.com/watch?")
+            or url.startswith("https://www.youtube.com/shorts/")
+            or url.startswith("https://youtu.be/")
+        ):
             # Not a YouTube URL
             return False
 
@@ -94,6 +99,9 @@ class YouTubeConverter(DocumentConverter):
                     if key and content:  # Only add non-empty content
                         metadata[key] = content
                     break
+
+        # Extract video ID from various YouTube URL formats
+        video_id = self._extract_video_id(stream_info.url)  # type: ignore
 
         # Try reading the description
         try:
@@ -147,10 +155,12 @@ class YouTubeConverter(DocumentConverter):
         if IS_YOUTUBE_TRANSCRIPT_CAPABLE:
             ytt_api = YouTubeTranscriptApi()
             transcript_text = ""
-            parsed_url = urlparse(stream_info.url)  # type: ignore
-            params = parse_qs(parsed_url.query)  # type: ignore
-            if "v" in params and params["v"][0]:
-                video_id = str(params["v"][0])
+            if not video_id:
+                # Fallback to parsing from query string for standard URLs
+                parsed_url = urlparse(stream_info.url)  # type: ignore
+                params = parse_qs(parsed_url.query)  # type: ignore
+                if "v" in params and params["v"][0]:
+                    video_id = str(params["v"][0])
                 transcript_list = ytt_api.list(video_id)
                 languages = ["en"]
                 for transcript in transcript_list:
@@ -221,6 +231,33 @@ class YouTubeConverter(DocumentConverter):
                     return json[k]
                 if result := self._findKey(v, key):
                     return result
+        return None
+
+    def _extract_video_id(self, url: str) -> Union[str, None]:
+        """Extract video ID from various YouTube URL formats."""
+        if not url:
+            return None
+        url = unquote(url)
+        url = url.replace(r"\?", "?").replace(r"\=", "=")
+        parsed_url = urlparse(url)
+
+        # Handle youtu.be short URLs: https://youtu.be/dQw4w9WgXcQ
+        if parsed_url.netloc == "youtu.be":
+            path = parsed_url.path.strip("/")
+            if path:
+                return path
+
+        # Handle shorts URLs: https://www.youtube.com/shorts/dQw4w9WgXcQ
+        if "/shorts/" in url:
+            match = re.search(r"/shorts/([a-zA-Z0-9_-]+)", url)
+            if match:
+                return match.group(1)
+
+        # Handle standard watch URLs: https://www.youtube.com/watch?v=dQw4w9WgXcQ
+        params = parse_qs(parsed_url.query)
+        if "v" in params and params["v"]:
+            return str(params["v"][0])
+
         return None
 
     def _retry_operation(self, operation, retries=3, delay=2):
