@@ -287,8 +287,14 @@ def sanitize_filename(filename: str) -> str:
     return filename
 
 
-def extract_images_from_pptx(file_path: Path, task_images_dir: Path) -> List[Dict]:
+def extract_all_images_from_pptx(file_path: Path, task_images_dir: Path, task_id: str) -> Tuple[List[Dict], List[Dict]]:
+    """
+    从 PPTX 提取所有图片，并返回：
+    - 图片信息列表（用于替换 MD 中的路径）
+    - 图片引用映射（用于匹配原始占位符）
+    """
     extracted_images = []
+    image_references = []
     try:
         import pptx
         from pptx.enum.shapes import MSO_SHAPE_TYPE
@@ -302,6 +308,9 @@ def extract_images_from_pptx(file_path: Path, task_images_dir: Path) -> List[Dic
                     try:
                         image_counter += 1
                         image = shape.image
+                        
+                        placeholder_name = re.sub(r"\W", "", shape.name) + ".jpg"
+                        
                         image_filename = image.filename or f"image_{slide_num}_{image_counter}"
                         image_ext = os.path.splitext(image_filename)[1] or '.png'
                         safe_name = sanitize_filename(os.path.splitext(image_filename)[0])
@@ -311,11 +320,20 @@ def extract_images_from_pptx(file_path: Path, task_images_dir: Path) -> List[Dic
                         with open(new_img_path, 'wb') as f:
                             f.write(image.blob)
                         
-                        extracted_images.append({
+                        img_info = {
                             'original_name': image_filename,
                             'saved_name': new_filename,
                             'relative_path': f"images/{new_filename}",
-                            'slide_num': slide_num
+                            'api_path': f"/api/images/{task_id}/{new_filename}",
+                            'slide_num': slide_num,
+                            'index': image_counter
+                        }
+                        extracted_images.append(img_info)
+                        
+                        image_references.append({
+                            'placeholder_name': placeholder_name,
+                            'shape_name': shape.name,
+                            'image_info': img_info
                         })
                     except Exception:
                         continue
@@ -327,6 +345,9 @@ def extract_images_from_pptx(file_path: Path, task_images_dir: Path) -> List[Dic
                                 try:
                                     image_counter += 1
                                     image = subshape.image
+                                    
+                                    placeholder_name = re.sub(r"\W", "", subshape.name) + ".jpg"
+                                    
                                     image_filename = image.filename or f"image_{slide_num}_{image_counter}"
                                     image_ext = os.path.splitext(image_filename)[1] or '.png'
                                     safe_name = sanitize_filename(os.path.splitext(image_filename)[0])
@@ -336,11 +357,20 @@ def extract_images_from_pptx(file_path: Path, task_images_dir: Path) -> List[Dic
                                     with open(new_img_path, 'wb') as f:
                                         f.write(image.blob)
                                     
-                                    extracted_images.append({
+                                    img_info = {
                                         'original_name': image_filename,
                                         'saved_name': new_filename,
                                         'relative_path': f"images/{new_filename}",
-                                        'slide_num': slide_num
+                                        'api_path': f"/api/images/{task_id}/{new_filename}",
+                                        'slide_num': slide_num,
+                                        'index': image_counter
+                                    }
+                                    extracted_images.append(img_info)
+                                    
+                                    image_references.append({
+                                        'placeholder_name': placeholder_name,
+                                        'shape_name': subshape.name,
+                                        'image_info': img_info
                                     })
                                 except Exception:
                                     continue
@@ -351,15 +381,17 @@ def extract_images_from_pptx(file_path: Path, task_images_dir: Path) -> List[Dic
     except Exception:
         pass
     
-    return extracted_images
+    return extracted_images, image_references
 
 
-def extract_images_from_docx(file_path: Path, task_images_dir: Path) -> List[Dict]:
+def extract_all_images_from_docx(file_path: Path, task_images_dir: Path, task_id: str) -> Tuple[List[Dict], List[Dict]]:
+    """
+    从 DOCX 提取所有图片
+    """
     extracted_images = []
+    image_references = []
     try:
         from docx import Document
-        from docx.oxml.ns import qn
-        from docx.oxml import OxmlElement
         
         doc = Document(str(file_path))
         image_counter = 0
@@ -378,10 +410,18 @@ def extract_images_from_docx(file_path: Path, task_images_dir: Path) -> List[Dic
                     with open(new_img_path, 'wb') as f:
                         f.write(image_part.blob)
                     
-                    extracted_images.append({
+                    img_info = {
                         'original_name': image_filename,
                         'saved_name': new_filename,
                         'relative_path': f"images/{new_filename}",
+                        'api_path': f"/api/images/{task_id}/{new_filename}",
+                        'index': image_counter
+                    }
+                    extracted_images.append(img_info)
+                    
+                    image_references.append({
+                        'placeholder_name': image_filename,
+                        'image_info': img_info
                     })
                 except Exception:
                     continue
@@ -390,10 +430,13 @@ def extract_images_from_docx(file_path: Path, task_images_dir: Path) -> List[Dic
     except Exception:
         pass
     
-    return extracted_images
+    return extracted_images, image_references
 
 
-def extract_images_from_html(markdown: str, task_images_dir: Path) -> Tuple[str, List[Dict]]:
+def extract_base64_images(markdown: str, task_images_dir: Path, task_id: str) -> Tuple[str, List[Dict]]:
+    """
+    从 Markdown 中提取 base64 编码的图片
+    """
     extracted_images = []
     result = markdown
     image_counter = 0
@@ -429,20 +472,82 @@ def extract_images_from_html(markdown: str, task_images_dir: Path) -> Tuple[str,
             with open(new_img_path, 'wb') as f:
                 f.write(image_data)
             
-            extracted_images.append({
+            img_info = {
                 'original_name': f"base64_image_{image_counter}",
                 'saved_name': new_filename,
                 'relative_path': f"images/{new_filename}",
-            })
+                'api_path': f"/api/images/{task_id}/{new_filename}",
+                'index': image_counter
+            }
+            extracted_images.append(img_info)
             
-            relative_url = f"images/{new_filename}"
-            replacement = f"![{alt_text}]({relative_url})"
+            replacement = f"![{alt_text}]({img_info['api_path']})"
             result = result[:start] + replacement + result[end:]
             
         except Exception:
             continue
     
     return result, extracted_images
+
+
+def find_all_image_references(markdown: str) -> List[Dict]:
+    """
+    查找 Markdown 中的所有图片引用
+    返回格式：[{ 'alt': '...', 'path': '...', 'start': index, 'end': index }]
+    """
+    img_pattern = r'!\[([^\]]*)\]\(([^)]+)\)'
+    references = []
+    
+    for match in re.finditer(img_pattern, markdown):
+        alt_text = match.group(1)
+        img_path = match.group(2)
+        start, end = match.span()
+        
+        if not img_path.startswith(('http://', 'https://', 'data:')):
+            references.append({
+                'alt': alt_text,
+                'path': img_path,
+                'start': start,
+                'end': end
+            })
+    
+    return references
+
+
+def smart_match_images(image_references: List[Dict], extracted_images: List[Dict], md_images: List[Dict]) -> Dict:
+    """
+    智能匹配图片引用
+    返回：{ md_image_index: image_info }
+    """
+    matches = {}
+    
+    placeholder_map = {}
+    for ref in image_references:
+        placeholder_name = ref.get('placeholder_name', '')
+        placeholder_map[placeholder_name.lower()] = ref.get('image_info')
+    
+    for i, md_img in enumerate(md_images):
+        md_path = md_img['path']
+        md_filename = os.path.basename(md_path).lower()
+        
+        if md_filename in placeholder_map:
+            matches[i] = placeholder_map[md_filename]
+            continue
+        
+        for ref in image_references:
+            img_info = ref.get('image_info', {})
+            saved_name = img_info.get('saved_name', '').lower()
+            original_name = img_info.get('original_name', '').lower()
+            
+            if md_filename == saved_name or md_filename == original_name:
+                matches[i] = img_info
+                break
+    
+    for i, md_img in enumerate(md_images):
+        if i not in matches and i < len(extracted_images):
+            matches[i] = extracted_images[i]
+    
+    return matches
 
 
 def load_history() -> List[Dict]:
@@ -493,76 +598,132 @@ def extract_and_save_images(
     file_path: Optional[Path] = None,
     options: Optional[ConversionOptions] = None
 ) -> Tuple[str, List[str]]:
-    images = []
+    """
+    提取并保存图片，确保路径完全匹配
+    """
+    all_extracted_images = []
     result = markdown
     
     task_images_dir = IMAGES_DIR / task_id
-    task_images_dir.mkdir(exist_ok=True)
+    task_images_dir.mkdir(exist_ok=True, parents=True)
     
     if options and options.extract_images:
+        image_references = []
+        extracted_from_file = []
+        
         if file_path:
             file_ext = file_path.suffix.lower()
             
             if file_ext == '.pptx':
-                extracted = extract_images_from_pptx(file_path, task_images_dir)
-                for img in extracted:
-                    images.append(img['relative_path'])
+                extracted_from_file, image_references = extract_all_images_from_pptx(
+                    file_path, task_images_dir, task_id
+                )
+                all_extracted_images.extend(extracted_from_file)
             
             elif file_ext == '.docx':
-                extracted = extract_images_from_docx(file_path, task_images_dir)
-                for img in extracted:
-                    images.append(img['relative_path'])
+                extracted_from_file, image_references = extract_all_images_from_docx(
+                    file_path, task_images_dir, task_id
+                )
+                all_extracted_images.extend(extracted_from_file)
         
-        result, base64_images = extract_images_from_html(result, task_images_dir)
-        for img in base64_images:
-            if img['relative_path'] not in images:
-                images.append(img['relative_path'])
+        result, base64_images = extract_base64_images(result, task_images_dir, task_id)
+        all_extracted_images.extend(base64_images)
+        
+        md_image_refs = find_all_image_references(result)
+        
+        if md_image_refs:
+            matches = smart_match_images(image_references, all_extracted_images, md_image_refs)
+            
+            for i, md_img in enumerate(md_image_refs):
+                if i in matches:
+                    img_info = matches[i]
+                    api_path = img_info.get('api_path', '')
+                    
+                    replacement = f"![{md_img['alt']}]({api_path})"
+                    
+                    offset = 0
+                    for j in range(i):
+                        if j in matches:
+                            old_len = md_image_refs[j]['end'] - md_image_refs[j]['start']
+                            new_len = len(f"![{md_image_refs[j]['alt']}]({matches[j].get('api_path', '')})")
+                            offset += new_len - old_len
+                    
+                    start = md_img['start'] + offset
+                    end = md_img['end'] + offset
+                    
+                    result = result[:start] + replacement + result[end:]
     
     img_pattern = r'!\[([^\]]*)\]\(([^)]+)\)'
     matches = list(re.finditer(img_pattern, result))
-    
-    image_name_map = {}
-    for img_info in images:
-        img_name = os.path.basename(img_info)
-        image_name_map[img_name] = img_info
     
     for match in reversed(matches):
         alt_text = match.group(1)
         img_path = match.group(2)
         start, end = match.span()
         
-        if img_path.startswith(('http://', 'https://')):
-            continue
-        
-        if img_path.startswith('data:'):
-            continue
-        
-        img_name = os.path.basename(img_path)
-        
-        if img_name in image_name_map:
-            relative_path = image_name_map[img_name]
-            api_url = f"/api/images/{task_id}/{img_name}"
-            replacement = f"![{alt_text}]({api_url})"
-            result = result[:start] + replacement + result[end:]
+        if img_path.startswith(('http://', 'https://', 'data:', '/api/images/')):
             continue
         
         original_img_path = Path(img_path)
+        
         if original_img_path.is_absolute() and original_img_path.exists():
             new_img_name = f"{uuid.uuid4()}{original_img_path.suffix or '.png'}"
             new_img_path = task_images_dir / new_img_name
             
             try:
                 shutil.copy2(original_img_path, new_img_path)
-                relative_path = f"images/{new_img_name}"
-                images.append(relative_path)
                 
                 api_url = f"/api/images/{task_id}/{new_img_name}"
                 replacement = f"![{alt_text}]({api_url})"
                 result = result[:start] + replacement + result[end:]
+                
+                all_extracted_images.append({
+                    'saved_name': new_img_name,
+                    'relative_path': f"images/{new_img_name}",
+                    'api_path': api_url
+                })
             except Exception:
                 continue
+        
+        elif not original_img_path.is_absolute():
+            found = False
+            for img_info in all_extracted_images:
+                if img_info.get('saved_name') == os.path.basename(img_path):
+                    found = True
+                    break
+            
+            if not found and file_path:
+                parent_dir = file_path.parent
+                possible_paths = [
+                    parent_dir / img_path,
+                    parent_dir / 'images' / os.path.basename(img_path),
+                ]
+                
+                for possible_path in possible_paths:
+                    if possible_path.exists():
+                        new_img_name = f"{uuid.uuid4()}{possible_path.suffix or '.png'}"
+                        new_img_path = task_images_dir / new_img_name
+                        
+                        try:
+                            shutil.copy2(possible_path, new_img_path)
+                            
+                            api_url = f"/api/images/{task_id}/{new_img_name}"
+                            replacement = f"![{alt_text}]({api_url})"
+                            result = result[:start] + replacement + result[end:]
+                            
+                            all_extracted_images.append({
+                                'saved_name': new_img_name,
+                                'relative_path': f"images/{new_img_name}",
+                                'api_path': api_url
+                            })
+                            found = True
+                            break
+                        except Exception:
+                            continue
     
-    return result, images
+    relative_paths = [img.get('relative_path', '') for img in all_extracted_images if img.get('relative_path')]
+    
+    return result, relative_paths
 
 
 async def convert_file_task(task_id: str, file_path: Path, filename: str, options: ConversionOptions):
@@ -946,18 +1107,50 @@ def cleanup_old_files():
 
 @app.get("/api/images/{task_id}/{filename}")
 async def get_extracted_image(task_id: str, filename: str):
-    image_path = IMAGES_DIR / task_id / filename
+    decoded_filename = unquote(filename)
+    sanitized_filename = sanitize_filename(decoded_filename)
+    
+    image_path = IMAGES_DIR / task_id / sanitized_filename
+    
+    if not image_path.exists():
+        task_images_dir = IMAGES_DIR / task_id
+        if task_images_dir.exists():
+            for img_file in task_images_dir.iterdir():
+                if img_file.is_file():
+                    if img_file.name == sanitized_filename:
+                        image_path = img_file
+                        break
+                    
+                    if img_file.name.lower() == sanitized_filename.lower():
+                        image_path = img_file
+                        break
+                    
+                    decoded_file = unquote(img_file.name)
+                    if decoded_file == decoded_filename:
+                        image_path = img_file
+                        break
     
     if not image_path.exists():
         raise HTTPException(status_code=404, detail="Image not found")
     
+    content_type = "image/png"
+    ext = image_path.suffix.lower()
+    if ext in ('.jpg', '.jpeg'):
+        content_type = "image/jpeg"
+    elif ext == '.gif':
+        content_type = "image/gif"
+    elif ext == '.bmp':
+        content_type = "image/bmp"
+    elif ext == '.webp':
+        content_type = "image/webp"
+    elif ext == '.svg':
+        content_type = "image/svg+xml"
+    elif ext == '.ico':
+        content_type = "image/x-icon"
+    
     return FileResponse(
         path=str(image_path),
-        media_type="image/png" if filename.endswith('.png') else 
-                   "image/jpeg" if filename.endswith(('.jpg', '.jpeg')) else
-                   "image/gif" if filename.endswith('.gif') else
-                   "image/bmp" if filename.endswith('.bmp') else
-                   "application/octet-stream"
+        media_type=content_type
     )
 
 
@@ -1158,3 +1351,10 @@ async def get_cache_stats():
 static_dir = Path(__file__).parent / "static"
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+images_abs_dir = Path(__file__).parent.parent.parent.parent.parent / IMAGES_DIR
+if not images_abs_dir.exists():
+    images_abs_dir = IMAGES_DIR
+    
+if images_abs_dir.exists():
+    app.mount("/images", StaticFiles(directory=str(images_abs_dir)), name="extracted_images")
