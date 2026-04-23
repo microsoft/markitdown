@@ -39,6 +39,29 @@ class DocumentConverterResult:
         return self.markdown
 
 
+class BatchConversionResult:
+    """Result of a single conversion within a convert_batch() call.
+
+    Note: `success` returns True when no error is set. `result` may still be
+    None if `success` is True and no conversion output was produced.
+    """
+
+    def __init__(
+        self,
+        source: Any,
+        *,
+        result: Optional["DocumentConverterResult"] = None,
+        error: Optional[Exception] = None,
+    ):
+        self.source = source
+        self.result = result
+        self.error = error
+
+    @property
+    def success(self) -> bool:
+        return self.error is None
+
+
 class DocumentConverter:
     """Abstract superclass of all DocumentConverters."""
 

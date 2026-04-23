@@ -1,3 +1,4 @@
+import concurrent.futures
 import mimetypes
 import os
 import re
@@ -7,7 +8,7 @@ import traceback
 import io
 from dataclasses import dataclass
 from importlib.metadata import entry_points
-from typing import Any, List, Dict, Optional, Union, BinaryIO
+from typing import Any, List, Dict, Optional, Union, BinaryIO, Iterator, Iterable
 from pathlib import Path
 from urllib.parse import urlparse
 from warnings import warn
@@ -41,7 +42,7 @@ from .converters import (
     CsvConverter,
 )
 
-from ._base_converter import DocumentConverter, DocumentConverterResult
+from ._base_converter import DocumentConverter, DocumentConverterResult, BatchConversionResult
 
 from ._exceptions import (
     FileConversionException,
@@ -298,6 +299,58 @@ class MarkItDown:
             raise TypeError(
                 f"Invalid source type: {type(source)}. Expected str, requests.Response, BinaryIO."
             )
+
+    def convert_batch(
+        self,
+        sources: Iterable[Union[str, Path, BinaryIO, "requests.Response"]],
+        *,
+        on_error: str = "collect",
+        workers: Optional[int] = None,
+        executor: Optional[concurrent.futures.Executor] = None,
+        **kwargs: Any,
+    ) -> Iterator[BatchConversionResult]:
+        """Convert multiple sources concurrently, yielding results in completion order.
+
+        Args:
+            sources: Iterable of inputs accepted by convert(). Consumed eagerly —
+                all sources are submitted to the thread pool before any result is
+                yielded. Not safe with infinite iterables.
+            on_error: "collect" wraps errors and continues; "raise" re-raises the first error.
+            workers: Thread count when no executor is provided. Defaults to min(32, cpu_count+4).
+            executor: If provided, used directly; caller owns its lifecycle.
+            **kwargs: Passed through to each convert() call.
+
+        Note: Passing a ProcessPoolExecutor is unsupported — MarkItDown is not reliably picklable.
+        """
+        if on_error not in ("collect", "raise"):
+            raise ValueError(f"on_error must be 'collect' or 'raise', got {on_error!r}")
+
+        if executor is not None and workers is not None:
+            warn("workers is ignored when an executor is provided", stacklevel=2)
+
+        own_executor = executor is None
+        _executor = executor or concurrent.futures.ThreadPoolExecutor(
+            max_workers=workers if workers is not None else min(32, (os.cpu_count() or 1) + 4)
+        )
+
+        try:
+            future_to_source = {
+                _executor.submit(self.convert, source, **kwargs): source
+                for source in sources
+            }
+
+            for future in concurrent.futures.as_completed(future_to_source):
+                source = future_to_source[future]
+                exc = future.exception()
+                if exc is not None:
+                    if on_error == "raise":
+                        raise exc
+                    yield BatchConversionResult(source=source, error=exc)
+                else:
+                    yield BatchConversionResult(source=source, result=future.result())
+        finally:
+            if own_executor:
+                _executor.shutdown(wait=True, cancel_futures=True)
 
     def convert_local(
         self,
