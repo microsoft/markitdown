@@ -75,7 +75,16 @@ class DocxConverter(HtmlConverter):
                 _dependency_exc_info[2]
             )
 
-        style_map = kwargs.get("style_map", None)
+        # Default style map preserves underline formatting via HTML <u> tags,
+        # since Markdown has no native underline syntax. User-supplied style_map
+        # is appended so its rules take precedence over the defaults.
+        default_style_map = "u => u"
+        user_style_map = kwargs.get("style_map", None)
+        style_map = (
+            default_style_map + "\n" + user_style_map
+            if user_style_map
+            else default_style_map
+        )
         pre_process_stream = pre_process_docx(file_stream)
         return self._html_converter.convert_string(
             mammoth.convert_to_html(pre_process_stream, style_map=style_map).value,
