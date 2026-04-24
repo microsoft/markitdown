@@ -15,7 +15,7 @@ MarkItDown currently supports the conversion from:
 - PowerPoint
 - Word
 - Excel
-- Images (EXIF metadata and OCR)
+- Images (EXIF metadata and LLM-based description)
 - Audio (EXIF metadata and speech transcription)
 - HTML
 - Text-based formats (CSV, JSON, XML)
