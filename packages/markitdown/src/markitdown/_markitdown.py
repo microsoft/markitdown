@@ -201,7 +201,7 @@ class MarkItDown:
             self.register_converter(PdfConverter())
             self.register_converter(OutlookMsgConverter())
             self.register_converter(EpubConverter())
-            self.register_converter(CsvConverter())
+            self.register_converter(CsvConverter(), priority=5.0)
 
             # Register Document Intelligence converter at the top of the stack if endpoint is provided
             docintel_endpoint = kwargs.get("docintel_endpoint")
