@@ -32,6 +32,7 @@ from .converters import (
     XlsxConverter,
     XlsConverter,
     PptxConverter,
+    PptConverter,
     ImageConverter,
     AudioConverter,
     OutlookMsgConverter,
@@ -195,6 +196,7 @@ class MarkItDown:
             self.register_converter(XlsxConverter())
             self.register_converter(XlsConverter())
             self.register_converter(PptxConverter())
+            self.register_converter(PptConverter())
             self.register_converter(AudioConverter())
             self.register_converter(ImageConverter())
             self.register_converter(IpynbConverter())
