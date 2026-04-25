@@ -51,7 +51,13 @@ class HtmlConverter(DocumentConverter):
 
         # Parse the stream
         encoding = "utf-8" if stream_info.charset is None else stream_info.charset
-        soup = BeautifulSoup(file_stream, "html.parser", from_encoding=encoding)
+        try:
+            soup = BeautifulSoup(file_stream, "html.parser", from_encoding=encoding)
+        except (UnicodeDecodeError, LookupError):
+            # If the declared (or default) charset fails, let BeautifulSoup
+            # auto-detect the encoding from the raw bytes.
+            file_stream.seek(0)
+            soup = BeautifulSoup(file_stream, "html.parser")
 
         # Remove javascript and style blocks
         for script in soup(["script", "style"]):
