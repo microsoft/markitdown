@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MarkItDown GUI</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f5f5f5;
+      color: #222;
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 1.6rem;
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+      color: #1a1a1a;
+    }
+    h1 span { color: #2563eb; }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.08);
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 1.5rem;
+    }
+
+    /* Tabs */
+    .tabs { display: flex; gap: 0; border-bottom: 2px solid #e5e7eb; margin-bottom: 1.25rem; }
+    .tab-btn {
+      padding: .6rem 1.25rem;
+      border: none;
+      background: none;
+      font-size: .95rem;
+      font-weight: 600;
+      color: #6b7280;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: color .15s, border-color .15s;
+    }
+    .tab-btn.active { color: #2563eb; border-bottom-color: #2563eb; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* Drop zone */
+    .drop-zone {
+      border: 2px dashed #d1d5db;
+      border-radius: 10px;
+      padding: 2.5rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+      color: #6b7280;
+    }
+    .drop-zone:hover, .drop-zone.over { border-color: #2563eb; background: #eff6ff; color: #2563eb; }
+    .drop-zone .icon { font-size: 2.5rem; margin-bottom: .5rem; }
+    .drop-zone p { font-size: .9rem; margin-top: .35rem; }
+    .drop-zone p small { display: block; margin-top: .2rem; font-size: .78rem; color: #9ca3af; }
+
+    /* URL input */
+    .url-row { display: flex; gap: .5rem; }
+    .url-row input {
+      flex: 1;
+      padding: .65rem .9rem;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: .95rem;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .url-row input:focus { border-color: #2563eb; }
+
+    /* Buttons */
+    .btn {
+      padding: .65rem 1.2rem;
+      border: none;
+      border-radius: 8px;
+      font-size: .9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s, opacity .15s;
+      white-space: nowrap;
+    }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-outline {
+      background: #fff;
+      color: #374151;
+      border: 1px solid #d1d5db;
+    }
+    .btn-outline:hover { background: #f3f4f6; }
+
+    /* Error */
+    .error-banner {
+      display: none;
+      margin-top: 1rem;
+      padding: .75rem 1rem;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 8px;
+      color: #b91c1c;
+      font-size: .88rem;
+      display: flex;
+      align-items: flex-start;
+      gap: .5rem;
+    }
+    .error-banner.hidden { display: none !important; }
+    .error-banner button {
+      margin-left: auto;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #b91c1c;
+      font-size: 1rem;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    /* Spinner */
+    .spinner-wrap { display: none; justify-content: center; align-items: center; padding: 1.5rem; gap: .75rem; color: #6b7280; }
+    .spinner-wrap.visible { display: flex; }
+    .spinner {
+      width: 22px; height: 22px;
+      border: 3px solid #e5e7eb;
+      border-top-color: #2563eb;
+      border-radius: 50%;
+      animation: spin .75s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Output */
+    .output-section { display: none; margin-top: 1.5rem; }
+    .output-section.visible { display: block; }
+
+    .output-header {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      margin-bottom: .75rem;
+      flex-wrap: wrap;
+    }
+    .output-title { font-weight: 600; font-size: .95rem; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .output-tabs { display: flex; gap: .25rem; }
+    .out-tab-btn {
+      padding: .3rem .75rem;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      background: #fff;
+      font-size: .82rem;
+      cursor: pointer;
+      font-weight: 500;
+      color: #6b7280;
+    }
+    .out-tab-btn.active { background: #2563eb; border-color: #2563eb; color: #fff; }
+
+    .action-btns { display: flex; gap: .4rem; margin-left: auto; }
+
+    .preview-box {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      min-height: 200px;
+      max-height: 60vh;
+      overflow-y: auto;
+      background: #fff;
+      line-height: 1.7;
+    }
+    .preview-box.hidden { display: none; }
+
+    /* Markdown styles inside preview */
+    .preview-box h1, .preview-box h2, .preview-box h3,
+    .preview-box h4, .preview-box h5, .preview-box h6 {
+      margin-top: 1em; margin-bottom: .4em; line-height: 1.3;
+    }
+    .preview-box p { margin-bottom: .8em; }
+    .preview-box ul, .preview-box ol { padding-left: 1.5em; margin-bottom: .8em; }
+    .preview-box li { margin-bottom: .25em; }
+    .preview-box pre { background: #f3f4f6; border-radius: 6px; padding: .75rem 1rem; overflow-x: auto; margin-bottom: .8em; }
+    .preview-box code { background: #f3f4f6; padding: .1em .35em; border-radius: 4px; font-size: .88em; }
+    .preview-box pre code { background: none; padding: 0; }
+    .preview-box table { border-collapse: collapse; width: 100%; margin-bottom: .8em; }
+    .preview-box th, .preview-box td { border: 1px solid #e5e7eb; padding: .4em .7em; text-align: left; }
+    .preview-box th { background: #f9fafb; font-weight: 600; }
+    .preview-box blockquote { border-left: 3px solid #d1d5db; padding-left: .9em; color: #6b7280; margin-bottom: .8em; }
+    .preview-box a { color: #2563eb; }
+    .preview-box img { max-width: 100%; }
+    .preview-box hr { border: none; border-top: 1px solid #e5e7eb; margin: 1em 0; }
+
+    textarea.raw-box {
+      display: none;
+      width: 100%;
+      min-height: 200px;
+      max-height: 60vh;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: "Fira Mono", "Consolas", monospace;
+      font-size: .83rem;
+      resize: vertical;
+      background: #fafafa;
+      color: #1a1a1a;
+      line-height: 1.6;
+    }
+    textarea.raw-box.visible { display: block; }
+  </style>
+</head>
+<body>
+
+<h1>Mark<span>It</span>Down GUI</h1>
+
+<div class="card">
+  <!-- Input tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="file">Datei</button>
+    <button class="tab-btn" data-tab="url">URL</button>
+  </div>
+
+  <!-- File tab -->
+  <div class="tab-panel active" id="tab-file">
+    <div class="drop-zone" id="drop-zone" role="button" tabindex="0" aria-label="Datei auswählen oder hierher ziehen">
+      <div class="icon">📄</div>
+      <strong>Datei hierher ziehen</strong>
+      <p>oder klicken zum Auswählen
+        <small>PDF · DOCX · PPTX · XLSX · Bilder · Audio · HTML · EPUB · CSV · ZIP …</small>
+      </p>
+    </div>
+    <input type="file" id="file-input" style="display:none" />
+  </div>
+
+  <!-- URL tab -->
+  <div class="tab-panel" id="tab-url">
+    <div class="url-row">
+      <input type="url" id="url-input" placeholder="https://de.wikipedia.org/wiki/…" />
+      <button class="btn btn-primary" id="url-btn">Konvertieren</button>
+    </div>
+  </div>
+
+  <!-- Error -->
+  <div class="error-banner hidden" id="error-banner" role="alert">
+    <span id="error-text"></span>
+    <button onclick="hideError()" aria-label="Schließen">✕</button>
+  </div>
+
+  <!-- Spinner -->
+  <div class="spinner-wrap" id="spinner">
+    <div class="spinner"></div>
+    <span>Wird konvertiert…</span>
+  </div>
+
+  <!-- Output -->
+  <div class="output-section" id="output-section">
+    <div class="output-header">
+      <span class="output-title" id="output-title"></span>
+      <div class="output-tabs">
+        <button class="out-tab-btn active" data-out="preview">Vorschau</button>
+        <button class="out-tab-btn" data-out="raw">Roh-Text</button>
+      </div>
+      <div class="action-btns">
+        <button class="btn btn-outline" id="copy-btn" onclick="copyMarkdown()">Kopieren</button>
+        <button class="btn btn-outline" id="download-btn" onclick="downloadMarkdown()">Download</button>
+      </div>
+    </div>
+    <div class="preview-box" id="preview-box"></div>
+    <textarea class="raw-box" id="raw-box" readonly></textarea>
+  </div>
+</div>
+
+<script>
+  // ── State ─────────────────────────────────────────────────────────────────
+  let currentMarkdown = "";
+  let currentTitle = "output";
+
+  // ── Tab switching ─────────────────────────────────────────────────────────
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+      btn.classList.add("active");
+      document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+    });
+  });
+
+  // ── Output sub-tabs ───────────────────────────────────────────────────────
+  document.querySelectorAll(".out-tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".out-tab-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      if (btn.dataset.out === "preview") {
+        document.getElementById("preview-box").classList.remove("hidden");
+        document.getElementById("raw-box").classList.remove("visible");
+      } else {
+        document.getElementById("preview-box").classList.add("hidden");
+        document.getElementById("raw-box").classList.add("visible");
+      }
+    });
+  });
+
+  // ── Drag & Drop ───────────────────────────────────────────────────────────
+  const dropZone = document.getElementById("drop-zone");
+  const fileInput = document.getElementById("file-input");
+
+  dropZone.addEventListener("click", () => fileInput.click());
+  dropZone.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") fileInput.click(); });
+
+  dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("over"); });
+  dropZone.addEventListener("dragleave", () => dropZone.classList.remove("over"));
+  dropZone.addEventListener("drop", e => {
+    e.preventDefault();
+    dropZone.classList.remove("over");
+    const file = e.dataTransfer.files[0];
+    if (file) uploadFile(file);
+  });
+
+  fileInput.addEventListener("change", () => {
+    if (fileInput.files[0]) uploadFile(fileInput.files[0]);
+    fileInput.value = "";
+  });
+
+  // ── URL conversion ────────────────────────────────────────────────────────
+  document.getElementById("url-btn").addEventListener("click", convertUrl);
+  document.getElementById("url-input").addEventListener("keydown", e => {
+    if (e.key === "Enter") convertUrl();
+  });
+
+  function convertUrl() {
+    const url = document.getElementById("url-input").value.trim();
+    if (!url) { showError("Bitte eine URL eingeben."); return; }
+    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+      showError("Die URL muss mit http:// oder https:// beginnen."); return;
+    }
+    showSpinner();
+    fetch("/api/convert/url", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url })
+    })
+      .then(handleResponse)
+      .catch(handleNetworkError);
+  }
+
+  // ── File upload ───────────────────────────────────────────────────────────
+  function uploadFile(file) {
+    showSpinner();
+    const fd = new FormData();
+    fd.append("file", file);
+    fetch("/api/convert/file", { method: "POST", body: fd })
+      .then(handleResponse)
+      .catch(handleNetworkError);
+  }
+
+  // ── Response handling ─────────────────────────────────────────────────────
+  function handleResponse(res) {
+    return res.json().then(data => {
+      hideSpinner();
+      if (!res.ok) { showError(data.error || "Unbekannter Fehler."); return; }
+      showOutput(data.markdown, data.title);
+    });
+  }
+
+  function handleNetworkError() {
+    hideSpinner();
+    showError("Server nicht erreichbar. Läuft gui.py?");
+  }
+
+  // ── UI helpers ────────────────────────────────────────────────────────────
+  function showSpinner() {
+    hideError();
+    document.getElementById("spinner").classList.add("visible");
+    document.getElementById("output-section").classList.remove("visible");
+  }
+
+  function hideSpinner() {
+    document.getElementById("spinner").classList.remove("visible");
+  }
+
+  function showError(msg) {
+    const banner = document.getElementById("error-banner");
+    document.getElementById("error-text").textContent = msg;
+    banner.classList.remove("hidden");
+  }
+
+  function hideError() {
+    document.getElementById("error-banner").classList.add("hidden");
+  }
+
+  function showOutput(markdown, title) {
+    currentMarkdown = markdown;
+    currentTitle = (title || "output").replace(/[\\/:*?"<>|]/g, "_");
+
+    // reset to preview tab
+    document.querySelectorAll(".out-tab-btn").forEach(b => b.classList.remove("active"));
+    document.querySelector(".out-tab-btn[data-out='preview']").classList.add("active");
+    document.getElementById("preview-box").classList.remove("hidden");
+    document.getElementById("raw-box").classList.remove("visible");
+
+    document.getElementById("output-title").textContent = title || "";
+    document.getElementById("preview-box").innerHTML = marked.parse(markdown);
+    document.getElementById("raw-box").value = markdown;
+    document.getElementById("output-section").classList.add("visible");
+  }
+
+  // ── Copy ──────────────────────────────────────────────────────────────────
+  function copyMarkdown() {
+    navigator.clipboard.writeText(currentMarkdown).then(() => {
+      const btn = document.getElementById("copy-btn");
+      btn.textContent = "Kopiert!";
+      setTimeout(() => { btn.textContent = "Kopieren"; }, 2000);
+    }).catch(() => showError("Kopieren fehlgeschlagen."));
+  }
+
+  // ── Download ──────────────────────────────────────────────────────────────
+  function downloadMarkdown() {
+    const blob = new Blob([currentMarkdown], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = currentTitle.endsWith(".md") ? currentTitle : currentTitle + ".md";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+</script>
+</body>
+</html>
