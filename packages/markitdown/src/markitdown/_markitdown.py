@@ -480,8 +480,9 @@ class MarkItDown:
             parts = response.headers["content-type"].split(";")
             mimetype = parts.pop(0).strip()
             for part in parts:
-                if part.strip().startswith("charset="):
-                    _charset = part.split("=")[1].strip()
+                key, sep, value = part.strip().partition("=")
+                if sep and key.strip().lower() == "charset":
+                    _charset = value.strip()
                     if len(_charset) > 0:
                         charset = _charset
 

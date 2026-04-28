@@ -219,6 +219,13 @@ def test_data_uris() -> None:
     assert attributes["charset"] == "utf-8"
     assert data == b"Hello, World!"
 
+    data_uri = "data:text/plain;Charset=utf-8,Hello%2C%20World%21"
+    mime_type, attributes, data = parse_data_uri(data_uri)
+    assert mime_type == "text/plain"
+    assert len(attributes) == 1
+    assert attributes["charset"] == "utf-8"
+    assert data == b"Hello, World!"
+
 
 def test_file_uris() -> None:
     # Test file URI with an empty host
@@ -250,6 +257,17 @@ def test_file_uris() -> None:
     netloc, path = file_uri_to_path(file_uri)
     assert netloc is None
     assert path == "/path/to/file.txt"
+
+
+def test_response_content_type_charset_is_case_insensitive() -> None:
+    response = MagicMock()
+    response.headers = {"content-type": "text/plain; Charset=UTF-8"}
+    response.url = "https://example.com/test.txt"
+    response.iter_content.return_value = [b"Hello, World!"]
+
+    result = MarkItDown().convert_response(response)
+
+    assert result.text_content == "Hello, World!"
 
 
 def test_docx_comments() -> None:
