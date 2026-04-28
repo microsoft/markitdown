@@ -18,6 +18,7 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
     def __init__(self, **options: Any):
         options["heading_style"] = options.get("heading_style", markdownify.ATX)
         options["keep_data_uris"] = options.get("keep_data_uris", False)
+        options["preserve_underlines"] = options.get("preserve_underlines", False)
         # Explicitly cast options to the expected type if necessary
         super().__init__(**options)
 
@@ -121,6 +122,24 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         if el.get("type") == "checkbox":
             return "[x] " if el.has_attr("checked") else "[ ] "
         return ""
+
+    def convert_u(
+        self,
+        el: Any,
+        text: str,
+        convert_as_inline: Optional[bool] = False,
+        **kwargs,
+    ) -> str:
+        """Optionally preserve underline markup as literal HTML tags."""
+
+        if not self.options["preserve_underlines"]:
+            return text
+
+        prefix, suffix, text = markdownify.chomp(text)  # type: ignore
+        if not text:
+            return ""
+
+        return f"{prefix}<u>{text}</u>{suffix}"
 
     def convert_soup(self, soup: Any) -> str:
         return super().convert_soup(soup)  # type: ignore

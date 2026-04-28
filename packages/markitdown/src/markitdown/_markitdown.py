@@ -125,6 +125,7 @@ class MarkItDown:
         self._llm_prompt: Union[str | None] = None
         self._exiftool_path: Union[str | None] = None
         self._style_map: Union[str | None] = None
+        self._preserve_underlines: bool = False
 
         # Register the converters
         self._converters: List[ConverterRegistration] = []
@@ -150,6 +151,7 @@ class MarkItDown:
             self._llm_prompt = kwargs.get("llm_prompt")
             self._exiftool_path = kwargs.get("exiftool_path")
             self._style_map = kwargs.get("style_map")
+            self._preserve_underlines = kwargs.get("preserve_underlines", False)
 
             if self._exiftool_path is None:
                 self._exiftool_path = os.getenv("EXIFTOOL_PATH")
@@ -576,6 +578,12 @@ class MarkItDown:
 
                 if "exiftool_path" not in _kwargs and self._exiftool_path is not None:
                     _kwargs["exiftool_path"] = self._exiftool_path
+
+                if (
+                    "preserve_underlines" not in _kwargs
+                    and self._preserve_underlines
+                ):
+                    _kwargs["preserve_underlines"] = self._preserve_underlines
 
                 # Add the list of converters for nested processing
                 _kwargs["_parent_converters"] = self._converters
