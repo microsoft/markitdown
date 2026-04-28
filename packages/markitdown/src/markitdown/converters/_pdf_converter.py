@@ -587,3 +587,51 @@ class PdfConverter(DocumentConverter):
         markdown = _merge_partial_numbering_lines(markdown)
 
         return DocumentConverterResult(markdown=markdown)
+
+
+def extract_tables_from_pdf(pdf_bytes: io.IOBase) -> list[list[list[str]]]:
+    """Extract all tables from a PDF as a list of row/column grids.
+
+    Each table is represented as a list of rows, where each row is a list
+    of cell strings.  This is useful when the caller needs structured data
+    rather than Markdown output.
+    """
+    import pdfminer.high_level
+    import pdfminer.layout as pdfminer_layout
+
+    tables: list[list[list[str]]] = []
+    for page_layout in pdfminer.high_level.extract_pages(pdf_bytes):
+        page_words: list[dict] = []
+        for element in page_layout:
+            if isinstance(element, pdfminer_layout.LTTextContainer):
+                for line in element:
+                    if isinstance(line, pdfminer_layout.LTTextLineHorizontal):
+                        text = line.get_text().strip()
+                        if text:
+                            page_words.append({
+                                "text": text,
+                                "x0": line.x0,
+                                "x1": line.x1,
+                                "top": line.y0,
+                                "bottom": line.y1,
+                            })
+        if page_words:
+            grid = _words_to_grid(page_words)
+            if grid:
+                tables.append(grid)
+    return tables
+
+
+def _words_to_grid(words: list[dict]) -> list[list[str]]:
+    """Heuristic grouping of words into a row/column grid."""
+    if not words:
+        return []
+    rows: dict[float, list[dict]] = {}
+    for w in words:
+        y_key = round(w["top"], 1)
+        rows.setdefault(y_key, []).append(w)
+    grid: list[list[str]] = []
+    for _, row_words in sorted(rows.items()):
+        row_words.sort(key=lambda w: w["x0"])
+        grid.append([w["text"] for w in row_words])
+    return grid

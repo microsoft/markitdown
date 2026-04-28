@@ -1,6 +1,6 @@
 {
   "repository_name": "markitdown",
-  "timestamp": "2026-04-20T05:39:29.685492+00:00",
+  "timestamp": "2026-04-26T23:42:46.139938+00:00",
   "overall_score": 0.7858407079646018,
   "check_summaries": [
     {
@@ -81,7 +81,7 @@
       "description": "Detects circular dependencies between packages",
       "check_type": "circular_dependencies",
       "cycles": [
-        "packages.markitdown.src.markitdown -> packages.markitdown.src.markitdown.converters -> packages.markitdown.src.markitdown"
+        "packages.markitdown.src.markitdown.converters -> packages.markitdown.src.markitdown -> packages.markitdown.src.markitdown.converters"
       ],
       "packages_checked": 8,
       "packages_in_cycles": 2
