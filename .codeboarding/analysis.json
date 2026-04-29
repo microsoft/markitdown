@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "generated_at": "2026-04-29T08:09:11.418566+00:00",
+    "generated_at": "2026-04-29T08:16:49.281891+00:00",
     "commit_hash": "",
     "repo_name": "snapshot-worktree",
     "depth_level": 2,
@@ -40,6 +40,7 @@
     },
     "packages/markitdown/src/markitdown/_markitdown.py": {
       "method_keys": [
+        "packages/markitdown/src/markitdown/_markitdown.py|packages.markitdown.src.markitdown._markitdown._load_plugins",
         "packages/markitdown/src/markitdown/_markitdown.py|packages.markitdown.src.markitdown._markitdown.ConverterRegistration",
         "packages/markitdown/src/markitdown/_markitdown.py|packages.markitdown.src.markitdown._markitdown.MarkItDown",
         "packages/markitdown/src/markitdown/_markitdown.py|packages.markitdown.src.markitdown._markitdown.MarkItDown.__init__",
@@ -395,15 +396,11 @@
         "packages/markitdown-sample-plugin/src/markitdown_sample_plugin/_plugin.py|packages.markitdown-sample-plugin.src.markitdown_sample_plugin._plugin.RtfConverter.convert"
       ]
     },
-    "packages/markitdown-mcp/src/markitdown_mcp/__main__.py": {
+    "packages/markitdown/src/markitdown/__main__.py": {
       "method_keys": [
-        "packages/markitdown-mcp/src/markitdown_mcp/__main__.py|packages.markitdown-mcp.src.markitdown_mcp.__main__.convert_to_markdown",
-        "packages/markitdown-mcp/src/markitdown_mcp/__main__.py|packages.markitdown-mcp.src.markitdown_mcp.__main__.check_plugins_enabled",
-        "packages/markitdown-mcp/src/markitdown_mcp/__main__.py|packages.markitdown-mcp.src.markitdown_mcp.__main__.create_starlette_app",
-        "packages/markitdown-mcp/src/markitdown_mcp/__main__.py|packages.markitdown-mcp.src.markitdown_mcp.__main__.create_starlette_app.handle_sse",
-        "packages/markitdown-mcp/src/markitdown_mcp/__main__.py|packages.markitdown-mcp.src.markitdown_mcp.__main__.create_starlette_app.handle_streamable_http",
-        "packages/markitdown-mcp/src/markitdown_mcp/__main__.py|packages.markitdown-mcp.src.markitdown_mcp.__main__.create_starlette_app.lifespan",
-        "packages/markitdown-mcp/src/markitdown_mcp/__main__.py|packages.markitdown-mcp.src.markitdown_mcp.__main__.main"
+        "packages/markitdown/src/markitdown/__main__.py|packages.markitdown.src.markitdown.__main__.main",
+        "packages/markitdown/src/markitdown/__main__.py|packages.markitdown.src.markitdown.__main__._handle_output",
+        "packages/markitdown/src/markitdown/__main__.py|packages.markitdown.src.markitdown.__main__._exit_with_error"
       ]
     }
   },
@@ -505,6 +502,13 @@
       "start_line": 58,
       "end_line": 76,
       "type": "METHOD"
+    },
+    "packages/markitdown/src/markitdown/_markitdown.py|packages.markitdown.src.markitdown._markitdown._load_plugins": {
+      "file_path": "packages/markitdown/src/markitdown/_markitdown.py",
+      "qualified_name": "packages.markitdown.src.markitdown._markitdown._load_plugins",
+      "start_line": 65,
+      "end_line": 82,
+      "type": "FUNCTION"
     },
     "packages/markitdown/src/markitdown/_markitdown.py|packages.markitdown.src.markitdown._markitdown.ConverterRegistration": {
       "file_path": "packages/markitdown/src/markitdown/_markitdown.py",
@@ -2053,53 +2057,25 @@
       "end_line": 71,
       "type": "METHOD"
     },
-    "packages/markitdown-mcp/src/markitdown_mcp/__main__.py|packages.markitdown-mcp.src.markitdown_mcp.__main__.convert_to_markdown": {
-      "file_path": "packages/markitdown-mcp/src/markitdown_mcp/__main__.py",
-      "qualified_name": "packages.markitdown-mcp.src.markitdown_mcp.__main__.convert_to_markdown",
-      "start_line": 21,
-      "end_line": 23,
+    "packages/markitdown/src/markitdown/__main__.py|packages.markitdown.src.markitdown.__main__.main": {
+      "file_path": "packages/markitdown/src/markitdown/__main__.py",
+      "qualified_name": "packages.markitdown.src.markitdown.__main__.main",
+      "start_line": 13,
+      "end_line": 200,
       "type": "FUNCTION"
     },
-    "packages/markitdown-mcp/src/markitdown_mcp/__main__.py|packages.markitdown-mcp.src.markitdown_mcp.__main__.check_plugins_enabled": {
-      "file_path": "packages/markitdown-mcp/src/markitdown_mcp/__main__.py",
-      "qualified_name": "packages.markitdown-mcp.src.markitdown_mcp.__main__.check_plugins_enabled",
-      "start_line": 26,
-      "end_line": 31,
+    "packages/markitdown/src/markitdown/__main__.py|packages.markitdown.src.markitdown.__main__._handle_output": {
+      "file_path": "packages/markitdown/src/markitdown/__main__.py",
+      "qualified_name": "packages.markitdown.src.markitdown.__main__._handle_output",
+      "start_line": 203,
+      "end_line": 214,
       "type": "FUNCTION"
     },
-    "packages/markitdown-mcp/src/markitdown_mcp/__main__.py|packages.markitdown-mcp.src.markitdown_mcp.__main__.create_starlette_app": {
-      "file_path": "packages/markitdown-mcp/src/markitdown_mcp/__main__.py",
-      "qualified_name": "packages.markitdown-mcp.src.markitdown_mcp.__main__.create_starlette_app",
-      "start_line": 34,
-      "end_line": 78,
-      "type": "FUNCTION"
-    },
-    "packages/markitdown-mcp/src/markitdown_mcp/__main__.py|packages.markitdown-mcp.src.markitdown_mcp.__main__.create_starlette_app.handle_sse": {
-      "file_path": "packages/markitdown-mcp/src/markitdown_mcp/__main__.py",
-      "qualified_name": "packages.markitdown-mcp.src.markitdown_mcp.__main__.create_starlette_app.handle_sse",
-      "start_line": 43,
-      "end_line": 53,
-      "type": "FUNCTION"
-    },
-    "packages/markitdown-mcp/src/markitdown_mcp/__main__.py|packages.markitdown-mcp.src.markitdown_mcp.__main__.create_starlette_app.handle_streamable_http": {
-      "file_path": "packages/markitdown-mcp/src/markitdown_mcp/__main__.py",
-      "qualified_name": "packages.markitdown-mcp.src.markitdown_mcp.__main__.create_starlette_app.handle_streamable_http",
-      "start_line": 55,
-      "end_line": 58,
-      "type": "FUNCTION"
-    },
-    "packages/markitdown-mcp/src/markitdown_mcp/__main__.py|packages.markitdown-mcp.src.markitdown_mcp.__main__.create_starlette_app.lifespan": {
-      "file_path": "packages/markitdown-mcp/src/markitdown_mcp/__main__.py",
-      "qualified_name": "packages.markitdown-mcp.src.markitdown_mcp.__main__.create_starlette_app.lifespan",
-      "start_line": 61,
-      "end_line": 68,
-      "type": "FUNCTION"
-    },
-    "packages/markitdown-mcp/src/markitdown_mcp/__main__.py|packages.markitdown-mcp.src.markitdown_mcp.__main__.main": {
-      "file_path": "packages/markitdown-mcp/src/markitdown_mcp/__main__.py",
-      "qualified_name": "packages.markitdown-mcp.src.markitdown_mcp.__main__.main",
-      "start_line": 82,
-      "end_line": 136,
+    "packages/markitdown/src/markitdown/__main__.py|packages.markitdown.src.markitdown.__main__._exit_with_error": {
+      "file_path": "packages/markitdown/src/markitdown/__main__.py",
+      "qualified_name": "packages.markitdown.src.markitdown.__main__._exit_with_error",
+      "start_line": 217,
+      "end_line": 219,
       "type": "FUNCTION"
     }
   },
@@ -2149,6 +2125,7 @@
         {
           "file_path": "packages/markitdown/src/markitdown/_markitdown.py",
           "methods": [
+            "packages.markitdown.src.markitdown._markitdown._load_plugins",
             "packages.markitdown.src.markitdown._markitdown.ConverterRegistration",
             "packages.markitdown.src.markitdown._markitdown.MarkItDown",
             "packages.markitdown.src.markitdown._markitdown.MarkItDown.__init__",
@@ -2708,6 +2685,14 @@
         3
       ],
       "file_methods": [
+        {
+          "file_path": "packages/markitdown/src/markitdown/__main__.py",
+          "methods": [
+            "packages.markitdown.src.markitdown.__main__.main",
+            "packages.markitdown.src.markitdown.__main__._handle_output",
+            "packages.markitdown.src.markitdown.__main__._exit_with_error"
+          ]
+        },
         {
           "file_path": "packages/markitdown/src/markitdown/_base_converter.py",
           "methods": [
@@ -3984,194 +3969,9 @@
           "is_static": false
         }
       ]
-    },
-    {
-      "name": "MCP Server Interface",
-      "description": "Implements the Model Context Protocol (MCP), exposing the library's conversion capabilities as a tool for AI agents via a Starlette-based web server.",
-      "key_entities": [
-        {
-          "qualified_name": "packages.markitdown-mcp.src.markitdown_mcp.__main__.create_starlette_app",
-          "reference_file": "packages/markitdown-mcp/src/markitdown_mcp/__main__.py",
-          "reference_start_line": 34,
-          "reference_end_line": 78
-        },
-        {
-          "qualified_name": "packages.markitdown-mcp.src.markitdown_mcp.__main__.convert_to_markdown",
-          "reference_file": "packages/markitdown-mcp/src/markitdown_mcp/__main__.py",
-          "reference_start_line": 21,
-          "reference_end_line": 23
-        }
-      ],
-      "source_cluster_ids": [
-        11,
-        15
-      ],
-      "file_methods": [
-        {
-          "file_path": "packages/markitdown-mcp/src/markitdown_mcp/__main__.py",
-          "methods": [
-            "packages.markitdown-mcp.src.markitdown_mcp.__main__.convert_to_markdown",
-            "packages.markitdown-mcp.src.markitdown_mcp.__main__.check_plugins_enabled",
-            "packages.markitdown-mcp.src.markitdown_mcp.__main__.create_starlette_app",
-            "packages.markitdown-mcp.src.markitdown_mcp.__main__.create_starlette_app.handle_sse",
-            "packages.markitdown-mcp.src.markitdown_mcp.__main__.create_starlette_app.handle_streamable_http",
-            "packages.markitdown-mcp.src.markitdown_mcp.__main__.create_starlette_app.lifespan",
-            "packages.markitdown-mcp.src.markitdown_mcp.__main__.main"
-          ]
-        }
-      ],
-      "component_id": "6",
-      "can_expand": true,
-      "components": [
-        {
-          "name": "MCP Tool Implementation",
-          "description": "Defines the core tools and logic exposed via the MCP protocol. It wraps the MarkItDown library, configuring it based on environment settings and providing the convert_to_markdown tool which handles various URI schemes (file, http, data).",
-          "key_entities": [
-            {
-              "qualified_name": "packages.markitdown-mcp.src.markitdown_mcp.__main__.convert_to_markdown",
-              "reference_file": "packages/markitdown-mcp/src/markitdown_mcp/__main__.py",
-              "reference_start_line": 21,
-              "reference_end_line": 23
-            },
-            {
-              "qualified_name": "packages.markitdown-mcp.src.markitdown_mcp.__main__.check_plugins_enabled",
-              "reference_file": "packages/markitdown-mcp/src/markitdown_mcp/__main__.py",
-              "reference_start_line": 26,
-              "reference_end_line": 31
-            }
-          ],
-          "source_cluster_ids": [
-            0,
-            1
-          ],
-          "file_methods": [
-            {
-              "file_path": "packages/markitdown-mcp/src/markitdown_mcp/__main__.py",
-              "methods": [
-                "packages.markitdown-mcp.src.markitdown_mcp.__main__.convert_to_markdown",
-                "packages.markitdown-mcp.src.markitdown_mcp.__main__.check_plugins_enabled"
-              ]
-            }
-          ],
-          "component_id": "6.1",
-          "can_expand": true
-        },
-        {
-          "name": "Web Transport & Session Management",
-          "description": "Implements the network-facing transport layer using the Starlette framework. It manages the complexities of Server-Sent Events (SSE) and Streamable HTTP sessions, providing a robust web interface for the MCP server that includes connection lifecycle management and request routing.",
-          "key_entities": [
-            {
-              "qualified_name": "packages.markitdown-mcp.src.markitdown_mcp.__main__.create_starlette_app",
-              "reference_file": "packages/markitdown-mcp/src/markitdown_mcp/__main__.py",
-              "reference_start_line": 34,
-              "reference_end_line": 78
-            },
-            {
-              "qualified_name": "packages.markitdown-mcp.src.markitdown_mcp.__main__.create_starlette_app.handle_sse",
-              "reference_file": "packages/markitdown-mcp/src/markitdown_mcp/__main__.py",
-              "reference_start_line": 43,
-              "reference_end_line": 53
-            },
-            {
-              "qualified_name": "packages.markitdown-mcp.src.markitdown_mcp.__main__.create_starlette_app.handle_streamable_http",
-              "reference_file": "packages/markitdown-mcp/src/markitdown_mcp/__main__.py",
-              "reference_start_line": 55,
-              "reference_end_line": 58
-            },
-            {
-              "qualified_name": "packages.markitdown-mcp.src.markitdown_mcp.__main__.create_starlette_app.lifespan",
-              "reference_file": "packages/markitdown-mcp/src/markitdown_mcp/__main__.py",
-              "reference_start_line": 61,
-              "reference_end_line": 68
-            }
-          ],
-          "source_cluster_ids": [
-            2,
-            3,
-            4,
-            5
-          ],
-          "file_methods": [
-            {
-              "file_path": "packages/markitdown-mcp/src/markitdown_mcp/__main__.py",
-              "methods": [
-                "packages.markitdown-mcp.src.markitdown_mcp.__main__.create_starlette_app",
-                "packages.markitdown-mcp.src.markitdown_mcp.__main__.create_starlette_app.handle_sse",
-                "packages.markitdown-mcp.src.markitdown_mcp.__main__.create_starlette_app.handle_streamable_http",
-                "packages.markitdown-mcp.src.markitdown_mcp.__main__.create_starlette_app.lifespan"
-              ]
-            }
-          ],
-          "component_id": "6.2",
-          "can_expand": true
-        },
-        {
-          "name": "CLI & Execution Orchestrator",
-          "description": "Acts as the primary entry point for the markitdown-mcp package. It is responsible for parsing command-line arguments, validating security configurations for network bindings, and orchestrating the startup of the server in either STDIO or HTTP/SSE mode.",
-          "key_entities": [
-            {
-              "qualified_name": "packages.markitdown-mcp.src.markitdown_mcp.__main__.main",
-              "reference_file": "packages/markitdown-mcp/src/markitdown_mcp/__main__.py",
-              "reference_start_line": 82,
-              "reference_end_line": 136
-            }
-          ],
-          "source_cluster_ids": [
-            6
-          ],
-          "file_methods": [
-            {
-              "file_path": "packages/markitdown-mcp/src/markitdown_mcp/__main__.py",
-              "methods": [
-                "packages.markitdown-mcp.src.markitdown_mcp.__main__.main"
-              ]
-            }
-          ],
-          "component_id": "6.3",
-          "can_expand": true
-        }
-      ],
-      "components_relations": [
-        {
-          "relation": "Configures and launches the Starlette application using uvicorn when network transport is requested.",
-          "src_name": "CLI & Execution Orchestrator",
-          "dst_name": "Web Transport & Session Management",
-          "src_id": "6.3",
-          "dst_id": "6.2",
-          "edge_count": 1,
-          "is_static": true
-        },
-        {
-          "relation": "Directly invokes the FastMCP run loop to start the server in standard I/O mode for local process communication.",
-          "src_name": "CLI & Execution Orchestrator",
-          "dst_name": "MCP Tool Implementation",
-          "src_id": "6.3",
-          "dst_id": "6.1",
-          "edge_count": 0,
-          "is_static": false
-        },
-        {
-          "relation": "Forwards protocol-level requests from network clients to the underlying MCP tool execution logic by passing the server instance to the Starlette app.",
-          "src_name": "Web Transport & Session Management",
-          "dst_name": "MCP Tool Implementation",
-          "src_id": "6.2",
-          "dst_id": "6.1",
-          "edge_count": 0,
-          "is_static": false
-        }
-      ]
     }
   ],
   "components_relations": [
-    {
-      "relation": "Forwards conversion requests from AI agents to the central library.",
-      "src_name": "MCP Server Interface",
-      "dst_name": "Core Orchestrator",
-      "src_id": "6",
-      "dst_id": "1",
-      "edge_count": 0,
-      "is_static": false
-    },
     {
       "relation": "Dispatches text/HTML streams for Markdown transformation.",
       "src_name": "Core Orchestrator",
@@ -4263,5 +4063,5 @@
       "is_static": true
     }
   ],
-  "snapshotCommit": "994a3663bdaee341c1c361dbd2774fda2cdfb159"
+  "snapshotCommit": "fdb052893c50496ea21da298841f00da0353bbe0"
 }
