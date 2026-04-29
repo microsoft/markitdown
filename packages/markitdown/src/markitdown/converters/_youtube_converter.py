@@ -53,7 +53,12 @@ class YouTubeConverter(DocumentConverter):
         url = unquote(url)
         url = url.replace(r"\?", "?").replace(r"\=", "=")
 
-        if not url.startswith("https://www.youtube.com/watch?"):
+        # Support full URLs, short URLs (youtu.be), and shorts (/shorts/)
+        if not (
+            url.startswith("https://www.youtube.com/watch?")
+            or url.startswith("https://youtu.be/")
+            or "/shorts/" in url
+        ):
             # Not a YouTube URL
             return False
 
@@ -147,10 +152,25 @@ class YouTubeConverter(DocumentConverter):
         if IS_YOUTUBE_TRANSCRIPT_CAPABLE:
             ytt_api = YouTubeTranscriptApi()
             transcript_text = ""
+            # Extract video ID from URL - support multiple formats
+            # 1. youtube.com/watch?v=VIDEO_ID
+            # 2. youtu.be/VIDEO_ID
+            # 3. youtube.com/shorts/VIDEO_ID
             parsed_url = urlparse(stream_info.url)  # type: ignore
-            params = parse_qs(parsed_url.query)  # type: ignore
+            video_id = None
+            
+            # Try standard ?v= query param first
+            params = parse_qs(parsed_url.query)
             if "v" in params and params["v"][0]:
                 video_id = str(params["v"][0])
+            # Try youtu.be/VIDEO_ID format
+            elif parsed_url.path and "/youtu.be/" in stream_info.url:  # type: ignore
+                video_id = parsed_url.path.split("/")[-1]
+            # Try youtube.com/shorts/VIDEO_ID format
+            elif parsed_url.path and "/shorts/" in stream_info.url:  # type: ignore
+                video_id = parsed_url.path.split("/")[-1]
+            
+            if video_id:
                 transcript_list = ytt_api.list(video_id)
                 languages = ["en"]
                 for transcript in transcript_list:
