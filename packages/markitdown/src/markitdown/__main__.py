@@ -90,6 +90,11 @@ def main():
         type=str,
         help="Document Intelligence Endpoint. Required if using Document Intelligence.",
     )
+    parser.add_argument(
+        "--docintel-feature",
+        action="append",
+        help="Document Intelligence analysis feature(s). Repeat or comma-separate values.",
+    )
 
     parser.add_argument(
         "-p",
@@ -172,6 +177,10 @@ def main():
             )
         sys.exit(0)
 
+    docintel_features = _parse_docintel_features(args.docintel_feature)
+    if docintel_features is not None and not args.use_docintel:
+        _exit_with_error("--docintel-feature requires --use-docintel.")
+
     if args.use_docintel:
         if args.endpoint is None:
             _exit_with_error(
@@ -180,9 +189,14 @@ def main():
         elif args.filename is None:
             _exit_with_error("Filename is required when using Document Intelligence.")
 
-        markitdown = MarkItDown(
-            enable_plugins=args.use_plugins, docintel_endpoint=args.endpoint
-        )
+        markitdown_kwargs = {
+            "enable_plugins": args.use_plugins,
+            "docintel_endpoint": args.endpoint,
+        }
+        if docintel_features is not None:
+            markitdown_kwargs["docintel_features"] = docintel_features
+
+        markitdown = MarkItDown(**markitdown_kwargs)
     else:
         markitdown = MarkItDown(enable_plugins=args.use_plugins)
 
@@ -217,6 +231,28 @@ def _handle_output(args, result: DocumentConverterResult):
 def _exit_with_error(message: str):
     print(message)
     sys.exit(1)
+
+
+def _parse_docintel_features(raw_features: list[str] | None) -> list[str] | None:
+    if raw_features is None:
+        return None
+
+    features: list[str] = []
+    seen = set()
+    for raw_feature in raw_features:
+        for feature in raw_feature.split(","):
+            feature = feature.strip()
+            if len(feature) == 0:
+                continue
+
+            dedupe_key = feature.lower()
+            if dedupe_key in seen:
+                continue
+
+            seen.add(dedupe_key)
+            features.append(feature)
+
+    return features if len(features) > 0 else None
 
 
 if __name__ == "__main__":
