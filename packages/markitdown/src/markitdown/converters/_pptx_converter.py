@@ -124,13 +124,17 @@ class PptxConverter(DocumentConverter):
                                 model=llm_model,
                                 prompt=kwargs.get("llm_prompt"),
                             )
+                            if llm_description is None:
+                                llm_description = ""
                         except Exception:
                             # Unable to generate a description
                             pass
 
                     # Also grab any description embedded in the deck
                     try:
-                        alt_text = shape._element._nvXxPr.cNvPr.attrib.get("descr", "")
+                        alt_text = (
+                            shape._element._nvXxPr.cNvPr.attrib.get("descr", "") or ""
+                        )
                     except Exception:
                         # Unable to get alt text
                         pass
