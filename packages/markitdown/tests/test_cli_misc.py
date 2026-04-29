@@ -27,8 +27,20 @@ def test_invalid_flag() -> None:
     assert "SYNTAX" in result.stderr, "Expected 'SYNTAX' to appear in STDERR"
 
 
+def test_docintel_api_version_requires_use_docintel() -> None:
+    result = subprocess.run(
+        ["python", "-m", "markitdown", "--docintel-api-version", "2024-07-31-preview"],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "--docintel-api-version requires --use-docintel." in result.stdout
+
+
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     test_version()
     test_invalid_flag()
+    test_docintel_api_version_requires_use_docintel()
     print("All tests passed!")
