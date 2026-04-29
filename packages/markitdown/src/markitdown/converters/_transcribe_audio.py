@@ -24,7 +24,7 @@ def transcribe_audio(file_stream: BinaryIO, *, audio_format: str = "wav") -> str
     # Check for installed dependencies
     if _dependency_exc_info is not None:
         raise MissingDependencyException(
-            "Speech transcription requires installing MarkItdown with the [audio-transcription] optional dependencies. E.g., `pip install markitdown[audio-transcription]` or `pip install markitdown[all]`"
+            "Speech transcription requires installing MarkItDown with the [audio-transcription] optional dependencies. E.g., `pip install markitdown[audio-transcription]` or `pip install markitdown[all]`"
         ) from _dependency_exc_info[
             1
         ].with_traceback(  # type: ignore[union-attr]

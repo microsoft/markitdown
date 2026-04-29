@@ -41,7 +41,7 @@ class UnsupportedFormatException(MarkItDownException):
 
 class FailedConversionAttempt(object):
     """
-    Represents an a single attempt to convert a file.
+    Represents a single attempt to convert a file.
     """
 
     def __init__(self, converter: Any, exc_info: Optional[tuple] = None):

@@ -580,7 +580,7 @@ class MarkItDown:
                 # Add the list of converters for nested processing
                 _kwargs["_parent_converters"] = self._converters
 
-                # Add legaxy kwargs
+                # Add legacy kwargs
                 if stream_info is not None:
                     if stream_info.extension is not None:
                         _kwargs["file_extension"] = stream_info.extension
@@ -631,7 +631,7 @@ class MarkItDown:
         )
 
     def register_page_converter(self, converter: DocumentConverter) -> None:
-        """DEPRECATED: User register_converter instead."""
+        """DEPRECATED: Use register_converter instead."""
         warn(
             "register_page_converter is deprecated. Use register_converter instead.",
             DeprecationWarning,
