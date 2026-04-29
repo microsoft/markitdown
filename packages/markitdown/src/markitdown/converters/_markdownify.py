@@ -1,3 +1,5 @@
+import base64
+from pathlib import Path
 import re
 import markdownify
 
@@ -18,7 +20,9 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
     def __init__(self, **options: Any):
         options["heading_style"] = options.get("heading_style", markdownify.ATX)
         options["keep_data_uris"] = options.get("keep_data_uris", False)
+        options["export_data_uris"] = options.get("export_data_uris", False)
         # Explicitly cast options to the expected type if necessary
+        self.save_uri_index = 0
         super().__init__(**options)
 
     def convert_hn(
@@ -103,9 +107,23 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         ):
             return alt
 
-        # Remove dataURIs
-        if src.startswith("data:") and not self.options["keep_data_uris"]:
-            src = src.split(",")[0] + "..."
+        # Handle dataURIs
+        if src.startswith("data:"):
+            if self.options["export_data_uris"]:
+                if (m := re.match(r"data:image/([^;]+);base64,(.*)", src)) is not None:
+                    self.save_uri_index += 1
+                    src = Path(
+                        self.options["export_data_uris"]
+                        + f"image{self.save_uri_index}.{m.group(1)}"
+                    )
+                    if not src.parent.exists():
+                        src.parent.mkdir(parents=True)
+                    with open(src, "wb") as fh:
+                        fh.write(base64.b64decode(m.group(2)))
+                else:
+                    src = src.split(",")[0] + "..."
+            elif not self.options["keep_data_uris"]:
+                src = src.split(",")[0] + "..."
 
         return "![%s](%s%s)" % (alt, src, title_part)
 
