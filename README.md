@@ -168,6 +168,8 @@ markitdown path-to-file.pdf -o document.md -d -e "<document_intelligence_endpoin
 
 More information about how to set up an Azure Document Intelligence Resource can be found [here](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/how-to-guides/create-document-intelligence-resource?view=doc-intel-4.0.0)
 
+When authenticating with an API key instead of Azure AD, pass an `AzureKeyCredential` through the `docintel_credential` argument.
+
 ### Python API
 
 Basic usage in Python:
@@ -183,9 +185,14 @@ print(result.text_content)
 Document Intelligence conversion in Python:
 
 ```python
+from azure.core.credentials import AzureKeyCredential
 from markitdown import MarkItDown
 
-md = MarkItDown(docintel_endpoint="<document_intelligence_endpoint>")
+md = MarkItDown(
+    docintel_endpoint="<document_intelligence_endpoint>",
+    docintel_credential=AzureKeyCredential("<document_intelligence_api_key>"),
+    docintel_file_types=["pdf"],
+)
 result = md.convert("test.pdf")
 print(result.text_content)
 ```
