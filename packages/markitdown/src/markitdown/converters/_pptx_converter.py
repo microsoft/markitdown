@@ -1,9 +1,11 @@
 import sys
 import base64
+import logging
 import os
 import io
 import re
 import html
+import zipfile
 
 from typing import BinaryIO, Any
 from operator import attrgetter
@@ -102,31 +104,37 @@ class PptxConverter(DocumentConverter):
                     llm_client = kwargs.get("llm_client")
                     llm_model = kwargs.get("llm_model")
                     if llm_client is not None and llm_model is not None:
-                        # Prepare a file_stream and stream_info for the image data
-                        image_filename = shape.image.filename
-                        image_extension = None
-                        if image_filename:
-                            image_extension = os.path.splitext(image_filename)[1]
-                        image_stream_info = StreamInfo(
-                            mimetype=shape.image.content_type,
-                            extension=image_extension,
-                            filename=image_filename,
-                        )
-
-                        image_stream = io.BytesIO(shape.image.blob)
-
-                        # Caption the image
                         try:
-                            llm_description = llm_caption(
-                                image_stream,
-                                image_stream_info,
-                                client=llm_client,
-                                model=llm_model,
-                                prompt=kwargs.get("llm_prompt"),
+                            # Prepare a file_stream and stream_info for the image data
+                            image_filename = shape.image.filename
+                            image_extension = None
+                            if image_filename:
+                                image_extension = os.path.splitext(image_filename)[1]
+                            image_stream_info = StreamInfo(
+                                mimetype=shape.image.content_type,
+                                extension=image_extension,
+                                filename=image_filename,
                             )
-                        except Exception:
-                            # Unable to generate a description
-                            pass
+
+                            image_stream = io.BytesIO(shape.image.blob)
+
+                            # Caption the image
+                            try:
+                                llm_description = llm_caption(
+                                    image_stream,
+                                    image_stream_info,
+                                    client=llm_client,
+                                    model=llm_model,
+                                    prompt=kwargs.get("llm_prompt"),
+                                )
+                            except Exception:
+                                # Unable to generate a description
+                                pass
+                        except (zipfile.BadZipFile, Exception):
+                            # Unable to read media file (e.g., corrupted CRC)
+                            logging.warning(
+                                f"Unable to read media for shape '{shape.name}': skipping image content."
+                            )
 
                     # Also grab any description embedded in the deck
                     try:
@@ -136,16 +144,23 @@ class PptxConverter(DocumentConverter):
                         pass
 
                     # Prepare the alt, escaping any special characters
-                    alt_text = "\n".join([llm_description, alt_text]) or shape.name
+                    alt_text = "\n".join(filter(None, [llm_description, alt_text])) or shape.name
                     alt_text = re.sub(r"[\r\n\[\]]", " ", alt_text)
                     alt_text = re.sub(r"\s+", " ", alt_text).strip()
 
                     # If keep_data_uris is True, use base64 encoding for images
                     if kwargs.get("keep_data_uris", False):
-                        blob = shape.image.blob
-                        content_type = shape.image.content_type or "image/png"
-                        b64_string = base64.b64encode(blob).decode("utf-8")
-                        md_content += f"\n![{alt_text}](data:{content_type};base64,{b64_string})\n"
+                        try:
+                            blob = shape.image.blob
+                            content_type = shape.image.content_type or "image/png"
+                            b64_string = base64.b64encode(blob).decode("utf-8")
+                            md_content += f"\n![{alt_text}](data:{content_type};base64,{b64_string})\n"
+                        except (zipfile.BadZipFile, Exception):
+                            logging.warning(
+                                f"Unable to read image data for shape '{shape.name}': using placeholder."
+                            )
+                            filename = re.sub(r"\W", "", shape.name) + ".jpg"
+                            md_content += "\n![" + alt_text + "](" + filename + ")\n"
                     else:
                         # A placeholder name
                         filename = re.sub(r"\W", "", shape.name) + ".jpg"
