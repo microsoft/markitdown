@@ -552,3 +552,31 @@ if __name__ == "__main__":
         test()
         print("OK")
     print("All tests passed!")
+
+
+def test_http_uri_uses_browser_user_agent() -> None:
+    markitdown = MarkItDown()
+
+    response = MagicMock()
+    response.headers = {"content-type": "text/html"}
+    response.url = "https://example.com/test.html"
+    response.raise_for_status.return_value = None
+
+    expected_result = MagicMock()
+    markitdown.convert_response = MagicMock(return_value=expected_result)
+    markitdown._requests_session.get = MagicMock(return_value=response)
+
+    result = markitdown.convert("https://example.com/test.html")
+
+    assert result is expected_result
+    markitdown._requests_session.get.assert_called_once()
+    _, kwargs = markitdown._requests_session.get.call_args
+    assert kwargs["stream"] is True
+    assert "headers" in kwargs
+    assert kwargs["headers"]["User-Agent"].startswith("Mozilla/5.0")
+    markitdown.convert_response.assert_called_once_with(
+        response,
+        stream_info=None,
+        file_extension=None,
+        url=None,
+    )

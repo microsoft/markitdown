@@ -19,6 +19,12 @@ import codecs
 from ._stream_info import StreamInfo
 from ._uri_utils import parse_data_uri, file_uri_to_path
 
+DEFAULT_HTTP_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/124.0.0.0 Safari/537.36"
+)
+
 from .converters import (
     PlainTextConverter,
     HtmlConverter,
@@ -449,7 +455,8 @@ class MarkItDown:
             )
         # HTTP/HTTPS URIs
         elif uri.startswith("http:") or uri.startswith("https:"):
-            response = self._requests_session.get(uri, stream=True)
+            headers = {"User-Agent": DEFAULT_HTTP_USER_AGENT}
+            response = self._requests_session.get(uri, stream=True, headers=headers)
             response.raise_for_status()
             return self.convert_response(
                 response,
