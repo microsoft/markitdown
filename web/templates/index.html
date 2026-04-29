@@ -27,132 +27,117 @@
         </header>
 
         <main class="main-content">
-            <section class="upload-section" id="uploadSection">
-                <div class="upload-area" id="uploadArea">
-                    <input type="file" id="fileInput" accept=".pdf,.docx,.doc,.pptx,.ppt,.xlsx,.xls,.jpg,.jpeg,.png,.html,.htm,.csv,.json,.xml,.epub,.txt,.md,.ipynb" multiple hidden>
-                    <div class="upload-content">
-                        <div class="upload-icon">
-                            <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M24 4V28M24 4L18 10M24 4L30 10" stroke="#6366F1" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-                                <path d="M8 32V40C8 42.2091 9.79086 44 12 44H36C38.2091 44 40 42.2091 40 40V32" stroke="#6366F1" stroke-width="3" stroke-linecap="round"/>
-                            </svg>
-                        </div>
-                        <h3>拖放文件到此处</h3>
-                        <p>或点击选择文件</p>
-                        <button class="btn-primary" id="selectFilesBtn">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M12 5V19M5 12H19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                            选择文件
-                        </button>
-                    </div>
-                </div>
-                <div class="supported-formats">
-                    <span class="label">支持格式：</span>
-                    <span class="formats">PDF, Word, PowerPoint, Excel, 图片, HTML, EPUB, 文本等</span>
-                </div>
-            </section>
-
-            <section class="processing-section" id="processingSection" hidden>
-                <div class="processing-content">
-                    <div class="spinner">
-                        <div class="spinner-ring"></div>
-                        <div class="spinner-path">
-                            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M12 3L15.09 9.26L22 9.27L16.54 13.37L18.18 20.02L12 16.77L5.82 20.02L7.46 13.37L2 9.27L8.91 9.26L12 3Z" fill="currentColor"/>
-                            </svg>
+            <div class="content-wrapper">
+                <section class="upload-section" id="uploadSection">
+                    <div class="upload-area" id="uploadArea">
+                        <input type="file" id="fileInput" accept=".pdf,.docx,.doc,.pptx,.ppt,.xlsx,.xls,.jpg,.jpeg,.png,.html,.htm,.csv,.json,.xml,.epub,.txt,.md,.ipynb" hidden>
+                        <div class="upload-content">
+                            <div class="upload-icon">
+                                <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M24 4V28M24 4L18 10M24 4L30 10" stroke="#6366F1" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M8 32V40C8 42.2091 9.79086 44 12 44H36C38.2091 44 40 42.2091 40 40V32" stroke="#6366F1" stroke-width="3" stroke-linecap="round"/>
+                                </svg>
+                            </div>
+                            <h3>拖放文件到此处</h3>
+                            <p>或点击选择文件</p>
+                            <button class="btn-primary" id="selectFilesBtn">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M12 5V19M5 12H19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                                选择文件
+                            </button>
                         </div>
                     </div>
-                    <h3 id="processingTitle">正在处理...</h3>
-                    <p id="processingFilename">准备中</p>
-                    <div class="progress-bar" id="progressBar">
-                        <div class="progress-fill" id="progressFill"></div>
+                    <div class="supported-formats">
+                        <span class="label">支持格式：</span>
+                        <span class="formats">PDF, Word, PowerPoint, Excel, 图片, HTML, EPUB, 文本等</span>
                     </div>
-                </div>
-            </section>
+                </section>
 
-            <section class="result-section" id="resultSection" hidden>
-                <div class="result-header">
-                    <div class="file-info">
-                        <div class="file-icon" id="fileIcon">📄</div>
-                        <div class="file-details">
-                            <h3 id="resultFilename">document.pdf</h3>
-                            <span class="file-type" id="resultFileType">PDF Document</span>
+                <section class="result-section" id="resultSection" hidden>
+                    <div class="result-header">
+                        <div class="file-info">
+                            <div class="file-icon" id="fileIcon">📄</div>
+                            <div class="file-details">
+                                <h3 id="resultFilename">document.pdf</h3>
+                                <span class="file-type" id="resultFileType">PDF Document</span>
+                            </div>
+                        </div>
+                        <div class="result-actions">
+                            <button class="btn-ghost" id="copyBtn" title="复制到剪贴板">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M8 8V16C8 17.1046 8.89543 18 10 18H18C19.1046 18 20 17.1046 20 16V8C20 6.89543 19.1046 6 18 6H10C8.89543 6 8 6.89543 8 8Z" stroke="currentColor" stroke-width="2"/>
+                                    <path d="M6 10H5C4.44772 10 4 10.4477 4 11V18C4 19.1046 4.89543 20 6 20H13C13.5523 20 14 19.5523 14 19V18" stroke="currentColor" stroke-width="2"/>
+                                </svg>
+                                复制
+                            </button>
+                            <button class="btn-ghost" id="downloadBtn" title="下载 Markdown">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M12 3V15M12 15L8 11M12 15L16 11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M5 21H19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                </svg>
+                                下载
+                            </button>
+                            <button class="btn-ghost" id="newFileBtn" title="转换新文件">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                    <path d="M12 3V12L17 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                                新文件
+                            </button>
                         </div>
                     </div>
-                    <div class="result-actions">
-                        <button class="btn-ghost" id="copyBtn" title="复制到剪贴板">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M8 8V16C8 17.1046 8.89543 18 10 18H18C19.1046 18 20 17.1046 20 16V8C20 6.89543 19.1046 6 18 6H10C8.89543 6 8 6.89543 8 8Z" stroke="currentColor" stroke-width="2"/>
-                                <path d="M6 10H5C4.44772 10 4 10.4477 4 11V18C4 19.1046 4.89543 20 6 20H13C13.5523 20 14 19.5523 14 19V18" stroke="currentColor" stroke-width="2"/>
+                    
+                    <div class="view-toggle">
+                        <button class="toggle-btn active" data-view="markdown">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M3 5C3 3.89543 3.89543 3 5 3H19C20.1046 3 21 3.89543 21 5V19C21 20.1046 20.1046 21 19 21H5C3.89543 21 3 20.1046 3 19V5Z" stroke="currentColor" stroke-width="2"/>
+                                <path d="M7 17V13L10 16L13 13V17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M17 13L14 17H20L17 13Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                             </svg>
-                            复制
+                            Markdown
                         </button>
-                        <button class="btn-ghost" id="downloadBtn" title="下载 Markdown">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M12 3V15M12 15L8 11M12 15L16 11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                <path d="M5 21H19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <button class="toggle-btn" data-view="preview">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M1 12C1 12 5 4 12 4C19 4 23 12 23 12C23 12 19 20 12 20C5 20 1 12 1 12Z" stroke="currentColor" stroke-width="2"/>
+                                <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
                             </svg>
-                            下载
-                        </button>
-                        <button class="btn-ghost" id="newFileBtn" title="转换新文件">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                                <path d="M12 3V12L17 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                            新文件
+                            预览
                         </button>
                     </div>
-                </div>
-                
-                <div class="view-toggle">
-                    <button class="toggle-btn active" data-view="markdown">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M3 5C3 3.89543 3.89543 3 5 3H19C20.1046 3 21 3.89543 21 5V19C21 20.1046 20.1046 21 19 21H5C3.89543 21 3 20.1046 3 19V5Z" stroke="currentColor" stroke-width="2"/>
-                            <path d="M7 17V13L10 16L13 13V17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            <path d="M17 13L14 17H20L17 13Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
-                        Markdown
-                    </button>
-                    <button class="toggle-btn" data-view="preview">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M1 12C1 12 5 4 12 4C19 4 23 12 23 12C23 12 19 20 12 20C5 20 1 12 1 12Z" stroke="currentColor" stroke-width="2"/>
-                            <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
-                        </svg>
-                        预览
-                    </button>
-                </div>
 
-                <div class="result-content">
-                    <div class="markdown-view active" id="markdownView">
-                        <pre><code id="markdownContent"></code></pre>
+                    <div class="result-content">
+                        <div class="markdown-view active" id="markdownView">
+                            <pre><code id="markdownContent"></code></pre>
+                        </div>
+                        <div class="preview-view" id="previewView">
+                            <div class="preview-content" id="previewContent"></div>
+                        </div>
                     </div>
-                    <div class="preview-view" id="previewView">
-                        <div class="preview-content" id="previewContent"></div>
-                    </div>
-                </div>
-            </section>
-
-            <section class="error-section" id="errorSection" hidden>
-                <div class="error-content">
-                    <div class="error-icon">
-                        <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <circle cx="24" cy="24" r="20" stroke="#EF4444" stroke-width="3"/>
-                            <path d="M15 15L33 33M33 15L15 33" stroke="#EF4444" stroke-width="3" stroke-linecap="round"/>
-                        </svg>
-                    </div>
-                    <h3>转换失败</h3>
-                    <p id="errorMessage">发生未知错误</p>
-                    <button class="btn-primary" id="retryBtn">
-                        重新上传
-                    </button>
-                </div>
-            </section>
+                </section>
+            </div>
         </main>
 
         <footer class="app-footer">
             <p>Powered by MarkItDown</p>
         </footer>
+    </div>
+
+    <div class="modal-overlay" id="modalOverlay" hidden>
+        <div class="modal" id="processingModal">
+            <div class="modal-content">
+                <div class="spinner">
+                    <div class="spinner-ring"></div>
+                    <div class="spinner-path">
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 3L15.09 9.26L22 9.27L16.54 13.37L18.18 20.02L12 16.77L5.82 20.02L7.46 13.37L2 9.27L8.91 9.26L12 3Z" fill="currentColor"/>
+                        </svg>
+                    </div>
+                </div>
+                <h3 id="processingTitle">正在处理...</h3>
+                <p id="processingFilename">准备中</p>
+            </div>
+        </div>
     </div>
 
     <div class="toast" id="toast">
