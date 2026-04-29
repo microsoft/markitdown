@@ -56,6 +56,7 @@ class DocumentIntelligenceFileType(str, Enum):
     """Enum of file types supported by the Document Intelligence Converter."""
 
     # No OCR
+    DOC = "doc"
     DOCX = "docx"
     PPTX = "pptx"
     XLSX = "xlsx"
@@ -72,7 +73,11 @@ def _get_mime_type_prefixes(types: List[DocumentIntelligenceFileType]) -> List[s
     """Get the MIME type prefixes for the given file types."""
     prefixes: List[str] = []
     for type_ in types:
-        if type_ == DocumentIntelligenceFileType.DOCX:
+        if type_ == DocumentIntelligenceFileType.DOC:
+            prefixes.append(
+                "application/msword"
+            )
+        elif type_ == DocumentIntelligenceFileType.DOCX:
             prefixes.append(
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
@@ -105,7 +110,9 @@ def _get_file_extensions(types: List[DocumentIntelligenceFileType]) -> List[str]
     """Get the file extensions for the given file types."""
     extensions: List[str] = []
     for type_ in types:
-        if type_ == DocumentIntelligenceFileType.DOCX:
+        if type_ == DocumentIntelligenceFileType.DOC:
+            extensions.append(".doc")
+        elif type_ == DocumentIntelligenceFileType.DOCX:
             extensions.append(".docx")
         elif type_ == DocumentIntelligenceFileType.PPTX:
             extensions.append(".pptx")
