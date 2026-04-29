@@ -590,6 +590,7 @@ class MarkItDown:
 
                 # Check if the converter will accept the file, and if so, try to convert it
                 _accepts = False
+                res: Optional[DocumentConverterResult] = None
                 try:
                     _accepts = converter.accepts(file_stream, stream_info, **_kwargs)
                 except NotImplementedError:
