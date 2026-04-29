@@ -282,6 +282,39 @@ def test_input_as_strings() -> None:
     result = markitdown.convert_stream(io.BytesIO(input_data))
     assert "# Test" in result.text_content
 
+
+def test_convert_github_markdown_url_uses_raw_content() -> None:
+    requested_urls: list[str] = []
+
+    class FakeResponse:
+        def __init__(self, url: str) -> None:
+            self.url = url
+            self.headers = {"content-type": "text/plain; charset=utf-8"}
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def iter_content(self, chunk_size: int = 512):
+            del chunk_size
+            yield b"# Hello from markdown\n"
+
+    class FakeSession:
+        def get(self, url: str, *, stream: bool = False) -> FakeResponse:
+            requested_urls.append(url)
+            assert stream is True
+            return FakeResponse(url)
+
+    markitdown = MarkItDown(requests_session=FakeSession())
+
+    result = markitdown.convert(
+        "https://github.com/microsoft/markitdown/blob/main/README.md"
+    )
+
+    assert result.text_content == "# Hello from markdown\n"
+    assert requested_urls == [
+        "https://raw.githubusercontent.com/microsoft/markitdown/main/README.md"
+    ]
+
     # Test input with leading blank characters
     input_data = b"   \n\n\n<html><body><h1>Test</h1></body></html>"
     result = markitdown.convert_stream(io.BytesIO(input_data))
