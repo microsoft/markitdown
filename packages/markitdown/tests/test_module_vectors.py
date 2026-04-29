@@ -46,6 +46,7 @@ def test_guess_stream_info(test_vector):
         # mimetype or extension, so we'll special-case them here.
         if test_vector.filename in [
             "test_outlook_msg.msg",
+            "test_udf.udf",
         ]:
             return
 

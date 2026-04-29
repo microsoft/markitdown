@@ -234,6 +234,23 @@ GENERAL_TEST_VECTORS = [
         ],
         must_not_include=[],
     ),
+    FileTestVector(
+        filename="test_udf.udf",
+        mimetype="application/zip",
+        charset=None,
+        url=None,
+        must_include=[
+            "Türkçe şığ ve emoji 👋",
+            "**Kalın**",
+            "*italik*",
+            "<u>altı çizili</u>",
+            "1. Birinci madde",
+            "2. İkinci madde",
+            "| Sütun A | Sütun B |",
+            "| Hücre 1 | Tablo değeri |",
+        ],
+        must_not_include=[],
+    ),
 ]
 
 
