@@ -1,6 +1,7 @@
 import os
 import io
 import tempfile
+from pathlib import Path
 from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
 from markitdown import MarkItDown
@@ -17,9 +18,13 @@ ALLOWED_EXTENSIONS = {'pdf', 'docx', 'doc', 'pptx', 'ppt', 'xlsx', 'xls',
 md = MarkItDown(enable_plugins=False)
 
 
+def get_file_extension(filename):
+    return Path(filename).suffix.lower().lstrip('.')
+
+
 def allowed_file(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    ext = get_file_extension(filename)
+    return ext in ALLOWED_EXTENSIONS
 
 
 @app.route('/')
@@ -33,27 +38,34 @@ def convert_file():
         return jsonify({'error': 'No file part'}), 400
     
     file = request.files['file']
+    original_filename = file.filename
     
-    if file.filename == '':
+    if not original_filename:
         return jsonify({'error': 'No selected file'}), 400
     
-    if not allowed_file(file.filename):
+    if not allowed_file(original_filename):
         return jsonify({'error': 'File type not supported'}), 400
     
     try:
-        filename = secure_filename(file.filename)
+        ext = get_file_extension(original_filename)
+        
+        safe_filename = secure_filename(original_filename)
+        if not safe_filename or safe_filename == '.':
+            safe_filename = f"upload.{ext}"
+        elif not get_file_extension(safe_filename):
+            safe_filename = f"{safe_filename}.{ext}"
         
         with tempfile.TemporaryDirectory() as temp_dir:
-            temp_path = os.path.join(temp_dir, filename)
+            temp_path = os.path.join(temp_dir, safe_filename)
             file.save(temp_path)
             
             result = md.convert(temp_path)
             
             return jsonify({
                 'success': True,
-                'filename': filename,
+                'filename': original_filename,
                 'markdown': result.text_content,
-                'file_type': filename.rsplit('.', 1)[1].lower()
+                'file_type': ext
             })
             
     except Exception as e:
