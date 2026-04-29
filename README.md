@@ -68,6 +68,38 @@ cd markitdown
 pip install -e 'packages/markitdown[all]'
 ```
 
+## Troubleshooting
+
+### ImageMagick Policy Error when Converting PDFs with Images
+
+If you encounter an error like `PolicyError: not authorized PDF at error/constitute.c/ReadImage/1243` when converting PDFs containing embedded images, this is caused by ImageMagick's security policy that restricts PDF processing by default.
+
+**Solution:**
+
+1. **Edit ImageMagick's policy file** (typically at `/etc/ImageMagick-6/policy.xml` or `/etc/ImageMagick/policy.xml`):
+
+```bash
+# Find and comment out or modify the PDF restriction line
+sudo sed -i 's/<policy domain="coder" rights="none" pattern="PDF" \/>/<!-- <policy domain="coder" rights="none" pattern="PDF" \/> -->/' /etc/ImageMagick-6/policy.xml
+```
+
+Or edit manually to change rights from "none" to "read|write":
+
+```xml
+<policy domain="coder" rights="read|write" pattern="PDF" />
+```
+
+2. **Restart ImageMagick** (if applicable):
+
+```bash
+# On some systems
+sudo systemctl restart imagemagick
+```
+
+3. **Alternative: Use PIL directly** - If you can't modify system policies, the `markitdown-ocr` plugin can use PyMuPDF directly to extract images without ImageMagick.
+
+For more details, see ImageMagick's [Security Policy](https://imagemagick.org/script/security-policy.php) documentation.
+
 ## Usage
 
 ### Command-Line
