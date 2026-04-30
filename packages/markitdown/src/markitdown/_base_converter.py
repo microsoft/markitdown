@@ -1,5 +1,45 @@
-from typing import Any, BinaryIO, Optional
+from dataclasses import dataclass
+from typing import Any, BinaryIO, Optional, Protocol, runtime_checkable
+
 from ._stream_info import StreamInfo
+
+
+@dataclass(frozen=True)
+class ConversionProgress:
+    """Progress update emitted by a converter during document processing.
+
+    Attributes:
+        current: Current unit number (1-indexed page, slide, chapter…).
+        total:   Total number of units (0 if unknown).
+        unit:    Semantic label for the unit being processed
+                 (``"page"``, ``"slide"``, ``"chapter"``, ``"sheet"``).
+        source:  Name of the converter class emitting the progress
+                 (e.g. ``"PdfConverter"``).  Useful when several converters
+                 are chained or when the caller wants format-specific logging.
+    """
+
+    current: int
+    total: int
+    unit: str = "page"
+    source: str = ""
+
+
+@runtime_checkable
+class ProgressCallback(Protocol):
+    """Interface for conversion progress callbacks.
+
+    Any callable matching this signature is accepted — no explicit
+    subclassing required (structural subtyping / duck typing).
+
+    Example usage::
+
+        def my_callback(progress: ConversionProgress) -> None:
+            print(f"{progress.source}: {progress.current}/{progress.total} {progress.unit}s")
+
+        result = md.convert("doc.pdf", progress_callback=my_callback)
+    """
+
+    def __call__(self, progress: ConversionProgress) -> None: ...
 
 
 class DocumentConverterResult:

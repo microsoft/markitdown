@@ -3,7 +3,7 @@ import io
 import re
 from typing import BinaryIO, Any
 
-from .._base_converter import DocumentConverter, DocumentConverterResult
+from .._base_converter import DocumentConverter, DocumentConverterResult, ConversionProgress
 from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 
@@ -536,6 +536,9 @@ class PdfConverter(DocumentConverter):
 
         assert isinstance(file_stream, io.IOBase)
 
+        # Optional progress callback — reported per page
+        progress_callback = kwargs.get("progress_callback")
+
         # Read file stream into BytesIO for compatibility with pdfplumber
         pdf_bytes = io.BytesIO(file_stream.read())
 
@@ -550,7 +553,15 @@ class PdfConverter(DocumentConverter):
             plain_page_indices: list[int] = []
 
             with pdfplumber.open(pdf_bytes) as pdf:
+                total_pages = len(pdf.pages)
                 for page_idx, page in enumerate(pdf.pages):
+                    if progress_callback is not None:
+                        progress_callback(ConversionProgress(
+                            current=page_idx + 1,
+                            total=total_pages,
+                            unit="page",
+                            source="PdfConverter",
+                        ))
                     page_content = _extract_form_content_from_words(page)
 
                     if page_content is not None:
