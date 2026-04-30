@@ -261,6 +261,13 @@ class MarkItDown:
             - source: can be a path (str or Path), url, or a requests.response object
             - stream_info: optional stream info to use for the conversion. If None, infer from source
             - kwargs: additional arguments to pass to the converter
+
+        Keyword Args:
+            progress_callback: An optional callable matching
+                :class:`~markitdown.ProgressCallback`.  When provided, the
+                converter will call it with a :class:`~markitdown.ConversionProgress`
+                object for each logical unit processed (page, slide, chapter, sheet).
+                Converters that do not support progress simply ignore it.
         """
 
         # Local path or url
