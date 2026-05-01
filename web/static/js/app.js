@@ -1,51 +1,48 @@
 document.addEventListener('DOMContentLoaded', function() {
-    let currentMarkdown = '';
-    let currentFilename = '';
-    let selectedFiles = [];
-    let batchResults = [];
+    let convertedDocuments = [];
+    let currentDocIndex = -1;
+    let activeView = 'markdown';
 
     const elements = {
-        uploadArea: document.getElementById('uploadArea'),
+        uploadBtn: document.getElementById('uploadBtn'),
+        emptyUploadBtn: document.getElementById('emptyUploadBtn'),
         fileInput: document.getElementById('fileInput'),
-        selectFilesBtn: document.getElementById('selectFilesBtn'),
-        uploadSection: document.getElementById('uploadSection'),
-        resultSection: document.getElementById('resultSection'),
-        batchResultSection: document.getElementById('batchResultSection'),
+        settingsBtn: document.getElementById('settingsBtn'),
+        settingsModal: document.getElementById('settingsModal'),
+        closeSettingsBtn: document.getElementById('closeSettingsBtn'),
         modalOverlay: document.getElementById('modalOverlay'),
-        processingFilename: document.getElementById('processingFilename'),
         processingTitle: document.getElementById('processingTitle'),
-        resultFilename: document.getElementById('resultFilename'),
-        resultFileType: document.getElementById('resultFileType'),
-        fileIcon: document.getElementById('fileIcon'),
+        processingFilename: document.getElementById('processingFilename'),
+        progressInfo: document.getElementById('progressInfo'),
+        progressCurrent: document.getElementById('progressCurrent'),
+        progressTotal: document.getElementById('progressTotal'),
+        previewHeader: document.getElementById('previewHeader'),
+        viewToggle: document.getElementById('viewToggle'),
+        emptyState: document.getElementById('emptyState'),
+        resultContent: document.getElementById('resultContent'),
+        previewFileIcon: document.getElementById('previewFileIcon'),
+        previewFilename: document.getElementById('previewFilename'),
+        previewFileType: document.getElementById('previewFileType'),
         markdownContent: document.getElementById('markdownContent'),
         previewContent: document.getElementById('previewContent'),
         markdownView: document.getElementById('markdownView'),
         previewView: document.getElementById('previewView'),
+        toggleBtns: document.querySelectorAll('.toggle-btn'),
         copyBtn: document.getElementById('copyBtn'),
         downloadBtn: document.getElementById('downloadBtn'),
-        newFileBtn: document.getElementById('newFileBtn'),
-        toast: document.getElementById('toast'),
-        toastMessage: document.getElementById('toastMessage'),
-        toggleBtns: document.querySelectorAll('.toggle-btn'),
-        fileListContainer: document.getElementById('fileListContainer'),
-        fileList: document.getElementById('fileList'),
-        selectedCount: document.getElementById('selectedCount'),
-        clearFilesBtn: document.getElementById('clearFilesBtn'),
-        convertAllBtn: document.getElementById('convertAllBtn'),
-        settingsBtn: document.getElementById('settingsBtn'),
-        settingsModal: document.getElementById('settingsModal'),
-        closeSettingsBtn: document.getElementById('closeSettingsBtn'),
+        sidebarActions: document.getElementById('sidebarActions'),
+        batchDownloadBtn: document.getElementById('batchDownloadBtn'),
+        clearAllBtn: document.getElementById('clearAllBtn'),
+        documentList: document.getElementById('documentList'),
+        emptyList: document.getElementById('emptyList'),
         llmConfigForm: document.getElementById('llmConfigForm'),
         apiKeyInput: document.getElementById('apiKeyInput'),
         baseUrlInput: document.getElementById('baseUrlInput'),
         modelInput: document.getElementById('modelInput'),
         toggleApiKey: document.getElementById('toggleApiKey'),
         clearConfigBtn: document.getElementById('clearConfigBtn'),
-        batchSuccessCount: document.getElementById('batchSuccessCount'),
-        batchErrorCount: document.getElementById('batchErrorCount'),
-        batchResultsList: document.getElementById('batchResultsList'),
-        batchDownloadAllBtn: document.getElementById('batchDownloadAllBtn'),
-        batchNewFileBtn: document.getElementById('batchNewFileBtn'),
+        toast: document.getElementById('toast'),
+        toastMessage: document.getElementById('toastMessage'),
     };
 
     const fileIcons = {
@@ -107,21 +104,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 3000);
     }
 
-    function showModal() {
+    function showProcessingModal() {
         elements.modalOverlay.hidden = false;
     }
 
-    function hideModal() {
+    function hideProcessingModal() {
         elements.modalOverlay.hidden = true;
-    }
-
-    function showSection(section) {
-        elements.uploadSection.hidden = true;
-        elements.resultSection.hidden = true;
-        elements.batchResultSection.hidden = true;
-        if (section) {
-            section.hidden = false;
-        }
+        elements.progressInfo.hidden = true;
     }
 
     function getFileIcon(extension) {
@@ -140,208 +129,8 @@ document.addEventListener('DOMContentLoaded', function() {
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
 
-    function updateFileList() {
-        if (selectedFiles.length === 0) {
-            elements.fileListContainer.hidden = true;
-            elements.fileList.innerHTML = '';
-            return;
-        }
-
-        elements.fileListContainer.hidden = false;
-        elements.selectedCount.textContent = selectedFiles.length;
-        elements.fileList.innerHTML = '';
-
-        selectedFiles.forEach((file, index) => {
-            const ext = file.name.split('.').pop().toLowerCase();
-            const item = document.createElement('div');
-            item.className = 'file-item';
-            item.innerHTML = `
-                <div class="file-item-info">
-                    <span class="file-item-icon">${getFileIcon(ext)}</span>
-                    <div class="file-item-details">
-                        <span class="file-item-name">${file.name}</span>
-                        <span class="file-item-size">${formatFileSize(file.size)}</span>
-                    </div>
-                </div>
-                <button class="btn-icon btn-remove" data-index="${index}" title="移除">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                    </svg>
-                </button>
-            `;
-            elements.fileList.appendChild(item);
-        });
-
-        document.querySelectorAll('.btn-remove').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const index = parseInt(btn.dataset.index);
-                selectedFiles.splice(index, 1);
-                updateFileList();
-            });
-        });
-    }
-
-    function handleFiles(files) {
-        if (!files || files.length === 0) return;
-        
-        for (let file of files) {
-            selectedFiles.push(file);
-        }
-        
-        updateFileList();
-    }
-
-    async function uploadAndConvert(file) {
-        const formData = new FormData();
-        formData.append('file', file);
-        
-        try {
-            const response = await fetch('/api/convert', {
-                method: 'POST',
-                body: formData,
-                credentials: 'include',
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                return { success: true, data };
-            } else {
-                return { success: false, error: data.error || '转换失败' };
-            }
-        } catch (error) {
-            return { success: false, error: error.message || '网络错误' };
-        }
-    }
-
-    async function uploadAndConvertBatch() {
-        if (selectedFiles.length === 0) {
-            showToast('没有选择文件', 'error');
-            return;
-        }
-
-        const formData = new FormData();
-        selectedFiles.forEach(file => {
-            formData.append('files', file);
-        });
-
-        elements.processingTitle.textContent = '正在批量处理...';
-        elements.processingFilename.textContent = `共 ${selectedFiles.length} 个文件`;
-        showModal();
-
-        try {
-            const response = await fetch('/api/convert-batch', {
-                method: 'POST',
-                body: formData,
-                credentials: 'include',
-            });
-            
-            const data = await response.json();
-            hideModal();
-            
-            if (data.success) {
-                batchResults = data.results;
-                displayBatchResults(data);
-                showToast(`批量转换完成：成功 ${data.success_count} 个，失败 ${data.error_count} 个`, 'success');
-            } else {
-                showToast(data.error || '批量转换失败', 'error');
-            }
-        } catch (error) {
-            hideModal();
-            showToast(error.message || '网络错误', 'error');
-        }
-    }
-
-    function displayResult(data) {
-        currentMarkdown = data.markdown;
-        currentFilename = data.filename;
-        
-        const extension = data.file_type;
-        
-        elements.resultFilename.textContent = data.filename;
-        elements.resultFileType.textContent = getFileTypeName(extension);
-        elements.fileIcon.textContent = getFileIcon(extension);
-        
-        elements.markdownContent.textContent = data.markdown;
-        
-        const previewHtml = marked.parse(data.markdown);
-        elements.previewContent.innerHTML = previewHtml;
-        
-        showSection(elements.resultSection);
-    }
-
-    function displayBatchResults(data) {
-        elements.batchSuccessCount.textContent = data.success_count;
-        elements.batchErrorCount.textContent = data.error_count;
-        elements.batchResultsList.innerHTML = '';
-
-        const allResults = [
-            ...data.results.map(r => ({ ...r, status: 'success' })),
-            ...data.errors.map(e => ({ ...e, status: 'error' }))
-        ];
-
-        allResults.forEach(result => {
-            const ext = result.filename.split('.').pop().toLowerCase();
-            const item = document.createElement('div');
-            item.className = `batch-result-item ${result.status}`;
-            
-            if (result.status === 'success') {
-                item.innerHTML = `
-                    <div class="batch-result-info">
-                        <span class="batch-result-icon">${getFileIcon(ext)}</span>
-                        <div class="batch-result-details">
-                            <span class="batch-result-name">${result.filename}</span>
-                            <span class="batch-result-status success">转换成功</span>
-                        </div>
-                    </div>
-                    <div class="batch-result-actions">
-                        <button class="btn-ghost btn-small view-result-btn" data-filename="${result.filename}">
-                            查看
-                        </button>
-                        <button class="btn-ghost btn-small download-single-btn" data-filename="${result.filename}">
-                            下载
-                        </button>
-                    </div>
-                `;
-            } else {
-                item.innerHTML = `
-                    <div class="batch-result-info">
-                        <span class="batch-result-icon">${getFileIcon(ext)}</span>
-                        <div class="batch-result-details">
-                            <span class="batch-result-name">${result.filename}</span>
-                            <span class="batch-result-status error">${result.error}</span>
-                        </div>
-                    </div>
-                `;
-            }
-            
-            elements.batchResultsList.appendChild(item);
-        });
-
-        document.querySelectorAll('.view-result-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const filename = btn.dataset.filename;
-                const result = batchResults.find(r => r.filename === filename);
-                if (result) {
-                    displayResult(result);
-                }
-            });
-        });
-
-        document.querySelectorAll('.download-single-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const filename = btn.dataset.filename;
-                const result = batchResults.find(r => r.filename === filename);
-                if (result) {
-                    downloadSingleMarkdown(result);
-                }
-            });
-        });
-
-        showSection(elements.batchResultSection);
-    }
-
     function switchView(view) {
+        activeView = view;
         elements.toggleBtns.forEach(btn => {
             btn.classList.remove('active');
             if (btn.dataset.view === view) {
@@ -358,21 +147,185 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    async function copyToClipboard() {
+    function displayDocument(doc) {
+        if (!doc) {
+            elements.previewHeader.hidden = true;
+            elements.viewToggle.hidden = true;
+            elements.emptyState.hidden = false;
+            elements.resultContent.hidden = true;
+            return;
+        }
+
+        elements.previewHeader.hidden = false;
+        elements.viewToggle.hidden = false;
+        elements.emptyState.hidden = true;
+        elements.resultContent.hidden = false;
+
+        const ext = doc.filename.split('.').pop().toLowerCase();
+        
+        elements.previewFileIcon.textContent = getFileIcon(ext);
+        elements.previewFilename.textContent = doc.filename;
+        elements.previewFileType.textContent = getFileTypeName(ext);
+
+        elements.markdownContent.textContent = doc.markdown;
+
+        const previewHtml = marked.parse(doc.markdown);
+        elements.previewContent.innerHTML = previewHtml;
+
+        switchView(activeView);
+    }
+
+    function updateDocumentList() {
+        if (convertedDocuments.length === 0) {
+            elements.emptyList.hidden = false;
+            elements.sidebarActions.hidden = true;
+            elements.documentList.innerHTML = '';
+            elements.documentList.appendChild(elements.emptyList);
+            displayDocument(null);
+            return;
+        }
+
+        elements.emptyList.hidden = true;
+        elements.sidebarActions.hidden = false;
+        
+        elements.documentList.innerHTML = '';
+        
+        convertedDocuments.forEach((doc, index) => {
+            const ext = doc.filename.split('.').pop().toLowerCase();
+            const item = document.createElement('div');
+            item.className = `document-item ${doc.status || 'success'} ${index === currentDocIndex ? 'active' : ''}`;
+            item.dataset.index = index;
+            
+            item.innerHTML = `
+                <span class="document-item-icon">${getFileIcon(ext)}</span>
+                <div class="document-item-details">
+                    <span class="document-item-name">${doc.filename}</span>
+                    <span class="document-item-status ${doc.status || 'success'}">
+                        ${doc.status === 'error' ? doc.error : '已转换'}
+                    </span>
+                </div>
+            `;
+            
+            item.addEventListener('click', () => {
+                if (doc.status !== 'error') {
+                    selectDocument(index);
+                }
+            });
+            
+            elements.documentList.appendChild(item);
+        });
+    }
+
+    function selectDocument(index) {
+        if (index < 0 || index >= convertedDocuments.length) return;
+        
+        currentDocIndex = index;
+        
+        document.querySelectorAll('.document-item').forEach((item, i) => {
+            if (i === index) {
+                item.classList.add('active');
+            } else {
+                item.classList.remove('active');
+            }
+        });
+        
+        const doc = convertedDocuments[index];
+        if (doc && doc.status !== 'error') {
+            displayDocument(doc);
+        }
+    }
+
+    function openFileDialog() {
+        elements.fileInput.click();
+    }
+
+    async function handleFiles(files) {
+        if (!files || files.length === 0) return;
+        
+        if (files.length === 1) {
+            elements.processingTitle.textContent = '正在处理...';
+            elements.processingFilename.textContent = files[0].name;
+            elements.progressInfo.hidden = true;
+        } else {
+            elements.processingTitle.textContent = '正在批量处理...';
+            elements.processingFilename.textContent = `共 ${files.length} 个文件`;
+            elements.progressInfo.hidden = false;
+            elements.progressCurrent.textContent = '0';
+            elements.progressTotal.textContent = files.length;
+        }
+        
+        showProcessingModal();
+        
+        const formData = new FormData();
+        for (let file of files) {
+            formData.append('files', file);
+        }
+        
         try {
-            await navigator.clipboard.writeText(currentMarkdown);
+            const response = await fetch('/api/convert-batch', {
+                method: 'POST',
+                body: formData,
+                credentials: 'include',
+            });
+            
+            const data = await response.json();
+            hideProcessingModal();
+            
+            if (data.success) {
+                const newResults = data.results.map(r => ({ ...r, status: 'success' }));
+                const newErrors = data.errors.map(e => ({ ...e, status: 'error' }));
+                
+                convertedDocuments = [...newResults, ...newErrors, ...convertedDocuments];
+                updateDocumentList();
+                
+                const firstSuccess = newResults.find(r => r.status === 'success');
+                if (firstSuccess) {
+                    const firstIndex = convertedDocuments.findIndex(d => d.filename === firstSuccess.filename);
+                    selectDocument(firstIndex);
+                }
+                
+                if (data.success_count > 0) {
+                    showToast(`成功转换 ${data.success_count} 个文件`, 'success');
+                }
+                if (data.error_count > 0) {
+                    showToast(`${data.error_count} 个文件转换失败`, 'error');
+                }
+            } else {
+                showToast(data.error || '转换失败', 'error');
+            }
+        } catch (error) {
+            hideProcessingModal();
+            showToast(error.message || '网络错误', 'error');
+        }
+    }
+
+    async function copyToClipboard() {
+        if (currentDocIndex < 0 || !convertedDocuments[currentDocIndex]) {
+            showToast('没有可复制的内容', 'error');
+            return;
+        }
+        
+        const doc = convertedDocuments[currentDocIndex];
+        try {
+            await navigator.clipboard.writeText(doc.markdown);
             showToast('已复制到剪贴板', 'success');
         } catch (error) {
             showToast('复制失败', 'error');
         }
     }
 
-    function downloadMarkdown() {
-        const blob = new Blob([currentMarkdown], { type: 'text/markdown' });
+    function downloadCurrentDocument() {
+        if (currentDocIndex < 0 || !convertedDocuments[currentDocIndex]) {
+            showToast('没有可下载的内容', 'error');
+            return;
+        }
+        
+        const doc = convertedDocuments[currentDocIndex];
+        const blob = new Blob([doc.markdown], { type: 'text/markdown' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = currentFilename.replace(/\.[^/.]+$/, '.md');
+        a.download = doc.filename.replace(/\.[^/.]+$/, '.md');
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -380,20 +333,13 @@ document.addEventListener('DOMContentLoaded', function() {
         showToast('下载已开始', 'success');
     }
 
-    function downloadSingleMarkdown(result) {
-        const blob = new Blob([result.markdown], { type: 'text/markdown' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = result.filename.replace(/\.[^/.]+$/, '.md');
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        showToast('下载已开始', 'success');
-    }
-
-    async function downloadAllBatch() {
+    async function downloadAllDocuments() {
+        const successDocs = convertedDocuments.filter(d => d.status === 'success');
+        if (successDocs.length === 0) {
+            showToast('没有可下载的文档', 'error');
+            return;
+        }
+        
         try {
             const response = await fetch('/api/download-batch', {
                 method: 'GET',
@@ -420,12 +366,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    function resetToUpload() {
-        elements.fileInput.value = '';
-        selectedFiles = [];
-        batchResults = [];
-        updateFileList();
-        showSection(elements.uploadSection);
+    function clearAllDocuments() {
+        convertedDocuments = [];
+        currentDocIndex = -1;
+        updateDocumentList();
+        displayDocument(null);
+        showToast('已清空列表', 'success');
     }
 
     function openSettingsModal() {
@@ -529,49 +475,15 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    if (elements.selectFilesBtn) {
-        elements.selectFilesBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            elements.fileInput.click();
-        });
-    }
+    elements.uploadBtn.addEventListener('click', openFileDialog);
+    elements.emptyUploadBtn.addEventListener('click', openFileDialog);
+    elements.fileInput.addEventListener('change', (e) => {
+        handleFiles(e.target.files);
+        elements.fileInput.value = '';
+    });
 
-    if (elements.uploadArea) {
-        elements.uploadArea.addEventListener('click', (e) => {
-            if (e.target === elements.selectFilesBtn || 
-                elements.selectFilesBtn && elements.selectFilesBtn.contains(e.target)) {
-                return;
-            }
-            elements.fileInput.click();
-        });
-    }
-
-    if (elements.fileInput) {
-        elements.fileInput.addEventListener('change', (e) => {
-            handleFiles(e.target.files);
-        });
-    }
-
-    if (elements.uploadArea) {
-        elements.uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            elements.uploadArea.classList.add('drag-over');
-        });
-
-        elements.uploadArea.addEventListener('dragleave', (e) => {
-            e.preventDefault();
-            elements.uploadArea.classList.remove('drag-over');
-        });
-
-        elements.uploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            elements.uploadArea.classList.remove('drag-over');
-            
-            const files = e.dataTransfer.files;
-            handleFiles(files);
-        });
-    }
+    elements.settingsBtn.addEventListener('click', openSettingsModal);
+    elements.closeSettingsBtn.addEventListener('click', closeSettingsModal);
 
     elements.toggleBtns.forEach(btn => {
         btn.addEventListener('click', () => {
@@ -579,56 +491,14 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    if (elements.copyBtn) {
-        elements.copyBtn.addEventListener('click', copyToClipboard);
-    }
+    elements.copyBtn.addEventListener('click', copyToClipboard);
+    elements.downloadBtn.addEventListener('click', downloadCurrentDocument);
+    elements.batchDownloadBtn.addEventListener('click', downloadAllDocuments);
+    elements.clearAllBtn.addEventListener('click', clearAllDocuments);
 
-    if (elements.downloadBtn) {
-        elements.downloadBtn.addEventListener('click', downloadMarkdown);
-    }
-
-    if (elements.newFileBtn) {
-        elements.newFileBtn.addEventListener('click', resetToUpload);
-    }
-
-    if (elements.clearFilesBtn) {
-        elements.clearFilesBtn.addEventListener('click', () => {
-            selectedFiles = [];
-            updateFileList();
-        });
-    }
-
-    if (elements.convertAllBtn) {
-        elements.convertAllBtn.addEventListener('click', uploadAndConvertBatch);
-    }
-
-    if (elements.settingsBtn) {
-        elements.settingsBtn.addEventListener('click', openSettingsModal);
-    }
-
-    if (elements.closeSettingsBtn) {
-        elements.closeSettingsBtn.addEventListener('click', closeSettingsModal);
-    }
-
-    if (elements.llmConfigForm) {
-        elements.llmConfigForm.addEventListener('submit', saveLLMConfig);
-    }
-
-    if (elements.toggleApiKey) {
-        elements.toggleApiKey.addEventListener('click', toggleApiKeyVisibility);
-    }
-
-    if (elements.clearConfigBtn) {
-        elements.clearConfigBtn.addEventListener('click', clearLLMConfig);
-    }
-
-    if (elements.batchDownloadAllBtn) {
-        elements.batchDownloadAllBtn.addEventListener('click', downloadAllBatch);
-    }
-
-    if (elements.batchNewFileBtn) {
-        elements.batchNewFileBtn.addEventListener('click', resetToUpload);
-    }
+    elements.llmConfigForm.addEventListener('submit', saveLLMConfig);
+    elements.toggleApiKey.addEventListener('click', toggleApiKeyVisibility);
+    elements.clearConfigBtn.addEventListener('click', clearLLMConfig);
 
     elements.settingsModal.addEventListener('click', (e) => {
         if (e.target === elements.settingsModal) {
@@ -641,5 +511,5 @@ document.addEventListener('DOMContentLoaded', function() {
         gfm: true,
     });
 
-    showSection(elements.uploadSection);
+    displayDocument(null);
 });
