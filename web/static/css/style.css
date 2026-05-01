@@ -73,6 +73,33 @@ body {
     display: flex;
     align-items: center;
     gap: 1.5rem;
+    flex: 1;
+}
+
+.btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--transition);
+}
+
+.btn-icon:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-color: var(--border-light);
+}
+
+.app-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-right: 1.5rem;
 }
 
 .logo {
@@ -213,6 +240,407 @@ body {
 .supported-formats .label {
     font-weight: 500;
     color: var(--text-secondary);
+}
+
+.file-list-container {
+    width: 100%;
+    max-width: 520px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.file-list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border);
+}
+
+.file-list-header .selected-count {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.file-list {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.file-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border-light);
+    transition: background var(--transition);
+}
+
+.file-item:last-child {
+    border-bottom: none;
+}
+
+.file-item:hover {
+    background: var(--bg-tertiary);
+}
+
+.file-item-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    overflow: hidden;
+}
+
+.file-item-icon {
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.file-item-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    overflow: hidden;
+}
+
+.file-item-name {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.file-item-size {
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+}
+
+.file-item .btn-remove {
+    padding: 0.25rem;
+    opacity: 0.6;
+}
+
+.file-item .btn-remove:hover {
+    opacity: 1;
+    color: var(--error);
+}
+
+.file-list-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem 1rem;
+    background: var(--bg-tertiary);
+    border-top: 1px solid var(--border);
+}
+
+.btn-small {
+    padding: 0.3125rem 0.625rem;
+    font-size: 0.75rem;
+}
+
+.modal-settings {
+    max-width: 480px;
+    width: 100%;
+    padding: 0;
+    overflow: hidden;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.modal-header h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.modal-body {
+    padding: 1.25rem;
+}
+
+.form-group {
+    margin-bottom: 1.25rem;
+}
+
+.form-group:last-child {
+    margin-bottom: 0;
+}
+
+.form-group label {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 0.375rem;
+}
+
+.form-group label .required {
+    color: var(--error);
+}
+
+.form-group input[type="text"],
+.form-group input[type="password"] {
+    width: 100%;
+    padding: 0.625rem 0.875rem;
+    font-size: 0.8125rem;
+    font-family: var(--font-sans);
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: all var(--transition);
+}
+
+.form-group input[type="text"]:focus,
+.form-group input[type="password"]:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.form-group input[type="text"]::placeholder,
+.form-group input[type="password"]::placeholder {
+    color: var(--text-muted);
+}
+
+.form-group .form-hint {
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+    margin-top: 0.375rem;
+}
+
+.form-group .input-with-toggle {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.form-group .input-with-toggle input {
+    padding-right: 2.5rem;
+}
+
+.toggle-password {
+    position: absolute;
+    right: 0.5rem;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.toggle-password:hover {
+    color: var(--text-primary);
+}
+
+.form-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 1.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--border);
+}
+
+.batch-result-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    flex: 1;
+    overflow: hidden;
+}
+
+.batch-result-section[hidden] {
+    display: none;
+}
+
+.batch-result-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg-secondary);
+    padding: 0.875rem 1.25rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.batch-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.batch-summary h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.batch-stats {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: 0.8125rem;
+}
+
+.batch-stats .stat-success {
+    color: var(--success);
+    font-weight: 500;
+}
+
+.batch-stats .stat-error {
+    color: var(--error);
+    font-weight: 500;
+}
+
+.batch-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.batch-results-list {
+    flex: 1;
+    overflow-y: auto;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    min-height: 0;
+}
+
+.batch-result-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.875rem 1rem;
+    border-bottom: 1px solid var(--border-light);
+    transition: background var(--transition);
+}
+
+.batch-result-item:last-child {
+    border-bottom: none;
+}
+
+.batch-result-item:hover {
+    background: var(--bg-tertiary);
+}
+
+.batch-result-item.success {
+    border-left: 3px solid var(--success);
+}
+
+.batch-result-item.error {
+    border-left: 3px solid var(--error);
+    background: rgba(239, 68, 68, 0.02);
+}
+
+.batch-result-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    overflow: hidden;
+}
+
+.batch-result-icon {
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.batch-result-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    overflow: hidden;
+}
+
+.batch-result-name {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.batch-result-status {
+    font-size: 0.6875rem;
+    font-weight: 500;
+}
+
+.batch-result-status.success {
+    color: var(--success);
+}
+
+.batch-result-status.error {
+    color: var(--error);
+}
+
+.batch-result-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+@media (max-width: 768px) {
+    .app-header {
+        flex-wrap: wrap;
+        padding-right: 1rem;
+    }
+
+    .header-content {
+        flex: 1 1 100%;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .modal-settings {
+        margin: 1rem;
+        max-width: none;
+    }
+
+    .batch-result-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+
+    .batch-actions {
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .file-list-header {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .form-actions {
+        flex-wrap: wrap;
+    }
+
+    .form-actions .btn-ghost,
+    .form-actions .btn-primary {
+        flex: 1;
+    }
 }
 
 /* Result Section */

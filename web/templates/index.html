@@ -24,13 +24,19 @@
                 </div>
                 <p class="tagline">将各类文件优雅地转换为 Markdown</p>
             </div>
+            <button class="btn-icon" id="settingsBtn" title="设置">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                    <path d="M19.4 15C19.1 14.2 18.8 13.2 18.9 12.3C18.9 11.9 19 11.5 19 11.1C19.5 9.9 19.4 8.5 18.8 7.4C18.7 7.1 18.5 6.8 18.3 6.6L16.3 4.6C16 4.3 15.7 4.1 15.3 4.1C14.3 4.2 13.5 4.3 12.7 4.5C11.9 4.7 11.1 4.9 10.4 5.3C10.1 5.5 9.8 5.6 9.4 5.6C9 5.6 8.7 5.5 8.4 5.3L6.4 3.3C6.2 3.1 6 2.9 5.7 2.9C5.3 2.9 4.9 3.1 4.6 3.4L3.5 4.5C3.2 4.8 3 5.2 2.9 5.6C2.7 6.4 2.5 7.2 2.4 8.1C2.2 8.9 2.1 9.7 2.1 10.6C2.1 11 2.1 11.4 2.2 11.8C2.4 12.6 2.7 13.5 3.1 14.3C3.3 14.7 3.5 15 3.8 15.2L5.8 17.2C6.1 17.5 6.4 17.7 6.8 17.7C7.2 17.7 7.5 17.6 7.8 17.4C8.6 17.6 9.4 17.8 10.2 17.9C11 18.1 11.8 18.1 12.7 18.1C13.5 18.1 14.3 18 15.1 17.8C15.9 17.6 16.7 17.4 17.4 17C17.8 16.8 18.1 16.5 18.3 16.2L20.3 14.2C20.6 13.9 20.8 13.5 20.8 13.1C20.8 12.7 20.7 12.4 20.5 12.1L19.4 15Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                </svg>
+            </button>
         </header>
 
         <main class="main-content">
             <div class="content-wrapper">
                 <section class="upload-section" id="uploadSection">
                     <div class="upload-area" id="uploadArea">
-                        <input type="file" id="fileInput" accept=".pdf,.docx,.doc,.pptx,.ppt,.xlsx,.xls,.jpg,.jpeg,.png,.html,.htm,.csv,.json,.xml,.epub,.txt,.md,.ipynb" hidden>
+                        <input type="file" id="fileInput" accept=".pdf,.docx,.doc,.pptx,.ppt,.xlsx,.xls,.jpg,.jpeg,.png,.html,.htm,.csv,.json,.xml,.epub,.txt,.md,.ipynb" multiple hidden>
                         <div class="upload-content">
                             <div class="upload-icon">
                                 <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -39,12 +45,27 @@
                                 </svg>
                             </div>
                             <h3>拖放文件到此处</h3>
-                            <p>或点击选择文件</p>
+                            <p>或点击选择文件（支持多选）</p>
                             <button class="btn-primary" id="selectFilesBtn">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                     <path d="M12 5V19M5 12H19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                                 </svg>
                                 选择文件
+                            </button>
+                        </div>
+                    </div>
+                    <div class="file-list-container" id="fileListContainer" hidden>
+                        <div class="file-list-header">
+                            <span class="selected-count">已选择 <span id="selectedCount">0</span> 个文件</span>
+                            <button class="btn-ghost btn-small" id="clearFilesBtn">清除</button>
+                        </div>
+                        <div class="file-list" id="fileList"></div>
+                        <div class="file-list-actions">
+                            <button class="btn-primary" id="convertAllBtn">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                                </svg>
+                                批量转换
                             </button>
                         </div>
                     </div>
@@ -139,6 +160,82 @@
             </div>
         </div>
     </div>
+
+    <div class="modal-overlay" id="settingsModal" hidden>
+        <div class="modal modal-settings">
+            <div class="modal-header">
+                <h3>大模型 API 配置</h3>
+                <button class="btn-icon" id="closeSettingsBtn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="llmConfigForm">
+                    <div class="form-group">
+                        <label for="apiKeyInput">API Key <span class="required">*</span></label>
+                        <input type="password" id="apiKeyInput" placeholder="sk-..." autocomplete="off">
+                        <button type="button" class="toggle-password" id="toggleApiKey">
+                            <svg class="icon-show" width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M1 12C1 12 5 4 12 4C19 4 23 12 23 12C23 12 19 20 12 20C5 20 1 12 1 12Z" stroke="currentColor" stroke-width="2"/>
+                                <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
+                            </svg>
+                            <svg class="icon-hide" width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:none">
+                                <path d="M17.94 17.94C16.23 19.24 14.2 20 12 20C5 20 1 12 1 12C2.24 9.68 4 7.76 6.06 6.06M1 1L23 23M15.5 11.25C15.55 11.5 15.58 11.75 15.58 12C15.58 14 13.97 15.58 12 15.58C11.75 15.58 11.5 15.55 11.25 15.5M8.42 8.42C7.77 8.95 7.29 9.66 7.03 10.47C6.78 11.28 6.76 12.13 6.99 12.95C7.22 13.77 7.7 14.53 8.38 15.13C9.06 15.73 9.92 16.14 10.82 16.27C11.72 16.4 12.65 16.25 13.5 15.82" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M12 7C14.5 7 16.73 8.24 18.29 10.23C19.85 12.22 20.54 14.59 20.23 16.9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                        <p class="form-hint">用于图片描述和 OCR 功能的大模型 API Key</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="baseUrlInput">API Base URL</label>
+                        <input type="text" id="baseUrlInput" placeholder="https://api.openai.com/v1">
+                        <p class="form-hint">可选，用于兼容其他 OpenAI 兼容的 API 服务</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="modelInput">Model</label>
+                        <input type="text" id="modelInput" placeholder="gpt-4o" value="gpt-4o">
+                        <p class="form-hint">要使用的模型名称</p>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn-ghost" id="clearConfigBtn">清除配置</button>
+                        <button type="submit" class="btn-primary">保存配置</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <section class="batch-result-section" id="batchResultSection" hidden>
+        <div class="batch-result-header">
+            <div class="batch-summary">
+                <h3>批量转换完成</h3>
+                <div class="batch-stats">
+                    <span class="stat-success">成功: <span id="batchSuccessCount">0</span></span>
+                    <span class="stat-error">失败: <span id="batchErrorCount">0</span></span>
+                </div>
+            </div>
+            <div class="batch-actions">
+                <button class="btn-ghost" id="batchDownloadAllBtn" title="下载所有">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 3V15M12 15L8 11M12 15L16 11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M5 21H19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M20 17V13C20 11.8954 19.1046 11 18 11H16V7C16 5.89543 15.1046 5 14 5H10C8.89543 5 8 5.89543 8 7V11H6C4.89543 11 4 11.8954 4 13V17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                    下载全部
+                </button>
+                <button class="btn-ghost" id="batchNewFileBtn" title="转换新文件">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M12 3V12L17 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    新文件
+                </button>
+            </div>
+        </div>
+        <div class="batch-results-list" id="batchResultsList"></div>
+    </section>
 
     <div class="toast" id="toast">
         <span id="toastMessage"></span>
