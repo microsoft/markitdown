@@ -432,6 +432,71 @@ def test_exceptions() -> None:
     assert type(exc_info.value.attempts[0].converter).__name__ == "PptxConverter"
 
 
+def test_unicode_encoding_in_cli() -> None:
+    """Test that Unicode characters don't cause UnicodeEncodeError on Windows (charmap codec).
+
+    This test verifies the fix for issue #1802: UnicodeEncodeError when converting
+    docx files containing Unicode characters on Windows systems where the terminal
+    or file encoding defaults to charmap (cp1252) instead of UTF-8.
+    """
+    import subprocess
+    import tempfile
+    import sys
+
+    # Test content with various Unicode characters (Chinese, Japanese, emojis, etc.)
+    unicode_test_content = "Hello 世界 🌍 你好"
+
+    # Create a simple HTML file with Unicode content
+    html_content = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Unicode Test</title></head>
+<body>
+<h1>{unicode_test_content}</h1>
+<p>Testing Unicode encoding: αβγδ εζηθ</p>
+</body>
+</html>"""
+
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as f:
+        f.write(html_content)
+        html_file = f.name
+
+    try:
+        # Test stdout output - should not raise UnicodeEncodeError
+        result = subprocess.run(
+            [sys.executable, "-m", "markitdown", html_file],
+            capture_output=True,
+            text=True,
+            encoding="utf-8"
+        )
+        assert result.returncode == 0, f"CLI failed: {result.stderr}"
+        assert "Hello" in result.stdout
+        assert "世界" in result.stdout
+
+        # Test file output with explicit UTF-8 encoding
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False, encoding='utf-8') as out_f:
+            output_file = out_f.name
+
+        result = subprocess.run(
+            [sys.executable, "-m", "markitdown", "-o", output_file, html_file],
+            capture_output=True,
+            text=True,
+            encoding="utf-8"
+        )
+        assert result.returncode == 0, f"CLI file output failed: {result.stderr}"
+
+        # Verify the output file contains Unicode characters
+        with open(output_file, 'r', encoding='utf-8') as f:
+            output_content = f.read()
+            assert "Hello" in output_content
+            assert "世界" in output_content
+
+        import os
+        os.remove(output_file)
+    finally:
+        import os
+        os.remove(html_file)
+
+
 @pytest.mark.skipif(
     skip_exiftool,
     reason="do not run if exiftool is not installed",

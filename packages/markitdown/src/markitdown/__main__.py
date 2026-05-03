@@ -207,15 +207,20 @@ def _handle_output(args, result: DocumentConverterResult):
             f.write(result.markdown)
     else:
         # Handle stdout encoding errors more gracefully
-        print(
-            result.markdown.encode(sys.stdout.encoding, errors="replace").decode(
-                sys.stdout.encoding
-            )
-        )
+        # Use errors="replace" to avoid UnicodeEncodeError on Windows (charmap codec)
+        try:
+            print(result.markdown)
+        except UnicodeEncodeError:
+            # Fallback for Windows or terminals that can't handle certain characters
+            print(result.markdown.encode(sys.stdout.encoding or "utf-8", errors="replace").decode(sys.stdout.encoding or "utf-8"))
 
 
 def _exit_with_error(message: str):
-    print(message)
+    # Handle encoding errors gracefully on Windows (charmap codec)
+    try:
+        print(message)
+    except UnicodeEncodeError:
+        print(message.encode(sys.stdout.encoding or "utf-8", errors="replace").decode(sys.stdout.encoding or "utf-8"))
     sys.exit(1)
 
 
