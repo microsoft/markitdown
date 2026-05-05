@@ -33,6 +33,14 @@ responses unprompted. This suggests that they have been trained on vast amounts 
 Markdown-formatted text, and understand it well. As a side benefit, Markdown conventions
 are also highly token-efficient.
 
+## Quick start
+
+To get started quickly with MarkItDown using an up-to-date installation of `uv`, run `uvx markitdown <Parameters>`. Example:
+
+```bash
+uvx markitdown path-to-file.pdf > document.md
+```
+
 ## Prerequisites
 MarkItDown requires Python 3.10 or higher. It is recommended to use a virtual environment to avoid dependency conflicts.
 
