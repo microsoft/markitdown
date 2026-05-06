@@ -292,6 +292,95 @@ class TestSmartRouting:
         call_args = conv._client.begin_analyze_binary.call_args
         assert call_args.kwargs["analyzer_id"] == "prebuilt-documentSearch"
 
+    def test_no_analyzer_id_routes_image_to_document_search(self):
+        """Default image routing should still use prebuilt-documentSearch."""
+        conv = _make_converter(analyzer_id=None, analyzer_modality=None)
+        conv._client = MagicMock()
+        mock_result = MagicMock()
+        mock_result.contents = []
+        mock_poller = MagicMock()
+        mock_poller.result.return_value = mock_result
+
+        conv._client.begin_analyze_binary.return_value = mock_poller
+
+        with patch("markitdown.converters._cu_converter.to_llm_input", return_value=""):
+            conv.convert(
+                io.BytesIO(b"fake image"),
+                StreamInfo(extension=".jpg", mimetype="image/jpeg"),
+            )
+
+        call_args = conv._client.begin_analyze_binary.call_args
+        assert call_args.kwargs["analyzer_id"] == "prebuilt-documentSearch"
+
+    def test_document_analyzer_routes_image_to_custom(self):
+        """Document-based analyzers should still handle image documents."""
+        conv = _make_converter(
+            analyzer_id="my-doc-analyzer",
+            analyzer_modality="document",
+        )
+        conv._client = MagicMock()
+        mock_result = MagicMock()
+        mock_result.contents = []
+        mock_poller = MagicMock()
+        mock_poller.result.return_value = mock_result
+
+        conv._client.begin_analyze_binary.return_value = mock_poller
+
+        with patch("markitdown.converters._cu_converter.to_llm_input", return_value=""):
+            conv.convert(
+                io.BytesIO(b"fake image"),
+                StreamInfo(extension=".jpg", mimetype="image/jpeg"),
+            )
+
+        call_args = conv._client.begin_analyze_binary.call_args
+        assert call_args.kwargs["analyzer_id"] == "my-doc-analyzer"
+
+    def test_image_analyzer_routes_jpeg_to_custom(self):
+        """Image-based analyzers should be used for image files."""
+        conv = _make_converter(
+            analyzer_id="my-image-analyzer",
+            analyzer_modality="image",
+        )
+        conv._client = MagicMock()
+        mock_result = MagicMock()
+        mock_result.contents = []
+        mock_poller = MagicMock()
+        mock_poller.result.return_value = mock_result
+
+        conv._client.begin_analyze_binary.return_value = mock_poller
+
+        with patch("markitdown.converters._cu_converter.to_llm_input", return_value=""):
+            conv.convert(
+                io.BytesIO(b"fake image"),
+                StreamInfo(extension=".jpg", mimetype="image/jpeg"),
+            )
+
+        call_args = conv._client.begin_analyze_binary.call_args
+        assert call_args.kwargs["analyzer_id"] == "my-image-analyzer"
+
+    def test_image_analyzer_routes_pdf_to_document_prebuilt(self):
+        """Image-based analyzers should not claim non-image document files."""
+        conv = _make_converter(
+            analyzer_id="my-image-analyzer",
+            analyzer_modality="image",
+        )
+        conv._client = MagicMock()
+        mock_result = MagicMock()
+        mock_result.contents = []
+        mock_poller = MagicMock()
+        mock_poller.result.return_value = mock_result
+
+        conv._client.begin_analyze_binary.return_value = mock_poller
+
+        with patch("markitdown.converters._cu_converter.to_llm_input", return_value=""):
+            conv.convert(
+                io.BytesIO(b"fake pdf"),
+                StreamInfo(extension=".pdf", mimetype="application/pdf"),
+            )
+
+        call_args = conv._client.begin_analyze_binary.call_args
+        assert call_args.kwargs["analyzer_id"] == "prebuilt-documentSearch"
+
     @pytest.mark.parametrize(("mimetype", "expected_analyzer"), [
         ("video/mp4", "prebuilt-videoSearch"),
         ("video/x-m4v", "prebuilt-videoSearch"),
@@ -374,9 +463,9 @@ class TestInferPrebuiltModality:
         assert _infer_prebuilt_modality("prebuilt-videoSearch") == "video"
         assert _infer_prebuilt_modality("prebuilt-videoSynopsis") == "video"
 
-    def test_image_prebuilts_map_to_document(self):
-        assert _infer_prebuilt_modality("prebuilt-imageSearch") == "document"
-        assert _infer_prebuilt_modality("prebuilt-image") == "document"
+    def test_image_prebuilts_map_to_image(self):
+        assert _infer_prebuilt_modality("prebuilt-imageSearch") == "image"
+        assert _infer_prebuilt_modality("prebuilt-image") == "image"
 
     def test_unknown_prebuilt_defaults_to_document(self):
         assert _infer_prebuilt_modality("prebuilt-unknownNewAnalyzer") == "document"
@@ -392,7 +481,10 @@ class TestGetModality:
     def test_document_types(self):
         assert _get_modality(ContentUnderstandingFileType.PDF) == "document"
         assert _get_modality(ContentUnderstandingFileType.DOCX) == "document"
-        assert _get_modality(ContentUnderstandingFileType.JPEG) == "document"
+
+    def test_image_types(self):
+        assert _get_modality(ContentUnderstandingFileType.JPEG) == "image"
+        assert _get_modality(ContentUnderstandingFileType.PNG) == "image"
 
     def test_video_types(self):
         assert _get_modality(ContentUnderstandingFileType.MP4) == "video"

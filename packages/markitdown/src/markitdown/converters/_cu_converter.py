@@ -206,6 +206,9 @@ _DOCUMENT_TYPES = {
     ContentUnderstandingFileType.XML,
     ContentUnderstandingFileType.EML,
     ContentUnderstandingFileType.MSG,
+}
+
+_IMAGE_TYPES = {
     ContentUnderstandingFileType.JPEG,
     ContentUnderstandingFileType.PNG,
     ContentUnderstandingFileType.BMP,
@@ -236,6 +239,7 @@ _AUDIO_TYPES = {
 
 _DEFAULT_ANALYZERS = {
     "document": "prebuilt-documentSearch",
+    "image": "prebuilt-documentSearch",
     "video": "prebuilt-videoSearch",
     "audio": "prebuilt-audioSearch",
 }
@@ -248,6 +252,8 @@ def _get_modality(file_type: ContentUnderstandingFileType) -> str:
     """Get the modality category for a file type."""
     if file_type in _DOCUMENT_TYPES:
         return "document"
+    elif file_type in _IMAGE_TYPES:
+        return "image"
     elif file_type in _VIDEO_TYPES:
         return "video"
     elif file_type in _AUDIO_TYPES:
@@ -317,7 +323,7 @@ def _detect_file_type_from_mime(
 
 _BASE_TO_MODALITY: Dict[str, str] = {
     "prebuilt-document": "document",
-    "prebuilt-image": "document",  # CU images return kind="document"
+    "prebuilt-image": "image",
     "prebuilt-audio": "audio",
     "prebuilt-video": "video",
 }
@@ -359,8 +365,8 @@ _PREBUILT_MODALITY: Dict[str, str] = {
     "prebuilt-mortgage.us.1003": "document",
     "prebuilt-mortgage.us.closingDisclosure": "document",
     # Image-based prebuilts
-    "prebuilt-image": "document",  # images are document modality in CU
-    "prebuilt-imageSearch": "document",
+    "prebuilt-image": "image",
+    "prebuilt-imageSearch": "image",
     # Audio-based prebuilts
     "prebuilt-audio": "audio",
     "prebuilt-audioSearch": "audio",
@@ -378,6 +384,13 @@ def _infer_prebuilt_modality(analyzer_id: str) -> str:
         return _PREBUILT_MODALITY[analyzer_id]
     # Unknown prebuilt — most prebuilts are document-based
     return "document"
+
+
+def _is_analyzer_compatible(file_modality: str, analyzer_modality: str) -> bool:
+    """Return True when an analyzer modality can process a file modality."""
+    if analyzer_modality == "document":
+        return file_modality in {"document", "image"}
+    return file_modality == analyzer_modality
 
 
 # ---------------------------------------------------------------------------
@@ -495,7 +508,7 @@ class ContentUnderstandingConverter(DocumentConverter):
         if (
             self._analyzer_id is not None
             and self._analyzer_modality is not None
-            and file_modality == self._analyzer_modality
+            and _is_analyzer_compatible(file_modality, self._analyzer_modality)
         ):
             analyzer_id = self._analyzer_id
         else:
