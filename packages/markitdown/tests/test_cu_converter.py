@@ -5,7 +5,7 @@ Follows the same pattern as test_docintel_html.py.
 """
 
 import io
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -14,6 +14,9 @@ from markitdown.converters._cu_converter import (
     ContentUnderstandingFileType,
     _infer_prebuilt_modality,
     _get_modality,
+    _detect_file_type,
+    _canonical_mime_type,
+    _content_type_for,
     _EXTENSION_MAP,
 )
 from markitdown._stream_info import StreamInfo
@@ -29,23 +32,13 @@ def _make_converter(file_types=None, analyzer_id=None, analyzer_modality=None):
     conv._analyzer_id = analyzer_id
     conv._analyzer_modality = analyzer_modality
 
-    # Build accepted extensions/mime from file_types
+    # Set accepted file types without running SDK-dependent initialization.
     from markitdown.converters._cu_converter import (
         _ALL_FILE_TYPES,
-        _MIME_PREFIXES,
     )
 
     types = file_types if file_types is not None else _ALL_FILE_TYPES
     conv._file_types = types
-
-    conv._accepted_extensions = set()
-    conv._accepted_mime_prefixes = []
-    for ft in types:
-        for ext, mapped_ft in _EXTENSION_MAP.items():
-            if mapped_ft == ft:
-                conv._accepted_extensions.add(ext)
-        if ft in _MIME_PREFIXES:
-            conv._accepted_mime_prefixes.extend(_MIME_PREFIXES[ft])
 
     return conv
 
@@ -68,7 +61,9 @@ class TestAcceptsExtension:
         conv = _make_converter()
         assert conv.accepts(io.BytesIO(b""), StreamInfo(extension=ext))
 
-    @pytest.mark.parametrize("ext", [".csv", ".json", ".zip", ".epub", ".py", ".rs"])
+    @pytest.mark.parametrize("ext", [
+        ".csv", ".json", ".zip", ".epub", ".py", ".rs",
+    ])
     def test_rejects_unsupported_extensions(self, ext):
         conv = _make_converter()
         assert not conv.accepts(io.BytesIO(b""), StreamInfo(extension=ext))
@@ -86,9 +81,18 @@ class TestAcceptsMime:
         "image/jpeg",
         "video/mp4",
         "audio/wav",
+        "audio/x-wav",
         "text/html",
         "audio/mpeg",
+        "audio/x-m4a",
+        "audio/x-flac",
         "video/quicktime",
+        "video/webm",
+        "video/x-m4v",
+        "video/x-flv",
+        "video/x-ms-wmv",
+        "audio/aac",
+        "audio/x-ms-wma",
     ])
     def test_accepts_supported_mimetypes(self, mime):
         conv = _make_converter()
@@ -127,6 +131,69 @@ class TestAcceptsFileTypeRestriction:
         assert conv.accepts(io.BytesIO(b""), StreamInfo(extension=".mp3"))
         assert not conv.accepts(io.BytesIO(b""), StreamInfo(extension=".pdf"))
 
+    def test_webm_value_matches_cli_input(self):
+        assert ContentUnderstandingFileType("webm") == ContentUnderstandingFileType.WEBM
+
+    def test_m4v_value_matches_cli_input(self):
+        assert ContentUnderstandingFileType("m4v") == ContentUnderstandingFileType.M4V
+
+
+# ---------------------------------------------------------------------------
+# file type detection tests
+# ---------------------------------------------------------------------------
+
+class TestDetectFileType:
+    """Test extension and MIME based file type detection."""
+
+    def test_detects_video_from_mime_without_extension(self):
+        assert (
+            _detect_file_type(StreamInfo(mimetype="video/mp4"))
+            == ContentUnderstandingFileType.MP4
+        )
+
+    def test_detects_audio_from_mime_without_extension(self):
+        assert (
+            _detect_file_type(StreamInfo(mimetype="audio/mpeg"))
+            == ContentUnderstandingFileType.MP3
+        )
+
+    def test_detects_audio_alias_from_mime_without_extension(self):
+        assert (
+            _detect_file_type(StreamInfo(mimetype="audio/x-wav"))
+            == ContentUnderstandingFileType.WAV
+        )
+
+    def test_detects_video_alias_from_mime_without_extension(self):
+        assert (
+            _detect_file_type(StreamInfo(mimetype="video/x-m4v"))
+            == ContentUnderstandingFileType.M4V
+        )
+
+    @pytest.mark.parametrize(("mimetype", "expected"), [
+        ("audio/x-wav", "audio/wav"),
+        ("audio/x-flac", "audio/flac"),
+        ("audio/x-m4a", "audio/mp4"),
+        ("video/x-m4v", "video/mp4"),
+        ("video/mp4", "video/mp4"),
+        (None, "application/octet-stream"),
+    ])
+    def test_canonical_mime_type(self, mimetype, expected):
+        assert _canonical_mime_type(mimetype) == expected
+
+    @pytest.mark.parametrize(("file_type", "mimetype", "expected"), [
+        (ContentUnderstandingFileType.PDF, None, "application/pdf"),
+        (ContentUnderstandingFileType.M4V, None, "video/mp4"),
+        (ContentUnderstandingFileType.FLAC, "audio/x-flac", "audio/flac"),
+    ])
+    def test_content_type_for(self, file_type, mimetype, expected):
+        assert _content_type_for(file_type, mimetype) == expected
+
+    def test_file_type_restriction_applies_to_mime(self):
+        assert _detect_file_type(
+            StreamInfo(mimetype="video/mp4"),
+            [ContentUnderstandingFileType.PDF],
+        ) is None
+
 
 # ---------------------------------------------------------------------------
 # Smart routing tests
@@ -150,7 +217,10 @@ class TestSmartRouting:
         conv._client.begin_analyze_binary.return_value = mock_poller
 
         with patch("markitdown.converters._cu_converter.to_llm_input", return_value=""):
-            conv.convert(io.BytesIO(b"fake pdf"), StreamInfo(extension=".pdf", mimetype="application/pdf"))
+            conv.convert(
+                io.BytesIO(b"fake pdf"),
+                StreamInfo(extension=".pdf", mimetype="application/pdf"),
+            )
 
         # Should use the custom analyzer for PDF (document modality)
         call_args = conv._client.begin_analyze_binary.call_args
@@ -171,7 +241,10 @@ class TestSmartRouting:
         conv._client.begin_analyze_binary.return_value = mock_poller
 
         with patch("markitdown.converters._cu_converter.to_llm_input", return_value=""):
-            conv.convert(io.BytesIO(b"fake audio"), StreamInfo(extension=".mp3", mimetype="audio/mpeg"))
+            conv.convert(
+                io.BytesIO(b"fake audio"),
+                StreamInfo(extension=".mp3", mimetype="audio/mpeg"),
+            )
 
         call_args = conv._client.begin_analyze_binary.call_args
         assert call_args.kwargs["analyzer_id"] == "prebuilt-audioSearch"
@@ -191,7 +264,10 @@ class TestSmartRouting:
         conv._client.begin_analyze_binary.return_value = mock_poller
 
         with patch("markitdown.converters._cu_converter.to_llm_input", return_value=""):
-            conv.convert(io.BytesIO(b"fake video"), StreamInfo(extension=".mp4", mimetype="video/mp4"))
+            conv.convert(
+                io.BytesIO(b"fake video"),
+                StreamInfo(extension=".mp4", mimetype="video/mp4"),
+            )
 
         call_args = conv._client.begin_analyze_binary.call_args
         assert call_args.kwargs["analyzer_id"] == "prebuilt-videoSearch"
@@ -208,10 +284,72 @@ class TestSmartRouting:
         conv._client.begin_analyze_binary.return_value = mock_poller
 
         with patch("markitdown.converters._cu_converter.to_llm_input", return_value=""):
-            conv.convert(io.BytesIO(b"fake pdf"), StreamInfo(extension=".pdf", mimetype="application/pdf"))
+            conv.convert(
+                io.BytesIO(b"fake pdf"),
+                StreamInfo(extension=".pdf", mimetype="application/pdf"),
+            )
 
         call_args = conv._client.begin_analyze_binary.call_args
         assert call_args.kwargs["analyzer_id"] == "prebuilt-documentSearch"
+
+    @pytest.mark.parametrize(("mimetype", "expected_analyzer"), [
+        ("video/mp4", "prebuilt-videoSearch"),
+        ("video/x-m4v", "prebuilt-videoSearch"),
+        ("audio/mpeg", "prebuilt-audioSearch"),
+        ("audio/x-wav", "prebuilt-audioSearch"),
+    ])
+    def test_mime_only_input_uses_auto_routing(self, mimetype, expected_analyzer):
+        """MIME-only streams should route to the matching modality analyzer."""
+        conv = _make_converter(analyzer_id=None, analyzer_modality=None)
+        conv._client = MagicMock()
+        mock_result = MagicMock()
+        mock_result.contents = []
+        mock_poller = MagicMock()
+        mock_poller.result.return_value = mock_result
+
+        conv._client.begin_analyze_binary.return_value = mock_poller
+
+        with patch("markitdown.converters._cu_converter.to_llm_input", return_value=""):
+            conv.convert(io.BytesIO(b"fake content"), StreamInfo(mimetype=mimetype))
+
+        call_args = conv._client.begin_analyze_binary.call_args
+        assert call_args.kwargs["analyzer_id"] == expected_analyzer
+
+    def test_mime_alias_input_uses_canonical_content_type(self):
+        """Alias MIME types should be sent to CU as canonical content types."""
+        conv = _make_converter(analyzer_id=None, analyzer_modality=None)
+        conv._client = MagicMock()
+        mock_result = MagicMock()
+        mock_result.contents = []
+        mock_poller = MagicMock()
+        mock_poller.result.return_value = mock_result
+
+        conv._client.begin_analyze_binary.return_value = mock_poller
+
+        with patch("markitdown.converters._cu_converter.to_llm_input", return_value=""):
+            conv.convert(io.BytesIO(b"fake video"), StreamInfo(mimetype="video/x-m4v"))
+
+        call_args = conv._client.begin_analyze_binary.call_args
+        assert call_args.kwargs["analyzer_id"] == "prebuilt-videoSearch"
+        assert call_args.kwargs["content_type"] == "video/mp4"
+
+    def test_extension_only_input_uses_file_type_content_type(self):
+        """Extension-only inputs should send CU a matching content type."""
+        conv = _make_converter(analyzer_id=None, analyzer_modality=None)
+        conv._client = MagicMock()
+        mock_result = MagicMock()
+        mock_result.contents = []
+        mock_poller = MagicMock()
+        mock_poller.result.return_value = mock_result
+
+        conv._client.begin_analyze_binary.return_value = mock_poller
+
+        with patch("markitdown.converters._cu_converter.to_llm_input", return_value=""):
+            conv.convert(io.BytesIO(b"fake pdf"), StreamInfo(extension=".pdf"))
+
+        call_args = conv._client.begin_analyze_binary.call_args
+        assert call_args.kwargs["analyzer_id"] == "prebuilt-documentSearch"
+        assert call_args.kwargs["content_type"] == "application/pdf"
 
 
 # ---------------------------------------------------------------------------
@@ -293,15 +431,21 @@ class TestConvertMock:
         return result
 
     def test_pdf_returns_markdown(self):
-        result = self._run_convert(".pdf", "application/pdf", "---\ncontentType: document\n---\n# Test")
+        result = self._run_convert(
+            ".pdf", "application/pdf", "---\ncontentType: document\n---\n# Test"
+        )
         assert "contentType: document" in result.markdown
 
     def test_mp4_returns_markdown(self):
-        result = self._run_convert(".mp4", "video/mp4", "---\ncontentType: audioVisual\n---\nSpeaker 1: Hello")
+        result = self._run_convert(
+            ".mp4", "video/mp4", "---\ncontentType: audioVisual\n---\nSpeaker 1: Hello"
+        )
         assert "contentType: audioVisual" in result.markdown
 
     def test_wav_returns_markdown(self):
-        result = self._run_convert(".wav", "audio/wav", "---\ncontentType: audioVisual\n---\nSpeaker 1: Hi")
+        result = self._run_convert(
+            ".wav", "audio/wav", "---\ncontentType: audioVisual\n---\nSpeaker 1: Hi"
+        )
         assert "audioVisual" in result.markdown
 
     def test_empty_result(self):

@@ -83,7 +83,7 @@ class ContentUnderstandingFileType(str, Enum):
     MOV = "mov"
     AVI = "avi"
     MKV = "mkv"
-    WEBM_VIDEO = "webm-video"
+    WEBM = "webm"
     FLV = "flv"
     WMV = "wmv"
 
@@ -127,7 +127,7 @@ _EXTENSION_MAP: Dict[str, ContentUnderstandingFileType] = {
     ".mov": ContentUnderstandingFileType.MOV,
     ".avi": ContentUnderstandingFileType.AVI,
     ".mkv": ContentUnderstandingFileType.MKV,
-    ".webm": ContentUnderstandingFileType.WEBM_VIDEO,
+    ".webm": ContentUnderstandingFileType.WEBM,
     ".flv": ContentUnderstandingFileType.FLV,
     ".wmv": ContentUnderstandingFileType.WMV,
     # Audio
@@ -173,17 +173,24 @@ _MIME_PREFIXES: Dict[ContentUnderstandingFileType, List[str]] = {
     ContentUnderstandingFileType.MOV: ["video/quicktime"],
     ContentUnderstandingFileType.AVI: ["video/x-msvideo"],
     ContentUnderstandingFileType.MKV: ["video/x-matroska"],
-    ContentUnderstandingFileType.WEBM_VIDEO: ["video/webm"],
+    ContentUnderstandingFileType.WEBM: ["video/webm"],
     ContentUnderstandingFileType.FLV: ["video/x-flv"],
     ContentUnderstandingFileType.WMV: ["video/x-ms-wmv"],
     # Audio
     ContentUnderstandingFileType.WAV: ["audio/wav", "audio/x-wav"],
     ContentUnderstandingFileType.MP3: ["audio/mpeg", "audio/mp3"],
-    ContentUnderstandingFileType.M4A: ["audio/mp4", "audio/m4a"],
+    ContentUnderstandingFileType.M4A: ["audio/mp4", "audio/m4a", "audio/x-m4a"],
     ContentUnderstandingFileType.FLAC: ["audio/flac", "audio/x-flac"],
     ContentUnderstandingFileType.OGG: ["audio/ogg"],
     ContentUnderstandingFileType.AAC: ["audio/aac"],
     ContentUnderstandingFileType.WMA: ["audio/x-ms-wma"],
+}
+
+_MIME_ALIASES: Dict[str, str] = {
+    "audio/x-wav": "audio/wav",
+    "audio/x-flac": "audio/flac",
+    "audio/x-m4a": "audio/mp4",
+    "video/x-m4v": "video/mp4",
 }
 
 # File type → modality category
@@ -212,7 +219,7 @@ _VIDEO_TYPES = {
     ContentUnderstandingFileType.MOV,
     ContentUnderstandingFileType.AVI,
     ContentUnderstandingFileType.MKV,
-    ContentUnderstandingFileType.WEBM_VIDEO,
+    ContentUnderstandingFileType.WEBM,
     ContentUnderstandingFileType.FLV,
     ContentUnderstandingFileType.WMV,
 }
@@ -246,6 +253,62 @@ def _get_modality(file_type: ContentUnderstandingFileType) -> str:
     elif file_type in _AUDIO_TYPES:
         return "audio"
     raise ValueError(f"Unknown file type: {file_type}")
+
+
+def _detect_file_type(
+    stream_info: StreamInfo,
+    file_types: Optional[List[ContentUnderstandingFileType]] = None,
+) -> Optional[ContentUnderstandingFileType]:
+    """Detect a supported CU file type from extension or MIME type."""
+    allowed = set(file_types) if file_types is not None else None
+
+    extension = (stream_info.extension or "").lower()
+    file_type = _EXTENSION_MAP.get(extension)
+    if file_type is not None and (allowed is None or file_type in allowed):
+        return file_type
+
+    mimetype = _clean_mime_type(stream_info.mimetype)
+    if not mimetype:
+        return None
+
+    return _detect_file_type_from_mime(mimetype, allowed)
+
+
+def _clean_mime_type(mimetype: Optional[str]) -> str:
+    return (mimetype or "").split(";", 1)[0].strip().lower()
+
+
+def _canonical_mime_type(mimetype: Optional[str]) -> str:
+    cleaned = _clean_mime_type(mimetype)
+    return _MIME_ALIASES.get(cleaned, cleaned) or "application/octet-stream"
+
+
+def _content_type_for(
+    file_type: ContentUnderstandingFileType,
+    mimetype: Optional[str],
+) -> str:
+    content_type = _canonical_mime_type(mimetype)
+    if content_type != "application/octet-stream":
+        return content_type
+
+    prefixes = _MIME_PREFIXES.get(file_type, [])
+    if not prefixes:
+        return content_type
+
+    return _canonical_mime_type(prefixes[0])
+
+
+def _detect_file_type_from_mime(
+    mimetype: str,
+    allowed: Optional[set[ContentUnderstandingFileType]],
+) -> Optional[ContentUnderstandingFileType]:
+    for candidate, prefixes in _MIME_PREFIXES.items():
+        if allowed is not None and candidate not in allowed:
+            continue
+        for prefix in prefixes:
+            if mimetype.startswith(prefix):
+                return candidate
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -377,18 +440,6 @@ class ContentUnderstandingConverter(DocumentConverter):
             else:
                 credential = DefaultAzureCredential()
 
-        # Build file type lookup sets
-        self._accepted_extensions = set()
-        self._accepted_mime_prefixes: List[str] = []
-        for ft in self._file_types:
-            # Extensions
-            for ext, mapped_ft in _EXTENSION_MAP.items():
-                if mapped_ft == ft:
-                    self._accepted_extensions.add(ext)
-            # MIME prefixes
-            if ft in _MIME_PREFIXES:
-                self._accepted_mime_prefixes.extend(_MIME_PREFIXES[ft])
-
         # User agent for telemetry
         try:
             from ..__about__ import __version__
@@ -425,17 +476,7 @@ class ContentUnderstandingConverter(DocumentConverter):
         **kwargs: Any,
     ) -> bool:
         """Return True if the file type is in the configured set."""
-        mimetype = (stream_info.mimetype or "").lower()
-        extension = (stream_info.extension or "").lower()
-
-        if extension in self._accepted_extensions:
-            return True
-
-        for prefix in self._accepted_mime_prefixes:
-            if mimetype.startswith(prefix):
-                return True
-
-        return False
+        return _detect_file_type(stream_info, self._file_types) is not None
 
     def convert(
         self,
@@ -446,14 +487,10 @@ class ContentUnderstandingConverter(DocumentConverter):
         """Convert the file using CU and return Markdown with YAML front matter."""
 
         # 1. Determine analyzer_id (smart routing: check modality)
-        extension = (stream_info.extension or "").lower()
-        file_type = _EXTENSION_MAP.get(extension)
-
-        if file_type is not None:
-            file_modality = _get_modality(file_type)
-        else:
-            # Fallback: try MIME type
-            file_modality = "document"
+        file_type = _detect_file_type(stream_info, self._file_types)
+        if file_type is None:
+            raise ValueError("Unsupported file type for Content Understanding conversion.")
+        file_modality = _get_modality(file_type)
 
         if (
             self._analyzer_id is not None
@@ -466,7 +503,7 @@ class ContentUnderstandingConverter(DocumentConverter):
 
         # 2. Read file bytes and determine MIME type
         file_bytes = file_stream.read()
-        content_type = stream_info.mimetype or "application/octet-stream"
+        content_type = _content_type_for(file_type, stream_info.mimetype)
 
         # 3. Call CU SDK
         poller = self._client.begin_analyze_binary(

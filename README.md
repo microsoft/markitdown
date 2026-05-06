@@ -107,6 +107,7 @@ At the moment, the following optional dependencies are available:
 * `[pdf]` Installs dependencies for PDF files
 * `[outlook]` Installs dependencies for Outlook messages
 * `[az-doc-intel]` Installs dependencies for Azure Document Intelligence
+* `[az-content-understanding]` Installs dependencies for Azure Content Understanding
 * `[audio-transcription]` Installs dependencies for audio transcription of wav and mp3 files
 * `[youtube-transcription]` Installs dependencies for fetching YouTube video transcription
 
@@ -173,6 +174,14 @@ More information about how to set up an Azure Document Intelligence Resource can
 [Azure Content Understanding](https://learn.microsoft.com/azure/ai-services/content-understanding/) provides higher-quality conversion with structured field extraction (YAML front matter), multi-modal support (documents, images, audio, video), and configurable analyzers.
 
 Install: `pip install 'markitdown[az-content-understanding]'`
+
+| Capability | Built-in converters | Azure Document Intelligence | Azure Content Understanding |
+|------------|---------------------|-----------------------------|-----------------------------|
+| Document conversion | Offline, format-specific extraction | Cloud layout extraction | Cloud multimodal extraction |
+| Structured fields | Not available | Not exposed by this integration | YAML front matter from analyzer fields |
+| Custom analyzers | Not available | Not configurable in this integration | Supported with `cu_analyzer_id` |
+| Audio and video | Basic audio, no video | Not supported | Audio and video analyzers |
+| Cost | Local compute only | Billable Azure API calls | Billable Azure API calls |
 
 **CLI:**
 
