@@ -168,6 +168,66 @@ markitdown path-to-file.pdf -o document.md -d -e "<document_intelligence_endpoin
 
 More information about how to set up an Azure Document Intelligence Resource can be found [here](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/how-to-guides/create-document-intelligence-resource?view=doc-intel-4.0.0)
 
+### Azure Content Understanding
+
+[Azure Content Understanding](https://learn.microsoft.com/azure/ai-services/content-understanding/) provides higher-quality conversion with structured field extraction (YAML front matter), multi-modal support (documents, images, audio, video), and configurable analyzers.
+
+Install: `pip install 'markitdown[az-content-understanding]'`
+
+**CLI:**
+
+```bash
+markitdown path-to-file.pdf --use-cu --cu-endpoint "<content_understanding_endpoint>"
+```
+
+**Python API:**
+
+```python
+from markitdown import MarkItDown
+
+# Zero-config — auto-selects analyzer per file type
+md = MarkItDown(cu_endpoint="<content_understanding_endpoint>")
+result = md.convert("report.pdf")   # documents → prebuilt-documentSearch
+result = md.convert("meeting.mp4")  # video → prebuilt-videoSearch
+result = md.convert("call.wav")     # audio → prebuilt-audioSearch
+print(result.markdown)
+```
+
+**With a custom analyzer** (for domain-specific field extraction):
+
+```python
+md = MarkItDown(
+    cu_endpoint="<content_understanding_endpoint>",
+    cu_analyzer_id="my-invoice-analyzer",
+)
+result = md.convert("invoice.pdf")
+print(result.markdown)
+# Output includes YAML front matter with extracted fields:
+# ---
+# contentType: document
+# fields:
+#   VendorName: CONTOSO LTD.
+#   InvoiceDate: '2019-11-15'
+# ---
+# <!-- page 1 -->
+# ...
+```
+
+When `cu_analyzer_id` is set, the converter automatically scopes it to compatible file types based on the analyzer's modality. Incompatible types (e.g., audio files with a document analyzer) auto-route to default prebuilt analyzers.
+
+**Cost note:** Each `convert()` call for a CU-routed format is a billable Azure API call. Use `cu_file_types` to restrict which formats route to CU:
+
+```python
+from markitdown.converters import ContentUnderstandingFileType
+
+md = MarkItDown(
+    cu_endpoint="<content_understanding_endpoint>",
+    cu_file_types=[ContentUnderstandingFileType.PDF],  # only PDFs use CU
+)
+```
+
+More information about Azure Content Understanding can be found [here](https://learn.microsoft.com/azure/ai-services/content-understanding/).
+
 ### Python API
 
 Basic usage in Python:
