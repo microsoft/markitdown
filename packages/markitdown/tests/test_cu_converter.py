@@ -546,6 +546,71 @@ class TestConvertMock:
 
 
 # ---------------------------------------------------------------------------
+# Init-time get_analyzer() error wrapping
+# ---------------------------------------------------------------------------
+
+class TestGetAnalyzerError:
+    """Test that get_analyzer() failures at init produce a clear error."""
+
+    def test_nonexistent_analyzer_raises_value_error(self):
+        """A failed get_analyzer() should raise ValueError with analyzer name."""
+        with patch(
+            "markitdown.converters._cu_converter._dependency_exc_info", None
+        ), patch(
+            "markitdown.converters._cu_converter.ContentUnderstandingClient"
+        ) as MockClient, patch(
+            "markitdown.converters._cu_converter.DefaultAzureCredential"
+        ):
+            mock_client = MagicMock()
+            mock_client.get_analyzer.side_effect = Exception("not found")
+            MockClient.return_value = mock_client
+
+            with pytest.raises(ValueError, match="Failed to resolve analyzer 'bad-id'"):
+                ContentUnderstandingConverter(endpoint="https://fake", analyzer_id="bad-id")
+
+
+# ---------------------------------------------------------------------------
+# Registration priority test
+# ---------------------------------------------------------------------------
+
+class TestRegistrationPriority:
+    """Test that CU converter is registered with higher priority than Doc Intel."""
+
+    def test_cu_registered_before_docintel(self):
+        """When both endpoints are provided, CU should appear before Doc Intel."""
+        with patch(
+            "markitdown.converters._cu_converter._dependency_exc_info", None
+        ), patch(
+            "markitdown.converters._cu_converter.ContentUnderstandingClient"
+        ), patch(
+            "markitdown.converters._cu_converter.DefaultAzureCredential"
+        ), patch(
+            "markitdown.converters._doc_intel_converter._dependency_exc_info", None
+        ), patch(
+            "markitdown.converters._doc_intel_converter.DocumentIntelligenceClient"
+        ), patch(
+            "markitdown.converters._doc_intel_converter.DefaultAzureCredential"
+        ):
+            from markitdown import MarkItDown
+            from markitdown.converters import (
+                ContentUnderstandingConverter,
+                DocumentIntelligenceConverter,
+            )
+
+            md = MarkItDown(
+                cu_endpoint="https://fake-cu",
+                docintel_endpoint="https://fake-di",
+            )
+
+            converter_types = [
+                type(reg.converter) for reg in md._converters
+            ]
+            cu_idx = converter_types.index(ContentUnderstandingConverter)
+            di_idx = converter_types.index(DocumentIntelligenceConverter)
+            assert cu_idx < di_idx, "CU should have higher priority (lower index) than Doc Intel"
+
+
+# ---------------------------------------------------------------------------
 # MissingDependencyException test
 # ---------------------------------------------------------------------------
 

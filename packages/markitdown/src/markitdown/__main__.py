@@ -78,11 +78,20 @@ def main():
         help="Provide a hint about the file's charset (e.g, UTF-8).",
     )
 
-    parser.add_argument(
+    cloud_group = parser.add_mutually_exclusive_group()
+    cloud_group.add_argument(
         "-d",
         "--use-docintel",
         action="store_true",
         help="Use Document Intelligence to extract text instead of offline conversion. Requires a valid Document Intelligence Endpoint.",
+    )
+
+    cloud_group.add_argument(
+        "--use-cu",
+        "--use-content-understanding",
+        action="store_true",
+        dest="use_cu",
+        help="Use Azure Content Understanding to extract text. Requires --cu-endpoint.",
     )
 
     parser.add_argument(
@@ -90,14 +99,6 @@ def main():
         "--endpoint",
         type=str,
         help="Document Intelligence Endpoint. Required if using Document Intelligence.",
-    )
-
-    parser.add_argument(
-        "--use-cu",
-        "--use-content-understanding",
-        action="store_true",
-        dest="use_cu",
-        help="Use Azure Content Understanding to extract text. Requires --cu-endpoint.",
     )
 
     parser.add_argument(

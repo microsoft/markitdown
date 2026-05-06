@@ -474,7 +474,12 @@ class ContentUnderstandingConverter(DocumentConverter):
                 self._analyzer_modality = _infer_prebuilt_modality(self._analyzer_id)
             else:
                 # Custom analyzer — one get_analyzer() call, cached
-                analyzer_info = self._client.get_analyzer(self._analyzer_id)
+                try:
+                    analyzer_info = self._client.get_analyzer(self._analyzer_id)
+                except Exception as exc:
+                    raise ValueError(
+                        f"Failed to resolve analyzer '{self._analyzer_id}': {exc}"
+                    ) from exc
                 if analyzer_info.base_analyzer_id:
                     self._analyzer_modality = _BASE_TO_MODALITY.get(
                         analyzer_info.base_analyzer_id, "document"
