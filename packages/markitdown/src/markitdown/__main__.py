@@ -228,7 +228,9 @@ def main():
             # Parse comma-separated file types into ContentUnderstandingFileType list
             from .converters import ContentUnderstandingFileType
 
-            type_names = [t.strip().lower() for t in args.cu_file_types.split(",") if t.strip()]
+            type_names = [
+                t.strip().lower() for t in args.cu_file_types.split(",") if t.strip()
+            ]
             cu_types = []
             for name in type_names:
                 # Try matching by value (e.g., "pdf", "jpeg", "mp4")

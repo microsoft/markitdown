@@ -507,7 +507,9 @@ class ContentUnderstandingConverter(DocumentConverter):
         # 1. Determine analyzer_id (smart routing: check modality)
         file_type = _detect_file_type(stream_info, self._file_types)
         if file_type is None:
-            raise ValueError("Unsupported file type for Content Understanding conversion.")
+            raise ValueError(
+                "Unsupported file type for Content Understanding conversion."
+            )
         file_modality = _get_modality(file_type)
 
         if (
@@ -517,7 +519,9 @@ class ContentUnderstandingConverter(DocumentConverter):
         ):
             analyzer_id = self._analyzer_id
         else:
-            analyzer_id = _DEFAULT_ANALYZERS.get(file_modality, "prebuilt-documentSearch")
+            analyzer_id = _DEFAULT_ANALYZERS.get(
+                file_modality, "prebuilt-documentSearch"
+            )
 
         # 2. Read file bytes and determine MIME type
         file_bytes = file_stream.read()

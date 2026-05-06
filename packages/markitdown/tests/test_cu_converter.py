@@ -26,6 +26,7 @@ from markitdown._stream_info import StreamInfo
 # Helper: create a converter with accepts() working but no SDK init
 # ---------------------------------------------------------------------------
 
+
 def _make_converter(file_types=None, analyzer_id=None, analyzer_modality=None):
     """Create a converter bypassing __init__ (no SDK deps needed)."""
     conv = ContentUnderstandingConverter.__new__(ContentUnderstandingConverter)
@@ -47,23 +48,64 @@ def _make_converter(file_types=None, analyzer_id=None, analyzer_modality=None):
 # accepts() tests — extension-based
 # ---------------------------------------------------------------------------
 
+
 class TestAcceptsExtension:
     """Test accepts() for supported and unsupported file extensions."""
 
-    @pytest.mark.parametrize("ext", [
-        ".pdf", ".docx", ".pptx", ".xlsx", ".html", ".txt", ".md", ".rtf", ".xml",
-        ".eml", ".msg",
-        ".jpg", ".jpeg", ".jpe", ".png", ".bmp", ".tiff", ".heif", ".heic",
-        ".mp4", ".m4v", ".mov", ".avi", ".mkv", ".webm", ".flv", ".wmv",
-        ".wav", ".mp3", ".m4a", ".flac", ".ogg", ".aac", ".wma",
-    ])
+    @pytest.mark.parametrize(
+        "ext",
+        [
+            ".pdf",
+            ".docx",
+            ".pptx",
+            ".xlsx",
+            ".html",
+            ".txt",
+            ".md",
+            ".rtf",
+            ".xml",
+            ".eml",
+            ".msg",
+            ".jpg",
+            ".jpeg",
+            ".jpe",
+            ".png",
+            ".bmp",
+            ".tiff",
+            ".heif",
+            ".heic",
+            ".mp4",
+            ".m4v",
+            ".mov",
+            ".avi",
+            ".mkv",
+            ".webm",
+            ".flv",
+            ".wmv",
+            ".wav",
+            ".mp3",
+            ".m4a",
+            ".flac",
+            ".ogg",
+            ".aac",
+            ".wma",
+        ],
+    )
     def test_accepts_supported_extensions(self, ext):
         conv = _make_converter()
         assert conv.accepts(io.BytesIO(b""), StreamInfo(extension=ext))
 
-    @pytest.mark.parametrize("ext", [
-        ".csv", ".json", ".zip", ".epub", ".py", ".rs",
-    ])
+    @pytest.mark.parametrize(
+        "ext",
+        [
+            ".csv",
+            ".json",
+            ".zip",
+            ".epub",
+            ".py",
+            ".rs",
+        ],
+    )
     def test_rejects_unsupported_extensions(self, ext):
         conv = _make_converter()
         assert not conv.accepts(io.BytesIO(b""), StreamInfo(extension=ext))
@@ -73,36 +115,43 @@ class TestAcceptsExtension:
 # accepts() tests — MIME-based
 # ---------------------------------------------------------------------------
 
+
 class TestAcceptsMime:
     """Test accepts() for MIME type matching."""
 
-    @pytest.mark.parametrize("mime", [
-        "application/pdf",
-        "image/jpeg",
-        "video/mp4",
-        "audio/wav",
-        "audio/x-wav",
-        "text/html",
-        "audio/mpeg",
-        "audio/x-m4a",
-        "audio/x-flac",
-        "video/quicktime",
-        "video/webm",
-        "video/x-m4v",
-        "video/x-flv",
-        "video/x-ms-wmv",
-        "audio/aac",
-        "audio/x-ms-wma",
-    ])
+    @pytest.mark.parametrize(
+        "mime",
+        [
+            "application/pdf",
+            "image/jpeg",
+            "video/mp4",
+            "audio/wav",
+            "audio/x-wav",
+            "text/html",
+            "audio/mpeg",
+            "audio/x-m4a",
+            "audio/x-flac",
+            "video/quicktime",
+            "video/webm",
+            "video/x-m4v",
+            "video/x-flv",
+            "video/x-ms-wmv",
+            "audio/aac",
+            "audio/x-ms-wma",
+        ],
+    )
     def test_accepts_supported_mimetypes(self, mime):
         conv = _make_converter()
         assert conv.accepts(io.BytesIO(b""), StreamInfo(mimetype=mime))
 
-    @pytest.mark.parametrize("mime", [
-        "text/csv",
-        "application/json",
-        "application/zip",
-    ])
+    @pytest.mark.parametrize(
+        "mime",
+        [
+            "text/csv",
+            "application/json",
+            "application/zip",
+        ],
+    )
     def test_rejects_unsupported_mimetypes(self, mime):
         conv = _make_converter()
         assert not conv.accepts(io.BytesIO(b""), StreamInfo(mimetype=mime))
@@ -111,6 +160,7 @@ class TestAcceptsMime:
 # ---------------------------------------------------------------------------
 # accepts() tests — cu_file_types restriction
 # ---------------------------------------------------------------------------
+
 
 class TestAcceptsFileTypeRestriction:
     """Test that cu_file_types restricts which formats are accepted."""
@@ -123,10 +173,12 @@ class TestAcceptsFileTypeRestriction:
         assert not conv.accepts(io.BytesIO(b""), StreamInfo(extension=".jpg"))
 
     def test_restricted_to_audio(self):
-        conv = _make_converter(file_types=[
-            ContentUnderstandingFileType.WAV,
-            ContentUnderstandingFileType.MP3,
-        ])
+        conv = _make_converter(
+            file_types=[
+                ContentUnderstandingFileType.WAV,
+                ContentUnderstandingFileType.MP3,
+            ]
+        )
         assert conv.accepts(io.BytesIO(b""), StreamInfo(extension=".wav"))
         assert conv.accepts(io.BytesIO(b""), StreamInfo(extension=".mp3"))
         assert not conv.accepts(io.BytesIO(b""), StreamInfo(extension=".pdf"))
@@ -141,6 +193,7 @@ class TestAcceptsFileTypeRestriction:
 # ---------------------------------------------------------------------------
 # file type detection tests
 # ---------------------------------------------------------------------------
+
 
 class TestDetectFileType:
     """Test extension and MIME based file type detection."""
@@ -169,35 +222,45 @@ class TestDetectFileType:
             == ContentUnderstandingFileType.M4V
         )
 
-    @pytest.mark.parametrize(("mimetype", "expected"), [
-        ("audio/x-wav", "audio/wav"),
-        ("audio/x-flac", "audio/flac"),
-        ("audio/x-m4a", "audio/mp4"),
-        ("video/x-m4v", "video/mp4"),
-        ("video/mp4", "video/mp4"),
-        (None, "application/octet-stream"),
-    ])
+    @pytest.mark.parametrize(
+        ("mimetype", "expected"),
+        [
+            ("audio/x-wav", "audio/wav"),
+            ("audio/x-flac", "audio/flac"),
+            ("audio/x-m4a", "audio/mp4"),
+            ("video/x-m4v", "video/mp4"),
+            ("video/mp4", "video/mp4"),
+            (None, "application/octet-stream"),
+        ],
+    )
     def test_canonical_mime_type(self, mimetype, expected):
         assert _canonical_mime_type(mimetype) == expected
 
-    @pytest.mark.parametrize(("file_type", "mimetype", "expected"), [
-        (ContentUnderstandingFileType.PDF, None, "application/pdf"),
-        (ContentUnderstandingFileType.M4V, None, "video/mp4"),
-        (ContentUnderstandingFileType.FLAC, "audio/x-flac", "audio/flac"),
-    ])
+    @pytest.mark.parametrize(
+        ("file_type", "mimetype", "expected"),
+        [
+            (ContentUnderstandingFileType.PDF, None, "application/pdf"),
+            (ContentUnderstandingFileType.M4V, None, "video/mp4"),
+            (ContentUnderstandingFileType.FLAC, "audio/x-flac", "audio/flac"),
+        ],
+    )
     def test_content_type_for(self, file_type, mimetype, expected):
         assert _content_type_for(file_type, mimetype) == expected
 
     def test_file_type_restriction_applies_to_mime(self):
-        assert _detect_file_type(
-            StreamInfo(mimetype="video/mp4"),
-            [ContentUnderstandingFileType.PDF],
-        ) is None
+        assert (
+            _detect_file_type(
+                StreamInfo(mimetype="video/mp4"),
+                [ContentUnderstandingFileType.PDF],
+            )
+            is None
+        )
 
 
 # ---------------------------------------------------------------------------
 # Smart routing tests
 # ---------------------------------------------------------------------------
+
 
 class TestSmartRouting:
     """Test modality-aware analyzer routing."""
@@ -381,12 +444,15 @@ class TestSmartRouting:
         call_args = conv._client.begin_analyze_binary.call_args
         assert call_args.kwargs["analyzer_id"] == "prebuilt-documentSearch"
 
-    @pytest.mark.parametrize(("mimetype", "expected_analyzer"), [
-        ("video/mp4", "prebuilt-videoSearch"),
-        ("video/x-m4v", "prebuilt-videoSearch"),
-        ("audio/mpeg", "prebuilt-audioSearch"),
-        ("audio/x-wav", "prebuilt-audioSearch"),
-    ])
+    @pytest.mark.parametrize(
+        ("mimetype", "expected_analyzer"),
+        [
+            ("video/mp4", "prebuilt-videoSearch"),
+            ("video/x-m4v", "prebuilt-videoSearch"),
+            ("audio/mpeg", "prebuilt-audioSearch"),
+            ("audio/x-wav", "prebuilt-audioSearch"),
+        ],
+    )
     def test_mime_only_input_uses_auto_routing(self, mimetype, expected_analyzer):
         """MIME-only streams should route to the matching modality analyzer."""
         conv = _make_converter(analyzer_id=None, analyzer_modality=None)
@@ -445,6 +511,7 @@ class TestSmartRouting:
 # _infer_prebuilt_modality tests
 # ---------------------------------------------------------------------------
 
+
 class TestInferPrebuiltModality:
     """Test modality inference from prebuilt analyzer names."""
 
@@ -475,6 +542,7 @@ class TestInferPrebuiltModality:
 # _get_modality tests
 # ---------------------------------------------------------------------------
 
+
 class TestGetModality:
     """Test file type → modality mapping."""
 
@@ -498,6 +566,7 @@ class TestGetModality:
 # ---------------------------------------------------------------------------
 # convert() mock tests
 # ---------------------------------------------------------------------------
+
 
 class TestConvertMock:
     """Test convert() with mocked CU SDK."""
@@ -549,6 +618,7 @@ class TestConvertMock:
 # Init-time get_analyzer() error wrapping
 # ---------------------------------------------------------------------------
 
+
 class TestGetAnalyzerError:
     """Test that get_analyzer() failures at init produce a clear error."""
 
@@ -566,12 +636,15 @@ class TestGetAnalyzerError:
             MockClient.return_value = mock_client
 
             with pytest.raises(ValueError, match="Failed to resolve analyzer 'bad-id'"):
-                ContentUnderstandingConverter(endpoint="https://fake", analyzer_id="bad-id")
+                ContentUnderstandingConverter(
+                    endpoint="https://fake", analyzer_id="bad-id"
+                )
 
 
 # ---------------------------------------------------------------------------
 # Registration priority test
 # ---------------------------------------------------------------------------
+
 
 class TestRegistrationPriority:
     """Test that CU converter is registered with higher priority than Doc Intel."""
@@ -602,17 +675,18 @@ class TestRegistrationPriority:
                 docintel_endpoint="https://fake-di",
             )
 
-            converter_types = [
-                type(reg.converter) for reg in md._converters
-            ]
+            converter_types = [type(reg.converter) for reg in md._converters]
             cu_idx = converter_types.index(ContentUnderstandingConverter)
             di_idx = converter_types.index(DocumentIntelligenceConverter)
-            assert cu_idx < di_idx, "CU should have higher priority (lower index) than Doc Intel"
+            assert (
+                cu_idx < di_idx
+            ), "CU should have higher priority (lower index) than Doc Intel"
 
 
 # ---------------------------------------------------------------------------
 # MissingDependencyException test
 # ---------------------------------------------------------------------------
+
 
 class TestMissingDependency:
     """Test that MissingDependencyException is raised when CU SDK is not installed."""
