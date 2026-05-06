@@ -161,10 +161,16 @@ class PptxConverter(DocumentConverter):
 
                 # Text areas
                 elif shape.has_text_frame:
+                    # python-pptx can yield ``None`` for ``shape.text`` when a
+                    # text frame has a run with no ``<a:t>`` child or when a
+                    # third-party deck stores chart/SmartArt titles as
+                    # ``None``. Coerce to "" so a single bad shape doesn't
+                    # fail the entire conversion (#1808).
+                    shape_text = shape.text or ""
                     if shape == title:
-                        md_content += "# " + shape.text.lstrip() + "\n"
+                        md_content += "# " + shape_text.lstrip() + "\n"
                     else:
-                        md_content += shape.text + "\n"
+                        md_content += shape_text + "\n"
 
                 # Group Shapes
                 if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.GROUP:
@@ -194,7 +200,9 @@ class PptxConverter(DocumentConverter):
                 md_content += "\n\n### Notes:\n"
                 notes_frame = slide.notes_slide.notes_text_frame
                 if notes_frame is not None:
-                    md_content += notes_frame.text
+                    # See note above re: ``shape.text`` returning ``None``;
+                    # the same coercion applies to notes text frames (#1808).
+                    md_content += notes_frame.text or ""
                 md_content = md_content.strip()
 
         return DocumentConverterResult(markdown=md_content.strip())
