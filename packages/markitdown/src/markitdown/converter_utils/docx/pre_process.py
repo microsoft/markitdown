@@ -1,3 +1,4 @@
+import struct
 import zipfile
 from io import BytesIO
 from typing import BinaryIO
@@ -115,6 +116,63 @@ def _pre_process_math(content: bytes) -> bytes:
     return str(soup).encode()
 
 
+def _fix_zip_name_casing(input_docx: BinaryIO) -> BinaryIO:
+    """Repair .docx zips whose local file headers disagree with the central
+    directory only in case (e.g. ``customXML/item2.xml`` locally vs
+    ``customXml/item2.xml`` in the central directory).
+
+    Some .docx producers emit such files. Most zip tools accept them, but
+    Python's :mod:`zipfile` strictly validates and raises ``BadZipFile``.
+    The central directory is authoritative per APPNOTE; we patch the local
+    file header bytes in-memory to match it. The patch is byte-length
+    preserving (case-only differences in ASCII paths never change length),
+    so no offset recomputation is needed.
+
+    If no fix is required the original stream is returned unchanged
+    (rewound to position 0). See markitdown #1812.
+    """
+    input_docx.seek(0)
+    raw = bytearray(input_docx.read())
+    patched = False
+    try:
+        zf = zipfile.ZipFile(BytesIO(raw), mode="r")
+    except zipfile.BadZipFile:
+        # Not even the central directory parses — nothing we can patch here.
+        # Let the caller see the same error the unfixed code path would.
+        input_docx.seek(0)
+        return input_docx
+    try:
+        for info in zf.infolist():
+            offset = info.header_offset
+            # Local file header signature is "PK\x03\x04". If we don't see
+            # it we have a malformed zip beyond what this fixer targets.
+            if raw[offset : offset + 4] != b"PK\x03\x04":
+                continue
+            # Per APPNOTE local file header layout:
+            #   bytes  0..3  signature
+            #   bytes 26..27 file name length (little-endian uint16)
+            #   bytes 30..   file name
+            fname_len = struct.unpack_from("<H", raw, offset + 26)[0]
+            local_name = bytes(raw[offset + 30 : offset + 30 + fname_len])
+            try:
+                central_name = info.filename.encode("utf-8")
+            except UnicodeEncodeError:
+                continue
+            if (
+                local_name != central_name
+                and local_name.lower() == central_name.lower()
+                and len(local_name) == len(central_name)
+            ):
+                raw[offset + 30 : offset + 30 + fname_len] = central_name
+                patched = True
+    finally:
+        zf.close()
+    if patched:
+        return BytesIO(bytes(raw))
+    input_docx.seek(0)
+    return input_docx
+
+
 def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
     """
     Pre-processes a DOCX file with provided steps.
@@ -129,6 +187,11 @@ def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
     Returns:
         BinaryIO: A binary output stream representing the processed DOCX file.
     """
+    # Repair .docx zips whose local headers disagree with the central
+    # directory only in case — Python's zipfile rejects these but most other
+    # zip tools accept them, so .docx producers occasionally emit them
+    # (markitdown #1812).
+    input_docx = _fix_zip_name_casing(input_docx)
     output_docx = BytesIO()
     # The files that need to be pre-processed from .docx
     pre_process_enable_files = [
