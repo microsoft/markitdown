@@ -404,14 +404,10 @@ def _resolve_analyzer_modality(client: Any, analyzer_id: str) -> str:
     try:
         analyzer_info = client.get_analyzer(analyzer_id)
     except Exception as exc:
-        raise ValueError(
-            f"Failed to resolve analyzer '{analyzer_id}': {exc}"
-        ) from exc
+        raise ValueError(f"Failed to resolve analyzer '{analyzer_id}': {exc}") from exc
 
     if analyzer_info.base_analyzer_id:
-        return _BASE_TO_MODALITY.get(
-            analyzer_info.base_analyzer_id, "document"
-        )
+        return _BASE_TO_MODALITY.get(analyzer_info.base_analyzer_id, "document")
     return "document"
 
 

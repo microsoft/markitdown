@@ -518,7 +518,9 @@ class TestResolveAnalyzerModality:
 
     def test_known_document_prebuilts(self):
         client = MagicMock()
-        assert _resolve_analyzer_modality(client, "prebuilt-documentSearch") == "document"
+        assert (
+            _resolve_analyzer_modality(client, "prebuilt-documentSearch") == "document"
+        )
         assert _resolve_analyzer_modality(client, "prebuilt-invoice") == "document"
         assert _resolve_analyzer_modality(client, "prebuilt-layout") == "document"
         assert _resolve_analyzer_modality(client, "prebuilt-receipt") == "document"
@@ -754,7 +756,10 @@ class TestCLIArgs:
             text=True,
         )
         assert result.returncode != 0
-        assert "cu-endpoint" in result.stderr.lower() or "cu-endpoint" in (result.stdout or "").lower()
+        assert (
+            "cu-endpoint" in result.stderr.lower()
+            or "cu-endpoint" in (result.stdout or "").lower()
+        )
 
     def test_use_cu_and_use_docintel_mutually_exclusive(self):
         """--use-cu and --use-docintel cannot be used together."""
@@ -762,9 +767,15 @@ class TestCLIArgs:
 
         result = subprocess.run(
             [
-                sys.executable, "-m", "markitdown",
-                "--use-cu", "--cu-endpoint", "https://fake",
-                "--use-docintel", "-e", "https://fake-di",
+                sys.executable,
+                "-m",
+                "markitdown",
+                "--use-cu",
+                "--cu-endpoint",
+                "https://fake",
+                "--use-docintel",
+                "-e",
+                "https://fake-di",
                 "fake.pdf",
             ],
             capture_output=True,
@@ -797,8 +808,52 @@ class TestCLIArgs:
         """Single file type (no comma) should parse correctly."""
         from markitdown.converters import ContentUnderstandingFileType
 
-        cu_types = [ContentUnderstandingFileType(t.strip().lower()) for t in "wav".split(",") if t.strip()]
+        cu_types = [
+            ContentUnderstandingFileType(t.strip().lower())
+            for t in "wav".split(",")
+            if t.strip()
+        ]
         assert cu_types == [ContentUnderstandingFileType.WAV]
+
+    def test_use_cu_wires_kwargs_to_markitdown(self, capsys):
+        """--use-cu should pass CU options through to MarkItDown."""
+        import markitdown.__main__ as markitdown_cli
+
+        markitdown_instance = MagicMock()
+        markitdown_instance.convert.return_value.markdown = "converted"
+        markitdown_cls = MagicMock(return_value=markitdown_instance)
+
+        with patch.object(
+            sys,
+            "argv",
+            [
+                "markitdown",
+                "--use-cu",
+                "--cu-endpoint",
+                "https://fake-cu",
+                "--cu-analyzer",
+                "custom-analyzer",
+                "--cu-file-types",
+                "pdf,jpeg,mp4",
+                "fake.pdf",
+            ],
+        ), patch.object(markitdown_cli, "MarkItDown", markitdown_cls):
+            markitdown_cli.main()
+
+        markitdown_cls.assert_called_once_with(
+            enable_plugins=False,
+            cu_endpoint="https://fake-cu",
+            cu_analyzer_id="custom-analyzer",
+            cu_file_types=[
+                ContentUnderstandingFileType.PDF,
+                ContentUnderstandingFileType.JPEG,
+                ContentUnderstandingFileType.MP4,
+            ],
+        )
+        markitdown_instance.convert.assert_called_once_with(
+            "fake.pdf", stream_info=None, keep_data_uris=False
+        )
+        assert capsys.readouterr().out == "converted\n"
 
 
 # ---------------------------------------------------------------------------
@@ -810,13 +865,17 @@ class TestMissingDependency:
     """Test that MissingDependencyException is raised when CU SDK is not installed."""
 
     def test_missing_deps_message(self):
-        """Verify the exception includes install hint."""
-        # We can't easily simulate ImportError in the module, but we can check
-        # the exception message pattern if it were raised.
+        """Converter construction should surface the optional install hint."""
+        import markitdown.converters._cu_converter as cu_converter_module
         from markitdown._exceptions import MissingDependencyException
 
-        exc = MissingDependencyException(
-            "ContentUnderstandingConverter requires the optional dependency "
-            "[az-content-understanding] (or [all]) to be installed."
-        )
-        assert "az-content-understanding" in str(exc)
+        import_error = ImportError("No module named 'azure.ai.contentunderstanding'")
+        dependency_exc_info = (ImportError, import_error, None)
+
+        with patch.object(
+            cu_converter_module, "_dependency_exc_info", dependency_exc_info
+        ), pytest.raises(MissingDependencyException) as exc_info:
+            ContentUnderstandingConverter(endpoint="https://fake-cu")
+
+        assert "az-content-understanding" in str(exc_info.value)
+        assert exc_info.value.__cause__ is import_error
