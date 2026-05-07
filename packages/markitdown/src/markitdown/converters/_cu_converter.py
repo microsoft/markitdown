@@ -237,7 +237,7 @@ _AUDIO_TYPES = {
     ContentUnderstandingFileType.WMA,
 }
 
-_DEFAULT_ANALYZERS = {
+_PREBUILT_ANALYZERS = {
     "document": "prebuilt-documentSearch",
     "image": "prebuilt-documentSearch",
     "video": "prebuilt-videoSearch",
@@ -328,8 +328,8 @@ _BASE_TO_MODALITY: Dict[str, str] = {
     "prebuilt-video": "video",
 }
 
-# For prebuilt analyzers, infer modality from name without an API call
-_PREBUILT_MODALITY: Dict[str, str] = {
+# Cache of known prebuilt analyzer name → modality (avoids API call)
+_KNOWN_PREBUILT_MODALITY: Dict[str, str] = {
     # Document-based prebuilts
     "prebuilt-documentSearch": "document",
     "prebuilt-layout": "document",
@@ -378,11 +378,40 @@ _PREBUILT_MODALITY: Dict[str, str] = {
 }
 
 
-def _infer_prebuilt_modality(analyzer_id: str) -> str:
-    """Infer modality from a prebuilt analyzer ID without an API call."""
-    if analyzer_id in _PREBUILT_MODALITY:
-        return _PREBUILT_MODALITY[analyzer_id]
-    # Unknown prebuilt — most prebuilts are document-based
+def _resolve_analyzer_modality(client: Any, analyzer_id: str) -> str:
+    """Resolve analyzer modality from cache or via get_analyzer() fallback.
+
+    For known prebuilt-* names, returns the modality from
+    ``_KNOWN_PREBUILT_MODALITY`` without an API call.  For unknown
+    prebuilt-* names or custom analyzers, calls ``get_analyzer()``
+    to inspect ``base_analyzer_id``.
+
+    Args:
+        client: A ``ContentUnderstandingClient`` instance.
+        analyzer_id: The analyzer ID to resolve.
+
+    Returns:
+        Modality string ("document", "image", "audio", or "video").
+
+    Raises:
+        ValueError: If ``get_analyzer()`` fails.
+    """
+    # Known prebuilt — use cache, no API call
+    if analyzer_id in _KNOWN_PREBUILT_MODALITY:
+        return _KNOWN_PREBUILT_MODALITY[analyzer_id]
+
+    # Unknown prebuilt or custom analyzer — call get_analyzer()
+    try:
+        analyzer_info = client.get_analyzer(analyzer_id)
+    except Exception as exc:
+        raise ValueError(
+            f"Failed to resolve analyzer '{analyzer_id}': {exc}"
+        ) from exc
+
+    if analyzer_info.base_analyzer_id:
+        return _BASE_TO_MODALITY.get(
+            analyzer_info.base_analyzer_id, "document"
+        )
     return "document"
 
 
@@ -467,25 +496,11 @@ class ContentUnderstandingConverter(DocumentConverter):
             user_agent_policy=UserAgentPolicy(user_agent=user_agent),
         )
 
-        # Smart routing: resolve analyzer modality at init
+        # Smart routing: resolve analyzer modality at init (at most one API call)
         if self._analyzer_id is not None:
-            if self._analyzer_id.startswith("prebuilt-"):
-                # Infer from name — no API call
-                self._analyzer_modality = _infer_prebuilt_modality(self._analyzer_id)
-            else:
-                # Custom analyzer — one get_analyzer() call, cached
-                try:
-                    analyzer_info = self._client.get_analyzer(self._analyzer_id)
-                except Exception as exc:
-                    raise ValueError(
-                        f"Failed to resolve analyzer '{self._analyzer_id}': {exc}"
-                    ) from exc
-                if analyzer_info.base_analyzer_id:
-                    self._analyzer_modality = _BASE_TO_MODALITY.get(
-                        analyzer_info.base_analyzer_id, "document"
-                    )
-                else:
-                    self._analyzer_modality = "document"
+            self._analyzer_modality = _resolve_analyzer_modality(
+                self._client, self._analyzer_id
+            )
 
     def accepts(
         self,
@@ -519,7 +534,7 @@ class ContentUnderstandingConverter(DocumentConverter):
         ):
             analyzer_id = self._analyzer_id
         else:
-            analyzer_id = _DEFAULT_ANALYZERS.get(
+            analyzer_id = _PREBUILT_ANALYZERS.get(
                 file_modality, "prebuilt-documentSearch"
             )
 

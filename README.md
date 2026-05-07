@@ -175,6 +175,15 @@ More information about how to set up an Azure Document Intelligence Resource can
 
 Install: `pip install 'markitdown[az-content-understanding]'`
 
+#### When to use Content Understanding
+
+Content Understanding is ideal when you need capabilities beyond what built-in or Document Intelligence converters provide:
+
+- **Audio and video files** — CU is the only option for converting MP4, MOV, WAV, MP3, and other media files. Built-in converters have no video support and only basic audio transcription.
+- **Structured field extraction** — Custom analyzers extract domain-specific fields (invoice amounts, receipt dates, contract clauses) serialized as YAML front matter. Neither built-in nor Doc Intel integration exposes fields.
+- **Higher-quality document extraction** — Cloud-based layout analysis and OCR for scanned PDFs, complex tables, and multi-page documents.
+- **Single API for all modalities** — One `cu_endpoint` handles documents, images, audio, and video with automatic analyzer routing.
+
 | Capability | Built-in converters | Azure Document Intelligence | Azure Content Understanding |
 |------------|---------------------|-----------------------------|-----------------------------|
 | Document conversion | Offline, format-specific extraction | Cloud layout extraction | Cloud multimodal extraction |

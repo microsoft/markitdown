@@ -5,6 +5,7 @@ Follows the same pattern as test_docintel_html.py.
 """
 
 import io
+import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -12,7 +13,7 @@ import pytest
 from markitdown.converters._cu_converter import (
     ContentUnderstandingConverter,
     ContentUnderstandingFileType,
-    _infer_prebuilt_modality,
+    _resolve_analyzer_modality,
     _get_modality,
     _detect_file_type,
     _canonical_mime_type,
@@ -512,30 +513,76 @@ class TestSmartRouting:
 # ---------------------------------------------------------------------------
 
 
-class TestInferPrebuiltModality:
-    """Test modality inference from prebuilt analyzer names."""
+class TestResolveAnalyzerModality:
+    """Test modality resolution from analyzer IDs."""
 
-    def test_document_prebuilts(self):
-        assert _infer_prebuilt_modality("prebuilt-documentSearch") == "document"
-        assert _infer_prebuilt_modality("prebuilt-invoice") == "document"
-        assert _infer_prebuilt_modality("prebuilt-layout") == "document"
-        assert _infer_prebuilt_modality("prebuilt-receipt") == "document"
-        assert _infer_prebuilt_modality("prebuilt-tax.us.w2") == "document"
+    def test_known_document_prebuilts(self):
+        client = MagicMock()
+        assert _resolve_analyzer_modality(client, "prebuilt-documentSearch") == "document"
+        assert _resolve_analyzer_modality(client, "prebuilt-invoice") == "document"
+        assert _resolve_analyzer_modality(client, "prebuilt-layout") == "document"
+        assert _resolve_analyzer_modality(client, "prebuilt-receipt") == "document"
+        assert _resolve_analyzer_modality(client, "prebuilt-tax.us.w2") == "document"
+        # Known prebuilts should never call get_analyzer()
+        client.get_analyzer.assert_not_called()
 
-    def test_audio_prebuilts(self):
-        assert _infer_prebuilt_modality("prebuilt-audioSearch") == "audio"
-        assert _infer_prebuilt_modality("prebuilt-callCenter") == "audio"
+    def test_known_audio_prebuilts(self):
+        client = MagicMock()
+        assert _resolve_analyzer_modality(client, "prebuilt-audioSearch") == "audio"
+        assert _resolve_analyzer_modality(client, "prebuilt-callCenter") == "audio"
+        client.get_analyzer.assert_not_called()
 
-    def test_video_prebuilts(self):
-        assert _infer_prebuilt_modality("prebuilt-videoSearch") == "video"
-        assert _infer_prebuilt_modality("prebuilt-videoSynopsis") == "video"
+    def test_known_video_prebuilts(self):
+        client = MagicMock()
+        assert _resolve_analyzer_modality(client, "prebuilt-videoSearch") == "video"
+        assert _resolve_analyzer_modality(client, "prebuilt-videoSynopsis") == "video"
+        client.get_analyzer.assert_not_called()
 
-    def test_image_prebuilts_map_to_image(self):
-        assert _infer_prebuilt_modality("prebuilt-imageSearch") == "image"
-        assert _infer_prebuilt_modality("prebuilt-image") == "image"
+    def test_known_image_prebuilts(self):
+        client = MagicMock()
+        assert _resolve_analyzer_modality(client, "prebuilt-imageSearch") == "image"
+        assert _resolve_analyzer_modality(client, "prebuilt-image") == "image"
+        client.get_analyzer.assert_not_called()
 
-    def test_unknown_prebuilt_defaults_to_document(self):
-        assert _infer_prebuilt_modality("prebuilt-unknownNewAnalyzer") == "document"
+    def test_unknown_prebuilt_falls_back_to_get_analyzer(self):
+        """Unknown prebuilt-* names should call get_analyzer() for resolution."""
+        client = MagicMock()
+        mock_analyzer = MagicMock()
+        mock_analyzer.base_analyzer_id = "prebuilt-audio"
+        client.get_analyzer.return_value = mock_analyzer
+
+        result = _resolve_analyzer_modality(client, "prebuilt-newAnalyzer")
+        assert result == "audio"
+        client.get_analyzer.assert_called_once_with("prebuilt-newAnalyzer")
+
+    def test_custom_analyzer_calls_get_analyzer(self):
+        """Custom analyzers should call get_analyzer() to resolve modality."""
+        client = MagicMock()
+        mock_analyzer = MagicMock()
+        mock_analyzer.base_analyzer_id = "prebuilt-document"
+        client.get_analyzer.return_value = mock_analyzer
+
+        result = _resolve_analyzer_modality(client, "my-custom-doc-analyzer")
+        assert result == "document"
+        client.get_analyzer.assert_called_once_with("my-custom-doc-analyzer")
+
+    def test_custom_analyzer_no_base_defaults_to_document(self):
+        """Analyzer with no base_analyzer_id defaults to document."""
+        client = MagicMock()
+        mock_analyzer = MagicMock()
+        mock_analyzer.base_analyzer_id = None
+        client.get_analyzer.return_value = mock_analyzer
+
+        result = _resolve_analyzer_modality(client, "my-custom-analyzer")
+        assert result == "document"
+
+    def test_get_analyzer_failure_raises_value_error(self):
+        """Failed get_analyzer() should raise ValueError."""
+        client = MagicMock()
+        client.get_analyzer.side_effect = Exception("not found")
+
+        with pytest.raises(ValueError, match="Failed to resolve analyzer 'bad-id'"):
+            _resolve_analyzer_modality(client, "bad-id")
 
 
 # ---------------------------------------------------------------------------
@@ -613,6 +660,12 @@ class TestConvertMock:
         result = self._run_convert(".pdf", "application/pdf", "")
         assert result.markdown == ""
 
+    def test_jpeg_returns_markdown(self):
+        result = self._run_convert(
+            ".jpg", "image/jpeg", "---\ncontentType: document\n---\n# Photo"
+        )
+        assert "contentType: document" in result.markdown
+
 
 # ---------------------------------------------------------------------------
 # Init-time get_analyzer() error wrapping
@@ -681,6 +734,71 @@ class TestRegistrationPriority:
             assert (
                 cu_idx < di_idx
             ), "CU should have higher priority (lower index) than Doc Intel"
+
+
+# ---------------------------------------------------------------------------
+# CLI argument tests
+# ---------------------------------------------------------------------------
+
+
+class TestCLIArgs:
+    """Test CLI argument parsing for CU flags."""
+
+    def test_use_cu_without_endpoint_exits(self):
+        """--use-cu without --cu-endpoint should exit with error."""
+        import subprocess
+
+        result = subprocess.run(
+            [sys.executable, "-m", "markitdown", "--use-cu", "fake.pdf"],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode != 0
+        assert "cu-endpoint" in result.stderr.lower() or "cu-endpoint" in (result.stdout or "").lower()
+
+    def test_use_cu_and_use_docintel_mutually_exclusive(self):
+        """--use-cu and --use-docintel cannot be used together."""
+        import subprocess
+
+        result = subprocess.run(
+            [
+                sys.executable, "-m", "markitdown",
+                "--use-cu", "--cu-endpoint", "https://fake",
+                "--use-docintel", "-e", "https://fake-di",
+                "fake.pdf",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode != 0
+
+    def test_cu_file_types_parsing(self):
+        """--cu-file-types should parse comma-separated values into enum list."""
+        from markitdown.converters import ContentUnderstandingFileType
+
+        raw = "pdf,jpeg,mp4"
+        type_names = [t.strip().lower() for t in raw.split(",") if t.strip()]
+        cu_types = [ContentUnderstandingFileType(name) for name in type_names]
+
+        assert cu_types == [
+            ContentUnderstandingFileType.PDF,
+            ContentUnderstandingFileType.JPEG,
+            ContentUnderstandingFileType.MP4,
+        ]
+
+    def test_cu_file_types_invalid_value(self):
+        """Unknown file type name should raise ValueError."""
+        from markitdown.converters import ContentUnderstandingFileType
+
+        with pytest.raises(ValueError):
+            ContentUnderstandingFileType("nonsense")
+
+    def test_cu_file_types_single_value(self):
+        """Single file type (no comma) should parse correctly."""
+        from markitdown.converters import ContentUnderstandingFileType
+
+        cu_types = [ContentUnderstandingFileType(t.strip().lower()) for t in "wav".split(",") if t.strip()]
+        assert cu_types == [ContentUnderstandingFileType.WAV]
 
 
 # ---------------------------------------------------------------------------
