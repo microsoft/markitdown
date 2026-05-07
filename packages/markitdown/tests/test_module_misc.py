@@ -544,7 +544,7 @@ _YT_FAKE_HTML = b"""<html><head>
 
 def test_youtube_cookie_path_builds_http_client() -> None:
     """When youtube_cookie_path is passed, YouTubeTranscriptApi must receive
-    an http_client (requests.Session) — cookie_path was removed in v1.2.4."""
+    an http_client (requests.Session with loaded cookies)."""
     with (
         patch(
             "markitdown.converters._youtube_converter.IS_YOUTUBE_TRANSCRIPT_CAPABLE",

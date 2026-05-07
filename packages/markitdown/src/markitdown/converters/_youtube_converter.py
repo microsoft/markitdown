@@ -2,6 +2,8 @@ import json
 import time
 import re
 import bs4
+import requests
+from http.cookiejar import MozillaCookieJar
 from typing import Any, BinaryIO, Dict, List, Union
 from urllib.parse import parse_qs, urlparse, unquote
 
@@ -148,12 +150,10 @@ class YouTubeConverter(DocumentConverter):
             cookie_path = kwargs.get("youtube_cookie_path", None)
             http_client = None
             if cookie_path:
-                from http.cookiejar import MozillaCookieJar
-                import requests as _requests
-
                 _jar = MozillaCookieJar(cookie_path)
+                # ignore_discard/expires: browser-exported cookies are often session-scoped
                 _jar.load(ignore_discard=True, ignore_expires=True)
-                http_client = _requests.Session()
+                http_client = requests.Session()
                 http_client.cookies = _jar  # type: ignore
             ytt_api = YouTubeTranscriptApi(http_client=http_client)
             transcript_text = ""
