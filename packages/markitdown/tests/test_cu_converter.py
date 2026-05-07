@@ -22,7 +22,6 @@ from markitdown.converters._cu_converter import (
 )
 from markitdown._stream_info import StreamInfo
 
-
 # ---------------------------------------------------------------------------
 # Helper: create a converter with accepts() working but no SDK init
 # ---------------------------------------------------------------------------
@@ -247,6 +246,54 @@ class TestDetectFileType:
     )
     def test_content_type_for(self, file_type, mimetype, expected):
         assert _content_type_for(file_type, mimetype) == expected
+
+    @pytest.mark.parametrize(
+        ("file_type", "mimetype", "expected"),
+        [
+            # Extension/file_type wins when mimetype disagrees — the
+            # resolved file_type is the single source of truth so that
+            # analyzer routing and payload metadata stay consistent.
+            (ContentUnderstandingFileType.PDF, "audio/mpeg", "application/pdf"),
+            (ContentUnderstandingFileType.MP3, "application/pdf", "audio/mpeg"),
+            (ContentUnderstandingFileType.MP4, "image/jpeg", "video/mp4"),
+            (ContentUnderstandingFileType.JPEG, "video/mp4", "image/jpeg"),
+            # Subtype distinctions are preserved when consistent
+            # (e.g., HEIC vs HEIF both map to file_type HEIF; if the
+            # caller passed image/heic explicitly, keep it).
+            (ContentUnderstandingFileType.HEIF, "image/heic", "image/heic"),
+            (ContentUnderstandingFileType.HEIF, "image/heif", "image/heif"),
+        ],
+    )
+    def test_content_type_for_resolves_conflicts_to_file_type(
+        self, file_type, mimetype, expected
+    ):
+        """When extension and mimetype disagree, file_type wins."""
+        assert _content_type_for(file_type, mimetype) == expected
+
+    def test_conflicting_extension_and_mimetype_in_convert(self):
+        """End-to-end: conflicting StreamInfo routes by extension and
+        sends a content_type consistent with the resolved file_type."""
+        conv = _make_converter()
+        conv._client = MagicMock()
+        mock_poller = MagicMock()
+        mock_poller.result.return_value = MagicMock(contents=[])
+        conv._client.begin_analyze_binary.return_value = mock_poller
+
+        with patch(
+            "markitdown.converters._cu_converter.to_llm_input",
+            return_value="ok",
+        ):
+            conv.convert(
+                io.BytesIO(b"fake"),
+                # .pdf extension but bogus audio mimetype
+                StreamInfo(extension=".pdf", mimetype="audio/mpeg"),
+            )
+
+        call_kwargs = conv._client.begin_analyze_binary.call_args.kwargs
+        # Routed by extension: document modality → prebuilt-documentSearch
+        assert call_kwargs["analyzer_id"] == "prebuilt-documentSearch"
+        # content_type derived from file_type (PDF), not the conflicting mime
+        assert call_kwargs["content_type"] == "application/pdf"
 
     def test_file_type_restriction_applies_to_mime(self):
         assert (

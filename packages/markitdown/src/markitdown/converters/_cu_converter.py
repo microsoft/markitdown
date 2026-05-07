@@ -293,15 +293,30 @@ def _content_type_for(
     file_type: ContentUnderstandingFileType,
     mimetype: Optional[str],
 ) -> str:
-    content_type = _canonical_mime_type(mimetype)
-    if content_type != "application/octet-stream":
-        return content_type
+    """Resolve the content type to send to the CU API.
 
+    Uses the resolved ``file_type`` as the source of truth so analyzer
+    routing and payload metadata stay consistent. The caller-provided
+    ``mimetype`` is only used when it is consistent with ``file_type``
+    (e.g., to preserve subtype distinctions like ``image/heic`` vs
+    ``image/heif``). When ``mimetype`` disagrees with the resolved
+    ``file_type`` (e.g., ``.pdf`` extension with ``audio/mpeg``
+    mimetype), the canonical MIME type for ``file_type`` is used.
+    """
     prefixes = _MIME_PREFIXES.get(file_type, [])
-    if not prefixes:
-        return content_type
+    canonical = _canonical_mime_type(mimetype)
 
-    return _canonical_mime_type(prefixes[0])
+    # Use caller-provided MIME if it's consistent with the resolved file_type
+    if prefixes and canonical != "application/octet-stream":
+        for prefix in prefixes:
+            if canonical.startswith(prefix):
+                return canonical
+
+    # Fallback: derive from the resolved file_type (single source of truth)
+    if prefixes:
+        return _canonical_mime_type(prefixes[0])
+
+    return canonical
 
 
 def _detect_file_type_from_mime(

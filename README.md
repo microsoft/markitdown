@@ -159,19 +159,9 @@ If no `llm_client` is provided the plugin still loads, but OCR is silently skipp
 
 See [`packages/markitdown-ocr/README.md`](packages/markitdown-ocr/README.md) for detailed documentation.
 
-### Azure Document Intelligence
-
-To use Microsoft Document Intelligence for conversion:
-
-```bash
-markitdown path-to-file.pdf -o document.md -d -e "<document_intelligence_endpoint>"
-```
-
-More information about how to set up an Azure Document Intelligence Resource can be found [here](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/how-to-guides/create-document-intelligence-resource?view=doc-intel-4.0.0)
-
 ### Azure Content Understanding
 
-[Azure Content Understanding](https://learn.microsoft.com/azure/ai-services/content-understanding/) provides higher-quality conversion with structured field extraction (YAML front matter), multi-modal support (documents, images, audio, video), and configurable analyzers.
+[Azure Content Understanding](https://learn.microsoft.com/azure/ai-services/content-understanding/) is the next iteration of Azure Document Intelligence and is the recommended cloud option for new projects. It provides higher-quality conversion with structured field extraction (YAML front matter), multi-modal support (documents, images, audio, video), and [prebuilt](https://learn.microsoft.com/azure/ai-services/content-understanding/concepts/prebuilt-analyzers) or [custom-built](https://learn.microsoft.com/azure/ai-services/content-understanding/how-to/customize-analyzer-content-understanding-studio?tabs=portal) analyzers.
 
 Install: `pip install 'markitdown[az-content-understanding]'`
 
@@ -245,6 +235,16 @@ md = MarkItDown(
 ```
 
 More information about Azure Content Understanding can be found [here](https://learn.microsoft.com/azure/ai-services/content-understanding/).
+
+### Azure Document Intelligence
+
+To use Microsoft Document Intelligence for conversion:
+
+```bash
+markitdown path-to-file.pdf -o document.md -d -e "<document_intelligence_endpoint>"
+```
+
+More information about how to set up an Azure Document Intelligence Resource can be found [here](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/how-to-guides/create-document-intelligence-resource?view=doc-intel-4.0.0)
 
 ### Python API
 
