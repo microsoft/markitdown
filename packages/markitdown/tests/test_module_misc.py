@@ -4,9 +4,12 @@ import os
 import re
 import shutil
 import pytest
-from unittest.mock import MagicMock
+import tempfile
+import requests
+from unittest.mock import MagicMock, patch
 
 from markitdown._uri_utils import parse_data_uri, file_uri_to_path
+from markitdown.converters._youtube_converter import YouTubeConverter
 
 from markitdown import (
     MarkItDown,
@@ -532,6 +535,55 @@ def test_markitdown_llm() -> None:
     validate_strings(result, PPTX_TEST_STRINGS)
 
 
+# Minimal YouTube-shaped HTML for unit tests (no network required)
+_YT_FAKE_HTML = b"""<html><head>
+<title>Test Video</title>
+<meta name="name" content="Test Video"/>
+</head><body></body></html>"""
+
+
+def test_youtube_cookie_path_builds_http_client() -> None:
+    """When youtube_cookie_path is passed, YouTubeTranscriptApi must receive
+    an http_client (requests.Session) — cookie_path was removed in v1.2.4."""
+    with (
+        patch(
+            "markitdown.converters._youtube_converter.IS_YOUTUBE_TRANSCRIPT_CAPABLE",
+            True,
+        ),
+        patch(
+            "markitdown.converters._youtube_converter.YouTubeTranscriptApi"
+        ) as mock_cls,
+    ):
+        mock_transcript = MagicMock()
+        mock_transcript.fetch.return_value = []
+        mock_cls.return_value.list.return_value.find_transcript.return_value = (
+            mock_transcript
+        )
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".txt", delete=False
+        ) as f:
+            f.write("# Netscape HTTP Cookie File\n")
+            cookie_path = f.name
+
+        try:
+            converter = YouTubeConverter()
+            stream = io.BytesIO(_YT_FAKE_HTML)
+            si = StreamInfo(
+                mimetype="text/html",
+                url="https://www.youtube.com/watch?v=test123",
+            )
+            converter.convert(stream, si, youtube_cookie_path=cookie_path)
+
+            _, kwargs = mock_cls.call_args
+            assert "http_client" in kwargs, (
+                "YouTubeTranscriptApi must receive http_client when cookie path is given"
+            )
+            assert isinstance(kwargs["http_client"], requests.Session)
+        finally:
+            os.unlink(cookie_path)
+
+
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     for test in [
@@ -547,6 +599,7 @@ if __name__ == "__main__":
         test_markitdown_exiftool,
         test_markitdown_llm_parameters,
         test_markitdown_llm,
+        test_youtube_cookie_path_builds_http_client,
     ]:
         print(f"Running {test.__name__}...", end="")
         test()

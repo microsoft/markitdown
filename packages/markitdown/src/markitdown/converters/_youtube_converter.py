@@ -145,7 +145,17 @@ class YouTubeConverter(DocumentConverter):
             webpage_text += f"\n### Description\n{description}\n"
 
         if IS_YOUTUBE_TRANSCRIPT_CAPABLE:
-            ytt_api = YouTubeTranscriptApi()
+            cookie_path = kwargs.get("youtube_cookie_path", None)
+            http_client = None
+            if cookie_path:
+                from http.cookiejar import MozillaCookieJar
+                import requests as _requests
+
+                _jar = MozillaCookieJar(cookie_path)
+                _jar.load(ignore_discard=True, ignore_expires=True)
+                http_client = _requests.Session()
+                http_client.cookies = _jar  # type: ignore
+            ytt_api = YouTubeTranscriptApi(http_client=http_client)
             transcript_text = ""
             parsed_url = urlparse(stream_info.url)  # type: ignore
             params = parse_qs(parsed_url.query)  # type: ignore
