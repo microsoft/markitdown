@@ -1,5 +1,4 @@
 import json
-import time
 import re
 import bs4
 import requests
@@ -228,17 +227,3 @@ class YouTubeConverter(DocumentConverter):
                 if result := self._findKey(v, key):
                     return result
         return None
-
-    def _retry_operation(self, operation, retries=3, delay=2):
-        """Retries the operation if it fails."""
-        attempt = 0
-        while attempt < retries:
-            try:
-                return operation()  # Attempt the operation
-            except Exception as e:
-                print(f"Attempt {attempt + 1} failed: {e}")
-                if attempt < retries - 1:
-                    time.sleep(delay)  # Wait before retrying
-                attempt += 1
-        # If all attempts fail, raise the last exception
-        raise Exception(f"Operation failed after {retries} attempts.")
