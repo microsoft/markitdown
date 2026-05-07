@@ -584,6 +584,36 @@ def test_youtube_cookie_path_builds_http_client() -> None:
             os.unlink(cookie_path)
 
 
+def test_youtube_transcript_uses_list_find_fetch() -> None:
+    """Transcript fetch must use api.list() → find_transcript() → fetch()."""
+    with (
+        patch(
+            "markitdown.converters._youtube_converter.IS_YOUTUBE_TRANSCRIPT_CAPABLE",
+            True,
+        ),
+        patch(
+            "markitdown.converters._youtube_converter.YouTubeTranscriptApi"
+        ) as mock_cls,
+    ):
+        mock_transcript = MagicMock()
+        mock_transcript.fetch.return_value = [MagicMock(text="hello world")]
+        mock_cls.return_value.list.return_value.find_transcript.return_value = (
+            mock_transcript
+        )
+
+        converter = YouTubeConverter()
+        stream = io.BytesIO(_YT_FAKE_HTML)
+        si = StreamInfo(
+            mimetype="text/html",
+            url="https://www.youtube.com/watch?v=test123",
+        )
+        result = converter.convert(stream, si)
+
+        assert "hello world" in result.markdown
+        mock_cls.return_value.list.assert_called_once_with("test123")
+        mock_transcript.fetch.assert_called_once()
+
+
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     for test in [
@@ -600,6 +630,7 @@ if __name__ == "__main__":
         test_markitdown_llm_parameters,
         test_markitdown_llm,
         test_youtube_cookie_path_builds_http_client,
+        test_youtube_transcript_uses_list_find_fetch,
     ]:
         print(f"Running {test.__name__}...", end="")
         test()
