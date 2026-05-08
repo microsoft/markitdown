@@ -222,6 +222,14 @@ class MarkItDown:
                 if docintel_version is not None:
                     docintel_args["api_version"] = docintel_version
 
+                docintel_model_id = kwargs.get("docintel_model_id")
+                if docintel_model_id is not None:
+                    docintel_args["model_id"] = docintel_model_id
+
+                docintel_query_fields = kwargs.get("docintel_query_fields")
+                if docintel_query_fields is not None:
+                    docintel_args["query_fields"] = docintel_query_fields
+
                 self.register_converter(
                     DocumentIntelligenceConverter(**docintel_args),
                 )
