@@ -161,7 +161,7 @@ See [`packages/markitdown-ocr/README.md`](packages/markitdown-ocr/README.md) for
 
 ### Azure Content Understanding
 
-[Azure Content Understanding](https://learn.microsoft.com/azure/ai-services/content-understanding/) is the next iteration of Azure Document Intelligence and is the recommended cloud option for new projects. It provides higher-quality conversion with structured field extraction (YAML front matter), multi-modal support (documents, images, audio, video), and [prebuilt](https://learn.microsoft.com/azure/ai-services/content-understanding/concepts/prebuilt-analyzers) or [custom-built](https://learn.microsoft.com/azure/ai-services/content-understanding/how-to/customize-analyzer-content-understanding-studio?tabs=portal) analyzers.
+[Azure Content Understanding](https://learn.microsoft.com/azure/ai-services/content-understanding/) provides higher-quality conversion with structured field extraction (YAML front matter), multi-modal support (documents, images, audio, video), and configurable analyzers.
 
 Install: `pip install 'markitdown[az-content-understanding]'`
 
@@ -170,7 +170,7 @@ Install: `pip install 'markitdown[az-content-understanding]'`
 Content Understanding is ideal when you need capabilities beyond what built-in or Document Intelligence converters provide:
 
 - **Audio and video files** — CU is the only option for video, and the higher-quality cloud option for audio. Built-in converters have no video support and only basic audio transcription.
-- **Structured field extraction** — Custom analyzers extract domain-specific fields (invoice amounts, receipt dates, contract clauses) serialized as YAML front matter. Neither built-in nor Doc Intel integration exposes fields.
+- **Structured field extraction** — [Prebuilt](https://learn.microsoft.com/azure/ai-services/content-understanding/concepts/prebuilt-analyzers) or [custom-built](https://learn.microsoft.com/azure/ai-services/content-understanding/how-to/customize-analyzer-content-understanding-studio?tabs=portal) analyzers extract domain-specific fields (invoice amounts, receipt dates, contract clauses) serialized as YAML front matter. Neither built-in nor Doc Intel integration exposes fields.
 - **Higher-quality document extraction** — Cloud-based layout analysis and OCR for scanned PDFs, complex tables, and multi-page documents.
 - **Single API for all modalities** — One `cu_endpoint` handles documents, images, audio, and video with automatic analyzer routing.
 
