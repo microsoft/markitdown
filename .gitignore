@@ -166,3 +166,8 @@ cython_debug/
 src/.DS_Store
 .DS_Store
 .cursorrules
+
+# Local secrets (never commit)
+.secrets.local
+*.secrets
+.env.local
