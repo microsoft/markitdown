@@ -5,7 +5,7 @@ import re
 from dataclasses import dataclass
 from typing import BinaryIO, Optional
 
-from ._config import NovaPdfConfig
+from ._config import GlmOcrConfig
 
 try:
     from zai import ZhipuAiClient
@@ -36,26 +36,26 @@ class AIService:
         api_key: Optional[str] = None,
         model: str = "glm-ocr",
         timeout: int = 120,
-        config: Optional[NovaPdfConfig] = None,
+        config: Optional[GlmOcrConfig] = None,
     ):
         if ZhipuAiClient is None:
             raise ImportError(
-                "zai-sdk is required. Install with: pip install nova-pdf[zhipu]"
+                "zai-sdk is required. Install with: pip install markitdown-glmocr[zhipu]"
             )
         
         if config:
-            self.api_key = api_key or config.zhipu_api_key
+            self.api_key = api_key or config.api_key
             self.model = model or config.model
             self.timeout = timeout or config.timeout
         else:
-            config = NovaPdfConfig.load()
-            self.api_key = api_key or config.zhipu_api_key
+            config = GlmOcrConfig.load()
+            self.api_key = api_key or config.api_key
             self.model = model
             self.timeout = timeout
         
         if not self.api_key:
             raise ValueError(
-                "API key is required. Set NOVA_ZHIPU_API_KEY environment variable"
+                "API key is required. Set GLMOCR_API_KEY environment variable"
             )
         
         self.client = ZhipuAiClient(api_key=self.api_key)

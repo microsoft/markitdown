@@ -4,8 +4,8 @@ import io
 import pytest
 from unittest.mock import MagicMock, patch
 
-from nova_pdf._ai_service import AIService, AIResult
-from nova_pdf._config import NovaPdfConfig
+from markitdown_glmocr._ai_service import AIService, AIResult
+from markitdown_glmocr._config import GlmOcrConfig
 
 
 class TestAIService:
@@ -13,13 +13,13 @@ class TestAIService:
 
     def test_missing_zai_sdk_raises_error(self):
         """Missing zai-sdk raises error."""
-        with patch("nova_pdf._ai_service.ZhipuAiClient", None):
+        with patch("markitdown_glmocr._ai_service.ZhipuAiClient", None):
             with pytest.raises(ImportError, match="zai-sdk is required"):
                 AIService(api_key="test")
 
     def test_missing_api_key_raises_error(self):
         """Missing API key raises error."""
-        with patch("nova_pdf._ai_service.ZhipuAiClient", MagicMock()):
+        with patch("markitdown_glmocr._ai_service.ZhipuAiClient", MagicMock()):
             with pytest.raises(ValueError, match="API key is required"):
                 AIService(api_key="")
 
@@ -32,7 +32,7 @@ class TestAIService:
         mock_response.layout_details = []
         mock_client.layout_parsing.create.return_value = mock_response
 
-        with patch("nova_pdf._ai_service.ZhipuAiClient", return_value=mock_client):
+        with patch("markitdown_glmocr._ai_service.ZhipuAiClient", return_value=mock_client):
             service = AIService(api_key="test-api-key")
             result = service.image_to_markdown(io.BytesIO(b"fake-image"))
 
@@ -47,7 +47,7 @@ class TestAIService:
         mock_response.layout_details = []
         mock_client.layout_parsing.create.return_value = mock_response
 
-        with patch("nova_pdf._ai_service.ZhipuAiClient", return_value=mock_client):
+        with patch("markitdown_glmocr._ai_service.ZhipuAiClient", return_value=mock_client):
             service = AIService(api_key="test-api-key")
             result = service.image_to_markdown(io.BytesIO(b"fake-image"))
 
@@ -64,7 +64,7 @@ class TestAIService:
         mock_response.layout_details = []
         mock_client.layout_parsing.create.return_value = mock_response
 
-        with patch("nova_pdf._ai_service.ZhipuAiClient", return_value=mock_client):
+        with patch("markitdown_glmocr._ai_service.ZhipuAiClient", return_value=mock_client):
             service = AIService(api_key="test-api-key")
             result = service.image_to_markdown(io.BytesIO(b"fake-image"))
 
@@ -76,7 +76,7 @@ class TestAIService:
         mock_client = MagicMock()
         mock_client.layout_parsing.create.side_effect = Exception("API Error")
 
-        with patch("nova_pdf._ai_service.ZhipuAiClient", return_value=mock_client):
+        with patch("markitdown_glmocr._ai_service.ZhipuAiClient", return_value=mock_client):
             service = AIService(api_key="test-api-key")
             result = service.image_to_markdown(io.BytesIO(b"fake-image"))
 
@@ -91,7 +91,7 @@ class TestAIService:
         mock_response.layout_details = []
         mock_client.layout_parsing.create.return_value = mock_response
 
-        with patch("nova_pdf._ai_service.ZhipuAiClient", return_value=mock_client):
+        with patch("markitdown_glmocr._ai_service.ZhipuAiClient", return_value=mock_client):
             service = AIService(api_key="test-api-key")
             result = service.image_to_markdown(io.BytesIO(b"fake-image"), "test.png")
 

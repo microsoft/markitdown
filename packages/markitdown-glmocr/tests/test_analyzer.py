@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import MagicMock
 
-from nova_pdf._page_analyzer import (
+from markitdown_glmocr._page_analyzer import (
     PageType,
     detect_images,
     detect_tables,

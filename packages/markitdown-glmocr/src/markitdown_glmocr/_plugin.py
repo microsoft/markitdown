@@ -1,11 +1,11 @@
-"""Plugin registration for nova-pdf."""
+"""Plugin registration for markitdown-glmocr."""
 
 from typing import Any
 from markitdown import MarkItDown
 
-from ._config import NovaPdfConfig
+from ._config import GlmOcrConfig
 from ._ai_service import AIService
-from ._converter import NovaPdfConverter
+from ._converter import GlmOcrPdfConverter
 
 
 __plugin_interface_version__ = 1
@@ -13,7 +13,7 @@ __plugin_interface_version__ = 1
 
 def register_converters(markitdown: MarkItDown, **kwargs: Any) -> None:
     """
-    Register nova-pdf converter.
+    Register markitdown-glmocr converter.
     
     Config sources (priority high to low):
     1. kwargs parameters
@@ -22,10 +22,10 @@ def register_converters(markitdown: MarkItDown, **kwargs: Any) -> None:
     4. Default values
     """
     # Load config
-    config = NovaPdfConfig.load()
+    config = GlmOcrConfig.load()
     
     # kwargs override config
-    api_key = kwargs.get("api_key") or kwargs.get("zhipu_api_key") or config.zhipu_api_key
+    api_key = kwargs.get("api_key") or config.api_key
     model = kwargs.get("model", config.model)
     dpi = kwargs.get("dpi", config.dpi)
     force_ai = kwargs.get("force_ai", config.force_ai)
@@ -44,13 +44,13 @@ def register_converters(markitdown: MarkItDown, **kwargs: Any) -> None:
             pass
     
     # Register converter
-    PRIORITY_NOVA_PDF = -1.0
+    PRIORITY_GLMOCR = -1.0
     
     markitdown.register_converter(
-        NovaPdfConverter(
+        GlmOcrPdfConverter(
             ai_service=ai_service,
             dpi=dpi,
             force_ai=force_ai,
         ),
-        priority=PRIORITY_NOVA_PDF,
+        priority=PRIORITY_GLMOCR,
     )

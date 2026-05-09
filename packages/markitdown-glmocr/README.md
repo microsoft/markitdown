@@ -1,4 +1,4 @@
-# Nova-PDF
+# markitdown-glmocr
 
 智能 PDF 转 Markdown 插件，使用 glm-ocr AI 驱动的图片和表格提取。
 
@@ -13,10 +13,10 @@
 
 ```bash
 # 基础安装
-pip install nova-pdf
+pip install markitdown-glmocr
 
 # 安装 AI 功能
-pip install nova-pdf[zhipu]
+pip install markitdown-glmocr[zhipu]
 ```
 
 ## 配置
@@ -27,7 +27,7 @@ pip install nova-pdf[zhipu]
 
 ```bash
 # 创建 .secrets.local 文件
-echo 'NOVA_ZHIPU_API_KEY="your-api-key"' > .secrets.local
+echo 'GLMOCR_API_KEY="your-api-key"' > .secrets.local
 
 # 加载配置
 source .secrets.local
@@ -37,12 +37,12 @@ source .secrets.local
 
 ```bash
 # 必需
-export NOVA_ZHIPU_API_KEY="your-zhipu-api-key"
+export GLMOCR_API_KEY="your-zhipu-api-key"
 
 # 可选
-export NOVA_MODEL="glm-ocr"
-export NOVA_DPI="150"
-export NOVA_TIMEOUT="120"
+export GLMOCR_MODEL="glm-ocr"
+export GLMOCR_DPI="150"
+export GLMOCR_TIMEOUT="120"
 ```
 
 ### 配置文件
@@ -50,7 +50,7 @@ export NOVA_TIMEOUT="120"
 在 `pyproject.toml` 中配置默认值：
 
 ```toml
-[tool.nova-pdf]
+[tool.markitdown-glmocr]
 model = "glm-ocr"
 dpi = 150
 timeout = 120
@@ -86,15 +86,15 @@ result = md.convert("document.pdf")
 print(result.markdown)
 
 # 方式2：手动配置
-from nova_pdf import NovaPdfConfig, AIService, NovaPdfConverter
+from markitdown_glmocr import GlmOcrConfig, AIService, GlmOcrPdfConverter
 
-config = NovaPdfConfig.load()
+config = GlmOcrConfig.load()
 ai_service = AIService(
     api_key="your-api-key",
     model="glm-ocr",
 )
 
-converter = NovaPdfConverter(
+converter = GlmOcrPdfConverter(
     ai_service=ai_service,
     dpi=150,
 )
@@ -106,17 +106,17 @@ result = md.convert("document.pdf")
 
 ## 配置选项
 
-### NovaPdfConfig 参数
+### GlmOcrConfig 参数
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `zhipu_api_key` | str | 环境变量 `NOVA_ZHIPU_API_KEY` | 智谱 API Key |
+| `api_key` | str | 环境变量 `GLMOCR_API_KEY` | 智谱 API Key |
 | `model` | str | "glm-ocr" | 模型名称 |
 | `dpi` | int | 150 | 截图分辨率 |
 | `timeout` | int | 120 | 请求超时（秒） |
 | `force_ai` | bool | False | 强制所有页面使用 AI |
 
-### NovaPdfConverter 参数
+### GlmOcrPdfConverter 参数
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|

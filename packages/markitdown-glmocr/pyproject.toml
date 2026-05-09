@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "nova-pdf"
+name = "markitdown-glmocr"
 dynamic = ["version"]
-description = "Intelligent PDF to Markdown converter with AI-powered image/table extraction"
+description = "Intelligent PDF to Markdown converter with glm-ocr AI-powered image/table extraction"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
@@ -44,31 +44,27 @@ Issues = "https://github.com/microsoft/markitdown/issues"
 Source = "https://github.com/microsoft/markitdown"
 
 [tool.hatch.version]
-path = "src/nova_pdf/__about__.py"
+path = "src/markitdown_glmocr/__about__.py"
 
 # Plugin entry point - MarkItDown will discover this plugin
 [project.entry-points."markitdown.plugin"]
-nova_pdf = "nova_pdf"
+markitdown_glmocr = "markitdown_glmocr"
 
 [tool.hatch.build.targets.sdist]
-only-include = ["src/nova_pdf"]
+only-include = ["src/markitdown_glmocr"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/nova_pdf"]
+packages = ["src/markitdown_glmocr"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 
-# Nova-PDF configuration
-[tool.nova-pdf]
-# API key - set via environment variable NOVA_ZHIPU_API_KEY
+# markitdown-glmocr configuration
+[tool.markitdown-glmocr]
+# API key - set via environment variable GLMOCR_API_KEY
 api_key = ""
 model = "glm-ocr"
 dpi = 150
 timeout = 120
 force_ai = false
-
-# Legacy config (deprecated, will be removed)
-workflow_image2markdown_key = "<your-workflow-token>"
-fastgpt_token = "<your-fastgpt-token>"

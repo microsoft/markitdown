@@ -1,4 +1,4 @@
-"""Configuration management for nova-pdf."""
+"""Configuration management for markitdown-glmocr."""
 
 import os
 from pathlib import Path
@@ -12,11 +12,11 @@ except ImportError:
 
 
 @dataclass
-class NovaPdfConfig:
-    """nova-pdf configuration."""
+class GlmOcrConfig:
+    """markitdown-glmocr configuration."""
     
     # API 配置
-    zhipu_api_key: str = ""
+    api_key: str = ""
     
     # OCR 配置
     model: str = "glm-ocr"
@@ -27,11 +27,11 @@ class NovaPdfConfig:
     force_ai: bool = False
     
     @classmethod
-    def load(cls, config_path: Optional[str] = None) -> "NovaPdfConfig":
+    def load(cls, config_path: Optional[str] = None) -> "GlmOcrConfig":
         """
         Load configuration from multiple sources (priority high to low):
         1. Environment variables
-        2. Config file (pyproject.toml or nova-pdf.toml)
+        2. Config file (pyproject.toml or markitdown-glmocr.toml)
         3. Default values
         """
         config = cls()
@@ -53,10 +53,10 @@ class NovaPdfConfig:
         
         # Current directory
         search_paths.append(Path("pyproject.toml"))
-        search_paths.append(Path("nova-pdf.toml"))
+        search_paths.append(Path("markitdown-glmocr.toml"))
         
         # User config directory
-        search_paths.append(Path.home() / ".config" / "nova-pdf" / "config.toml")
+        search_paths.append(Path.home() / ".config" / "markitdown-glmocr" / "config.toml")
         
         for path in search_paths:
             if path.exists():
@@ -64,11 +64,11 @@ class NovaPdfConfig:
                     with open(path, "rb") as f:
                         data = tomllib.load(f)
                     
-                    # Read [tool.nova-pdf] section
-                    if "tool" in data and "nova-pdf" in data["tool"]:
-                        self._apply_config(data["tool"]["nova-pdf"])
-                    elif "nova-pdf" in data:
-                        self._apply_config(data["nova-pdf"])
+                    # Read [tool.markitdown-glmocr] section
+                    if "tool" in data and "markitdown-glmocr" in data["tool"]:
+                        self._apply_config(data["tool"]["markitdown-glmocr"])
+                    elif "markitdown-glmocr" in data:
+                        self._apply_config(data["markitdown-glmocr"])
                     
                     break
                 except Exception:
@@ -77,7 +77,7 @@ class NovaPdfConfig:
     def _apply_config(self, data: dict):
         """Apply config from dict."""
         if "api_key" in data:
-            self.zhipu_api_key = data["api_key"]
+            self.api_key = data["api_key"]
         if "model" in data:
             self.model = data["model"]
         if "dpi" in data:
@@ -89,13 +89,13 @@ class NovaPdfConfig:
     
     def _load_from_env(self):
         """Load from environment variables (highest priority)."""
-        if os.environ.get("NOVA_ZHIPU_API_KEY"):
-            self.zhipu_api_key = os.environ["NOVA_ZHIPU_API_KEY"]
-        if os.environ.get("NOVA_MODEL"):
-            self.model = os.environ["NOVA_MODEL"]
-        if os.environ.get("NOVA_DPI"):
-            self.dpi = int(os.environ["NOVA_DPI"])
-        if os.environ.get("NOVA_TIMEOUT"):
-            self.timeout = int(os.environ["NOVA_TIMEOUT"])
-        if os.environ.get("NOVA_FORCE_AI"):
-            self.force_ai = os.environ["NOVA_FORCE_AI"].lower() in ("true", "1", "yes")
+        if os.environ.get("GLMOCR_API_KEY"):
+            self.api_key = os.environ["GLMOCR_API_KEY"]
+        if os.environ.get("GLMOCR_MODEL"):
+            self.model = os.environ["GLMOCR_MODEL"]
+        if os.environ.get("GLMOCR_DPI"):
+            self.dpi = int(os.environ["GLMOCR_DPI"])
+        if os.environ.get("GLMOCR_TIMEOUT"):
+            self.timeout = int(os.environ["GLMOCR_TIMEOUT"])
+        if os.environ.get("GLMOCR_FORCE_AI"):
+            self.force_ai = os.environ["GLMOCR_FORCE_AI"].lower() in ("true", "1", "yes")

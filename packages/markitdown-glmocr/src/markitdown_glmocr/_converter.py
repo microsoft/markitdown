@@ -1,4 +1,4 @@
-"""Nova PDF Converter - Intelligent PDF to Markdown conversion."""
+"""GlmOcr PDF Converter - Intelligent PDF to Markdown conversion."""
 
 import io
 import sys
@@ -29,14 +29,14 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 ACCEPTED_FILE_EXTENSIONS = [".pdf"]
 
 
-class NovaPdfConverter(DocumentConverter):
+class GlmOcrPdfConverter(DocumentConverter):
     """
-    智能 PDF 转换器
+    Intelligent PDF converter using glm-ocr.
     
-    特性：
-    - 自动检测每页内容类型（纯文本 vs 包含图片/表格）
-    - 纯文本页面使用默认解析（pdfplumber/pdfminer）
-    - 复杂页面截图后调用 AI 转换为 Markdown
+    Features:
+    - Auto-detect page content type (plain text vs images/tables)
+    - Plain text pages use default parser (pdfplumber/pdfminer)
+    - Complex pages use AI screenshot conversion to Markdown
     """
 
     def __init__(
@@ -46,12 +46,12 @@ class NovaPdfConverter(DocumentConverter):
         force_ai: bool = False,
     ):
         """
-        初始化转换器
+        Initialize converter.
 
         Args:
-            ai_service: AI 服务实例
-            dpi: 截图分辨率（默认 150）
-            force_ai: 强制所有页面使用 AI（默认 False）
+            ai_service: AI service instance
+            dpi: Screenshot DPI (default: 150)
+            force_ai: Force all pages to use AI (default: False)
         """
         self.ai_service = ai_service
         self.dpi = dpi
@@ -92,47 +92,47 @@ class NovaPdfConverter(DocumentConverter):
                 _dependency_exc_info[2]
             )
 
-        # 获取 AI 服务（从 kwargs 或实例）
+        # Get AI service (from kwargs or instance)
         ai_service = kwargs.get("ai_service") or self.ai_service
 
-        # 读取 PDF
+        # Read PDF
         pdf_stream = io.BytesIO(file_stream.read())
         markdown_parts = []
 
         try:
             with pdfplumber.open(pdf_stream) as pdf:
                 for page_num, page in enumerate(pdf.pages):
-                    # 分析页面类型
+                    # Analyze page type
                     page_type = analyze_page(page)
 
-                    # 根据类型选择处理方式
+                    # Choose processing method based on type
                     if self.force_ai or page_type != PageType.PLAIN_TEXT:
-                        # 复杂内容：截图 + AI
+                        # Complex content: screenshot + AI
                         if ai_service:
                             markdown = self._convert_with_ai(
                                 page, page_num, ai_service
                             )
                         else:
-                            # 无 AI 服务，回退到默认解析
+                            # No AI service, fallback to default
                             markdown = self._extract_text_with_tables(page)
                     else:
-                        # 纯文本：默认解析
+                        # Plain text: default parser
                         markdown = self._extract_text_with_tables(page)
 
                     if markdown.strip():
                         markdown_parts.append(f"## Page {page_num + 1}\n\n{markdown}")
 
-                    # 释放页面资源
+                    # Release page resources
                     page.close()
 
             markdown = "\n\n".join(markdown_parts).strip()
 
         except Exception:
-            # 异常情况：回退到 pdfminer
+            # Exception: fallback to pdfminer
             pdf_stream.seek(0)
             markdown = pdfminer.high_level.extract_text(pdf_stream) or ""
 
-        # 最终回退
+        # Final fallback
         if not markdown:
             pdf_stream.seek(0)
             markdown = pdfminer.high_level.extract_text(pdf_stream) or ""
@@ -146,52 +146,52 @@ class NovaPdfConverter(DocumentConverter):
         ai_service: AIService,
     ) -> str:
         """
-        使用 AI 转换页面
+        Convert page using AI.
 
         Args:
-            page: pdfplumber 页面对象
-            page_num: 页码
-            ai_service: AI 服务
+            page: pdfplumber page object
+            page_num: Page number
+            ai_service: AI service
 
         Returns:
-            str: Markdown 内容
+            str: Markdown content
         """
         try:
-            # 截图
+            # Screenshot
             img_stream = render_page_to_image(page, self.dpi)
 
-            # 调用 AI（文件名使用页码）
+            # Call AI (filename uses page number)
             filename = f"page_{page_num + 1}.png"
             result = ai_service.image_to_markdown(img_stream, filename=filename)
 
             if result.success and result.text.strip():
                 return result.text
             else:
-                # AI 失败，回退到默认解析
+                # AI failed, fallback to default
                 return self._extract_text_with_tables(page)
 
         except Exception:
-            # 异常情况，回退到默认解析
+            # Exception, fallback to default
             return self._extract_text_with_tables(page)
 
     def _extract_text_with_tables(self, page: Any) -> str:
         """
-        提取文本和表格
+        Extract text and tables.
 
         Args:
-            page: pdfplumber 页面对象
+            page: pdfplumber page object
 
         Returns:
-            str: Markdown 内容
+            str: Markdown content
         """
         parts = []
 
-        # 提取文本
+        # Extract text
         text = page.extract_text() or ""
         if text.strip():
             parts.append(text.strip())
 
-        # 提取表格
+        # Extract tables
         try:
             tables = page.extract_tables()
             if tables:
@@ -207,43 +207,43 @@ class NovaPdfConverter(DocumentConverter):
 
     def _table_to_markdown(self, table: list[list[str]]) -> str:
         """
-        将表格转换为 Markdown
+        Convert table to Markdown.
 
         Args:
-            table: 2D 列表
+            table: 2D list
 
         Returns:
-            str: Markdown 表格
+            str: Markdown table
         """
         if not table:
             return ""
 
-        # 过滤 None 值
+        # Filter None values
         table = [[cell if cell is not None else "" for cell in row] for row in table]
 
-        # 过滤空行
+        # Filter empty rows
         table = [row for row in table if any(cell.strip() for cell in row)]
 
         if not table:
             return ""
 
-        # 计算列宽
+        # Calculate column widths
         col_widths = [
             max(len(str(row[i])) if i < len(row) else 0 for row in table)
             for i in range(max(len(row) for row in table))
         ]
 
-        # 格式化表格
+        # Format table
         lines = []
         for row_idx, row in enumerate(table):
-            # 补齐列数
+            # Pad columns
             padded_row = row + [""] * (len(col_widths) - len(row))
             line = "| " + " | ".join(
                 str(cell).ljust(width) for cell, width in zip(padded_row, col_widths)
             ) + " |"
             lines.append(line)
 
-            # 添加分隔行
+            # Add separator
             if row_idx == 0:
                 sep = "|" + "|".join("-" * (w + 2) for w in col_widths) + "|"
                 lines.append(sep)
