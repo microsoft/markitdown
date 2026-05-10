@@ -1,3 +1,4 @@
+# sprint0
 # 目标
 重构调用ai接口解析PDF的功能：对包含图片/表格的页面截图后调用 AI 接口转 Markdown
 
@@ -29,3 +30,6 @@ print(response)
 详细文档：https://docs.bigmodel.cn/cn/guide/models/vlm/glm-ocr#python
 
 先设计重构方案
+
+## sprint1
+重命名：nova-pdf 改成markitdown-glmocr
