@@ -5,11 +5,11 @@ build-backend = "hatchling.build"
 [project]
 name = "markitdown-ocr"
 dynamic = ["version"]
-description = 'OCR plugin for MarkItDown - Extracts text from images in PDF, DOCX, PPTX, and XLSX via LLM Vision'
+description = 'OCR plugin for MarkItDown - Extracts text from images in PDF, DOCX, PPTX, and XLSX via LLM Vision or glm-ocr'
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
-keywords = ["markitdown", "ocr", "pdf", "docx", "xlsx", "pptx", "llm", "vision"]
+keywords = ["markitdown", "ocr", "pdf", "docx", "xlsx", "pptx", "llm", "vision", "glm-ocr", "zhipu"]
 authors = [
   { name = "Contributors", email = "noreply@github.com" },
 ]
@@ -43,6 +43,9 @@ dependencies = [
 llm = [
   "openai>=1.0.0",
 ]
+glmocr = [
+  "zai-sdk>=0.2.2",
+]
 
 [project.urls]
 Documentation = "https://github.com/microsoft/markitdown#readme"
@@ -55,3 +58,9 @@ path = "src/markitdown_ocr/__about__.py"
 # CRITICAL: Plugin entry point - MarkItDown will discover this plugin through this entry point
 [project.entry-points."markitdown.plugin"]
 ocr = "markitdown_ocr"
+
+# glm-ocr provider configuration (also supports environment variables)
+[tool.markitdown-ocr.glmocr]
+# api_key = ""  # Recommended: set via environment variable GLMOCR_API_KEY
+model = "glm-ocr"
+timeout = 120
