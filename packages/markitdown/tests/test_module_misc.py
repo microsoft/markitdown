@@ -14,6 +14,7 @@ from markitdown import (
     FileConversionException,
     StreamInfo,
 )
+from markitdown.converters._csv_converter import CsvConverter
 
 # This file contains module tests that are not directly tested by the FileTestVectors.
 # This includes things like helper functions and runtime conversion options
@@ -250,6 +251,19 @@ def test_file_uris() -> None:
     netloc, path = file_uri_to_path(file_uri)
     assert netloc is None
     assert path == "/path/to/file.txt"
+
+
+def test_csv_converter_escapes_markdown_table_cells() -> None:
+    csv_content = 'name,notes\nAda,"uses A|B\nnext line"\n'
+
+    result = CsvConverter().convert(
+        io.BytesIO(csv_content.encode("utf-8")),
+        StreamInfo(extension=".csv", charset="utf-8"),
+    )
+
+    assert result.markdown == (
+        "| name | notes |\n| --- | --- |\n| Ada | uses A\\|B<br>next line |"
+    )
 
 
 def test_docx_comments() -> None:
