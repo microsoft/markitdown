@@ -1,15 +1,16 @@
 ## Snowflake-to-DD Semantic Concep
-| Unnamed: 0 | Unnamed: 1 | Unnamed: 2 | Unnamed: 3 |
+
+This is the mapping between the Snowflake Semantic Model Concepts and the Duodata Metric Definitions. In the context of this mapping, a single Duodata Report maps to a single Snowflake Semantic Model.
+
+These mappings will be incorporated into the spec for a Snowflake Native App workflow that uses Duodata metrics definitions, schema mappings (platform implementations), and Cortex Analyst within the user's Snowflake <br>account to define and create one Snowflake semantic view/model per Duodata report. The workflow should be AI-assisted, but have CRUD capabilities for each semantic model element.
+
+| Snowflake Semantic Model Concepts |  | Duodata Definitions |  |
 | --- | --- | --- | --- |
-| This is the mapping between the Snowflake Semantic Model Concepts and the Duodata Metric Definitions. In the context of this mapping, a single Duodata Report maps to a single Snowflake Semantic Model. | NaN | NaN | NaN |
-| These mappings will be incorporated into the spec for a Snowflake Native App workflow that uses Duodata metrics definitions, schema mappings (platform implementations), and Cortex Analyst within the user's Snowflake \naccount to define and create one Snowflake semantic view/model per Duodata report. The workflow should be AI-assisted, but have CRUD capabilities for each semantic model element. | NaN | NaN | NaN |
-| NaN | NaN | NaN | NaN |
-| Snowflake Semantic Model Concepts | NaN | Duodata Definitions | NaN |
 | Concept | Description | Concept | Description |
 | Semantic Model Name | Name of the Snowflake Semantic Model. Used as the SQL object name | Report Name | Name of the Duodata Report which should be converted to a "SQL safe" format as the name of the Semantic Model. Alternatively, the user can explicitly name the Semantic Model in the Native App. |
 | Logical Tables | Represent business entities mapped to physical database tables or views. | tables (implementations) | The tables mapped to Slices and Metrics; The name of a Slice mapped to the business key of a dimension table in the implementation schema also serves as the name of the Logical Table in the Snowflake Semantic Model. Fact tables and reference tables do not have corresponding naming elements in Duodata; their Logical Tables names must be inferred or explicitly added by the use in the Snowflake Native App. |
 | Relationships | Define how logical tables join together, enabling queries that span multiple tables. | -- No equivalent -- | Not an explict Duodata element; inferred from the relationships in the mapped implementation schema and Duodata Slice Hierarchy |
-| Filters | Standalone, view-level concepts used to define reusable WHERE-clause logic using a SQL expression. They allow Cortex Analyst to apply predefined business rules across the semantic view to slice data. | Filters (Metric or Slice in Reports,\nMetric or Slice in Metrics) | Filters are mapped to Logical Tables or Relationships (view-level objects) via the implementation table object. For example, if a filter is applied to a given Metric in Duodata, the table in that Metric's implementation links the filter to its Logical Table equivalent in the Semantic Model. Some relationship filters, like those represented by conditional joins in SQL, must be explictly defined by the user in the Snowflake Native App. |
+| Filters | Standalone, view-level concepts used to define reusable WHERE-clause logic using a SQL expression. They allow Cortex Analyst to apply predefined business rules across the semantic view to slice data. | Filters (Metric or Slice in Reports,<br>Metric or Slice in Metrics) | Filters are mapped to Logical Tables or Relationships (view-level objects) via the implementation table object. For example, if a filter is applied to a given Metric in Duodata, the table in that Metric's implementation links the filter to its Logical Table equivalent in the Semantic Model. Some relationship filters, like those represented by conditional joins in SQL, must be explictly defined by the user in the Snowflake Native App. |
 | Dimensions | Categorical attributes that provide context for analysis, answering 'who', 'what', 'where', and 'when'. | Slices | Categorical attributes that provide context for analysis, answering 'who', 'what', 'where', and 'when'. Mapped at the column level in the implementation; |
 | Facts | Row-level quantitative data or helper concepts used to construct metrics. | Metrics (not aggregated) | Metrics that sit at the row-level with no aggregation applied |
 | Metrics | Quantifiable measures of business performance calculated by aggregating facts or columns. | Metrics (aggregated) | Metrics which have one or more aggregations applied: SUM(), COUNT(), AVG(), etc. |
@@ -17,161 +18,181 @@
 | Verified Queries - out of scope | Example natural language questions and their corresponding SQL queries used to guide the AI. | -- No equivalent -- | Must be generated by Cortex Analyst or explictly defined by the user in the Snowflake Native App; Duodata will eventually assist with Questions applied to Reports. |
 | Custom Instructions - out of scope | Natural language instructions that guide how queries are generated and how questions are categorized. | -- No equivalent -- | Must be explictly defined by the user in the Snowflake Native App; some inference is possible from Duodata descriptions. |
 | Semantic Model Description | Free text description of the Semantic Model | -- No equivalent -- | Can be inferred from the Report Description or explictly defined by the user in the Snowflake Native App |
-| NaN | NaN | NaN | NaN |
-| Official Snowflake Resources & Documentation | NaN | NaN | NaN |
-| Overview of Semantic Views | https://docs.snowflake.com/en/user-guide/views-semantic/overview | NaN | NaN |
-| Best Practices for Semantic Views | https://docs.snowflake.com/en/user-guide/views-semantic/best-practices-dev | NaN | NaN |
-| Snowflake's Native Semantic Views: AI-Powered BI | https://www.snowflake.com/en/engineering-blog/native-semantic-views-ai-bi/ | NaN | NaN |
-| Semantic View YAML Spec | https://docs.snowflake.com/en/user-guide/views-semantic/semantic-view-yaml-spec | NaN | NaN |
-| Semantic View Validation Rules | https://docs.snowflake.com/en/user-guide/views-semantic/validation-rules | NaN | NaN |
-| NaN | NaN | NaN | NaN |
-| Helpful Future Additions | NaN | NaN | NaN |
-| Semantic View JSON YAML spec (like Duodata's) | NaN | NaN | NaN |
+
+### Official Snowflake Resources & Documentation
+
+| Overview of Semantic Views | https://docs.snowflake.com/en/user-guide/views-semantic/overview |
+| --- | --- |
+| Best Practices for Semantic Views | https://docs.snowflake.com/en/user-guide/views-semantic/best-practices-dev |
+| Snowflake's Native Semantic Views: AI-Powered BI | https://www.snowflake.com/en/engineering-blog/native-semantic-views-ai-bi/ |
+| Semantic View YAML Spec | https://docs.snowflake.com/en/user-guide/views-semantic/semantic-view-yaml-spec |
+| Semantic View Validation Rules | https://docs.snowflake.com/en/user-guide/views-semantic/validation-rules |
+
+Helpful Future Additions
+
+Semantic View JSON YAML spec (like Duodata's)
 
 ## Name & Description
-| Snowflake Semantic Concept | Snowflake Semantic YAML node | Duodata YAML file | Unnamed: 3 | Unnamed: 4 | Unnamed: 5 | Unnamed: 6 | Unnamed: 7 | Unnamed: 8 | Unnamed: 9 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Semantic Model Name | root | definitions/reports/{report.identifier}.yaml | NaN | NaN | NaN | NaN | NaN | NaN | NaN |
-| Semantic Model Description | root | definitions/reports/{report.identifier}.yaml | NaN | NaN | NaN | NaN | NaN | NaN | NaN |
-| NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN |
-| NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN |
+
+| Snowflake Semantic Concept | Snowflake Semantic YAML node | Duodata YAML file |
+| --- | --- | --- |
+| Semantic Model Name | root | definitions/reports/{report.identifier}.yaml |
+| Semantic Model Description | root | definitions/reports/{report.identifier}.yaml |
+
 | Mapping Rule Number | Mapping Rule Name | Snowflake YAML Element | Snowflake Element Description | Duodata YAML Element | Duodata Element Description | Inference Sources | Enforce with Cortex | App Notes | Required for Semantic Model |
-| 1 | Semantic Model Name Mapping | name | Name of the Snowflake Semantic Model. Used as the SQL object name | reports.name | Unique report name within the organization | NaN | NaN | Report name should be converted to SQL safe string that will deploy with quotes. Prefix the name with the user-entered parameter: semantic\_view\_prefix and "\_". (e.g., "SV\_RECRUITER\_PERFORMANCE" | Y |
-| 2 | Semantic Model Description Mapping | description | Free text description of the Semantic Model | reports.description | Description of the report | NaN | NaN | NaN | NaN |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1.0 | Semantic Model Name Mapping | name | Name of the Snowflake Semantic Model. Used as the SQL object name | reports.name | Unique report name within the organization |  |  | Report name should be converted to SQL safe string that will deploy with quotes. Prefix the name with the user-entered parameter: semantic_view_prefix and "_". (e.g., "SV_RECRUITER_PERFORMANCE" | Y |
+| 2.0 | Semantic Model Description Mapping | description | Free text description of the Semantic Model | reports.description | Description of the report |  |  |  |  |
 
 ## Logical Tables
-| Snowflake Semantic Concept | Snowflake Semantic YAML node | Duodata YAML file(s) | Unnamed: 3 | Unnamed: 4 | Unnamed: 5 | Unnamed: 6 | Unnamed: 7 | Unnamed: 8 | Unnamed: 9 | Unnamed: 10 | Unnamed: 11 | Unnamed: 12 | Unnamed: 13 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Logical Tables | tables | definitions/slices/{slice.identifier}.yaml | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN |
-| Logical Tables | tables | definitions/metrics/{metric.identifier}.yaml | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN |
-| Logical Tables | tables | platforms/{platform.identifier}/implementations/slices/{slice.identifier}.yaml | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN |
-| Logical Tables | tables | platforms/{platform.identifier}/implementations/slices/{metric.identifier}.yaml | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN |
-| NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN |
+
+| Snowflake Semantic Concept | Snowflake Semantic YAML node | Duodata YAML file(s) |
+| --- | --- | --- |
+| Logical Tables | tables | definitions/slices/{slice.identifier}.yaml |
+| Logical Tables | tables | definitions/metrics/{metric.identifier}.yaml |
+| Logical Tables | tables | platforms/{platform.identifier}/implementations/slices/{slice.identifier}.yaml |
+| Logical Tables | tables | platforms/{platform.identifier}/implementations/slices/{metric.identifier}.yaml |
+
 | Mapping Rule Number | Mapping Rule Name | Snowflake YAML Element | Snowflake Element Description | Duodata YAML file name | Duodata YAML Element | Duodata Element Description | Mapping logic | Infer with Cortex | Inference Sources | App Notes | Required for Semantic Model | Related Issue | Include in Current Release |
-| 3 | Slice to Logical Table Name | tables.name | Name of Logical Table | definitions/slices/{slice.identifier}.yaml | slice.name | Name of the view-level slice mapped at the view-level of the dimension object or reference table in the implementation. | The slice name becomes the logical table name | NaN | NaN | - Applies to view-level dimensions and reference objects | Y | #1 | Y |
-| 4 | Metric to Logical Table Name | tables.name | Name of Logical Table | platforms/{platform.identifier}/implementations/slices/{metric.identifier}.yaml | metricImplementations.schemaObjectRef.table | The distinct name of the physical table in the implementation of a metric or group of metrics. (table name only--not qualified by database or schema) | NaN | Y | Implementation table for metric (only table name--not schema or database) | - Applies to view-level facts and view-level aggregate objects containing metrics\n- A standard format must be applied to make the string "SQL safe" for deployment. | Y | NaN | Y |
-| 5 | Slice to Logical Table Description | tables.description | Description of Logical Table | definitions/slices/{slice.identifier}.yaml | slice.description | Description of the view-level slice mapped to the business key, natural key, or reference code of the view-level object in the implementation. | For each physical table (slices.implementations.schema\_object\_ref.table), infer business keys. Where slice maps to business key(s), use description for Logical Table. | NaN | NaN | - Applies to view-level dimensions and reference objects\n- Impacted by Issue #1 | NaN | #1 | Y |
-| 6 | Fact to Logical Table Description (User-Defined) | tables.description | Description of Logical Table | platforms/{platform.identifier}/implementations/slices/{metric.identifier}.yaml | -- No equivalent -- | User will enter a description in the Snowflake Native App. | NaN | Y | NaN | - Applies to view-level facts and view-level aggregate objects containing metrics; Must be explictly defined by the user in the Snowflake Native App | NaN | NaN | Y |
-| 7 | Slice Database Mapping | tables.base\_table.database | name of the physical database | platforms/{platform.identifier}/implementations/slices/{slice.identifier}.yaml | sliceImplementations.schemaObjectRef.database | Name of the physical database where the slice is implemented | NaN | NaN | NaN | base table is the fully qualified name of the physical table (view-level object) | Y | NaN | Y |
-| 8 | Slice Schema Mapping | tables.base\_table.schema | name of the physical schema | platforms/{platform.identifier}/implementations/slices/{slice.identifier}.yaml | sliceImplementations.schemaObjectRef.schema | Name of the physical schema where the slice is implemented | NaN | NaN | NaN | base table is the fully qualified name of the physical table (view-level object) | Y | NaN | Y |
-| 9 | Slice Base Table Mapping | tables.base\_table.table | name of the physical table | platforms/{platform.identifier}/implementations/slices/{slice.identifier}.yaml | sliceImplementations.schemaObjectRef.table | Name of the physical table where the slice is implemented | NaN | NaN | NaN | base table is the fully qualified name of the physical table (view-level object) | Y | NaN | Y |
-| 7 | Metric Database Mapping | tables.base\_table.database | name of the physical database | platforms/{platform.identifier}/implementations/slices/{metric.identifier}.yaml | metricImplementations.schemaObjectRef.database | Name of the physical database where the metric is implemented | NaN | NaN | NaN | base table is the fully qualified name of the physical table (view-level object) | Y | NaN | Y |
-| 8 | Metric Schema Mapping | tables.base\_table.schema | name of the physical schema | platforms/{platform.identifier}/implementations/slices/{metric.identifier}.yaml | metricImplementations.schemaObjectRef.schema | Name of the physical schema where the metric is implemented | NaN | NaN | NaN | base table is the fully qualified name of the physical table (view-level object) | Y | NaN | Y |
-| 9 | Metric Base Table Mapping | tables.base\_table.table | name of the physical table | platforms/{platform.identifier}/implementations/slices/{metric.identifier}.yaml | metricImplementations.schemaObjectRef.table | Name of the physical table where the metric is implemented | NaN | NaN | NaN | base table is the fully qualified name of the physical table (view-level object) | Y | NaN | Y |
-| 10 | Primary Key Inference | tables.primary\_key | Columns that uniquely identify rows | NaN | -- No equivalent -- | Inferred from physical schema in database as mapped in implementations | NaN | Y | Table within the implemented database schema | Applies to all Logical Tables | Y | NaN | Y |
-| 11 | Slice Logical Table Synonyms Mapping | tables.synonyms | Alternative names for the table | definitions/slices/{slice.identifier}.yaml | slice.synonyms[] | Synonyms for the view-level slice mapped to the business key, natural key, or reference code of the view-level object in the implementation. | NaN | NaN | NaN | Applies to view-level dimensions and reference objects | NaN | NaN | NaN |
-| 12 | Metric Logical Table Synonyms (User-Defined) | tables.synonyms | Alternative names for the table | NaN | -- No equivalent -- | Synonyms for the view-level fact or view-level aggregate object containing metrics | NaN | NaN | NaN | Applies to view-level facts and view-level aggregate objects containing metrics; Must be explictly defined by the user in the Snowflake Native App. | NaN | NaN | NaN |
-| NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN |
-| NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN |
-| NaN | Workflow Notes: | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN |
-| NaN | Step | CREATE | NaN | NaN | NaN | NaN | NaN | Validations | NaN | Exceptions | NaN | NaN | NaN |
-| NaN | 1 | Compile a distinct list of schema-qualified table names from Duodata slice and metric implementations:\nslices.implementations.schema\_object\_ref.schema\nslices.implementations.schema\_object\_ref.table\nmetrics.implementations.schema\_object\_ref.schema\nmetrics.implementations.schema\_object\_ref.table | NaN | NaN | NaN | NaN | NaN | Table count must be > 0 to keep Logical Table record | NaN | If count of tables = 0, exit and add to Issues | NaN | NaN | NaN |
-| NaN | 2 | Apply rule #3 to create a Logical Table for each view-level Duodata slice implementation. | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN |
-| NaN | 3 | Apply rule #4 to create a Logical Table for each view-level fact object and each view-level aggregrate object in Duodata metric implementations. | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN |
-| NaN | 4 | Check for unmapped tables; if unmapped, add table item stub for edit. | NaN | NaN | NaN | NaN | NaN | NaN | NaN | If table item exists for unmapped table, raise with user | NaN | NaN | NaN |
-| NaN | 5 | Create table item where user deems needed | NaN | NaN | NaN | NaN | NaN | Unmapped table count must be zero; If > 0, then raise with user; add to Issue if condition exist upon exiting screen | NaN | If table item exists for unmapped table, raise with user | NaN | NaN | NaN |
-| NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN |
-| NaN | User Story | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN |
-| NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN |
-| NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN |
-| NaN | Gerkin Test Statement | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 3.0 | Slice to Logical Table Name | tables.name | Name of Logical Table | definitions/slices/{slice.identifier}.yaml | slice.name | Name of the view-level slice mapped at the view-level of the dimension object or reference table in the implementation. | The slice name becomes the logical table name |  |  | - Applies to view-level dimensions and reference objects | Y | #1 | Y |
+| 4.0 | Metric to Logical Table Name | tables.name | Name of Logical Table | platforms/{platform.identifier}/implementations/slices/{metric.identifier}.yaml | metricImplementations.schemaObjectRef.table | The distinct name of the physical table in the implementation of a metric or group of metrics. (table name only--not qualified by database or schema) |  | Y | Implementation table for metric (only table name--not schema or database) | - Applies to view-level facts and view-level aggregate objects containing metrics<br>- A standard format must be applied to make the string "SQL safe" for deployment. | Y |  | Y |
+| 5.0 | Slice to Logical Table Description | tables.description | Description of Logical Table | definitions/slices/{slice.identifier}.yaml | slice.description | Description of the view-level slice mapped to the business key, natural key, or reference code of the view-level object in the implementation. | For each physical table (slices.implementations.schema_object_ref.table), infer business keys. Where slice maps to business key(s), use description for Logical Table. |  |  | - Applies to view-level dimensions and reference objects<br>- Impacted by Issue #1 |  | #1 | Y |
+| 6.0 | Fact to Logical Table Description (User-Defined) | tables.description | Description of Logical Table | platforms/{platform.identifier}/implementations/slices/{metric.identifier}.yaml | -- No equivalent -- | User will enter a description in the Snowflake Native App. |  | Y |  | - Applies to view-level facts and view-level aggregate objects containing metrics; Must be explictly defined by the user in the Snowflake Native App |  |  | Y |
+| 7.0 | Slice Database Mapping | tables.base_table.database | name of the physical database | platforms/{platform.identifier}/implementations/slices/{slice.identifier}.yaml | sliceImplementations.schemaObjectRef.database | Name of the physical database where the slice is implemented |  |  |  | base table is the fully qualified name of the physical table (view-level object) | Y |  | Y |
+| 8.0 | Slice Schema Mapping | tables.base_table.schema | name of the physical schema | platforms/{platform.identifier}/implementations/slices/{slice.identifier}.yaml | sliceImplementations.schemaObjectRef.schema | Name of the physical schema where the slice is implemented |  |  |  | base table is the fully qualified name of the physical table (view-level object) | Y |  | Y |
+| 9.0 | Slice Base Table Mapping | tables.base_table.table | name of the physical table | platforms/{platform.identifier}/implementations/slices/{slice.identifier}.yaml | sliceImplementations.schemaObjectRef.table | Name of the physical table where the slice is implemented |  |  |  | base table is the fully qualified name of the physical table (view-level object) | Y |  | Y |
+| 7.0 | Metric Database Mapping | tables.base_table.database | name of the physical database | platforms/{platform.identifier}/implementations/slices/{metric.identifier}.yaml | metricImplementations.schemaObjectRef.database | Name of the physical database where the metric is implemented |  |  |  | base table is the fully qualified name of the physical table (view-level object) | Y |  | Y |
+| 8.0 | Metric Schema Mapping | tables.base_table.schema | name of the physical schema | platforms/{platform.identifier}/implementations/slices/{metric.identifier}.yaml | metricImplementations.schemaObjectRef.schema | Name of the physical schema where the metric is implemented |  |  |  | base table is the fully qualified name of the physical table (view-level object) | Y |  | Y |
+| 9.0 | Metric Base Table Mapping | tables.base_table.table | name of the physical table | platforms/{platform.identifier}/implementations/slices/{metric.identifier}.yaml | metricImplementations.schemaObjectRef.table | Name of the physical table where the metric is implemented |  |  |  | base table is the fully qualified name of the physical table (view-level object) | Y |  | Y |
+| 10.0 | Primary Key Inference | tables.primary_key | Columns that uniquely identify rows |  | -- No equivalent -- | Inferred from physical schema in database as mapped in implementations |  | Y | Table within the implemented database schema | Applies to all Logical Tables | Y |  | Y |
+| 11.0 | Slice Logical Table Synonyms Mapping | tables.synonyms | Alternative names for the table | definitions/slices/{slice.identifier}.yaml | slice.synonyms[] | Synonyms for the view-level slice mapped to the business key, natural key, or reference code of the view-level object in the implementation. |  |  |  | Applies to view-level dimensions and reference objects |  |  |  |
+| 12.0 | Metric Logical Table Synonyms (User-Defined) | tables.synonyms | Alternative names for the table |  | -- No equivalent -- | Synonyms for the view-level fact or view-level aggregate object containing metrics |  |  |  | Applies to view-level facts and view-level aggregate objects containing metrics; Must be explictly defined by the user in the Snowflake Native App. |  |  |  |
+
+### Workflow Notes:
+
+| Step | CREATE |  |  |  |  |  | Validations |  | Exceptions |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1.0 | Compile a distinct list of schema-qualified table names from Duodata slice and metric implementations:<br>slices.implementations.schema_object_ref.schema<br>slices.implementations.schema_object_ref.table<br>metrics.implementations.schema_object_ref.schema<br>metrics.implementations.schema_object_ref.table |  |  |  |  |  | Table count must be > 0 to keep Logical Table record |  | If count of tables = 0, exit and add to Issues |
+| 2.0 | Apply rule #3 to create a Logical Table for each view-level Duodata slice implementation. |  |  |  |  |  |  |  |  |
+| 3.0 | Apply rule #4 to create a Logical Table for each view-level fact object and each view-level aggregrate object in Duodata metric implementations. |  |  |  |  |  |  |  |  |
+| 4.0 | Check for unmapped tables; if unmapped, add table item stub for edit. |  |  |  |  |  |  |  | If table item exists for unmapped table, raise with user |
+| 5.0 | Create table item where user deems needed |  |  |  |  |  | Unmapped table count must be zero; If > 0, then raise with user; add to Issue if condition exist upon exiting screen |  | If table item exists for unmapped table, raise with user |
+
+User Story
+
+Gerkin Test Statement
 
 ## Relationships
-| Snowflake Semantic Concept | Snowflake Semantic YAML node | Duodata YAML file(s) | Unnamed: 3 | Unnamed: 4 | Unnamed: 5 | Unnamed: 6 | Unnamed: 7 | Unnamed: 8 | Unnamed: 9 | Unnamed: 10 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Relationships | relationships | definitions/slices/{slice.identifier}.yaml | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN |
-| Relationships | relationships | platforms/{platform.identifier}/implementations/slices/{metric.identifier}.yaml | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN |
-| NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN |
+
+| Snowflake Semantic Concept | Snowflake Semantic YAML node | Duodata YAML file(s) |
+| --- | --- | --- |
+| Relationships | relationships | definitions/slices/{slice.identifier}.yaml |
+| Relationships | relationships | platforms/{platform.identifier}/implementations/slices/{metric.identifier}.yaml |
+
 | Mapping Rule Number | Mapping Rule Name | Snowflake YAML Element | Snowflake Element Description | Duodata YAML file name | Duodata YAML Element | Duodata Element Description | Inference Sources | Enforce with Cortex | App Notes | Required for Semantic Model |
-| 13 | Inferred Relationship Name | name | Name of the relationship | NaN | -- no equivalent -- | Inferred | Relationships in the mapped implementation schema. | Y | NaN | Y |
-| 14 | Inferred Left Table | left\_table | The table containing the foreign key | NaN | -- no equivalent -- | Inferred | Relationships in the mapped implementation schema. | Y | The Snowflake element left\_table is inferred from mapped implementation schemas and the Duodata Slice Hierarchy. | Y |
-| 15 | Inferred Right Table | right\_table | The table being referenced | NaN | -- no equivalent -- | Inferred | Relationships in the mapped implementation schema. | Y | NaN | Y |
-| 16 | Inferred Left Column | relationship\_columns: left\_column | The foreign key column(s) in the left table | NaN | -- no equivalent -- | Inferred | Relationships in the mapped implementation schema. | Y | NaN | Y |
-| 17 | Inferred Right Column | relationship\_columns: right\_column | The primary key column(s) in the right table | NaN | -- no equivalent -- | Inferred | Relationships in the mapped implementation schema. | Y | NaN | Y |
-| 18 | Slice Rollup to Relationship Name | name | Name of the relationship | definitions/slices/{slice.identifier}.yaml | Inferred from slice.rollsUpTo[] | Inferred using the pairing of the name of the mapped table in implementations (left table) and the name of the mapped table corresponding to the dimension that the left table rolls up to. | Slice Hierarchy | Y | NaN | Y |
-| 19 | Slice Implementation to Left Table | left\_table | The table containing the foreign key. | platforms/{platform.identifier}/implementations/slices/{metric.identifier}.yaml | sliceImplementations.schemaObjectRef.table | Inferred: Logical Table mapped to the physical table in the implementation of the dimension | Slice Hierarchy | Y | NaN | Y |
-| 20 | Slice Rollup to Right Table | right\_table | The table being referenced. | definitions/slices/{slice.identifier}.yaml | Inferred from slice.rollsUpTo[] | Inferred: Logical Table mapped to the dimension that the left\_table rolls up to | Slice Hierarchy | Y | The Snowflake element left\_table is inferred from mapped implementation schemas and the Duodata Slice Hierarchy. | Y |
-| 21 | Slice Implementation to Left Column | relationship\_columns: left\_column | The foreign key column(s) in the left table. | platforms/{platform.identifier}/implementations/slices/{metric.identifier}.yaml | Inferred from slices.implementations.schema\_object\_ref.table | Inferred | Slice Hierarchy | Y | NaN | Y |
-| 22 | Slice Rollup to Right Column | relationship\_columns: right\_column | The primary key column(s) in the right table. | definitions/slices/{slice.identifier}.yaml | Inferred from slice.rollsUpTo[] | Inferred: Primary Logical Table mapped to the physical table in the implementation of the dimension | Slice Hierarchy | Y | The Snowflake element left\_table is inferred from mapped implementation schemas and the Duodata Slice Hierarchy. | Y |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 13.0 | Inferred Relationship Name | name | Name of the relationship | N/A | -- no equivalent -- | Inferred | Relationships in the mapped implementation schema. | Y |  | Y |
+| 14.0 | Inferred Left Table | left_table | The table containing the foreign key |  | -- no equivalent -- | Inferred | Relationships in the mapped implementation schema. | Y | The Snowflake element left_table is inferred from mapped implementation schemas and the Duodata Slice Hierarchy. | Y |
+| 15.0 | Inferred Right Table | right_table | The table being referenced |  | -- no equivalent -- | Inferred | Relationships in the mapped implementation schema. | Y |  | Y |
+| 16.0 | Inferred Left Column | relationship_columns: left_column | The foreign key column(s) in the left table |  | -- no equivalent -- | Inferred | Relationships in the mapped implementation schema. | Y |  | Y |
+| 17.0 | Inferred Right Column | relationship_columns: right_column | The primary key column(s) in the right table |  | -- no equivalent -- | Inferred | Relationships in the mapped implementation schema. | Y |  | Y |
+| 18.0 | Slice Rollup to Relationship Name | name | Name of the relationship | definitions/slices/{slice.identifier}.yaml | Inferred from slice.rollsUpTo[] | Inferred using the pairing of the name of the mapped table in implementations (left table) and the name of the mapped table corresponding to the dimension that the left table rolls up to. | Slice Hierarchy | Y |  | Y |
+| 19.0 | Slice Implementation to Left Table | left_table | The table containing the foreign key. | platforms/{platform.identifier}/implementations/slices/{metric.identifier}.yaml | sliceImplementations.schemaObjectRef.table | Inferred: Logical Table mapped to the physical table in the implementation of the dimension | Slice Hierarchy | Y |  | Y |
+| 20.0 | Slice Rollup to Right Table | right_table | The table being referenced. | definitions/slices/{slice.identifier}.yaml | Inferred from slice.rollsUpTo[] | Inferred: Logical Table mapped to the dimension that the left_table rolls up to | Slice Hierarchy | Y | The Snowflake element left_table is inferred from mapped implementation schemas and the Duodata Slice Hierarchy. | Y |
+| 21.0 | Slice Implementation to Left Column | relationship_columns: left_column | The foreign key column(s) in the left table. | platforms/{platform.identifier}/implementations/slices/{metric.identifier}.yaml | Inferred from slices.implementations.schema_object_ref.table | Inferred | Slice Hierarchy | Y |  | Y |
+| 22.0 | Slice Rollup to Right Column | relationship_columns: right_column | The primary key column(s) in the right table. | definitions/slices/{slice.identifier}.yaml | Inferred from slice.rollsUpTo[] | Inferred: Primary Logical Table mapped to the physical table in the implementation of the dimension | Slice Hierarchy | Y | The Snowflake element left_table is inferred from mapped implementation schemas and the Duodata Slice Hierarchy. | Y |
 
 ## Dimensions
-| Snowflake Semantic Concept | Snowflake Semantic YAML node(s) | Duodata YAML file(s) | Unnamed: 3 | Unnamed: 4 | Unnamed: 5 | Unnamed: 6 | Unnamed: 7 | Unnamed: 8 | Unnamed: 9 | Unnamed: 10 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Dimensions, Time Dimensions | dimensions, \ntime\_dimensions | definitions/slices/{slice.identifier}.yaml | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN |
-| NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN |
+
+| Snowflake Semantic Concept | Snowflake Semantic YAML node(s) | Duodata YAML file(s) |
+| --- | --- | --- |
+| Dimensions, Time Dimensions | dimensions, <br>time_dimensions | definitions/slices/{slice.identifier}.yaml |
+
 | Mapping Rule Number | Mapping Rule Name | Snowflake YAML Element | Snowflake Element Description | Duodata YAML file name | Duodata YAML Element | Duodata Element Description | Inference Sources | Infer with Cortex | App Notes | Required for Semantic Model |
-| 1 | Estimated Rule | dimensions: name | Name of the dimension | definitions/slices/{slice.identifier}.yaml | slice.name | Unique slice name within the organization | NaN | NaN | NaN | Y |
-| 2 | Estimated Rule | dimensions: description | Description of the dimension | definitions/slices/{slice.identifier}.yaml | slice.description | Description of the slice | NaN | NaN | NaN | Y |
-| 3 | Estimated Rule | dimensions: expr | SQL expression to calculate the dimension value | NaN | -- no equivalent -- | -- no equivalent -- | SQL expression added to slice.description | Y | NaN | Y |
-| 4 | Estimated Rule | dimensions: data\_type | Data type | NaN | -- no equivalent -- | -- no equivalent -- | sliceImplementations.schemaObjectRef.column | Y | NaN | Y |
-| 5 | Estimated Rule | dimensions: synonyms | Alternative names for the dimension | definitions/slices/{slice.identifier}.yaml | synonyms[] | Alternative names for the slice | NaN | NaN | NaN | NaN |
-| NaN | Estimated Rule | dimensions: unique | Whether values are unique across rows | NaN | -- no equivalent -- | -- no equivalent -- | Cortex-invoked query | Y | NaN | NaN |
-| NaN | Estimated Rule | dimensions: is\_enum | Whether the dimension has a fixed set of values | NaN | -- no equivalent -- | -- no equivalent -- | Cortex-invoked query | Y | NaN | NaN |
-| NaN | Estimated Rule | dimensions: sample\_values | Sample values of this column, if any. Add any value that is likely to be referenced in the user questions. | definitions/slices/{slice.identifier}.yaml | slice.values[] | Sample values likely to be important to the context of the slice | NaN | NaN | NaN | NaN |
-| NaN | Estimated Rule | dimensions: cortex\_search\_service | Optional Cortex Search service for semantic search | NaN | -- no equivalent -- | -- no equivalent -- | NaN | NaN | NaN | NaN |
-| NaN | Estimated Rule | time\_dimensions: name | Name of the dimension | definitions/slices/{slice.identifier}.yaml | slice.name | Unique time slice name within the organization | NaN | NaN | NaN | Y |
-| NaN | Estimated Rule | time\_dimensions: description | Description of the dimension | definitions/slices/{slice.identifier}.yaml | slice.description | Description of the time slice | NaN | NaN | NaN | Y |
-| NaN | Estimated Rule | time\_dimensions: expr | Expression for the dimension | NaN | -- no equivalent -- | -- no equivalent -- | SQL expression added to slice.description | Y | NaN | Y |
-| NaN | Estimated Rule | time\_dimensions: data\_type | Data type | NaN | -- no equivalent -- | -- no equivalent -- | sliceImplementations.schemaObjectRef.column | Y | NaN | Y |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1.0 | Estimated Rule | dimensions: name | Name of the dimension | definitions/slices/{slice.identifier}.yaml | slice.name | Unique slice name within the organization |  |  |  | Y |
+| 2.0 | Estimated Rule | dimensions: description | Description of the dimension | definitions/slices/{slice.identifier}.yaml | slice.description | Description of the slice |  |  |  | Y |
+| 3.0 | Estimated Rule | dimensions: expr | SQL expression to calculate the dimension value | N/A | -- no equivalent -- | -- no equivalent -- | SQL expression added to slice.description | Y |  | Y |
+| 4.0 | Estimated Rule | dimensions: data_type | Data type | N/A | -- no equivalent -- | -- no equivalent -- | sliceImplementations.schemaObjectRef.column | Y |  | Y |
+| 5.0 | Estimated Rule | dimensions: synonyms | Alternative names for the dimension | definitions/slices/{slice.identifier}.yaml | synonyms[] | Alternative names for the slice |  |  |  |  |
+|  | Estimated Rule | dimensions: unique | Whether values are unique across rows | N/A | -- no equivalent -- | -- no equivalent -- | Cortex-invoked query | Y |  |  |
+|  | Estimated Rule | dimensions: is_enum | Whether the dimension has a fixed set of values | N/A | -- no equivalent -- | -- no equivalent -- | Cortex-invoked query | Y |  |  |
+|  | Estimated Rule | dimensions: sample_values | Sample values of this column, if any. Add any value that is likely to be referenced in the user questions. | definitions/slices/{slice.identifier}.yaml | slice.values[] | Sample values likely to be important to the context of the slice |  |  |  |  |
+|  | Estimated Rule | dimensions: cortex_search_service | Optional Cortex Search service for semantic search | N/A | -- no equivalent -- | -- no equivalent -- |  |  |  |  |
+|  | Estimated Rule | time_dimensions: name | Name of the dimension | definitions/slices/{slice.identifier}.yaml | slice.name | Unique time slice name within the organization |  |  |  | Y |
+|  | Estimated Rule | time_dimensions: description | Description of the dimension | definitions/slices/{slice.identifier}.yaml | slice.description | Description of the time slice |  |  |  | Y |
+|  | Estimated Rule | time_dimensions: expr | Expression for the dimension | N/A | -- no equivalent -- | -- no equivalent -- | SQL expression added to slice.description | Y |  | Y |
+|  | Estimated Rule | time_dimensions: data_type | Data type | N/A | -- no equivalent -- | -- no equivalent -- | sliceImplementations.schemaObjectRef.column | Y |  | Y |
 
 ## Facts
-| Snowflake Semantic Concept | Snowflake Semantic YAML node | Duodata YAML file(s) | Node mapping rule | Unnamed: 4 | Unnamed: 5 | Unnamed: 6 | Unnamed: 7 | Unnamed: 8 | Unnamed: 9 | Unnamed: 10 |
+
+| Snowflake Semantic Concept | Snowflake Semantic YAML node | Duodata YAML file(s) | Node mapping rule |
+| --- | --- | --- | --- |
+| Facts | facts | definitions/metrics/{metric.identifier}.yaml | Metrics that sit at the row-level with no aggregation applied |
+
+| Mapping Rule Number | Mapping Rule Name | Snowflake YAML Element | Snowflake Element Description |  | Duodata YAML Element | Duodata Element Description | Inference Sources | Enforce with Cortex | App Notes | Required for Semantic Model |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Facts | facts | definitions/metrics/{metric.identifier}.yaml | Metrics that sit at the row-level with no aggregation applied | NaN | NaN | NaN | NaN | NaN | NaN | NaN |
-| NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN |
-| Mapping Rule Number | Mapping Rule Name | Snowflake YAML Element | Snowflake Element Description | NaN | Duodata YAML Element | Duodata Element Description | Inference Sources | Enforce with Cortex | App Notes | Required for Semantic Model |
-| NaN | Estimated Rule | name | Name of the fact | definitions/metrics/{metric.identifier}.yaml | metric.name | Name of metric that sits at the row-level with no aggregation applied | NaN | NaN | NaN | Y |
-| NaN | Estimated Rule | description | Description of the fact | definitions/metrics/{metric.identifier}.yaml | metric.description | Description of metric that sits at the row-level with no aggregation applied | NaN | NaN | NaN | Y |
-| NaN | Estimated Rule | expr | SQL expression to calculate the fact value | definitions/metrics/{metric.identifier}.yaml | metric.formula.pretty | Formula of the metric calculation | metric.formula.pretty | Y | NaN | Y |
-| NaN | Estimated Rule | data\_type | The data type of the fact | NaN | -- no equivalent -- | NaN | mapped schema | Y | NaN | Y |
-| NaN | Estimated Rule | access\_modifier | Set to private\_access to hide from queries (useful for intermediate calculations) | -- no equivalent -- | -- no equivalent -- | Must be set in app | NaN | NaN | NaN | Y |
-| NaN | Estimated Rule | synonyms[] | Synonyms for facts | definitions/metrics/{metric.identifier}.yaml | metric.synonyms[] | NaN | NaN | NaN | NaN | Y |
+|  | Estimated Rule | name | Name of the fact | definitions/metrics/{metric.identifier}.yaml | metric.name | Name of metric that sits at the row-level with no aggregation applied |  |  |  | Y |
+|  | Estimated Rule | description | Description of the fact | definitions/metrics/{metric.identifier}.yaml | metric.description | Description of metric that sits at the row-level with no aggregation applied |  |  |  | Y |
+|  | Estimated Rule | expr | SQL expression to calculate the fact value | definitions/metrics/{metric.identifier}.yaml | metric.formula.pretty | Formula of the metric calculation | metric.formula.pretty | Y |  | Y |
+|  | Estimated Rule | data_type | The data type of the fact |  | -- no equivalent -- |  | mapped schema | Y |  | Y |
+|  | Estimated Rule | access_modifier | Set to private_access to hide from queries (useful for intermediate calculations) | -- no equivalent -- | -- no equivalent -- | Must be set in app |  |  |  | Y |
+|  | Estimated Rule | synonyms[] | Synonyms for facts | definitions/metrics/{metric.identifier}.yaml | metric.synonyms[] |  |  |  |  | Y |
 
 ## Metrics
-| Snowflake Semantic Concept | Unnamed: 1 | Snowflake Semantic YAML node | Duodata YAML file(s) | Unnamed: 4 | Unnamed: 5 | Unnamed: 6 | Unnamed: 7 | Unnamed: 8 | Unnamed: 9 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Metrics | NaN | metrics | metrics.yaml | NaN | NaN | NaN | NaN | NaN | NaN |
-| NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN |
+
+| Snowflake Semantic Concept |  | Snowflake Semantic YAML node | Duodata YAML file(s) |
+| --- | --- | --- | --- |
+| Metrics |  | metrics | metrics.yaml |
+
 | Mapping Rule Number | Mapping Rule Name | Snowflake YAML Element | Snowflake Element Description | Duodata YAML Element | Duodata Element Description | Inference Sources | Enforce with Cortex | App Notes | Required for Semantic Model |
-| 1 | Estimated Rule | name | Quantifiable measures of business performance calculated by aggregating facts or columns. | Metrics (aggregated) | Unique dimension name within the organization | NaN | NaN | NaN | Y |
-| 2 | Estimated Rule | description | Description of the metric | metrics: description | Description of the metric | NaN | NaN | NaN | Y |
-| 3 | Estimated Rule | expr | Calculation expression | metrics: formula: pretty | Human-readable formula expression | NaN | NaN | NaN | Y |
-| 4 | Estimated Rule | synonyms | Alternative names for the metric | -- no equivalent -- | -- no equivalent -- | NaN | NaN | NaN | Y |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1.0 | Estimated Rule | name | Quantifiable measures of business performance calculated by aggregating facts or columns. | Metrics (aggregated) | Unique dimension name within the organization |  |  |  | Y |
+| 2.0 | Estimated Rule | description | Description of the metric | metrics: description | Description of the metric |  |  |  | Y |
+| 3.0 | Estimated Rule | expr | Calculation expression | metrics: formula: pretty | Human-readable formula expression |  |  |  | Y |
+| 4.0 | Estimated Rule | synonyms | Alternative names for the metric | -- no equivalent -- | -- no equivalent -- |  |  |  | Y |
 
 ## Filters
-| Snowflake Semantic Concept | Unnamed: 1 | Snowflake Semantic YAML node | Unnamed: 3 | Unnamed: 4 | Unnamed: 5 | Unnamed: 6 | Unnamed: 7 | Unnamed: 8 | Unnamed: 9 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Filters | NaN | filters | NaN | NaN | NaN | NaN | NaN | NaN | NaN |
-| NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN |
+
+| Snowflake Semantic Concept |  | Snowflake Semantic YAML node |
+| --- | --- | --- |
+| Filters |  | filters |
+
 | Mapping Rule Number | Mapping Rule Name | Snowflake YAML Element | Snowflake Element Description | Duodata YAML Element | Duodata Element Description | Inference Sources | Enforce with Cortex | App Notes | Required for Semantic Model |
-| 1 | Estimated Rule | -- no equivalent -- | -- no equivalent -- | -- no equivalent -- | -- no equivalent -- | -- no equivalent -- | NaN | -- no equivalent -- | Y |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1.0 | Estimated Rule | -- no equivalent -- | -- no equivalent -- | -- no equivalent -- | -- no equivalent -- | -- no equivalent -- |  | -- no equivalent -- | Y |
 
 ## OUT-OF-SCOPE-Custom Instruction
-| Snowflake Semantic Concept | Unnamed: 1 | Snowflake Semantic YAML node | Unnamed: 3 | Unnamed: 4 | Unnamed: 5 | Unnamed: 6 | Unnamed: 7 | Unnamed: 8 | Unnamed: 9 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Custom Instructions | NaN | custom\_instructions | NaN | NaN | NaN | NaN | NaN | NaN | NaN |
-| NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN |
+
+| Snowflake Semantic Concept |  | Snowflake Semantic YAML node |
+| --- | --- | --- |
+| Custom Instructions |  | custom_instructions |
+
 | Mapping Rule Number | Mapping Rule Name | Snowflake YAML Element | Snowflake Element Description | Duodata YAML Element | Duodata Element Description | Inference Sources | Enforce with Cortex | App Notes | Required for Semantic Model |
-| 1 | Estimated Rule | -- no equivalent -- | -- no equivalent -- | -- no equivalent -- | -- no equivalent -- | -- no equivalent -- | NaN | -- no equivalent -- | Y |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1.0 | Estimated Rule | -- no equivalent -- | -- no equivalent -- | -- no equivalent -- | -- no equivalent -- | -- no equivalent -- |  | -- no equivalent -- | Y |
 
 ## OUT-OF-SCOPE-Verified Queries
-| Snowflake Semantic Concept | Unnamed: 1 | Snowflake Semantic YAML node | Unnamed: 3 | Unnamed: 4 | Unnamed: 5 | Unnamed: 6 | Unnamed: 7 | Unnamed: 8 | Unnamed: 9 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Verified Queries | NaN | verified\_queries | NaN | NaN | NaN | NaN | NaN | NaN | NaN |
-| NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN |
+
+| Snowflake Semantic Concept |  | Snowflake Semantic YAML node |
+| --- | --- | --- |
+| Verified Queries |  | verified_queries |
+
 | Mapping Rule Number | Mapping Rule Name | Snowflake YAML Element | Snowflake Element Description | Duodata YAML Element | Duodata Element Description | Inference Sources | Enforce with Cortex | App Notes | Required for Semantic Model |
-| 1 | Estimated Rule | -- no equivalent -- | -- no equivalent -- | -- no equivalent -- | -- no equivalent -- | -- no equivalent -- | NaN | -- no equivalent -- | Y |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1.0 | Estimated Rule | -- no equivalent -- | -- no equivalent -- | -- no equivalent -- | -- no equivalent -- | -- no equivalent -- |  | -- no equivalent -- | Y |
 
 ## Issues
+
 | Issue # | Issue Description | Solution Recommendation(s) | Solution |
 | --- | --- | --- | --- |
-| 1 | Some slices need to map to the entity level in the data model via the business key, natural key, reference code, or similar identifier. (mapped to key column(s) in implementations) These slices are likely mapped to dimension tables or reference tables. In the Snowflake semantic context, this is termed the "view-level" dimension. (DD: slice = SF: dimension) Currently, the user cannot explicitly tag a slice at the entity level. all slices map to the attribute (column) level. The mapping at the entity level is necessary for linking slices, along with their properties like name, desciption, etc., to Logical Tables in Snowflake Semantic Models/Views. | Create a tag in Duodata named "entity" or "view-level". Assign this tag to entity level slices. (mapped to key columns) \nor \nAdd a flag "Entity" or "View-level" for the mapping in Implementations. This is likely the most user-friendly option, as nearly all platform implementations will have the entity (view-level, table) concept. | Map to table only in implementations |
+| 1.0 | Some slices need to map to the entity level in the data model via the business key, natural key, reference code, or similar identifier. (mapped to key column(s) in implementations) These slices are likely mapped to dimension tables or reference tables. In the Snowflake semantic context, this is termed the "view-level" dimension. (DD: slice = SF: dimension) Currently, the user cannot explicitly tag a slice at the entity level. all slices map to the attribute (column) level. The mapping at the entity level is necessary for linking slices, along with their properties like name, desciption, etc., to Logical Tables in Snowflake Semantic Models/Views. | Create a tag in Duodata named "entity" or "view-level". Assign this tag to entity level slices. (mapped to key columns) <br>or <br>Add a flag "Entity" or "View-level" for the mapping in Implementations. This is likely the most user-friendly option, as nearly all platform implementations will have the entity (view-level, table) concept. | Map to table only in implementations |
 
 ## Special Cases
-| Unnamed: 0 | Unnamed: 1 |
-| --- | --- |
-| Context-driven Relationships | https://docs.snowflake.com/en/user-guide/views-semantic/sql#label-semantic-views-create-logical-tables-relations |
+
+Context-driven Relationships
 
 ## Sheet Range
-|
-|  |
+
+_(empty)_
