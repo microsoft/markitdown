@@ -13,17 +13,16 @@ class TestGlmOcrServiceInit:
 
     def test_init_requires_api_key(self):
         """GlmOcrService should raise ValueError for empty api_key."""
-        with patch("markitdown_ocr._ocr_service.GlmOcrService") as mock_cls:
-            # We need to test the actual init, so mock zai import
-            pass
+        with patch.dict("sys.modules", {"zai": MagicMock()}):
+            with pytest.raises(ValueError, match="GLMOCR_API_KEY"):
+                GlmOcrService(api_key="")
 
     def test_init_with_valid_key(self):
         """GlmOcrService should initialize with a valid API key."""
         with patch.dict("sys.modules", {"zai": MagicMock()}):
-            mock_zai = MagicMock()
-            with patch("markitdown_ocr._ocr_service.GlmOcrService.__init__", return_value=None) as mock_init:
-                # Can't easily test this due to import in __init__
-                pass
+            service = GlmOcrService(api_key="test-key")
+            assert service.model == "glm-ocr"
+            assert service.timeout == 120
 
 
 class TestGlmOcrServiceExtractText:
@@ -49,35 +48,55 @@ class TestGlmOcrServiceExtractText:
         assert result.backend_used == "glm_ocr"
         assert result.error is not None
 
-    def test_extract_text_success_with_md_results(self):
-        """extract_text should parse md_results from response."""
+    def test_extract_text_md_results_used_directly(self):
+        """md_results is already Markdown — should be used as-is, no HTML conversion."""
         service = self._make_service()
 
+        # Simulate real API response: md_results contains Markdown table
         mock_response = MagicMock()
-        mock_response.md_results = "<table><tr><td>Hello</td><td>World</td></tr></table>"
+        mock_response.md_results = "| Name | Value |\n| --- | --- |\n| Hello | World |"
         mock_response.layout_details = None
         service.client.layout_parsing.create.return_value = mock_response
 
-        # Create a minimal PNG-like stream
         image_stream = io.BytesIO(b"\x89PNG\r\n\x1a\n" + b"\x00" * 100)
         result = service.extract_text(image_stream)
 
         assert isinstance(result, OCRResult)
         assert result.backend_used == "glm_ocr"
         assert result.error is None
-        assert "Hello" in result.text
-        assert "World" in result.text
+        # Markdown table should be preserved as-is
+        assert "| Name | Value |" in result.text
+        assert "| --- | --- |" in result.text
+        assert "| Hello | World |" in result.text
+
+    def test_extract_text_md_results_with_heading(self):
+        """md_results with Markdown heading should be preserved."""
+        service = self._make_service()
+
+        mock_response = MagicMock()
+        mock_response.md_results = "# Report Title\n\nSome paragraph text."
+        mock_response.layout_details = None
+        service.client.layout_parsing.create.return_value = mock_response
+
+        image_stream = io.BytesIO(b"\x89PNG\r\n\x1a\n" + b"\x00" * 100)
+        result = service.extract_text(image_stream)
+
+        assert result.error is None
+        assert "# Report Title" in result.text
+        assert "Some paragraph text." in result.text
 
     def test_extract_text_success_with_layout_details(self):
         """extract_text should fallback to layout_details when md_results is empty."""
         service = self._make_service()
 
-        mock_detail = MagicMock()
-        mock_detail.content = "Detail text"
+        mock_detail1 = MagicMock()
+        mock_detail1.content = "First block text"
+        mock_detail2 = MagicMock()
+        mock_detail2.content = "Second block text"
 
         mock_response = MagicMock()
         mock_response.md_results = ""
-        mock_response.layout_details = [[mock_detail]]
+        mock_response.layout_details = [[mock_detail1, mock_detail2]]
         service.client.layout_parsing.create.return_value = mock_response
 
         image_stream = io.BytesIO(b"\x89PNG\r\n\x1a\n" + b"\x00" * 100)
@@ -86,7 +105,27 @@ class TestGlmOcrServiceExtractText:
         assert isinstance(result, OCRResult)
         assert result.backend_used == "glm_ocr"
         assert result.error is None
-        assert "Detail text" in result.text
+        assert "First block text" in result.text
+        assert "Second block text" in result.text
+
+    def test_extract_text_layout_details_joined_with_double_newline(self):
+        """layout_details content blocks should be joined with double newline."""
+        service = self._make_service()
+
+        mock_detail1 = MagicMock()
+        mock_detail1.content = "Block A"
+        mock_detail2 = MagicMock()
+        mock_detail2.content = "Block B"
+
+        mock_response = MagicMock()
+        mock_response.md_results = ""
+        mock_response.layout_details = [[mock_detail1], [mock_detail2]]
+        service.client.layout_parsing.create.return_value = mock_response
+
+        image_stream = io.BytesIO(b"\x89PNG\r\n\x1a\n" + b"\x00" * 100)
+        result = service.extract_text(image_stream)
+
+        assert "Block A\n\nBlock B" in result.text
 
     def test_extract_text_empty_response(self):
         """extract_text should handle empty response gracefully."""
@@ -134,67 +173,22 @@ class TestGlmOcrServiceExtractText:
         service.extract_text(image_stream)
         assert image_stream.tell() == 0
 
-
-class TestGlmOcrServiceHtmlToMarkdown:
-    """Tests for HTML to Markdown conversion."""
-
-    def _make_service(self) -> GlmOcrService:
-        service = GlmOcrService.__new__(GlmOcrService)
-        service.model = "glm-ocr"
-        service.timeout = 120
-        service.client = MagicMock()
-        return service
-
-    def test_empty_html(self):
+    def test_extract_text_md_results_stripped(self):
+        """md_results should be stripped of leading/trailing whitespace."""
         service = self._make_service()
-        assert service._html_to_markdown("") == ""
 
-    def test_plain_text(self):
-        service = self._make_service()
-        html = "<p>Hello World</p>"
-        result = service._html_to_markdown(html)
-        assert "Hello World" in result
+        mock_response = MagicMock()
+        mock_response.md_results = "  \n  Hello World  \n  "
+        mock_response.layout_details = None
+        service.client.layout_parsing.create.return_value = mock_response
 
-    def test_simple_table(self):
-        service = self._make_service()
-        html = (
-            "<table>"
-            "<tr><td>A</td><td>B</td></tr>"
-            "<tr><td>1</td><td>2</td></tr>"
-            "</table>"
-        )
-        result = service._html_to_markdown(html)
-        assert "|" in result
-        assert "---" in result
-        assert "A" in result
-        assert "1" in result
+        image_stream = io.BytesIO(b"\x89PNG\r\n\x1a\n" + b"\x00" * 100)
+        result = service.extract_text(image_stream)
 
-    def test_div_title(self):
-        service = self._make_service()
-        html = "<div>Section Title</div><p>Content</p>"
-        result = service._html_to_markdown(html)
-        assert "**Section Title**" in result
+        assert result.text == "Hello World"
 
-    def test_table_with_colspan(self):
+    def test_no_html_to_markdown_method(self):
+        """GlmOcrService should NOT have _html_to_markdown or _convert_html_table."""
         service = self._make_service()
-        html = (
-            "<table>"
-            "<tr><td colspan='2'>Wide</td></tr>"
-            "<tr><td>A</td><td>B</td></tr>"
-            "</table>"
-        )
-        result = service._html_to_markdown(html)
-        assert "Wide" in result
-        assert "---" in result
-
-    def test_table_with_rowspan(self):
-        service = self._make_service()
-        html = (
-            "<table>"
-            "<tr><td rowspan='2'>Tall</td><td>A</td></tr>"
-            "<tr><td>B</td></tr>"
-            "</table>"
-        )
-        result = service._html_to_markdown(html)
-        assert "Tall" in result
-        assert "---" in result
+        assert not hasattr(service, "_html_to_markdown")
+        assert not hasattr(service, "_convert_html_table")

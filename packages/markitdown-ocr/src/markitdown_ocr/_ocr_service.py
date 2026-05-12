@@ -4,7 +4,6 @@ Provides LLM Vision-based and glm-ocr-based image text extraction.
 """
 
 import base64
-import re
 from typing import Any, BinaryIO
 from dataclasses import dataclass
 
@@ -116,7 +115,7 @@ class GlmOcrService:
 
     Uses ZhiPu AI's specialized document layout parsing model which provides:
     - Better table recognition than general LLM Vision
-    - Structured HTML output with layout details
+    - Markdown formatted output via md_results
     - Lower cost per call compared to GPT-4o etc.
     """
 
@@ -191,20 +190,17 @@ class GlmOcrService:
                 file=data_uri,
             )
 
-            # Extract result — prefer md_results, fallback to layout_details
-            html = ""
+            # Extract result — prefer md_results (already Markdown), fallback to layout_details
+            text = ""
             if hasattr(response, "md_results") and response.md_results:
-                html = response.md_results
+                text = response.md_results.strip()
             elif hasattr(response, "layout_details") and response.layout_details:
                 parts = []
                 for detail_list in response.layout_details:
                     for detail in detail_list:
                         if hasattr(detail, "content") and detail.content:
-                            parts.append(detail.content)
-                html = "\n".join(parts)
-
-            # Convert HTML to Markdown
-            text = self._html_to_markdown(html.strip()) if html else ""
+                            parts.append(detail.content.strip())
+                text = "\n\n".join(parts)
 
             return OCRResult(
                 text=text.strip(),
@@ -216,110 +212,4 @@ class GlmOcrService:
         finally:
             image_stream.seek(0)
 
-    # ------------------------------------------------------------------
-    # HTML → Markdown conversion (adapted from markitdown-glmocr)
-    # ------------------------------------------------------------------
 
-    def _html_to_markdown(self, html: str) -> str:
-        """Convert HTML from glm-ocr to Markdown."""
-        if not html:
-            return ""
-
-        # Extract titles from <div>
-        titles: list[str] = []
-        div_pattern = r"<div[^>]*>(.*?)</div>"
-        for match in re.finditer(div_pattern, html, re.DOTALL | re.IGNORECASE):
-            title = re.sub(r"<[^>]+>", "", match.group(1)).strip()
-            if title:
-                titles.append(title)
-
-        # Remove <div> from HTML
-        html = re.sub(div_pattern, "", html, flags=re.DOTALL | re.IGNORECASE)
-
-        # Check for table
-        if "<table" in html.lower():
-            table_md = self._convert_html_table(html)
-            if titles:
-                return f"**{' '.join(titles)}**\n\n{table_md}"
-            return table_md
-
-        # Plain text
-        text = re.sub(r"<[^>]+>", "", html).strip()
-        if titles:
-            return f"**{' '.join(titles)}**\n\n{text}"
-        return text
-
-    def _convert_html_table(self, html: str) -> str:
-        """Convert HTML table to Markdown table."""
-        rows: list[list[str]] = []
-        rowspan_cells: dict[tuple[int, int], str] = {}
-
-        for row_idx, row_match in enumerate(
-            re.finditer(r"<tr[^>]*>(.*?)</tr>", html, re.DOTALL | re.IGNORECASE)
-        ):
-            cells: list[str] = []
-            col_idx = 0
-
-            # Fill rowspan cells from previous rows
-            while (row_idx, col_idx) in rowspan_cells:
-                cells.append(rowspan_cells[(row_idx, col_idx)])
-                col_idx += 1
-
-            # Parse cells in this row
-            for cell_match in re.finditer(
-                r"<td([^>]*)>(.*?)</td>",
-                row_match.group(1),
-                re.DOTALL | re.IGNORECASE,
-            ):
-                attrs, content = cell_match.groups()
-                content = re.sub(r"<[^>]+>", "", content).strip().replace("\n", " ")
-
-                # Parse rowspan/colspan attributes
-                rowspan = 1
-                rowspan_m = re.search(
-                    r'rowspan\s*=\s*["\']?(\d+)', attrs, re.IGNORECASE
-                )
-                if rowspan_m:
-                    rowspan = int(rowspan_m.group(1))
-
-                colspan = 1
-                colspan_m = re.search(
-                    r'colspan\s*=\s*["\']?(\d+)', attrs, re.IGNORECASE
-                )
-                if colspan_m:
-                    colspan = int(colspan_m.group(1))
-
-                cells.append(content)
-                cells.extend([""] * (colspan - 1))
-
-                if rowspan > 1:
-                    for r in range(1, rowspan):
-                        for c in range(colspan):
-                            rowspan_cells[(row_idx + r, col_idx + c)] = content
-
-                col_idx += colspan
-
-            # Fill remaining rowspan
-            while (row_idx, col_idx) in rowspan_cells:
-                cells.append(rowspan_cells[(row_idx, col_idx)])
-                col_idx += 1
-
-            rows.append(cells)
-
-        if not rows:
-            return ""
-
-        # Normalize column count
-        max_cols = max(len(row) for row in rows)
-        for row in rows:
-            row.extend([""] * (max_cols - len(row)))
-
-        # Build markdown table
-        md_lines = []
-        for i, row in enumerate(rows):
-            md_row = "| " + " | ".join(c or " " for c in row) + " |"
-            md_lines.append(md_row)
-            if i == 0:
-                md_lines.append("|" + "|".join(["---"] * max_cols) + "|")
-
-        return "\n".join(md_lines)

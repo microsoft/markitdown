@@ -63,4 +63,4 @@ ocr = "markitdown_ocr"
 [tool.markitdown-ocr.glmocr]
 # api_key = ""  # Recommended: set via environment variable GLMOCR_API_KEY
 model = "glm-ocr"
-timeout = 120
+timeout = 600
