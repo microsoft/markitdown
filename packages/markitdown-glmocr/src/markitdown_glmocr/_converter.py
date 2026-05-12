@@ -1,4 +1,4 @@
-"""GlmOcr PDF Converter - Intelligent PDF to Markdown conversion."""
+"""GlmOcr PDF/Image Converter - Intelligent PDF and Image to Markdown conversion."""
 
 import io
 import sys
@@ -30,19 +30,22 @@ except ImportError:
 ACCEPTED_MIME_TYPE_PREFIXES = [
     "application/pdf",
     "application/x-pdf",
+    "image/jpeg",
+    "image/png",
 ]
 
-ACCEPTED_FILE_EXTENSIONS = [".pdf"]
+ACCEPTED_FILE_EXTENSIONS = [".pdf", ".jpg", ".jpeg", ".png"]
 
 
 class GlmOcrConverter(DocumentConverter):
     """
-    Intelligent PDF converter using glmocr SDK.
+    Intelligent PDF/Image converter using glmocr SDK.
     
     Features:
     - Auto-detect page content type (plain text vs images/tables)
     - Plain text pages use pdfplumber/pdfminer (fast, free)
     - Complex pages use glmocr SDK for AI-powered OCR
+    - Image files (PNG, JPG) use glmocr SDK directly
     - One-liner: glmocr.parse("document.pdf") handles everything
     """
 
@@ -128,7 +131,36 @@ class GlmOcrConverter(DocumentConverter):
                 _dependency_exc_info[2]
             )
 
-        # Read PDF
+        extension = (stream_info.extension or "").lower()
+
+        # Image files: use glmocr directly
+        if extension in (".jpg", ".jpeg", ".png"):
+            return self._convert_image(file_stream, extension)
+
+        # PDF files: use hybrid approach
+        return self._convert_pdf(file_stream)
+
+    def _convert_image(self, file_stream: BinaryIO, extension: str = ".png") -> DocumentConverterResult:
+        """Convert image file using glmocr SDK."""
+        img_bytes = file_stream.read()
+
+        try:
+            result = self._get_glmocr().parse(img_bytes)
+
+            # Check for errors
+            d = result.to_dict()
+            if "error" in d:
+                return DocumentConverterResult(markdown="")
+
+            return DocumentConverterResult(
+                markdown=result.markdown_result or ""
+            )
+        except Exception as e:
+            return DocumentConverterResult(
+                markdown=f"<!-- Error converting image: {e} -->"
+            )
+
+    def _convert_pdf(self, file_stream: BinaryIO) -> DocumentConverterResult:
         pdf_stream = io.BytesIO(file_stream.read())
         markdown_parts = []
 
@@ -189,10 +221,7 @@ class GlmOcrConverter(DocumentConverter):
             img = page.to_image(resolution=150)
             img_bytes = io.BytesIO()
             img.save(img_bytes, format="PNG")
-            img_bytes.seek(0)
-            
-            # Use glmocr to parse the image
-            result = self._get_glmocr().parse(img_bytes)
+            result = self._get_glmocr().parse(img_bytes.getvalue())
             
             # Check for errors
             d = result.to_dict()
