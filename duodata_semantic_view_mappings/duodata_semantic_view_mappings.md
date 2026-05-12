@@ -1,4 +1,4 @@
-## Snowflake-to-DD Semantic Concep
+## Snowflake-to-DD Semantic Concepts
 
 This is the mapping between the Snowflake Semantic Model Concepts and the Duodata Metric Definitions. In the context of this mapping, a single Duodata Report maps to a single Snowflake Semantic Model.
 
