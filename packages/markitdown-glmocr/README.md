@@ -1,13 +1,14 @@
 # markitdown-glmocr
 
-智能 PDF 转 Markdown 插件，使用 glm-ocr AI 驱动的图片和表格提取。
+智能 PDF 转 Markdown 插件，使用 glmocr SDK（智谱 GLM-OCR）驱动的图片和表格提取。
 
 ## 特性
 
 - 🔍 **智能检测**：自动识别每页内容类型（纯文本 vs 图片/表格）
 - 📄 **默认解析**：纯文本页面使用 pdfplumber/pdfminer 提取，速度快、成本低
-- 🤖 **AI 增强**：复杂页面（图片、表格）使用 glm-ocr 转换为 Markdown
-- ⚙️ **灵活配置**：支持配置文件、环境变量等多种配置方式
+- 🤖 **AI 增强**：复杂页面（图片、表格）使用 glmocr SDK 转换为 Markdown
+- ⚡ **一行调用**：`glmocr.parse("document.pdf")` 完成 OCR，无需手动截图编码
+- 📊 **结构化输出**：返回 Markdown + JSON 结构（含区域标签、边界框）
 
 ## 安装
 
@@ -16,45 +17,35 @@
 pip install markitdown-glmocr
 
 # 安装 AI 功能
-pip install markitdown-glmocr[zhipu]
+pip install markitdown-glmocr[glmocr]
 ```
 
 ## 配置
 
-### 本地敏感配置（推荐）
-
-项目根目录的 `.secrets.local` 文件存储敏感信息，此文件不会被提交到 Git：
+### 环境变量（推荐）
 
 ```bash
-# 创建 .secrets.local 文件
-echo 'GLMOCR_API_KEY="your-api-key"' > .secrets.local
-
-# 加载配置
-source .secrets.local
-```
-
-### 环境变量
-
-```bash
-# 必需
-export GLMOCR_API_KEY="your-zhipu-api-key"
+# 必需：智谱 API Key
+export ZHIPU_API_KEY="your-zhipu-api-key"
 
 # 可选
-export GLMOCR_MODEL="glm-ocr"
-export GLMOCR_DPI="150"
-export GLMOCR_TIMEOUT="120"
+export GLMOCR_MODEL="glm-ocr"          # 模型名称
+export GLMOCR_TIMEOUT="600"             # 请求超时（秒）
+export GLMOCR_ENABLE_LAYOUT="true"      # 启用布局检测
+export GLMOCR_LOG_LEVEL="INFO"          # 日志级别
 ```
 
-### 配置文件
+### 配置优先级
 
-在 `pyproject.toml` 中配置默认值：
+```
+构造函数参数 > 环境变量 > .env 文件 > config.yaml > 内置默认值
+```
 
-```toml
-[tool.markitdown-glmocr]
-model = "glm-ocr"
-dpi = 150
-timeout = 120
-force_ai = false
+### 本地敏感配置
+
+```bash
+# 创建 .env 文件（自动读取）
+echo "ZHIPU_API_KEY=your-api-key" > .env
 ```
 
 ## 使用方法
@@ -62,8 +53,8 @@ force_ai = false
 ### 命令行（推荐）
 
 ```bash
-# 1. 加载敏感配置
-source .secrets.local
+# 1. 设置 API Key
+export ZHIPU_API_KEY="sk-xxx"
 
 # 2. 查看已安装插件
 markitdown --list-plugins
@@ -79,50 +70,73 @@ markitdown -p document.pdf -o output.md
 
 ```python
 from markitdown import MarkItDown
+from markitdown_glmocr import GlmOcrConverter
 
-# 方式1：自动加载配置
-md = MarkItDown(enable_plugins=True)
-result = md.convert("document.pdf")
-print(result.markdown)
-
-# 方式2：手动配置
-from markitdown_glmocr import GlmOcrConfig, AIService, GlmOcrPdfConverter
-
-config = GlmOcrConfig.load()
-ai_service = AIService(
-    api_key="your-api-key",
-    model="glm-ocr",
-)
-
-converter = GlmOcrPdfConverter(
-    ai_service=ai_service,
-    dpi=150,
-)
-
+# 方式1：自动从环境变量读取 ZHIPU_API_KEY
+converter = GlmOcrConverter()
 md = MarkItDown(enable_plugins=False)
 md.register_converter(converter, priority=-1.0)
 result = md.convert("document.pdf")
+print(result.markdown)
+
+# 方式2：手动传入 API Key
+converter = GlmOcrConverter(api_key="sk-xxx")
+md = MarkItDown(enable_plugins=False)
+md.register_converter(converter, priority=-1.0)
+result = md.convert("document.pdf")
+print(result.markdown)
+
+# 方式3：直接使用 glmocr SDK（更简单）
+import glmocr
+result = glmocr.parse("document.pdf")
+print(result.markdown_result)  # Markdown 输出
+print(result.json_result)      # 结构化 JSON（区域标签、边界框）
+```
+
+### 处理结果
+
+```python
+import glmocr
+
+result = glmocr.parse("report.pdf")
+
+# 获取 Markdown
+print(result.markdown_result)
+
+# 获取结构化数据（按页分组）
+for page_idx, page_regions in enumerate(result.json_result):
+    print(f"Page {page_idx + 1}: {len(page_regions)} regions")
+    for region in page_regions:
+        print(f"  [{region['label']}] {region['content'][:60]}")
+
+# 按标签筛选
+tables = [r for r in result.json_result[0] if r["label"] == "table"]
+formulas = [r for r in result.json_result[0] if r["label"] == "formula"]
+
+# 保存到磁盘
+result.save(output_dir="./output")
 ```
 
 ## 配置选项
 
-### GlmOcrConfig 参数
+### GlmOcrConverter 参数
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `api_key` | str | 环境变量 `GLMOCR_API_KEY` | 智谱 API Key |
-| `model` | str | "glm-ocr" | 模型名称 |
-| `dpi` | int | 150 | 截图分辨率 |
-| `timeout` | int | 120 | 请求超时（秒） |
+| `api_key` | str | 环境变量 `ZHIPU_API_KEY` | 智谱 API Key |
+| `timeout` | int | 1800 | 请求超时（秒） |
+| `enable_layout` | bool | False | 启用布局检测 |
 | `force_ai` | bool | False | 强制所有页面使用 AI |
 
-### GlmOcrPdfConverter 参数
+### 环境变量
 
-| 参数 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `ai_service` | AIService | None | AI 服务实例 |
-| `dpi` | int | 150 | 截图分辨率 |
-| `force_ai` | bool | False | 强制所有页面使用 AI |
+| 变量 | 说明 | 示例 |
+|------|------|------|
+| `ZHIPU_API_KEY` | API Key（必需） | `sk-abc123` |
+| `GLMOCR_MODEL` | 模型名称 | `glm-ocr` |
+| `GLMOCR_TIMEOUT` | 请求超时（秒） | `600` |
+| `GLMOCR_ENABLE_LAYOUT` | 布局检测 | `true` |
+| `GLMOCR_LOG_LEVEL` | 日志级别 | `INFO` |
 
 ## 工作原理
 
@@ -136,22 +150,38 @@ PDF 输入
     │
     └─ 复杂页面（图片/表格）
           │
-          ├─ 截图渲染 (150 DPI)
-          │
-          ├─ base64 编码
-          │
-          └─ 调用 glm-ocr API 转 Markdown
+          └─► glmocr.parse() 一行调用
+                │
+                ├─ 内置截图渲染
+                ├─ 内置 base64 编码
+                └─ 内置 OCR 识别
     │
     ▼
 合并输出完整 Markdown
 ```
 
+## 区域标签（json_result）
+
+glmocr SDK 返回的结构化数据支持以下标签：
+
+| 标签 | 说明 |
+|------|------|
+| `title` | 标题 |
+| `text` | 正文文本 |
+| `table` | 表格 |
+| `figure` | 图片 |
+| `formula` | 公式 |
+| `header` | 页眉 |
+| `footer` | 页脚 |
+| `page_number` | 页码 |
+| `reference` | 参考文献 |
+| `seal` | 印章 |
+
 ## 技术架构
 
-- **zai-sdk**: 智谱 AI 官方 SDK
-- **glm-ocr**: 智谱 OCR 模型，支持表格、图片识别
-- **pdfplumber**: PDF 页面分析和截图
-- **pdfminer**: 纯文本页面提取
+- **glmocr**: 智谱 OCR SDK，一行代码完成 PDF/图片解析
+- **pdfplumber**: PDF 页面分析和纯文本提取
+- **pdfminer**: 纯文本页面提取备用
 
 ## 依赖
 
@@ -159,7 +189,7 @@ PDF 输入
 - `pdfplumber>=0.11.9` - PDF 解析和截图
 - `pdfminer.six>=20251230` - 文本提取备用
 - `Pillow>=9.0.0` - 图像处理
-- `zai-sdk>=0.2.2` - 智谱 AI SDK（可选，AI 功能需要）
+- `glmocr` - 智谱 OCR SDK（可选，AI 功能需要）
 
 ## 许可证
 

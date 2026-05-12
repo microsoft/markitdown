@@ -5,11 +5,11 @@ build-backend = "hatchling.build"
 [project]
 name = "markitdown-glmocr"
 dynamic = ["version"]
-description = "Intelligent PDF to Markdown converter with glm-ocr AI-powered image/table extraction"
+description = "Intelligent PDF to Markdown converter using glmocr SDK"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
-keywords = ["markitdown", "pdf", "ocr", "ai", "llm", "vision", "glm-ocr"]
+keywords = ["markitdown", "pdf", "ocr", "ai", "llm", "vision", "glm-ocr", "glmocr"]
 authors = [
   { name = "Contributors", email = "noreply@github.com" },
 ]
@@ -27,12 +27,11 @@ dependencies = [
   "pdfminer.six>=20251230",
   "pdfplumber>=0.11.9",
   "Pillow>=9.0.0",
-  "tomli>=2.0.0;python_version<'3.11'",
 ]
 
 [project.optional-dependencies]
-zhipu = [
-  "zai-sdk>=0.2.2",
+glmocr = [
+  "glmocr",
 ]
 dev = [
   "pytest>=7.0.0",
@@ -59,12 +58,3 @@ packages = ["src/markitdown_glmocr"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-
-# markitdown-glmocr configuration
-[tool.markitdown-glmocr]
-# API key - set via environment variable GLMOCR_API_KEY
-api_key = ""
-model = "glm-ocr"
-dpi = 150
-timeout = 120
-force_ai = false

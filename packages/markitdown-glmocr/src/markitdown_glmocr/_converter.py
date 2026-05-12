@@ -7,9 +7,7 @@ from typing import Any, BinaryIO, Optional
 from markitdown import DocumentConverter, DocumentConverterResult, StreamInfo
 from markitdown._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 
-from ._page_analyzer import PageType, analyze_page
-from ._page_renderer import render_page_to_image
-from ._ai_service import AIService
+from ._config import GlmOcrConfig
 
 # Import dependencies
 _dependency_exc_info = None
@@ -20,6 +18,14 @@ try:
 except ImportError:
     _dependency_exc_info = sys.exc_info()
 
+# glmocr SDK
+try:
+    import glmocr
+    from glmocr import GlmOcr
+except ImportError:
+    glmocr = None
+    GlmOcr = None
+
 
 ACCEPTED_MIME_TYPE_PREFIXES = [
     "application/pdf",
@@ -29,33 +35,63 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 ACCEPTED_FILE_EXTENSIONS = [".pdf"]
 
 
-class GlmOcrPdfConverter(DocumentConverter):
+class GlmOcrConverter(DocumentConverter):
     """
-    Intelligent PDF converter using glm-ocr.
+    Intelligent PDF converter using glmocr SDK.
     
     Features:
     - Auto-detect page content type (plain text vs images/tables)
-    - Plain text pages use default parser (pdfplumber/pdfminer)
-    - Complex pages use AI screenshot conversion to Markdown
+    - Plain text pages use pdfplumber/pdfminer (fast, free)
+    - Complex pages use glmocr SDK for AI-powered OCR
+    - One-liner: glmocr.parse("document.pdf") handles everything
     """
 
     def __init__(
         self,
-        ai_service: Optional[AIService] = None,
-        dpi: int = 150,
+        api_key: Optional[str] = None,
+        timeout: int = 1800,
+        enable_layout: bool = False,
         force_ai: bool = False,
+        config: Optional[GlmOcrConfig] = None,
     ):
         """
         Initialize converter.
 
         Args:
-            ai_service: AI service instance
-            dpi: Screenshot DPI (default: 150)
+            api_key: Zhipu API key (reads from ZHIPU_API_KEY env var if not provided)
+            timeout: Request timeout in seconds (default: 1800)
+            enable_layout: Enable layout detection (default: False)
             force_ai: Force all pages to use AI (default: False)
+            config: Optional GlmOcrConfig instance
         """
-        self.ai_service = ai_service
-        self.dpi = dpi
-        self.force_ai = force_ai
+        if glmocr is None:
+            raise ImportError(
+                "glmocr is required. Install with: pip install markitdown-glmocr[glmocr]"
+            )
+        
+        # Use config if provided
+        if config:
+            self.api_key = api_key or config.api_key
+            self.timeout = timeout if timeout != 1800 else config.timeout
+            self.enable_layout = enable_layout if enable_layout else config.enable_layout
+            self.force_ai = force_ai or config.force_ai
+        else:
+            self.api_key = api_key
+            self.timeout = timeout
+            self.enable_layout = enable_layout
+            self.force_ai = force_ai
+        
+        # Lazy init GlmOcr instance
+        self._glmocr: Optional[GlmOcr] = None
+
+    def _get_glmocr(self) -> GlmOcr:
+        """Get or create GlmOcr instance."""
+        if self._glmocr is None:
+            kwargs = {"timeout": self.timeout, "enable_layout": self.enable_layout}
+            if self.api_key:
+                kwargs["api_key"] = self.api_key
+            self._glmocr = GlmOcr(**kwargs)
+        return self._glmocr
 
     def accepts(
         self,
@@ -92,9 +128,6 @@ class GlmOcrPdfConverter(DocumentConverter):
                 _dependency_exc_info[2]
             )
 
-        # Get AI service (from kwargs or instance)
-        ai_service = kwargs.get("ai_service") or self.ai_service
-
         # Read PDF
         pdf_stream = io.BytesIO(file_stream.read())
         markdown_parts = []
@@ -103,32 +136,25 @@ class GlmOcrPdfConverter(DocumentConverter):
             with pdfplumber.open(pdf_stream) as pdf:
                 for page_num, page in enumerate(pdf.pages):
                     # Analyze page type
-                    page_type = analyze_page(page)
+                    page_type = self._analyze_page(page)
 
-                    # Choose processing method based on type
-                    if self.force_ai or page_type != PageType.PLAIN_TEXT:
-                        # Complex content: screenshot + AI
-                        if ai_service:
-                            markdown = self._convert_with_ai(
-                                page, page_num, ai_service
-                            )
-                        else:
-                            # No AI service, fallback to default
-                            markdown = self._extract_text_with_tables(page)
+                    # Choose processing method
+                    if self.force_ai or page_type != "plain_text":
+                        # Complex content: use glmocr
+                        markdown = self._convert_with_glmocr(page, page_num)
                     else:
-                        # Plain text: default parser
+                        # Plain text: use pdfplumber
                         markdown = self._extract_text_with_tables(page)
 
                     if markdown.strip():
                         markdown_parts.append(f"## Page {page_num + 1}\n\n{markdown}")
 
-                    # Release page resources
                     page.close()
 
             markdown = "\n\n".join(markdown_parts).strip()
 
         except Exception:
-            # Exception: fallback to pdfminer
+            # Fallback to pdfminer
             pdf_stream.seek(0)
             markdown = pdfminer.high_level.extract_text(pdf_stream) or ""
 
@@ -139,51 +165,47 @@ class GlmOcrPdfConverter(DocumentConverter):
 
         return DocumentConverterResult(markdown=markdown)
 
-    def _convert_with_ai(
-        self,
-        page: Any,
-        page_num: int,
-        ai_service: AIService,
-    ) -> str:
-        """
-        Convert page using AI.
+    def _analyze_page(self, page: Any) -> str:
+        """Analyze page content type."""
+        # Check for images
+        if hasattr(page, "images") and page.images:
+            return "complex"
+        
+        # Check for tables
+        tables = page.find_tables()
+        if tables:
+            return "complex"
+        
+        # Check for graphics/curves
+        if hasattr(page, "curves") and page.curves:
+            return "complex"
+        
+        return "plain_text"
 
-        Args:
-            page: pdfplumber page object
-            page_num: Page number
-            ai_service: AI service
-
-        Returns:
-            str: Markdown content
-        """
+    def _convert_with_glmocr(self, page: Any, page_num: int) -> str:
+        """Convert page using glmocr SDK."""
         try:
-            # Screenshot
-            img_stream = render_page_to_image(page, self.dpi)
-
-            # Call AI (filename uses page number)
-            filename = f"page_{page_num + 1}.png"
-            result = ai_service.image_to_markdown(img_stream, filename=filename)
-
-            if result.success and result.text.strip():
-                return result.text
-            else:
-                # AI failed, fallback to default
+            # Render page to image
+            img = page.to_image(resolution=150)
+            img_bytes = io.BytesIO()
+            img.save(img_bytes, format="PNG")
+            img_bytes.seek(0)
+            
+            # Use glmocr to parse the image
+            result = self._get_glmocr().parse(img_bytes)
+            
+            # Check for errors
+            d = result.to_dict()
+            if "error" in d:
                 return self._extract_text_with_tables(page)
-
+            
+            return result.markdown_result or ""
+            
         except Exception:
-            # Exception, fallback to default
             return self._extract_text_with_tables(page)
 
     def _extract_text_with_tables(self, page: Any) -> str:
-        """
-        Extract text and tables.
-
-        Args:
-            page: pdfplumber page object
-
-        Returns:
-            str: Markdown content
-        """
+        """Extract text and tables from page."""
         parts = []
 
         # Extract text
@@ -206,15 +228,7 @@ class GlmOcrPdfConverter(DocumentConverter):
         return "\n\n".join(parts)
 
     def _table_to_markdown(self, table: list[list[str]]) -> str:
-        """
-        Convert table to Markdown.
-
-        Args:
-            table: 2D list
-
-        Returns:
-            str: Markdown table
-        """
+        """Convert table to Markdown."""
         if not table:
             return ""
 
@@ -236,16 +250,26 @@ class GlmOcrPdfConverter(DocumentConverter):
         # Format table
         lines = []
         for row_idx, row in enumerate(table):
-            # Pad columns
             padded_row = row + [""] * (len(col_widths) - len(row))
             line = "| " + " | ".join(
                 str(cell).ljust(width) for cell, width in zip(padded_row, col_widths)
             ) + " |"
             lines.append(line)
 
-            # Add separator
             if row_idx == 0:
                 sep = "|" + "|".join("-" * (w + 2) for w in col_widths) + "|"
                 lines.append(sep)
 
         return "\n".join(lines)
+    
+    def close(self):
+        """Close the GlmOcr instance."""
+        if self._glmocr:
+            self._glmocr.close()
+            self._glmocr = None
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
