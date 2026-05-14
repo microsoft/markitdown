@@ -34,6 +34,7 @@ from .converters import (
     PptxConverter,
     ImageConverter,
     AudioConverter,
+    EmlConverter,
     OutlookMsgConverter,
     ZipConverter,
     EpubConverter,
@@ -199,6 +200,7 @@ class MarkItDown:
             self.register_converter(ImageConverter())
             self.register_converter(IpynbConverter())
             self.register_converter(PdfConverter())
+            self.register_converter(EmlConverter())
             self.register_converter(OutlookMsgConverter())
             self.register_converter(EpubConverter())
             self.register_converter(CsvConverter())
