@@ -99,7 +99,7 @@ class LLMVisionOCRService:
                 ],
             )
 
-            text = response.choices[0].message.content
+            text = response.choices[0].message.content if response.choices else None
             return OCRResult(
                 text=text.strip() if text else "",
                 backend_used="llm_vision",
