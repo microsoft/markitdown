@@ -432,6 +432,37 @@ def test_exceptions() -> None:
     assert type(exc_info.value.attempts[0].converter).__name__ == "PptxConverter"
 
 
+def test_webvtt_converter_outputs_clean_transcript(tmp_path) -> None:
+    vtt_file = tmp_path / "meeting.vtt"
+    vtt_file.write_text(
+        """WEBVTT
+Kind: captions
+
+NOTE this should be ignored
+
+1
+00:00:01.000 --> 00:00:03.000 position:10%
+<v Alice>Hello &amp; welcome</v>
+to the meeting.
+
+STYLE
+::cue { color: lime; }
+
+00:00:04.000 --> 00:00:06.000
+<i>Next action item</i>
+""",
+        encoding="utf-8",
+    )
+
+    result = MarkItDown().convert(str(vtt_file))
+
+    assert result.text_content == (
+        "Alice: Hello & welcome\n"
+        "to the meeting.\n\n"
+        "Next action item"
+    )
+
+
 @pytest.mark.skipif(
     skip_exiftool,
     reason="do not run if exiftool is not installed",
