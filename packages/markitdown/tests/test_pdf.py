@@ -1,8 +1,12 @@
 """PDF conversion, table extraction, numbering, and page cleanup."""
 
+import io
 import os
 import re
-from unittest.mock import patch
+import sys
+import types
+import warnings
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -1382,6 +1386,105 @@ def test_markitdown_remote() -> None:
     result = markitdown.convert(PDF_TEST_URL)
     for test_string in PDF_TEST_STRINGS:
         assert test_string in result.text_content
+
+
+
+
+class TestPdfInlineImageRecovery:
+    """Recover text that pdfplumber/pdfminer drop after inline image data.
+
+    Some PDFs embed images with the inline-image operators (BI / ID / EI) in
+    the middle of a content stream. pdfminer truncates extraction at the raw
+    image bytes, so everything after the image is silently lost. When the
+    bytes contain inline-image markers, the converter compares against an
+    optional PyMuPDF extraction and keeps whichever recovers more text.
+    """
+
+    @staticmethod
+    def _inline_image_pdf_bytes() -> bytes:
+        return (
+            b"%PDF-1.7\n"
+            b"1 0 obj <<>> stream\n"
+            b"BT (BEFORE_IMAGE) Tj ET\n"
+            b"BI /W 1 /H 1 /BPC 1 /IM true ID\n"
+            b"abc\n"
+            b"EI\n"
+            b"BT (AFTER_IMAGE) Tj ET\n"
+            b"endstream endobj\n%%EOF\n"
+        )
+
+    @staticmethod
+    def _plain_page():
+        page = MagicMock()
+        page.width = 612
+        page.close = MagicMock()
+        page.extract_words.return_value = [
+            {
+                "text": "This is a long paragraph of plain text.",
+                "x0": 50,
+                "x1": 550,
+                "top": 10,
+                "bottom": 20,
+            },
+        ]
+        page.extract_text.return_value = "This is a long paragraph of plain text."
+        return page
+
+    @staticmethod
+    def _pdfplumber_open(pages):
+        def mock_open(stream):
+            mock_pdf = MagicMock()
+            mock_pdf.pages = pages
+            mock_pdf.__enter__ = MagicMock(return_value=mock_pdf)
+            mock_pdf.__exit__ = MagicMock(return_value=False)
+            return mock_pdf
+
+        return mock_open
+
+    def _convert(self, pages, monkeypatch=None, fitz_module=...):
+        from markitdown import StreamInfo
+
+        with (
+            patch("markitdown.converters._pdf_converter.pdfplumber") as mock_pdfplumber,
+            patch("markitdown.converters._pdf_converter.pdfminer") as mock_pdfminer,
+        ):
+            mock_pdfplumber.open.side_effect = self._pdfplumber_open(pages)
+            # pdfminer only sees the text before the image, matching what a
+            # truncated extraction produces for a stream with inline image data.
+            mock_pdfminer.high_level.extract_text.return_value = "BEFORE_IMAGE"
+            if fitz_module is not ...:
+                monkeypatch.setitem(sys.modules, "fitz", fitz_module)
+            result = MarkItDown().convert_stream(
+                io.BytesIO(self._inline_image_pdf_bytes()),
+                stream_info=StreamInfo(extension=".pdf", mimetype="application/pdf"),
+            )
+        return result
+
+    def test_uses_pymupdf_when_it_recovers_more_text(self, monkeypatch):
+        class FakePage:
+            def get_text(self, mode):
+                assert mode == "text"
+                return "BEFORE_IMAGE\nAFTER_IMAGE\n" + ("Recovered body. " * 50)
+
+        class FakeDoc:
+            def __iter__(self):
+                return iter([FakePage()])
+
+            def close(self):
+                pass
+
+        fake_fitz = types.SimpleNamespace(open=lambda *, stream, filetype: FakeDoc())
+        result = self._convert([self._plain_page()], monkeypatch, fake_fitz)
+        assert "AFTER_IMAGE" in result.text_content
+
+    def test_warns_when_pymupdf_is_missing(self, monkeypatch):
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            result = self._convert(
+                [self._plain_page()], monkeypatch, None
+            )
+        assert result.text_content == "BEFORE_IMAGE"
+        assert any("inline image data" in str(item.message) for item in caught)
 
 
 if __name__ == "__main__":
