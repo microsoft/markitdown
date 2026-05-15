@@ -432,6 +432,21 @@ def test_exceptions() -> None:
     assert type(exc_info.value.attempts[0].converter).__name__ == "PptxConverter"
 
 
+def test_pptx_converter_treats_none_text_as_empty(monkeypatch) -> None:
+    import pptx.text.text
+
+    original_getter = pptx.text.text.TextFrame.text.fget
+
+    def text_or_none(self):
+        text = original_getter(self)
+        return None if text else text
+
+    monkeypatch.setattr(pptx.text.text.TextFrame, "text", property(text_or_none))
+
+    result = MarkItDown().convert(os.path.join(TEST_FILES_DIR, "test.pptx"))
+    assert result.text_content is not None
+
+
 @pytest.mark.skipif(
     skip_exiftool,
     reason="do not run if exiftool is not installed",

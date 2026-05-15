@@ -31,6 +31,10 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 ACCEPTED_FILE_EXTENSIONS = [".pptx"]
 
 
+def _safe_text(value: Any) -> str:
+    return "" if value is None else str(value)
+
+
 class PptxConverter(DocumentConverter):
     """
     Converts PPTX files to Markdown. Supports heading, tables and images with alt text.
@@ -161,10 +165,11 @@ class PptxConverter(DocumentConverter):
 
                 # Text areas
                 elif shape.has_text_frame:
+                    text = _safe_text(shape.text)
                     if shape == title:
-                        md_content += "# " + shape.text.lstrip() + "\n"
+                        md_content += "# " + text.lstrip() + "\n"
                     else:
-                        md_content += shape.text + "\n"
+                        md_content += text + "\n"
 
                 # Group Shapes
                 if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.GROUP:
@@ -194,7 +199,7 @@ class PptxConverter(DocumentConverter):
                 md_content += "\n\n### Notes:\n"
                 notes_frame = slide.notes_slide.notes_text_frame
                 if notes_frame is not None:
-                    md_content += notes_frame.text
+                    md_content += _safe_text(notes_frame.text)
                 md_content = md_content.strip()
 
         return DocumentConverterResult(markdown=md_content.strip())
@@ -219,10 +224,11 @@ class PptxConverter(DocumentConverter):
         for row in table.rows:
             html_table += "<tr>"
             for cell in row.cells:
+                text = _safe_text(cell.text)
                 if first_row:
-                    html_table += "<th>" + html.escape(cell.text) + "</th>"
+                    html_table += "<th>" + html.escape(text) + "</th>"
                 else:
-                    html_table += "<td>" + html.escape(cell.text) + "</td>"
+                    html_table += "<td>" + html.escape(text) + "</td>"
             html_table += "</tr>"
             first_row = False
         html_table += "</table></body></html>"
@@ -236,7 +242,7 @@ class PptxConverter(DocumentConverter):
         try:
             md = "\n\n### Chart"
             if chart.has_title:
-                md += f": {chart.chart_title.text_frame.text}"
+                md += f": {_safe_text(chart.chart_title.text_frame.text)}"
             md += "\n\n"
             data = []
             category_names = [c.label for c in chart.plots[0].categories]
