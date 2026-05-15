@@ -238,26 +238,37 @@ You can help by looking at issues or helping review PRs. Any issue or PR is welc
 
 ### Running Tests and Checks
 
-- Navigate to the MarkItDown package:
+The core Python package lives in `packages/markitdown`. From a fresh checkout,
+create a Python 3.10+ environment and install the package in editable mode:
 
   ```sh
   cd packages/markitdown
+  python -m venv .venv
+  source .venv/bin/activate
+  pip install -e '.[all]'
   ```
 
-- Install `hatch` in your environment and run tests:
+MarkItDown uses [Hatch](https://hatch.pypa.io/) for its test environments. Install
+Hatch in your active environment and run the package test suite:
 
   ```sh
-  pip install hatch  # Other ways of installing hatch: https://hatch.pypa.io/dev/install/
-  hatch shell
+  pip install hatch
   hatch test
   ```
 
-  (Alternative) Use the Devcontainer which has all the dependencies installed:
+To run type checks for the core package:
 
   ```sh
-  # Reopen the project in Devcontainer and run:
-  hatch test
+  hatch run types:check
   ```
+
+The GitHub Actions test workflow runs the same package test command from
+`packages/markitdown`. If you are changing another package, such as
+`packages/markitdown-mcp` or `packages/markitdown-sample-plugin`, run that
+package's tests from its own directory as well.
+
+Alternatively, reopen the project in the Dev Container and run the same Hatch
+commands there; the container has the development dependencies preinstalled.
 
 - Run pre-commit checks before submitting a PR: `pre-commit run --all-files`
 
