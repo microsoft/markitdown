@@ -11,12 +11,16 @@ Verifies that:
 import gc
 import io
 import os
+import sys
 import tracemalloc
 
 import pytest
 from unittest.mock import patch, MagicMock
 
 from markitdown import MarkItDown
+from markitdown.converters._pdf_converter import (
+    _prefer_pymupdf_text_if_substantially_better,
+)
 
 TEST_FILES_DIR = os.path.join(os.path.dirname(__file__), "test_files")
 
@@ -78,6 +82,58 @@ def _mock_pdfplumber_open(pages):
         return mock_pdf
 
     return mock_open
+
+
+def _install_fake_pymupdf(monkeypatch, text: str):
+    """Install a tiny fake PyMuPDF module for fallback selection tests."""
+
+    class FakePage:
+        def get_text(self, mode):
+            assert mode == "text"
+            return text
+
+    class FakeDoc(list):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+    class FakePyMuPDF:
+        @staticmethod
+        def open(stream, filetype):
+            assert stream == b"fake pdf content"
+            assert filetype == "pdf"
+            return FakeDoc([FakePage()])
+
+    monkeypatch.setitem(sys.modules, "pymupdf", FakePyMuPDF)
+
+
+def test_pymupdf_fallback_replaces_suspiciously_short_text(monkeypatch):
+    """PyMuPDF should win when it recovers substantially more PDF text."""
+    recovered_text = "AFTER_IMAGE recovered text " * 80
+    _install_fake_pymupdf(monkeypatch, recovered_text)
+
+    pdf_bytes = io.BytesIO(b"fake pdf content")
+    pdf_bytes.seek(4)
+    result = _prefer_pymupdf_text_if_substantially_better("BEFORE_IMAGE", pdf_bytes)
+
+    assert result == recovered_text
+    assert pdf_bytes.tell() == 4
+
+
+def test_pymupdf_fallback_keeps_existing_text_when_not_substantially_better(
+    monkeypatch,
+):
+    """Existing pdfminer/pdfplumber text should remain unless clearly truncated."""
+    _install_fake_pymupdf(monkeypatch, "same content with minor formatting changes")
+
+    result = _prefer_pymupdf_text_if_substantially_better(
+        "same content",
+        io.BytesIO(b"fake pdf content"),
+    )
+
+    assert result == "same content"
 
 
 class TestPdfMemoryOptimization:
