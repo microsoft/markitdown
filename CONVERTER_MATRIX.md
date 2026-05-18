@@ -101,22 +101,25 @@
 | Plain Text | ❌ 0 | ✅ 1 | ✅ | — | — | — |
 | HTML | ⚠️ 1 | ✅ 2 | ✅ | ✅ | — | — |
 | RSS | ⚠️ 2* | ✅ 2 | — | ✅ | — | — |
-| Image | ✅ 1 | ✅ 1 | — | — | — | — |
-| IPYNB | ✅ 2 | ✅ 2 | — | — | — | — |
+| Image | ✅ 1 | ✅ 3 | — | — | — | — |
+| IPYNB | ✅ 2 | ✅ 3 | — | — | — | — |
+| Audio | ✅ 2 | ✅ 3 | — | — | — | — |
+| Bing SERP | ❌ 0 | ✅ 3 | — | — | — | — |
 | **Legend** | ❌=none | ⚠️=too broad | ✅=specific | — | — | — |
 | *RSS used `except BaseException` | `except Exception` (anti-patterns) | — | — | — | — |
+| **R4 (Darwin)** improved Image/Audio/Ipynb/BingSerp | error handling (5→8→11 converters covered) | — | — | — | — |
 
 ## Known Limitations
 
 | Converter | Limitation | Workaround |
 |-----------|-----------|------------|
 | **Audio** | Requires `speech_recognition` + FFmpeg | Install `markitdown[all]` or `markitdown[audio]` |
-| **BingSerp** | Requires network access; Bing HTML format may change | None (network-dependent) |
+| **BingSerp** | Requires network access; Bing HTML format may change. R4: errors handled gracefully (logs warning, skips bad entries) | Network-dependent |
 | **DocIntel** | Requires Azure subscription + `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT` | Use PDF converter as fallback |
 | **DOCX** | Requires `mammoth`; complex formatting may be lost | Install `markitdown[docx]` |
 | **EPUB** | DRM-protected EPUBs not supported | Remove DRM before conversion |
-| **Image** | LLM description requires `llm_client` + `llm_model` in kwargs | Falls back to EXIF-only output |
-| **IPYNB** | Embedded images output as base64 data URIs (large) | None |
+| **Image** | LLM description requires `llm_client` + `llm_model` in kwargs. R4: API/network errors caught gracefully, returns EXIF-only | Falls back to EXIF-only output |
+| **IPYNB** | Embedded images output as base64 data URIs (large). R4: encoding errors + corrupt JSON → FileConversionException | None |
 | **Outlook MSG** | Requires `olefile`; attachments not extracted | Install `markitdown[msg]` |
 | **PDF** | Scanned PDFs require OCR (DocIntel); complex layouts may degrade | Use DocIntel for scanned PDFs |
 | **PPTX** | Requires `python-pptx`; charts/SmartArt not converted | Install `markitdown[pptx]` |
