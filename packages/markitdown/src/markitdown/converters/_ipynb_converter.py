@@ -29,7 +29,12 @@ class IpynbConverter(DocumentConverter):
 
         for prefix in CANDIDATE_MIME_TYPE_PREFIXES:
             if mimetype.startswith(prefix):
-                # Read further to see if it's a notebook
+                # Read further to see if it's a notebook.
+                # Guard against UnicodeDecodeError: accepts() must never raise —
+                # it should return False for any file it cannot decode.
+                # This can happen with binary files (e.g. French PDF with UTF-8
+                # accented characters: é, è, à → bytes starting with 0xc3)
+                # that happen to share the application/json MIME prefix.
                 cur_pos = file_stream.tell()
                 try:
                     encoding = stream_info.charset or "utf-8"
@@ -38,6 +43,9 @@ class IpynbConverter(DocumentConverter):
                         "nbformat" in notebook_content
                         and "nbformat_minor" in notebook_content
                     )
+                except (UnicodeDecodeError, ValueError):
+                    # File contains non-decodable bytes — definitely not a notebook
+                    return False
                 finally:
                     file_stream.seek(cur_pos)
 
