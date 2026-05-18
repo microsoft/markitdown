@@ -1,5 +1,6 @@
 #!/usr/bin/env python3 -m pytest
 import os
+import sys
 import time
 import pytest
 import subprocess
@@ -19,9 +20,14 @@ else:
         FileTestVector,
     )
 
+# === WorkBuddy managed Python compatibility ===
+# When running under WorkBuddy's managed Python, use sys.executable
+# instead of hardcoded "python" to ensure the correct venv is used.
+_PYTHON = sys.executable
+
 skip_remote = (
-    True if os.environ.get("GITHUB_ACTIONS") else False
-)  # Don't run these tests in CI
+    True if os.environ.get("GITHUB_ACTIONS") or os.environ.get("_WORKBUDDY_RAW_GITHUB_AVAILABLE") == "0" else False
+)  # Don't run these tests in CI or when GitHub raw is unreachable
 
 TEST_FILES_DIR = os.path.join(os.path.dirname(__file__), "test_files")
 TEST_FILES_URL = "https://raw.githubusercontent.com/microsoft/markitdown/refs/heads/main/packages/markitdown/tests/test_files"
@@ -46,13 +52,14 @@ def test_output_to_stdout(shared_tmp_dir, test_vector) -> None:
 
     result = subprocess.run(
         [
-            "python",
+            _PYTHON,
             "-m",
             "markitdown",
             os.path.join(TEST_FILES_DIR, test_vector.filename),
         ],
         capture_output=True,
         text=True,
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
     )
 
     assert result.returncode == 0, f"CLI exited with error: {result.stderr}"
@@ -69,7 +76,7 @@ def test_output_to_file(shared_tmp_dir, test_vector) -> None:
     output_file = os.path.join(shared_tmp_dir, test_vector.filename + ".output")
     result = subprocess.run(
         [
-            "python",
+            _PYTHON,
             "-m",
             "markitdown",
             "-o",
@@ -78,6 +85,7 @@ def test_output_to_file(shared_tmp_dir, test_vector) -> None:
         ],
         capture_output=True,
         text=True,
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
     )
 
     assert result.returncode == 0, f"CLI exited with error: {result.stderr}"
@@ -104,7 +112,7 @@ def test_input_from_stdin_without_hints(shared_tmp_dir, test_vector) -> None:
 
     result = subprocess.run(
         [
-            "python",
+            _PYTHON,
             "-m",
             "markitdown",
             os.path.join(TEST_FILES_DIR, test_vector.filename),
@@ -112,6 +120,7 @@ def test_input_from_stdin_without_hints(shared_tmp_dir, test_vector) -> None:
         input=test_input,
         capture_output=True,
         text=False,
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
     )
 
     stdout = result.stdout.decode(locale.getpreferredencoding())
@@ -135,9 +144,10 @@ def test_convert_url(shared_tmp_dir, test_vector):
 
     time.sleep(1)  # Ensure we don't hit rate limits
     result = subprocess.run(
-        ["python", "-m", "markitdown", TEST_FILES_URL + "/" + test_vector.filename],
+        [_PYTHON, "-m", "markitdown", TEST_FILES_URL + "/" + test_vector.filename],
         capture_output=True,
         text=False,
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
     )
 
     stdout = result.stdout.decode(locale.getpreferredencoding())
@@ -155,7 +165,7 @@ def test_output_to_file_with_data_uris(shared_tmp_dir, test_vector) -> None:
     output_file = os.path.join(shared_tmp_dir, test_vector.filename + ".output")
     result = subprocess.run(
         [
-            "python",
+            _PYTHON,
             "-m",
             "markitdown",
             "--keep-data-uris",
@@ -165,6 +175,7 @@ def test_output_to_file_with_data_uris(shared_tmp_dir, test_vector) -> None:
         ],
         capture_output=True,
         text=True,
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
     )
 
     assert result.returncode == 0, f"CLI exited with error: {result.stderr}"

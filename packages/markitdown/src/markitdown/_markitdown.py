@@ -18,6 +18,7 @@ import codecs
 
 from ._stream_info import StreamInfo
 from ._uri_utils import parse_data_uri, file_uri_to_path
+from ._cache import get_global_cache
 
 from .converters import (
     PlainTextConverter,
@@ -306,10 +307,29 @@ class MarkItDown:
         stream_info: Optional[StreamInfo] = None,
         file_extension: Optional[str] = None,  # Deprecated -- use stream_info
         url: Optional[str] = None,  # Deprecated -- use stream_info
+        security_check: bool = True,
         **kwargs: Any,
     ) -> DocumentConverterResult:
         if isinstance(path, Path):
             path = str(path)
+
+        # Security validation
+        if security_check:
+            # Check for path traversal
+            normalized_path = os.path.normpath(path)
+            if ".." in normalized_path.split(os.sep):
+                raise ValueError(f"Path traversal detected: {path}")
+
+            # Check for symlinks (warn by default)
+            if os.path.islink(path):
+                resolved_path = os.path.realpath(path)
+                warn(
+                    f"Symbolic link detected: {path} -> {resolved_path}. "
+                    "Ensure this is intended before proceeding."
+                )
+
+            # Resolve to absolute path
+            path = os.path.abspath(path)
 
         # Build a base StreamInfo object from which to start guesses
         base_guess = StreamInfo(
@@ -330,11 +350,26 @@ class MarkItDown:
             # Deprecated -- use stream_info
             base_guess = base_guess.copy_and_update(url=url)
 
+        # Check global cache first (if enabled)
+        # Note: path may have been modified by security checks (absolute path resolution)
+        cache = get_global_cache()
+        cached_result = None
+        if cache is not None:
+            cached_result = cache.get(path)
+            if cached_result is not None:
+                return cached_result
+
         with open(path, "rb") as fh:
             guesses = self._get_stream_info_guesses(
                 file_stream=fh, base_guess=base_guess
             )
-            return self._convert(file_stream=fh, stream_info_guesses=guesses, **kwargs)
+            result = self._convert(file_stream=fh, stream_info_guesses=guesses, **kwargs)
+
+        # Store in cache if enabled (only if we actually had to convert)
+        if cache is not None and cached_result is None:
+            cache.put(path, result)
+
+        return result
 
     def convert_stream(
         self,
@@ -451,11 +486,28 @@ class MarkItDown:
         elif uri.startswith("http:") or uri.startswith("https:"):
             response = self._requests_session.get(uri, stream=True)
             response.raise_for_status()
+
+            # Check content length before downloading (if available)
+            content_length = response.headers.get("content-length")
+            max_download_size = kwargs.get("max_download_size", 100 * 1024 * 1024)  # 100MB default
+            if content_length:
+                try:
+                    size = int(content_length)
+                    if size > max_download_size:
+                        raise ValueError(
+                            f"Download too large: {size} bytes ({size / 1024 / 1024:.1f} MB). "
+                            f"Maximum allowed: {max_download_size} bytes ({max_download_size / 1024 / 1024:.1f} MB). "
+                            f"Increase via max_download_size parameter if needed."
+                        )
+                except (ValueError, TypeError):
+                    pass  # Ignore invalid content-length headers
+
             return self.convert_response(
                 response,
                 stream_info=stream_info,
                 file_extension=file_extension,
                 url=mock_url,
+                max_download_size=max_download_size,
                 **kwargs,
             )
         else:
@@ -470,6 +522,7 @@ class MarkItDown:
         stream_info: Optional[StreamInfo] = None,
         file_extension: Optional[str] = None,  # Deprecated -- use stream_info
         url: Optional[str] = None,  # Deprecated -- use stream_info
+        max_download_size: int = 100 * 1024 * 1024,  # 100MB default
         **kwargs: Any,
     ) -> DocumentConverterResult:
         # If there is a content-type header, get the mimetype and charset (if present)
@@ -523,9 +576,17 @@ class MarkItDown:
             # Deprecated -- use stream_info
             base_guess = base_guess.copy_and_update(url=url)
 
-        # Read into BytesIO
+        # Read into BytesIO with size limit
         buffer = io.BytesIO()
-        for chunk in response.iter_content(chunk_size=512):
+        total_downloaded = 0
+        for chunk in response.iter_content(chunk_size=512 * 1024):  # 512KB chunks
+            total_downloaded += len(chunk)
+            if total_downloaded > max_download_size:
+                raise ValueError(
+                    f"Download exceeded maximum size: {total_downloaded} bytes. "
+                    f"Maximum allowed: {max_download_size} bytes ({max_download_size / 1024 / 1024:.1f} MB). "
+                    f"Increase via max_download_size parameter if needed."
+                )
             buffer.write(chunk)
         buffer.seek(0)
 

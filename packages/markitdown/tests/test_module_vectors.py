@@ -17,8 +17,8 @@ from markitdown import (
 )
 
 skip_remote = (
-    True if os.environ.get("GITHUB_ACTIONS") else False
-)  # Don't run these tests in CI
+    True if os.environ.get("GITHUB_ACTIONS") or os.environ.get("_WORKBUDDY_RAW_GITHUB_AVAILABLE") == "0" else False
+)  # Don't run these tests in CI or when GitHub raw is unreachable
 
 TEST_FILES_DIR = os.path.join(os.path.dirname(__file__), "test_files")
 TEST_FILES_URL = "https://raw.githubusercontent.com/microsoft/markitdown/refs/heads/main/packages/markitdown/tests/test_files"

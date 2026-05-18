@@ -17,6 +17,26 @@ from ._exceptions import (
     FileConversionException,
     UnsupportedFormatException,
 )
+from ._progress import (
+    ConversionPhase,
+    ConversionProgress,
+    ProgressCallback,
+    ProgressTracker,
+    create_progress_reporter,
+)
+from ._cache import (
+    ConversionCache,
+    enable_global_cache,
+    disable_global_cache,
+    get_global_cache,
+    _HAS_PSUTIL,
+)
+
+# Re-export logging if available, but don't fail if not imported
+try:
+    from . import _logging as logging
+except ImportError:
+    pass
 
 __all__ = [
     "__version__",
@@ -31,4 +51,17 @@ __all__ = [
     "StreamInfo",
     "PRIORITY_SPECIFIC_FILE_FORMAT",
     "PRIORITY_GENERIC_FILE_FORMAT",
+    # Progress tracking
+    "ConversionPhase",
+    "ConversionProgress",
+    "ProgressCallback",
+    "ProgressTracker",
+    "create_progress_reporter",
+    # Caching
+    "ConversionCache",
+    "enable_global_cache",
+    "disable_global_cache",
+    "get_global_cache",
+    # Logging
+    "logging",
 ]
