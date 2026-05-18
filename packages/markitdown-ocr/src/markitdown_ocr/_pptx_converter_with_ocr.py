@@ -7,8 +7,6 @@ import io
 import sys
 from typing import Any, BinaryIO, Optional
 
-from typing import BinaryIO, Any, Optional
-
 from markitdown.converters import HtmlConverter
 from markitdown import DocumentConverter, DocumentConverterResult, StreamInfo
 from markitdown._exceptions import (
@@ -118,10 +116,8 @@ class PptxConverterWithOCR(DocumentConverter):
                                 model=kwargs.get("llm_model"),
                                 prompt=kwargs.get("llm_prompt"),
                             )
-                        except Exception:
+                        except (ImportError, AttributeError, ValueError, RuntimeError):
                             pass
-
-                    # Try OCR if LLM failed or not available
                     ocr_text = ""
                     if not llm_description and ocr_service:
                         try:
@@ -129,7 +125,7 @@ class PptxConverterWithOCR(DocumentConverter):
                             ocr_result = ocr_service.extract_text(image_stream)
                             if ocr_result.text.strip():
                                 ocr_text = ocr_result.text.strip()
-                        except Exception:
+                        except (ValueError, RuntimeError, OSError):
                             pass
 
                     # Format extracted content using unified OCR block format

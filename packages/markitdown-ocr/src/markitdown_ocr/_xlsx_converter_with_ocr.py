@@ -131,7 +131,7 @@ class XlsxConverterWithOCR(DocumentConverter):
                     ).markdown.strip()
                     + "\n\n"
                 )
-            except Exception:
+            except (ValueError, TypeError, OSError):
                 # If pandas fails, just skip the table
                 pass
 
@@ -205,10 +205,10 @@ class XlsxConverterWithOCR(DocumentConverter):
                                 }
                             )
 
-                    except Exception:
+                    except (ValueError, RuntimeError, OSError):
                         continue
 
-        except Exception:
+        except (AttributeError, KeyError, TypeError):
             pass
 
         return results

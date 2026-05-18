@@ -104,7 +104,7 @@ class LLMVisionOCRService:
                 text=text.strip() if text else "",
                 backend_used="llm_vision",
             )
-        except Exception as e:
+        except (RuntimeError, TypeError, ValueError, ConnectionError, OSError) as e:
             return OCRResult(text="", backend_used="llm_vision", error=str(e))
         finally:
             image_stream.seek(0)

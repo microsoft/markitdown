@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: MIT
 
+"""MarkItDown MCP Server — exposes MarkItDown as a Model Context Protocol service."""
+
 from .__about__ import __version__
 
 __all__ = [

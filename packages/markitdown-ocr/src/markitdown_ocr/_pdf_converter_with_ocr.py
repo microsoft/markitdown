@@ -80,10 +80,8 @@ def _extract_images_from_page(page: Any) -> list[dict]:
                         img_stream.seek(0)
 
                         y_pos = img_dict.get("top", 0)
-                    except Exception:
+                    except (IOError, OSError, ValueError):
                         pass
-
-                # Method B: Fallback to rendering page region
                 if img_stream is None:
                     x0 = img_dict.get("x0", 0)
                     y0 = img_dict.get("top", 0)
@@ -117,10 +115,10 @@ def _extract_images_from_page(page: Any) -> list[dict]:
                         }
                     )
 
-            except Exception:
+            except (KeyError, AttributeError, ValueError, OSError):
                 continue
 
-    except Exception:
+    except (AttributeError, TypeError):
         pass
 
     return images_info
@@ -294,12 +292,12 @@ class PdfConverterWithOCR(DocumentConverter):
                     pdf_bytes.seek(0)
                     markdown = pdfminer.high_level.extract_text(pdf_bytes)
 
-        except Exception:
+        except (ValueError, OSError):
             # Fallback to pdfminer
             try:
                 pdf_bytes.seek(0)
                 markdown = pdfminer.high_level.extract_text(pdf_bytes)
-            except Exception:
+            except (ValueError, OSError):
                 markdown = ""
 
         # Final fallback: If still empty/whitespace and OCR is available,
@@ -329,7 +327,7 @@ class PdfConverterWithOCR(DocumentConverter):
                 if page_num <= len(pdf.pages):
                     page = pdf.pages[page_num - 1]  # 0-indexed
                     images = _extract_images_from_page(page)
-        except Exception:
+        except (ValueError, OSError, AttributeError):
             pass
 
         # Sort by vertical position (top to bottom)
@@ -377,13 +375,13 @@ class PdfConverterWithOCR(DocumentConverter):
                                 "*[No text could be extracted from this page]*"
                             )
 
-                    except Exception as e:
+                    except (ValueError, RuntimeError, OSError) as e:
                         markdown_parts.append(
                             f"*[Error processing page {page_num}: {str(e)}]*"
                         )
                         continue
 
-        except Exception:
+        except (ValueError, OSError):
             # pdfplumber failed (e.g. malformed EOF) — try PyMuPDF for rendering
             markdown_parts = []
             try:
@@ -410,13 +408,13 @@ class PdfConverterWithOCR(DocumentConverter):
                                 "*[No text could be extracted from this page]*"
                             )
 
-                    except Exception as e:
+                    except (ValueError, RuntimeError, OSError) as e:
                         markdown_parts.append(
                             f"*[Error processing page {page_num}: {str(e)}]*"
                         )
                         continue
                 doc.close()
-            except Exception:
+            except (ImportError, ValueError, OSError):
                 return "*[Error: Could not process scanned PDF]*"
 
         return "\n\n".join(markdown_parts).strip()
