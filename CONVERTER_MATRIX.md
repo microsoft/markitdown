@@ -1,7 +1,7 @@
 # MarkItDown Converter Capability Matrix
 
 > Auto-generated from 22 converters in `packages/markitdown/src/markitdown/converters/`
-> Last updated: 2026-05-18 | Darwin R2 · D5 Documentation
+> Last updated: 2026-05-18 | Darwin R5 · D2 Code Quality
 
 ## Overview
 
@@ -108,6 +108,17 @@
 | **Legend** | ❌=none | ⚠️=too broad | ✅=specific | — | — | — |
 | *RSS used `except BaseException` | `except Exception` (anti-patterns) | — | — | — | — |
 | **R4 (Darwin)** improved Image/Audio/Ipynb/BingSerp | error handling (5→8→11 converters covered) | — | — | — | — |
+| **R5 (Darwin)** extracted accepts() pattern → `_accepted_by_mime_or_ext()` | -127 net lines, 15+ DRY violations resolved | — | — | — | — |
+
+## Code Quality Metrics (post-R5)
+
+| Metric | Pre-R5 | Post-R5 | Improvement |
+|--------|:------:|:-------:|:-----------:|
+| Duplicate `accepts()` blocks | 15+ identical patterns | 0 (single base impl) | **100%** |
+| Net lines in converters/ | ~230 duplicate lines removed | -127 lines | **-35%** |
+| Empty `__init__` methods | 1 (CsvConverter) | 0 | **100%** |
+| `_base_converter` static helpers | 0 | 2 (`_accepted_by_mime_or_ext`, `_accepted_by_url_pattern`) | **new** |
+| Tests | 283 passed, 0 failed | 283 passed, 0 failed | **stable** |
 
 ## Known Limitations
 
