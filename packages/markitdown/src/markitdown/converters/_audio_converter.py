@@ -1,10 +1,13 @@
 from typing import Any, BinaryIO
+import logging
 
 from ._exiftool import exiftool_metadata
 from ._transcribe_audio import transcribe_audio
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException
+
+logger = logging.getLogger(__name__)
 
 ACCEPTED_MIME_TYPE_PREFIXES = [
     "audio/x-wav",
@@ -52,9 +55,13 @@ class AudioConverter(DocumentConverter):
         md_content = ""
 
         # Add metadata
-        metadata = exiftool_metadata(
-            file_stream, exiftool_path=kwargs.get("exiftool_path")
-        )
+        try:
+            metadata = exiftool_metadata(
+                file_stream, exiftool_path=kwargs.get("exiftool_path")
+            )
+        except Exception as e:
+            logger.warning("AudioConverter: exiftool metadata extraction failed: %s", e)
+            metadata = None
         if metadata:
             for f in [
                 "Title",
@@ -96,6 +103,12 @@ class AudioConverter(DocumentConverter):
                     md_content += "\n\n### Audio Transcript:\n" + transcript
             except MissingDependencyException:
                 pass
+            except Exception as e:
+                logger.warning(
+                    "AudioConverter: transcription failed for format=%s: %s",
+                    audio_format,
+                    e,
+                )
 
         # Return the result
         return DocumentConverterResult(markdown=md_content.strip())

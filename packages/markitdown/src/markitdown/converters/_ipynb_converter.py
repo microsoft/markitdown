@@ -1,9 +1,12 @@
 from typing import BinaryIO, Any
 import json
+import logging
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._exceptions import FileConversionException
 from .._stream_info import StreamInfo
+
+logger = logging.getLogger(__name__)
 
 CANDIDATE_MIME_TYPE_PREFIXES = [
     "application/json",
@@ -38,6 +41,8 @@ class IpynbConverter(DocumentConverter):
                         "nbformat" in notebook_content
                         and "nbformat_minor" in notebook_content
                     )
+                except (UnicodeDecodeError, LookupError):
+                    return False
                 finally:
                     file_stream.seek(cur_pos)
 
@@ -51,8 +56,21 @@ class IpynbConverter(DocumentConverter):
     ) -> DocumentConverterResult:
         # Parse and convert the notebook
         encoding = stream_info.charset or "utf-8"
-        notebook_content = file_stream.read().decode(encoding=encoding)
-        return self._convert(json.loads(notebook_content))
+        try:
+            notebook_content = file_stream.read().decode(encoding=encoding)
+        except (UnicodeDecodeError, LookupError) as e:
+            raise FileConversionException(
+                f"Failed to decode .ipynb file with encoding '{encoding}': {e}"
+            ) from e
+
+        try:
+            notebook_json = json.loads(notebook_content)
+        except json.JSONDecodeError as e:
+            raise FileConversionException(
+                f"Failed to parse .ipynb file as JSON: {e}"
+            ) from e
+
+        return self._convert(notebook_json)
 
     def _convert(self, notebook_content: dict) -> DocumentConverterResult:
         """Helper function that converts notebook JSON content to Markdown."""

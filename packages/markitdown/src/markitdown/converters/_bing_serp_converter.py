@@ -1,13 +1,16 @@
 import re
 import base64
 import binascii
+import logging
 from urllib.parse import parse_qs, urlparse
 from typing import Any, BinaryIO
-from bs4 import BeautifulSoup
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
+from .._exceptions import FileConversionException
 from .._stream_info import StreamInfo
 from ._markdownify import _CustomMarkdownify
+
+logger = logging.getLogger(__name__)
 
 ACCEPTED_MIME_TYPE_PREFIXES = [
     "text/html",
@@ -60,22 +63,36 @@ class BingSerpConverter(DocumentConverter):
         stream_info: StreamInfo,
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
-        assert stream_info.url is not None
+        if stream_info.url is None:
+            raise FileConversionException(
+                "BingSerpConverter requires a URL in stream_info"
+            )
 
         # Parse the query parameters
         parsed_params = parse_qs(urlparse(stream_info.url).query)
         query = parsed_params.get("q", [""])[0]
 
-        # Parse the stream
+        # Parse the stream as BeautifulSoup
         encoding = "utf-8" if stream_info.charset is None else stream_info.charset
-        soup = BeautifulSoup(file_stream, "html.parser", from_encoding=encoding)
+        try:
+            soup = __import__("bs4", fromlist=["BeautifulSoup"]).BeautifulSoup(
+                file_stream, "html.parser", from_encoding=encoding
+            )
+        except Exception as e:
+            logger.warning("BingSerpConverter: BeautifulSoup parse failed: %s", e)
+            raise FileConversionException(
+                f"BingSerpConverter: failed to parse HTML: {e}"
+            ) from e
 
         # Clean up some formatting
-        for tptt in soup.find_all(class_="tptt"):
-            if hasattr(tptt, "string") and tptt.string:
-                tptt.string += " "
-        for slug in soup.find_all(class_="algoSlug_icon"):
-            slug.extract()
+        try:
+            for tptt in soup.find_all(class_="tptt"):
+                if hasattr(tptt, "string") and tptt.string:
+                    tptt.string += " "
+            for slug in soup.find_all(class_="algoSlug_icon"):
+                slug.extract()
+        except Exception as e:
+            logger.warning("BingSerpConverter: HTML cleanup failed: %s", e)
 
         # Parse the algorithmic results
         _markdownify = _CustomMarkdownify(**kwargs)
@@ -103,9 +120,22 @@ class BingSerpConverter(DocumentConverter):
                         pass
                     except binascii.Error:
                         pass
+                    except Exception as e:
+                        logger.warning(
+                            "BingSerpConverter: base64 decode failed for %s: %s",
+                            u[:50],
+                            e,
+                        )
 
             # Convert to markdown
-            md_result = _markdownify.convert_soup(result).strip()
+            try:
+                md_result = _markdownify.convert_soup(result).strip()
+            except Exception as e:
+                logger.warning(
+                    "BingSerpConverter: markdownify conversion failed: %s", e
+                )
+                continue
+
             lines = [line.strip() for line in re.split(r"\n+", md_result)]
             results.append("\n".join([line for line in lines if len(line) > 0]))
 
@@ -114,7 +144,14 @@ class BingSerpConverter(DocumentConverter):
             + "\n\n".join(results)
         )
 
+        title = None
+        try:
+            if soup.title is not None:
+                title = soup.title.string
+        except Exception:
+            pass
+
         return DocumentConverterResult(
             markdown=webpage_text,
-            title=None if soup.title is None else soup.title.string,
+            title=title,
         )

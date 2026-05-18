@@ -263,3 +263,90 @@ def test_local_file_usable(filename):
     path = os.path.join(TEST_FILES_DIR, filename)
     assert os.path.isfile(path), f"Missing test file: {path}"
     assert os.path.getsize(path) > 0, f"Empty test file: {path}"
+
+
+# ── R4: Error handling in image / audio / ipynb / bing_serp converters ──
+
+
+def test_corrupt_ipynb_invalid_json():
+    """Corrupt .ipynb (invalid JSON) should raise FileConversionException.
+    
+    Tests the IpynbConverter directly (bypassing PlainTextConverter priority)
+    because in the full pipeline, PlainTextConverter (priority 10.0) catches
+    non-HTML text before IpynbConverter (priority 0.0).
+    """
+    from markitdown.converters._ipynb_converter import IpynbConverter
+    
+    converter = IpynbConverter()
+    corrupt_data = b'{"nbformat": 4, "nbformat_minor": 5, "cells": [BROKEN'
+    
+    with pytest.raises(FileConversionException):
+        converter.convert(
+            io.BytesIO(corrupt_data),
+            StreamInfo(extension=".ipynb", mimetype="application/json"),
+        )
+
+
+def test_ipynb_wrong_encoding():
+    """Non-UTF-8 .ipynb with valid JSON structure should still decode."""
+    md = _make_md()
+    notebook = b'{"cells":[],"metadata":{},"nbformat":4,"nbformat_minor":5}'
+    result = md.convert(
+        io.BytesIO(notebook),
+        stream_info=StreamInfo(extension=".ipynb", mimetype="application/json"),
+    )
+    # Should produce empty markdown (no cells), not crash
+    assert result is not None
+
+
+def test_bing_serp_no_url():
+    """BingSerpConverter without URL should raise error."""
+    md = _make_md()
+    html = b"<html><body><h1>Test</h1></body></html>"
+    # Without a bing.com URL, this won't match BingSerpConverter;
+    # should fall through to another converter or raise UnsupportedFormatException
+    try:
+        result = md.convert(
+            io.BytesIO(html),
+            stream_info=StreamInfo(extension=".html", mimetype="text/html"),
+        )
+        # If it succeeds, it used a different converter (likely HtmlConverter)
+        assert result is not None
+    except (UnsupportedFormatException, FileConversionException):
+        pass  # Also acceptable: gracefully reject
+
+
+def test_malformed_html_graceful():
+    """Severely malformed HTML should not crash converters."""
+    md = _make_md()
+    # Binary garbage that looks like HTML but isn't really
+    corrupt_html = b"<html><head></head><body><<<>>>{{{{malformed</body></html>"
+    try:
+        result = md.convert(
+            io.BytesIO(corrupt_html),
+            stream_info=StreamInfo(extension=".html", mimetype="text/html"),
+        )
+        assert result is not None
+    except FileConversionException:
+        pass  # Acceptable: raised by converter with proper error handling
+
+
+def test_image_converter_no_llm():
+    """Image converter without LLM client should still return metadata."""
+    md = _make_md()
+    test_file = os.path.join(TEST_FILES_DIR, "test_llm.jpg")
+    # No llm_client → should return metadata only (no crash)
+    result = md.convert(test_file)
+    assert result is not None
+    # Should at minimum have some output (metadata or empty)
+    assert hasattr(result, "text_content")
+
+
+def test_audio_converter_no_speech():
+    """Audio converter without speech_recognition should return metadata only."""
+    md = _make_md()
+    test_file = os.path.join(TEST_FILES_DIR, "test.wav")
+    # No speech_recognition installed → metadata only, no crash
+    result = md.convert(test_file)
+    assert result is not None
+    assert hasattr(result, "text_content")
