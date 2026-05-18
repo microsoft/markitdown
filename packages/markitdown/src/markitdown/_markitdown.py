@@ -551,6 +551,9 @@ class MarkItDown:
         # Remember the initial stream position so that we can return to it
         cur_pos = file_stream.tell()
 
+        # Stop trying further guesses if a specific-format converter has already failed.
+        _specific_converter_failed = False
+
         for stream_info in stream_info_guesses + [StreamInfo()]:
             for converter_registration in sorted_registrations:
                 converter = converter_registration.converter
@@ -610,6 +613,8 @@ class MarkItDown:
                                 converter=converter, exc_info=sys.exc_info()
                             )
                         )
+                        if converter_registration.priority < PRIORITY_GENERIC_FILE_FORMAT:
+                            _specific_converter_failed = True
                     finally:
                         file_stream.seek(cur_pos)
 
@@ -620,6 +625,9 @@ class MarkItDown:
                     )
                     res.text_content = re.sub(r"\n{3,}", "\n\n", res.text_content)
                     return res
+
+            if _specific_converter_failed:
+                break
 
         # If we got this far without success, report any exceptions
         if len(failed_attempts) > 0:

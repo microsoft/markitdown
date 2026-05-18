@@ -3,6 +3,7 @@ import io
 import os
 import re
 import shutil
+import tempfile
 import pytest
 from unittest.mock import MagicMock
 
@@ -430,6 +431,33 @@ def test_exceptions() -> None:
         )
     assert len(exc_info.value.attempts) == 1
     assert type(exc_info.value.attempts[0].converter).__name__ == "PptxConverter"
+
+
+def test_invalid_ooxml_raises_exception() -> None:
+    """Corrupt or non-OOXML files with .docx/.pptx/.xlsx extensions must raise
+    FileConversionException rather than silently succeeding (issue #1408).
+    """
+    markitdown = MarkItDown()
+    fake_content = b"This is not a valid Office Open XML file."
+
+    for ext, expected_converter in (
+        (".docx", "DocxConverter"),
+        (".pptx", "PptxConverter"),
+        (".xlsx", "XlsxConverter"),
+    ):
+        with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as f:
+            f.write(fake_content)
+            path = f.name
+
+        try:
+            with pytest.raises(FileConversionException) as exc_info:
+                markitdown.convert(path)
+            assert any(
+                type(a.converter).__name__ == expected_converter
+                for a in exc_info.value.attempts
+            ), f"Expected {expected_converter} in failed attempts for {ext}"
+        finally:
+            os.unlink(path)
 
 
 @pytest.mark.skipif(
