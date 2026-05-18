@@ -1,5 +1,6 @@
 from defusedxml import minidom
 from xml.dom.minidom import Document, Element
+from xml.parsers.expat import ExpatError
 from typing import BinaryIO, Any, Union
 from bs4 import BeautifulSoup
 
@@ -65,11 +66,10 @@ class RssConverter(DocumentConverter):
         try:
             doc = minidom.parse(file_stream)
             return self._feed_type(doc) is not None
-        except BaseException as _:
-            pass
+        except (ExpatError, ValueError, OSError):
+            return False
         finally:
             file_stream.seek(cur_pos)
-        return False
 
     def _feed_type(self, doc: Any) -> str | None:
         if doc.getElementsByTagName("rss"):
@@ -173,7 +173,7 @@ class RssConverter(DocumentConverter):
             # using bs4 because many RSS feeds have HTML-styled content
             soup = BeautifulSoup(content, "html.parser")
             return _CustomMarkdownify(**self._kwargs).convert_soup(soup)
-        except BaseException as _:
+        except Exception:
             return content
 
     def _get_data_by_tag_name(

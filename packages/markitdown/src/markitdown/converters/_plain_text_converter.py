@@ -1,9 +1,13 @@
 import sys
+import logging
 
 from typing import BinaryIO, Any
 from charset_normalizer import from_bytes
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
+from .._exceptions import FileConversionException
+
+logger = logging.getLogger(__name__)
 
 # Try loading optional (but in this case, required) dependencies
 # Save reporting of any exceptions for later
@@ -63,9 +67,19 @@ class PlainTextConverter(DocumentConverter):
         stream_info: StreamInfo,
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
-        if stream_info.charset:
-            text_content = file_stream.read().decode(stream_info.charset)
-        else:
-            text_content = str(from_bytes(file_stream.read()).best())
+        raw_bytes = file_stream.read()
+        if not raw_bytes:
+            return DocumentConverterResult(markdown="")
+
+        try:
+            if stream_info.charset:
+                text_content = raw_bytes.decode(stream_info.charset)
+            else:
+                text_content = str(from_bytes(raw_bytes).best())
+        except (UnicodeDecodeError, LookupError) as e:
+            logger.warning("PlainText encoding detection failed: %s", e)
+            raise FileConversionException(
+                f"PlainTextConverter: unable to decode content with charset={stream_info.charset}: {e}"
+            ) from e
 
         return DocumentConverterResult(markdown=text_content)

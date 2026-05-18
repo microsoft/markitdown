@@ -1,10 +1,14 @@
 import re
+import logging
 import bs4
 from typing import Any, BinaryIO
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
+from .._exceptions import FileConversionException
 from ._markdownify import _CustomMarkdownify
+
+logger = logging.getLogger(__name__)
 
 ACCEPTED_MIME_TYPE_PREFIXES = [
     "text/html",
@@ -55,8 +59,14 @@ class WikipediaConverter(DocumentConverter):
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
         # Parse the stream
-        encoding = "utf-8" if stream_info.charset is None else stream_info.charset
-        soup = bs4.BeautifulSoup(file_stream, "html.parser", from_encoding=encoding)
+        try:
+            encoding = "utf-8" if stream_info.charset is None else stream_info.charset
+            soup = bs4.BeautifulSoup(file_stream, "html.parser", from_encoding=encoding)
+        except (bs4.FeatureNotFound, UnicodeDecodeError, LookupError) as e:
+            logger.warning("Wikipedia HTML parsing failed: %s", e)
+            raise FileConversionException(
+                f"WikipediaConverter: unable to parse HTML (encoding={encoding}): {e}"
+            ) from e
 
         # Remove javascript and style blocks
         for script in soup(["script", "style"]):
@@ -66,20 +76,26 @@ class WikipediaConverter(DocumentConverter):
         body_elm = soup.find("div", {"id": "mw-content-text"})
         title_elm = soup.find("span", {"class": "mw-page-title-main"})
 
-        webpage_text = ""
-        main_title = None if soup.title is None else soup.title.string
+        try:
+            webpage_text = ""
+            main_title = None if soup.title is None else soup.title.string
 
-        if body_elm:
-            # What's the title
-            if title_elm and isinstance(title_elm, bs4.Tag):
-                main_title = title_elm.string
+            if body_elm:
+                # What's the title
+                if title_elm and isinstance(title_elm, bs4.Tag):
+                    main_title = title_elm.string
 
-            # Convert the page
-            webpage_text = f"# {main_title}\n\n" + _CustomMarkdownify(
-                **kwargs
-            ).convert_soup(body_elm)
-        else:
-            webpage_text = _CustomMarkdownify(**kwargs).convert_soup(soup)
+                # Convert the page
+                webpage_text = f"# {main_title}\n\n" + _CustomMarkdownify(
+                    **kwargs
+                ).convert_soup(body_elm)
+            else:
+                webpage_text = _CustomMarkdownify(**kwargs).convert_soup(soup)
+        except Exception as e:
+            logger.warning("Wikipedia content extraction failed: %s", e)
+            raise FileConversionException(
+                f"WikipediaConverter: content extraction failed: {e}"
+            ) from e
 
         return DocumentConverterResult(
             markdown=webpage_text,

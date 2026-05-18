@@ -1,11 +1,15 @@
 import io
+import logging
 import warnings
 from typing import Any, BinaryIO, Optional
 from bs4 import BeautifulSoup
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
+from .._exceptions import FileConversionException
 from ._markdownify import _CustomMarkdownify
+
+logger = logging.getLogger(__name__)
 
 ACCEPTED_MIME_TYPE_PREFIXES = [
     "text/html",
@@ -51,7 +55,13 @@ class HtmlConverter(DocumentConverter):
 
         # Parse the stream
         encoding = "utf-8" if stream_info.charset is None else stream_info.charset
-        soup = BeautifulSoup(file_stream, "html.parser", from_encoding=encoding)
+        try:
+            soup = BeautifulSoup(file_stream, "html.parser", from_encoding=encoding)
+        except (UnicodeDecodeError, LookupError) as e:
+            logger.warning("HTML parsing failed: encoding=%s: %s", encoding, e)
+            raise FileConversionException(
+                f"HtmlConverter: unable to parse HTML (encoding={encoding}): {e}"
+            ) from e
 
         # Remove javascript and style blocks
         for script in soup(["script", "style"]):
