@@ -1,3 +1,5 @@
+"""Base converter infrastructure — converter result, registration, and abstract base class."""
+
 from typing import Any, BinaryIO, List, Optional
 from ._stream_info import StreamInfo
 

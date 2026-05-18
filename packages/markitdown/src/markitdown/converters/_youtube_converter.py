@@ -1,3 +1,5 @@
+"""YouTube page converter — extracts video metadata, description, and transcript from YouTube watch pages."""
+
 import json
 import time
 import re
@@ -99,7 +101,7 @@ class YouTubeConverter(DocumentConverter):
                         if attrdesc and isinstance(attrdesc, dict):
                             metadata["description"] = str(attrdesc.get("content", ""))
                     break
-        except Exception as e:
+        except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
             print(f"Error extracting description: {e}")
             pass
 
@@ -161,7 +163,7 @@ class YouTubeConverter(DocumentConverter):
                         transcript_text = " ".join(
                             [part.text for part in transcript]
                         )  # type: ignore
-                except Exception as e:
+                except (OSError, RuntimeError, ValueError) as e:
                     # No transcript available
                     if len(languages) == 1:
                         print(f"Error fetching transcript: {e}")

@@ -1,3 +1,5 @@
+"""HTML converter — generic HTML-to-Markdown conversion using markdownify with table support."""
+
 import io
 import logging
 import warnings

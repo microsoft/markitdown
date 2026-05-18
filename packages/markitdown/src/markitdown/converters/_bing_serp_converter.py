@@ -1,3 +1,5 @@
+"""Bing SERP HTML converter — extracts organic search results from Bing result pages."""
+
 import re
 import base64
 import binascii
@@ -64,7 +66,7 @@ class BingSerpConverter(DocumentConverter):
             soup = __import__("bs4", fromlist=["BeautifulSoup"]).BeautifulSoup(
                 file_stream, "html.parser", from_encoding=encoding
             )
-        except Exception as e:
+        except (IOError, UnicodeDecodeError) as e:
             logger.warning("BingSerpConverter: BeautifulSoup parse failed: %s", e)
             raise FileConversionException(
                 f"BingSerpConverter: failed to parse HTML: {e}"
@@ -77,7 +79,7 @@ class BingSerpConverter(DocumentConverter):
                     tptt.string += " "
             for slug in soup.find_all(class_="algoSlug_icon"):
                 slug.extract()
-        except Exception as e:
+        except (AttributeError, RuntimeError) as e:
             logger.warning("BingSerpConverter: HTML cleanup failed: %s", e)
 
         # Parse the algorithmic results
@@ -106,7 +108,7 @@ class BingSerpConverter(DocumentConverter):
                         pass
                     except binascii.Error:
                         pass
-                    except Exception as e:
+                    except (ValueError, TypeError) as e:
                         logger.warning(
                             "BingSerpConverter: base64 decode failed for %s: %s",
                             u[:50],
@@ -116,7 +118,7 @@ class BingSerpConverter(DocumentConverter):
             # Convert to markdown
             try:
                 md_result = _markdownify.convert_soup(result).strip()
-            except Exception as e:
+            except (RuntimeError, ValueError, TypeError) as e:
                 logger.warning(
                     "BingSerpConverter: markdownify conversion failed: %s", e
                 )
@@ -134,7 +136,7 @@ class BingSerpConverter(DocumentConverter):
         try:
             if soup.title is not None:
                 title = soup.title.string
-        except Exception:
+        except AttributeError:
             pass
 
         return DocumentConverterResult(

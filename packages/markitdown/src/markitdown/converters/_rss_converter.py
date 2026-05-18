@@ -1,3 +1,5 @@
+"""RSS/Atom feed converter — parses RSS 2.0 and Atom feeds to Markdown."""
+
 from defusedxml import minidom
 from xml.dom.minidom import Document, Element
 from xml.parsers.expat import ExpatError
@@ -171,7 +173,7 @@ class RssConverter(DocumentConverter):
             # using bs4 because many RSS feeds have HTML-styled content
             soup = BeautifulSoup(content, "html.parser")
             return _CustomMarkdownify(**self._kwargs).convert_soup(soup)
-        except Exception:
+        except (RuntimeError, ValueError, TypeError):
             return content
 
     def _get_data_by_tag_name(

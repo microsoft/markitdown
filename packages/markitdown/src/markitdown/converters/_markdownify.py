@@ -1,3 +1,5 @@
+"""Custom Markdownify wrapper — extends markdownify with URL sanitization, data URI handling, and checkbox support."""
+
 import re
 import markdownify
 

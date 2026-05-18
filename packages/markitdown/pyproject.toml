@@ -77,6 +77,7 @@ features = ["all"]
 features = ["all"]
 extra-dependencies = [
   "openai",
+  "pytest-xdist>=3.0",
 ]
 
 [tool.hatch.envs.types]

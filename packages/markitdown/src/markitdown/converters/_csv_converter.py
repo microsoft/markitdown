@@ -1,3 +1,5 @@
+"""CSV converter — converts comma/tab-delimited files to Markdown tables."""
+
 import csv
 import io
 import logging

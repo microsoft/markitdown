@@ -1,3 +1,5 @@
+"""MarkItDown — the main document conversion engine."""
+
 import mimetypes
 import os
 import re
@@ -76,7 +78,7 @@ def _load_plugins() -> Union[None, List[Any]]:
     for entry_point in entry_points(group="markitdown.plugin"):
         try:
             _plugins.append(entry_point.load())
-        except Exception:
+        except Exception:  # Plugin loading — third-party code may raise anything
             tb = traceback.format_exc()
             warn(f"Plugin '{entry_point.name}' failed to load ... skipping:\n{tb}")
 
@@ -243,7 +245,7 @@ class MarkItDown:
             for plugin in plugins:
                 try:
                     plugin.register_converters(self, **kwargs)
-                except Exception:
+                except Exception:  # Plugin registration — third-party code may raise anything
                     tb = traceback.format_exc()
                     warn(f"Plugin '{plugin}' failed to register converters:\n{tb}")
             self._plugins_enabled = True
@@ -665,7 +667,7 @@ class MarkItDown:
                 if _accepts:
                     try:
                         res = converter.convert(file_stream, stream_info, **_kwargs)
-                    except Exception:
+                    except Exception:  # Conversion wrapper — any converter error must be caught
                         failed_attempts.append(
                             FailedConversionAttempt(
                                 converter=converter, exc_info=sys.exc_info()

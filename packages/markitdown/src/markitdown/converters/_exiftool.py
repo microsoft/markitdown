@@ -1,3 +1,5 @@
+"""ExifTool metadata extraction helper — wraps exiftool CLI for reading image/audio/video metadata."""
+
 import json
 import locale
 import subprocess

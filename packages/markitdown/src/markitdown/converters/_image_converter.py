@@ -1,3 +1,5 @@
+"""Image converter — extracts EXIF metadata via exiftool and generates descriptions via multimodal LLM."""
+
 from typing import BinaryIO, Any, Union
 import base64
 import logging
@@ -45,7 +47,7 @@ class ImageConverter(DocumentConverter):
             metadata = exiftool_metadata(
                 file_stream, exiftool_path=kwargs.get("exiftool_path")
             )
-        except Exception as e:
+        except (FileNotFoundError, OSError, RuntimeError) as e:
             logger.warning("ImageConverter: exiftool metadata extraction failed: %s", e)
             metadata = None
 
@@ -77,7 +79,7 @@ class ImageConverter(DocumentConverter):
                     model=llm_model,
                     prompt=kwargs.get("llm_prompt"),
                 )
-            except Exception as e:
+            except (OSError, ValueError, RuntimeError) as e:
                 logger.warning(
                     "ImageConverter: LLM description failed for %s: %s",
                     getattr(stream_info, "extension", "?"),
@@ -111,7 +113,7 @@ class ImageConverter(DocumentConverter):
                 content_type, _ = mimetypes.guess_type(
                     "_dummy" + (stream_info.extension or "")
                 )
-            except Exception:
+            except (OSError, ValueError):
                 content_type = None
         if not content_type:
             content_type = "application/octet-stream"
@@ -158,7 +160,7 @@ class ImageConverter(DocumentConverter):
         try:
             response = client.chat.completions.create(model=model, messages=messages)
             return response.choices[0].message.content
-        except Exception as e:
+        except (OSError, ValueError, RuntimeError) as e:
             logger.warning(
                 "ImageConverter: LLM API call failed for %s: %s",
                 getattr(stream_info, "extension", "?"),

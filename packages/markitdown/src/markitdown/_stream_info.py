@@ -1,3 +1,5 @@
+"""Stream metadata for file identification and conversion routing."""
+
 from dataclasses import dataclass, asdict
 from typing import Optional
 

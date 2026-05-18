@@ -1,3 +1,5 @@
+"""DOCX converter — converts Word documents to Markdown preserving headings, tables, and images."""
+
 import sys
 import io
 from warnings import warn

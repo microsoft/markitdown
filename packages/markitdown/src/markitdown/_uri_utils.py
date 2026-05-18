@@ -1,3 +1,5 @@
+"""URI/path utilities — file URI conversion and data URI detection."""
+
 import base64
 import os
 from typing import Tuple, Dict

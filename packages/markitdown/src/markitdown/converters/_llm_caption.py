@@ -1,3 +1,5 @@
+"""Shared LLM caption helper — calls a multimodal LLM (OpenAI-compatible) to caption image content."""
+
 from typing import BinaryIO, Union
 import base64
 import mimetypes
@@ -21,7 +23,7 @@ def llm_caption(
     cur_pos = file_stream.tell()
     try:
         base64_image = base64.b64encode(file_stream.read()).decode("utf-8")
-    except Exception as e:
+    except (OSError, ValueError) as e:
         return None
     finally:
         file_stream.seek(cur_pos)

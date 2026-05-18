@@ -90,8 +90,7 @@ class ProgressTracker:
         )
         try:
             self._callback(progress)
-        except Exception:
-            # Never let callback errors break conversion
+        except Exception:  # Callback error guard — must never break conversion
             pass
 
 

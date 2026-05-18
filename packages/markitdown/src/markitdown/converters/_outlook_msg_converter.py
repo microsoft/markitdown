@@ -1,3 +1,5 @@
+"""Outlook .msg converter — extracts email metadata and body from Outlook message files via olefile."""
+
 import sys
 from typing import Any, Union, BinaryIO
 from .._stream_info import StreamInfo
@@ -55,7 +57,7 @@ class OutlookMsgConverter(DocumentConverter):
                 "__properties_version1.0" in toc
                 and "__recip_version1.0_#00000000" in toc
             )
-        except Exception:
+        except (OSError, RuntimeError):
             return False
         finally:
             file_stream.seek(cur_pos)
@@ -134,6 +136,6 @@ class OutlookMsgConverter(DocumentConverter):
                     except UnicodeDecodeError:
                         # Last resort - ignore errors
                         return data.decode("utf-8", errors="ignore").strip()
-        except Exception:
+        except (AttributeError, OSError, IndexError, RuntimeError):
             pass
         return None

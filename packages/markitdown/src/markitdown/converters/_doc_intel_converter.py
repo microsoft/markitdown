@@ -1,3 +1,5 @@
+"""Azure Document Intelligence converter — cloud-based OCR/layout analysis for documents and images."""
+
 import sys
 import re
 import os

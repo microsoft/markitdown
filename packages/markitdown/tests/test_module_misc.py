@@ -407,27 +407,19 @@ def test_doc_rlink() -> None:
         os.remove(rlink_file_path)
 
 
-@pytest.mark.skipif(
-    skip_remote,
-    reason="do not run tests that query external urls",
-)
 def test_markitdown_remote() -> None:
+    """Test remote URL conversion (arxiv PDF served from local mock)."""
     markitdown = MarkItDown()
 
-    # By URL
+    # By URL (intercepted by conftest mock → local test.pdf)
     result = markitdown.convert(PDF_TEST_URL)
     for test_string in PDF_TEST_STRINGS:
         assert test_string in result.text_content
 
-    # Youtube
-    # result = markitdown.convert(YOUTUBE_TEST_URL)
-    # for test_string in YOUTUBE_TEST_STRINGS:
-    #    assert test_string in result.text_content
-
 
 @pytest.mark.skipif(
-    skip_remote,
-    reason="do not run remotely run speech transcription tests",
+    os.environ.get("_WORKBUDDY_GOOGLE_REACHABLE") == "0",
+    reason="Google Speech API unreachable and mock not active",
 )
 def test_speech_transcription() -> None:
     markitdown = MarkItDown()

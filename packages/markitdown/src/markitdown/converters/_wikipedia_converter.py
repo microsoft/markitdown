@@ -1,3 +1,5 @@
+"""Wikipedia page converter — extracts main content from Wikipedia HTML pages."""
+
 import re
 import logging
 import bs4
@@ -77,7 +79,7 @@ class WikipediaConverter(DocumentConverter):
                 ).convert_soup(body_elm)
             else:
                 webpage_text = _CustomMarkdownify(**kwargs).convert_soup(soup)
-        except Exception as e:
+        except (AttributeError, RuntimeError, TypeError) as e:
             logger.warning("Wikipedia content extraction failed: %s", e)
             raise FileConversionException(
                 f"WikipediaConverter: content extraction failed: {e}"

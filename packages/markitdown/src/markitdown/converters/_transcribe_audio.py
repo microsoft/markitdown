@@ -1,3 +1,5 @@
+"""Audio transcription helper — wraps speech_recognition for WAV/MP3/M4A transcription."""
+
 import io
 import sys
 from typing import BinaryIO

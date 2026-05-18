@@ -133,18 +133,12 @@ def test_input_from_stdin_without_hints(shared_tmp_dir, test_vector) -> None:
         assert test_string not in stdout
 
 
-@pytest.mark.skipif(
-    skip_remote,
-    reason="do not run tests that query external urls",
-)
 @pytest.mark.parametrize("test_vector", CLI_TEST_VECTORS)
-def test_convert_url(shared_tmp_dir, test_vector):
-    """Test the conversion of a stream with no stream info."""
-    # Note: tmp_dir is not used here, but is needed to match the signature
-
-    time.sleep(1)  # Ensure we don't hit rate limits
+def test_convert_url(shared_tmp_dir, test_vector, local_test_server):
+    """Test CLI URL conversion using local HTTP server (no network)."""
+    url = f"{local_test_server}/{test_vector.filename}"
     result = subprocess.run(
-        [_PYTHON, "-m", "markitdown", TEST_FILES_URL + "/" + test_vector.filename],
+        [_PYTHON, "-m", "markitdown", url],
         capture_output=True,
         text=False,
         env={**os.environ, "PYTHONIOENCODING": "utf-8"},

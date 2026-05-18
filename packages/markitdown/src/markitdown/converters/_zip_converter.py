@@ -1,3 +1,5 @@
+"""ZIP archive converter — recursively converts files within ZIP archives to Markdown."""
+
 import zipfile
 import io
 import os

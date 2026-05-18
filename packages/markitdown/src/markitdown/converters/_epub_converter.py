@@ -1,3 +1,5 @@
+"""EPUB converter — converts EPUB e-books to Markdown preserving headings, tables, and metadata."""
+
 import os
 import logging
 import zipfile
@@ -128,7 +130,7 @@ class EpubConverter(HtmlConverter):
                                 ),
                             )
                             markdown_content.append(converted_content.markdown.strip())
-                    except Exception as e:
+                    except (OSError, ValueError, RuntimeError) as e:
                         logger.warning("EPUB chapter conversion failed for %s: %s", file, e)
                         # Continue with remaining chapters instead of failing entirely
                         markdown_content.append(f"[Conversion failed for {file}: {e}]")

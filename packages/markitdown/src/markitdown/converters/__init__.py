@@ -1,4 +1,5 @@
 # SPDX-FileCopyrightText: 2024-present Adam Fourney <adamfo@microsoft.com>
+"""Built-in document converters for MarkItDown — each module handles a specific file format."""
 #
 # SPDX-License-Identifier: MIT
 

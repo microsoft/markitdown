@@ -102,16 +102,14 @@ def test_convert_stream_without_hints(test_vector):
             assert string not in result.markdown
 
 
-@pytest.mark.skipif(
-    skip_remote,
-    reason="do not run tests that query external urls",
-)
 @pytest.mark.parametrize("test_vector", GENERAL_TEST_VECTORS)
 def test_convert_http_uri(test_vector):
-    """Test the conversion of an HTTP:// or HTTPS:// URI."""
-    markitdown = MarkItDown()
+    """Test the conversion of an HTTP:// or HTTPS:// URI.
 
-    time.sleep(1)  # Ensure we don't hit rate limits
+    URL requests are intercepted by conftest.py mock layer and served
+    from local test_files/ — no network dependency.
+    """
+    markitdown = MarkItDown()
 
     result = markitdown.convert(
         TEST_FILES_URL + "/" + test_vector.filename,

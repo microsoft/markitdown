@@ -1,3 +1,5 @@
+"""PDF converter — extracts text from PDFs via pdfplumber with pdfminer.six fallback."""
+
 import sys
 import io
 import re
@@ -565,7 +567,7 @@ class PdfConverter(DocumentConverter):
             else:
                 markdown = "\n\n".join(markdown_chunks).strip()
 
-        except Exception:
+        except (ValueError, TypeError, IndexError, AttributeError, RuntimeError, OSError):
             # Fallback if pdfplumber fails
             pdf_bytes.seek(0)
             markdown = pdfminer.high_level.extract_text(pdf_bytes)

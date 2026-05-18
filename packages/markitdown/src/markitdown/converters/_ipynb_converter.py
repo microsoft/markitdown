@@ -1,3 +1,5 @@
+"""Jupyter Notebook converter — converts .ipynb files to Markdown with code blocks."""
+
 from typing import BinaryIO, Any
 import json
 import logging
@@ -108,7 +110,7 @@ class IpynbConverter(DocumentConverter):
                 title=title,
             )
 
-        except Exception as e:
+        except (KeyError, TypeError, ValueError) as e:
             raise FileConversionException(
                 f"Error converting .ipynb file: {str(e)}"
             ) from e

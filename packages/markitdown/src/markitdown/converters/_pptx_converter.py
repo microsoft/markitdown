@@ -1,3 +1,5 @@
+"""PPTX converter — converts PowerPoint presentations to Markdown with headings, tables, charts, and images."""
+
 import sys
 import base64
 import os
@@ -116,14 +118,14 @@ class PptxConverter(DocumentConverter):
                                 model=llm_model,
                                 prompt=kwargs.get("llm_prompt"),
                             )
-                        except Exception:
+                        except (OSError, ValueError, RuntimeError):
                             # Unable to generate a description
                             pass
 
                     # Also grab any description embedded in the deck
                     try:
                         alt_text = shape._element._nvXxPr.cNvPr.attrib.get("descr", "")
-                    except Exception:
+                    except AttributeError:
                         # Unable to get alt text
                         pass
 
@@ -251,6 +253,6 @@ class PptxConverter(DocumentConverter):
             # Handle the specific error for unsupported chart types
             if "unsupported plot type" in str(e):
                 return "\n\n[unsupported chart]\n\n"
-        except Exception:
+        except (TypeError, AttributeError, IndexError):
             # Catch any other exceptions that might occur
             return "\n\n[unsupported chart]\n\n"

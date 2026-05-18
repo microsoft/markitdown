@@ -1,3 +1,5 @@
+"""Audio converter — extracts metadata via exiftool and transcribes audio via speech_recognition."""
+
 from typing import Any, BinaryIO
 import logging
 
@@ -51,7 +53,7 @@ class AudioConverter(DocumentConverter):
             metadata = exiftool_metadata(
                 file_stream, exiftool_path=kwargs.get("exiftool_path")
             )
-        except Exception as e:
+        except (FileNotFoundError, OSError, RuntimeError) as e:
             logger.warning("AudioConverter: exiftool metadata extraction failed: %s", e)
             metadata = None
         if metadata:
@@ -95,7 +97,7 @@ class AudioConverter(DocumentConverter):
                     md_content += "\n\n### Audio Transcript:\n" + transcript
             except MissingDependencyException:
                 pass
-            except Exception as e:
+            except (OSError, RuntimeError, ValueError) as e:
                 logger.warning(
                     "AudioConverter: transcription failed for format=%s: %s",
                     audio_format,

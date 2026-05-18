@@ -1,3 +1,5 @@
+"""DOCX pre-processing utilities — MathML/OMath to LaTeX conversion."""
+
 import zipfile
 from io import BytesIO
 from typing import BinaryIO
@@ -147,7 +149,7 @@ def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
                         updated_content = _pre_process_math(content)
                         # In the future, if there are more pre-processing steps, they can be added here
                         zip_output.writestr(name, updated_content)
-                    except Exception:
+                    except (RuntimeError, ValueError, TypeError, AttributeError):
                         # If there is an error in processing the content, write the original content
                         zip_output.writestr(name, content)
                 else:

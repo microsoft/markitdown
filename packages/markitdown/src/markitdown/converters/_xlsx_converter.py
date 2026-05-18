@@ -1,3 +1,5 @@
+"""XLSX/XLS converter — converts Excel spreadsheets to Markdown tables via HTML intermediary."""
+
 import sys
 from typing import BinaryIO, Any
 from ._html_converter import HtmlConverter
