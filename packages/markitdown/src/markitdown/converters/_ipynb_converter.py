@@ -24,12 +24,12 @@ class IpynbConverter(DocumentConverter):
         stream_info: StreamInfo,
         **kwargs: Any,  # Options to pass to the converter
     ) -> bool:
-        mimetype = (stream_info.mimetype or "").lower()
         extension = (stream_info.extension or "").lower()
 
         if extension in ACCEPTED_FILE_EXTENSIONS:
             return True
 
+        mimetype = (stream_info.mimetype or "").lower()
         for prefix in CANDIDATE_MIME_TYPE_PREFIXES:
             if mimetype.startswith(prefix):
                 # Read further to see if it's a notebook

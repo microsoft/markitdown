@@ -43,23 +43,13 @@ class PlainTextConverter(DocumentConverter):
         stream_info: StreamInfo,
         **kwargs: Any,  # Options to pass to the converter
     ) -> bool:
-        mimetype = (stream_info.mimetype or "").lower()
-        extension = (stream_info.extension or "").lower()
-
         # If we have a charset, we can safely assume it's text
-        # With Magika in the earlier stages, this handles most cases
         if stream_info.charset is not None:
             return True
 
-        # Otherwise, check the mimetype and extension
-        if extension in ACCEPTED_FILE_EXTENSIONS:
-            return True
-
-        for prefix in ACCEPTED_MIME_TYPE_PREFIXES:
-            if mimetype.startswith(prefix):
-                return True
-
-        return False
+        return self._accepted_by_mime_or_ext(
+            stream_info, ACCEPTED_MIME_TYPE_PREFIXES, ACCEPTED_FILE_EXTENSIONS
+        )
 
     def convert(
         self,

@@ -192,17 +192,11 @@ class DocumentIntelligenceConverter(DocumentConverter):
         stream_info: StreamInfo,
         **kwargs: Any,  # Options to pass to the converter
     ) -> bool:
-        mimetype = (stream_info.mimetype or "").lower()
-        extension = (stream_info.extension or "").lower()
-
-        if extension in _get_file_extensions(self._file_types):
-            return True
-
-        for prefix in _get_mime_type_prefixes(self._file_types):
-            if mimetype.startswith(prefix):
-                return True
-
-        return False
+        return self._accepted_by_mime_or_ext(
+            stream_info,
+            _get_mime_type_prefixes(self._file_types),
+            _get_file_extensions(self._file_types),
+        )
 
     def _analysis_features(self, stream_info: StreamInfo) -> List[str]:
         """

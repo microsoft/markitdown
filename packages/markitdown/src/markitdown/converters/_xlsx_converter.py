@@ -48,17 +48,9 @@ class XlsxConverter(DocumentConverter):
         stream_info: StreamInfo,
         **kwargs: Any,  # Options to pass to the converter
     ) -> bool:
-        mimetype = (stream_info.mimetype or "").lower()
-        extension = (stream_info.extension or "").lower()
-
-        if extension in ACCEPTED_XLSX_FILE_EXTENSIONS:
-            return True
-
-        for prefix in ACCEPTED_XLSX_MIME_TYPE_PREFIXES:
-            if mimetype.startswith(prefix):
-                return True
-
-        return False
+        return self._accepted_by_mime_or_ext(
+            stream_info, ACCEPTED_XLSX_MIME_TYPE_PREFIXES, ACCEPTED_XLSX_FILE_EXTENSIONS
+        )
 
     def convert(
         self,
@@ -110,17 +102,9 @@ class XlsConverter(DocumentConverter):
         stream_info: StreamInfo,
         **kwargs: Any,  # Options to pass to the converter
     ) -> bool:
-        mimetype = (stream_info.mimetype or "").lower()
-        extension = (stream_info.extension or "").lower()
-
-        if extension in ACCEPTED_XLS_FILE_EXTENSIONS:
-            return True
-
-        for prefix in ACCEPTED_XLS_MIME_TYPE_PREFIXES:
-            if mimetype.startswith(prefix):
-                return True
-
-        return False
+        return self._accepted_by_mime_or_ext(
+            stream_info, ACCEPTED_XLS_MIME_TYPE_PREFIXES, ACCEPTED_XLS_FILE_EXTENSIONS
+        )
 
     def convert(
         self,

@@ -1,4 +1,4 @@
-from typing import Any, BinaryIO, Optional
+from typing import Any, BinaryIO, List, Optional
 from ._stream_info import StreamInfo
 
 
@@ -41,6 +41,35 @@ class DocumentConverterResult:
 
 class DocumentConverter:
     """Abstract superclass of all DocumentConverters."""
+
+    @staticmethod
+    def _accepted_by_mime_or_ext(
+        stream_info: StreamInfo,
+        mime_prefixes: List[str],
+        extensions: List[str],
+    ) -> bool:
+        """Standard check: accept if extension or mimetype prefix matches.
+
+        Used by most converters to avoid repeating the same accepts() logic.
+        """
+        mimetype = (stream_info.mimetype or "").lower()
+        extension = (stream_info.extension or "").lower()
+        if extension in extensions:
+            return True
+        for prefix in mime_prefixes:
+            if mimetype.startswith(prefix):
+                return True
+        return False
+
+    @staticmethod
+    def _accepted_by_url_pattern(
+        stream_info: StreamInfo,
+        pattern: str,
+    ) -> bool:
+        """Check if the URL matches a regex pattern (for web-based converters)."""
+        url = stream_info.url or ""
+        import re
+        return bool(re.search(pattern, url))
 
     def accepts(
         self,
