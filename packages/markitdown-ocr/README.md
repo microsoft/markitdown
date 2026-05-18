@@ -136,6 +136,24 @@ Every extracted OCR block is wrapped as:
 [End OCR]*
 ```
 
+## Converter Capability Matrix
+
+| Feature | PDF | DOCX | PPTX | XLSX |
+|---------|-----|------|------|------|
+| **Primary format** | `.pdf` | `.docx` | `.pptx` | `.xlsx` |
+| **Embedded image OCR** | Inline by vertical position | Inline via part rels | Per-shape (inc. groups) | Per-worksheet list |
+| **Full-page fallback** | Scanned pages at 300 DPI | — | — | — |
+| **Malformed file recovery** | PyMuPDF retry | — | — | — |
+| **Chart / table handling** | N/A (text extraction) | Preserved via HTML→MD | Markdown table export | Sheet data + image list |
+| **OCR output format** | `*[Image OCR]... [End OCR]*` blocks | Same | Same | Same |
+| **Priority** | -1.0 (replaces built-in) | -1.0 | -1.0 | -1.0 |
+| **Dependencies** | pdfplumber, pdfminer, PyMuPDF, PIL | python-docx, mammoth, PIL | python-pptx, PIL | openpyxl, pandas, PIL |
+| **LLM required** | Optional (skips OCR if absent) | Optional | Optional | Optional |
+
+### What happens when LLM is not configured?
+
+All four converters still register and accept their respective file types. If no `llm_client` + `llm_model` are provided, OCR is silently skipped and the converter falls back to standard text extraction (same behavior as the built-in converters at priority 0.0).
+
 ## Troubleshooting
 
 ### OCR text missing from output

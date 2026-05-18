@@ -96,7 +96,7 @@ class TestUriValidation:
             path = f.name
 
         try:
-            normalized = _validate_uri(f"file://{path}", config)
+            normalized = _validate_uri(Path(path).as_uri(), config)
             assert normalized == path
         finally:
             os.unlink(path)
@@ -123,14 +123,14 @@ class TestUriValidation:
         # Small file should pass
         small_file = tmp_path / "small.txt"
         small_file.write_text("x" * 50)
-        result = _validate_uri(f"file://{small_file}", config)
+        result = _validate_uri(small_file.as_uri(), config)
         assert result == str(small_file)
 
         # Large file should be rejected
         large_file = tmp_path / "large.txt"
         large_file.write_text("x" * 200)
         with pytest.raises(ValueError, match="too large"):
-            _validate_uri(f"file://{large_file}", config)
+            _validate_uri(large_file.as_uri(), config)
 
     def test_symlink_blocked_by_default(self, monkeypatch, tmp_path):
         """Test that symlinks are blocked by default."""
@@ -167,14 +167,14 @@ class TestUriValidation:
         # File in allowed directory should work
         allowed_file = allowed_dir / "test.txt"
         allowed_file.write_text("test")
-        result = _validate_uri(f"file://{allowed_file}", config)
+        result = _validate_uri(allowed_file.as_uri(), config)
         assert result == str(allowed_file)
 
         # File outside allowed directory should be blocked
         forbidden_file = forbidden_dir / "test.txt"
         forbidden_file.write_text("test")
         with pytest.raises(ValueError, match="not in allowed list"):
-            _validate_uri(f"file://{forbidden_file}", config)
+            _validate_uri(forbidden_file.as_uri(), config)
 
 
 class TestShowSecurityConfig:

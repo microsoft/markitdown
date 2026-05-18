@@ -149,10 +149,10 @@ class DocxConverterWithOCR(HtmlConverter):
                             # Store raw text only — markers added later
                             ocr_map[rel.rId] = ocr_result.text.strip()
 
-                    except Exception:
+                    except (AttributeError, KeyError, TypeError, ValueError, RuntimeError, ConnectionError, OSError):
                         continue
 
-        except Exception:
+        except (ValueError, OSError, TypeError):
             pass
 
         return ocr_map

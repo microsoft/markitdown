@@ -75,7 +75,7 @@ class LLMVisionOCRService:
                     img = Image.open(image_stream)
                     fmt = img.format.lower() if img.format else "png"
                     content_type = f"image/{fmt}"
-                except Exception:
+                except (OSError, ValueError, TypeError):
                     content_type = "image/png"
 
             image_stream.seek(0)

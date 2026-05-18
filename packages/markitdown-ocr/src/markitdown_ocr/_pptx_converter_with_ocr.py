@@ -241,5 +241,5 @@ class PptxConverterWithOCR(DocumentConverter):
         except ValueError as e:
             if "unsupported plot type" in str(e):
                 return "\\n\\n[unsupported chart]\\n\\n"
-        except Exception:
+        except (AttributeError, IndexError, TypeError, KeyError):
             return "\\n\\n[unsupported chart]\\n\\n"

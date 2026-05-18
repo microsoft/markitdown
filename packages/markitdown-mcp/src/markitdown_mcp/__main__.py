@@ -89,6 +89,11 @@ def _validate_uri(uri: str, config: SecurityConfig) -> str:
     # Validate file URIs
     if scheme == "file":
         file_path = unquote(parsed.path)
+        # Handle cases where Windows drive letter ended up in netloc
+        if not file_path and parsed.netloc:
+            file_path = "/" + parsed.netloc
+        elif not file_path.startswith("/") and parsed.netloc:
+            file_path = "/" + parsed.netloc + file_path
         # Handle Windows file URIs: file:///C:/path...
         if file_path.startswith("/") and re.match(r"^/[A-Za-z]:/", file_path):
             file_path = file_path[1:]
@@ -96,15 +101,15 @@ def _validate_uri(uri: str, config: SecurityConfig) -> str:
             # UNC path handling
             pass
 
+        # Check path traversal BEFORE resolve() normalizes it away
+        if ".." in Path(file_path).parts:
+            raise ValueError(f"Path traversal detected: {file_path}")
+
         path = Path(file_path).resolve()
 
         # Check symlinks
         if not config.allow_symlinks and os.path.islink(file_path):
             raise ValueError(f"Symlinks not allowed: {file_path}")
-
-        # Check path traversal
-        if ".." in path.parts:
-            raise ValueError(f"Path traversal detected: {file_path}")
 
         # Check allowed paths whitelist
         if config.allowed_paths is not None:
