@@ -1,7 +1,7 @@
 # MarkItDown Converter Capability Matrix
 
 > Auto-generated from 22 converters in `packages/markitdown/src/markitdown/converters/`
-> Last updated: 2026-05-18 | Darwin R5 · D2 Code Quality
+> Last updated: 2026-05-19 | Darwin R7 · P2.5 PlainTextConverter Rewrite
 
 ## Overview
 
@@ -19,7 +19,7 @@
 | 10 | **LLM Caption** | `LlmCaption`†† | — | — | `base64`, `mimetypes` | 1 | ✅ | — | ✅ |
 | 11 | **Outlook MSG** | `OutlookMsgConverter` | application/vnd.ms-outlook | `.msg` | `olefile` | 7 | — | — | — |
 | 12 | **PDF** | `PdfConverter` | application/pdf | `.pdf` | `pdfminer`, `pdfplumber` | 3 | — | — | — |
-| 13 | **Plain Text** | `PlainTextConverter` | text/* | `.txt,.md,.json,.jsonl` | `charset_normalizer` | 1 🆕 | — | — | — |
+| 13 | **Plain Text** | `PlainTextConverter` | text/* | `.txt,.md,.json,.jsonl` | `charset_normalizer`, `json` | 3 🆕🔄 | — | — | — |
 | 14 | **PPTX** | `PptxConverter` | application/vnd.openxmlformats-officedocument.presentationml.presentation | `.pptx` | `python-pptx` | 8 | — | — | — |
 | 15 | **RSS/Atom** | `RssConverter` | application/rss+xml, application/atom+xml | `.rss,.atom,.xml` | `defusedxml`, `BeautifulSoup` | 2 🆕 | — | — | ✅ |
 | 16 | **Transcribe** | `TranscribeAudio`†† | — | — | `speech_recognition` | 3 | ✅ | — | ✅ |
@@ -83,7 +83,7 @@
 | IPYNB | — | — | ✅ (base64) | — | ✅ | — |
 | Outlook MSG | ✅ (sender/date) | — | — | — | — | — |
 | PDF | ✅ | ✅ | — | — | — | — |
-| Plain Text | — | — | — | — | ✅ | — |
+| Plain Text | ✅ (title) | ✅ (JSON→table) | — | — | ✅ | — |
 | PPTX | — | — | ✅ | — | — | — |
 | RSS/Atom | ✅ (title/date) | — | — | — | — | — |
 | Wikipedia | ✅ (title) | ✅ | — | ✅ | ✅ | — |
@@ -98,7 +98,7 @@
 | CSV | ❌ 0 | ✅ 3 | ✅ | ✅ | — | — |
 | Wikipedia | ❌ 0 | ✅ 2 | ✅ | ✅ | — | — |
 | EPUB | ❌ 0 | ✅ 4 | — | ✅ | — | ✅ |
-| Plain Text | ❌ 0 | ✅ 1 | ✅ | — | — | — |
+| Plain Text | ❌ 0 | ✅ 3🔄 | ✅ | ✅ | — | — |
 | HTML | ⚠️ 1 | ✅ 2 | ✅ | ✅ | — | — |
 | RSS | ⚠️ 2* | ✅ 2 | — | ✅ | — | — |
 | Image | ✅ 1 | ✅ 3 | — | — | — | — |
@@ -138,6 +138,7 @@
 | **Wikipedia** | Network-dependent; only standard Wikipedia article layout | Use HtmlConverter for other wiki engines |
 | **XLS/XLSX** | Requires `pandas` + `openpyxl`/`xlrd`; merged cells flattened | Install `markitdown[xlsx]` |
 | **YouTube** | Requires `yt-dlp` CLI or `pip install yt-dlp`; subject to rate limiting | Install `markitdown[youtube]` |
+| **Plain Text** | Plain text returned as-is (no structure detection). No code language auto-detect. | JSON→Markdown table (P2.5 rewrite) |
 | **ZIP** | Nested archives not deeply recursed; password-protected ZIPs fail | Extract manually for complex cases |
 
 ## Optional Dependency Groups
