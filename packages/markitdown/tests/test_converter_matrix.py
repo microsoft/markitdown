@@ -91,8 +91,9 @@ def _all_converter_classes() -> Dict[str, Path]:
 
 # Row format (column 3 = class, in `backticks`):
 # | 1 | **Audio** | `AudioConverter` | ...
+# Accept fractional row numbers like "5.5" for insertions between rows.
 _MATRIX_ROW_RE = re.compile(
-    r"^\|\s*\d+\s*\|\s*\*\*(?P<name>[^*]+)\*\*\s*\|\s*`(?P<cls>[^`]+)`",
+    r"^\|\s*[\d.]+\s*\|\s*\*\*(?P<name>[^*]+)\*\*\s*\|\s*`(?P<cls>[^`]+)`",
     re.MULTILINE,
 )
 

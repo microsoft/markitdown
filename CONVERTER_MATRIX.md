@@ -12,6 +12,7 @@
 | 3 | **CSV** | `CsvConverter` | text/csv | `.csv` | `csv`, `charset_normalizer` | 3 🆕 | — | — | — |
 | 4 | **DocIntel** | `DocumentIntelligenceConverter` | * (Azure AI) | * | `azure-ai-documentintelligence` | 3 | ✅ | ✅ | ✅ |
 | 5 | **DOCX** | `DocxConverter` | application/vnd.openxmlformats-officedocument.wordprocessingml.document | `.docx` | `mammoth` | 3 | — | — | — |
+| 5.5 | **DOC** | `DocConverter` | application/msword | `.doc` | `pywin32`† + `olefile` (fallback) | 3 🆕 | — | — | — |
 | 6 | **EPUB** | `EpubConverter` | application/epub+zip | `.epub` | `zipfile`, `defusedxml` | 4 🆕 | — | — | — |
 | 7 | **HTML** | `HtmlConverter` | text/html | `.html,.htm` | `BeautifulSoup` | 2 🆕 | — | — | — |
 | 8 | **Image** | `ImageConverter` | image/jpeg, image/png | `.jpg,.jpeg,.png` | `exiftool`† | 1 | ✅ | — | — |
