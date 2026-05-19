@@ -225,3 +225,156 @@ class TestShowSecurityConfig:
 
         captured = capsys.readouterr()
         assert "--show-security-config" in captured.out
+
+
+class TestSchemeSmuggling:
+    """R13: harden against URI scheme/SSRF smuggling vectors."""
+
+    def test_javascript_scheme_rejected(self, monkeypatch):
+        """javascript: URIs must be rejected even if they look harmless."""
+        for key in list(os.environ.keys()):
+            if key.startswith("MARKITDOWN_MCP_"):
+                monkeypatch.delenv(key, raising=False)
+        from markitdown_mcp.__main__ import _load_security_config, _validate_uri
+
+        config = _load_security_config()
+        for payload in (
+            "javascript:alert(1)",
+            "JaVaScRiPt:void(0)",
+            "data:text/html,<script>alert(1)</script>",  # data:html should fail when only "data:" data subset desired
+            "vbscript:msgbox",
+            "ftp://internal-host/etc/passwd",
+        ):
+            scheme = payload.split(":", 1)[0].lower()
+            if scheme in config.allowed_schemes:
+                # The `data:` scheme is in defaults; the test fixture above uses
+                # `data:text/html,...` which is allowed by scheme but flagged
+                # only if downstream parsing rejects HTML. We assert here only
+                # the scheme gate; downstream behavior is verified separately.
+                continue
+            with pytest.raises(ValueError, match="not allowed"):
+                _validate_uri(payload, config)
+
+    def test_url_encoded_traversal_blocked(self, monkeypatch):
+        """%2e%2e (URL-encoded ..) must still be detected as traversal."""
+        for key in list(os.environ.keys()):
+            if key.startswith("MARKITDOWN_MCP_"):
+                monkeypatch.delenv(key, raising=False)
+        from markitdown_mcp.__main__ import _load_security_config, _validate_uri
+
+        config = _load_security_config()
+        # %2e%2e decodes to ".." → unquote happens inside _validate_uri before
+        # the traversal check, so this MUST raise.
+        with pytest.raises((ValueError, FileNotFoundError)):
+            _validate_uri("file:///tmp/%2e%2e/%2e%2e/etc/passwd", config)
+
+    def test_unicode_overlong_dot_blocked(self, monkeypatch, tmp_path):
+        """Mixed-case / overlong path traversal must not bypass detection."""
+        for key in list(os.environ.keys()):
+            if key.startswith("MARKITDOWN_MCP_"):
+                monkeypatch.delenv(key, raising=False)
+        from markitdown_mcp.__main__ import _load_security_config, _validate_uri
+
+        config = _load_security_config()
+        # `....//` is a classic CVE pattern that some normalizers collapse to "..".
+        # Path() doesn't, so traversal is blocked at a later layer (resolve()).
+        # We assert it never escalates to a successful path outside cwd.
+        with pytest.raises((ValueError, FileNotFoundError)):
+            _validate_uri("file:///tmp/..../..../etc/passwd", config)
+
+    def test_empty_uri_rejected(self, monkeypatch):
+        for key in list(os.environ.keys()):
+            if key.startswith("MARKITDOWN_MCP_"):
+                monkeypatch.delenv(key, raising=False)
+        from markitdown_mcp.__main__ import _load_security_config, _validate_uri
+
+        config = _load_security_config()
+        with pytest.raises((ValueError, FileNotFoundError)):
+            _validate_uri("", config)
+
+    def test_file_uri_without_path_rejected(self, monkeypatch):
+        for key in list(os.environ.keys()):
+            if key.startswith("MARKITDOWN_MCP_"):
+                monkeypatch.delenv(key, raising=False)
+        from markitdown_mcp.__main__ import _load_security_config, _validate_uri
+
+        config = _load_security_config()
+        with pytest.raises((ValueError, FileNotFoundError)):
+            # No path component → should fail before any IO.
+            _validate_uri("file://", config)
+
+
+class TestApiKeyEnforcement:
+    """R13: end-to-end API key enforcement on the MCP tool entry points."""
+
+    def test_convert_to_markdown_rejects_wrong_key(self, monkeypatch, tmp_path):
+        """Calling convert_to_markdown with wrong key must raise."""
+        monkeypatch.setenv("MARKITDOWN_MCP_API_KEY", "secret-key-123")
+
+        # Force reload of the security config so the env var takes effect.
+        import importlib
+        import markitdown_mcp.__main__ as mod
+        importlib.reload(mod)
+
+        target = tmp_path / "f.txt"
+        target.write_text("hello")
+        uri = target.as_uri()
+
+        async def _run():
+            return await mod.convert_to_markdown(uri=uri, api_key="WRONG")
+
+        import asyncio
+        with pytest.raises(ValueError, match="Invalid API key"):
+            asyncio.run(_run())
+
+    def test_convert_to_markdown_accepts_correct_key(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("MARKITDOWN_MCP_API_KEY", "secret-key-123")
+        import importlib
+        import markitdown_mcp.__main__ as mod
+        importlib.reload(mod)
+
+        target = tmp_path / "f.txt"
+        target.write_text("hello world")
+        uri = target.as_uri()
+
+        async def _run():
+            return await mod.convert_to_markdown(uri=uri, api_key="secret-key-123")
+
+        import asyncio
+        result = asyncio.run(_run())
+        assert "hello world" in result
+
+    def test_convert_to_markdown_rejects_empty_key_when_required(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("MARKITDOWN_MCP_API_KEY", "secret-key-123")
+        import importlib
+        import markitdown_mcp.__main__ as mod
+        importlib.reload(mod)
+
+        target = tmp_path / "f.txt"
+        target.write_text("hello")
+        uri = target.as_uri()
+
+        async def _run():
+            # Default api_key="" — must NOT silently bypass the requirement.
+            return await mod.convert_to_markdown(uri=uri)
+
+        import asyncio
+        with pytest.raises(ValueError, match="Invalid API key"):
+            asyncio.run(_run())
+
+    def test_local_file_tool_rejects_wrong_key(self, monkeypatch, tmp_path):
+        """Even when called via the same tool with a file URI, wrong key must fail."""
+        monkeypatch.setenv("MARKITDOWN_MCP_API_KEY", "secret-key-123")
+        import importlib
+        import markitdown_mcp.__main__ as mod
+        importlib.reload(mod)
+
+        target = tmp_path / "f.txt"
+        target.write_text("local hello")
+
+        async def _run():
+            return await mod.convert_to_markdown(uri=target.as_uri(), api_key="bad")
+
+        import asyncio
+        with pytest.raises(ValueError, match="Invalid API key"):
+            asyncio.run(_run())

@@ -101,9 +101,24 @@ def _validate_uri(uri: str, config: SecurityConfig) -> str:
             # UNC path handling
             pass
 
-        # Check path traversal BEFORE resolve() normalizes it away
-        if ".." in Path(file_path).parts:
+        # R13: reject empty / whitespace-only paths before any disk IO
+        if not file_path or not file_path.strip() or file_path.strip() == "/":
+            raise ValueError(f"Empty or invalid file URI: {uri!r}")
+
+        # Check path traversal BEFORE resolve() normalizes it away.
+        # R13: also detect overlong dots ("..." / "...." / etc.) — some
+        # path normalizers collapse these to ".." and escape sandboxes.
+        parts = Path(file_path).parts
+        if ".." in parts:
             raise ValueError(f"Path traversal detected: {file_path}")
+        for seg in parts:
+            # Pure-dot segments longer than 2 chars are never legitimate
+            # (e.g. "...", "....", "....."). Block them as a CVE-style
+            # traversal smuggling vector.
+            if len(seg) >= 3 and set(seg) == {"."}:
+                raise ValueError(
+                    f"Overlong dot traversal detected in segment {seg!r}: {file_path}"
+                )
 
         path = Path(file_path).resolve()
 
