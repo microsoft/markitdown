@@ -132,24 +132,59 @@ class TestUriValidation:
         with pytest.raises(ValueError, match="too large"):
             _validate_uri(large_file.as_uri(), config)
 
-    def test_symlink_blocked_by_default(self, monkeypatch, tmp_path):
-        """Test that symlinks are blocked by default."""
-        if os.name == "nt":
-            pytest.skip("Symlink tests skipped on Windows (requires admin)")
+    def _try_create_symlink(self, tmp_path):
+        """Try to create a real symlink; return (target, link) or None if unable."""
+        target = tmp_path / "target.txt"
+        target.write_text("secret")
+        link = tmp_path / "link.txt"
+        try:
+            link.symlink_to(target)
+        except (OSError, NotImplementedError):
+            # Windows without admin / dev-mode raises OSError; some FS reject it
+            return None
+        return target, link
 
+    def test_symlink_blocked_by_default(self, monkeypatch, tmp_path):
+        """Test that symlinks are blocked by default.
+
+        On Windows without admin/dev-mode we cannot create a real symlink, so
+        we fall back to a mock-based test that verifies the same code path
+        (is_symlink() detection → ValueError raise) without requiring elevated
+        privileges.  This keeps coverage non-zero on every platform.
+        """
         from markitdown_mcp.__main__ import _load_security_config, _validate_uri
 
         config = _load_security_config()
+        assert config.allow_symlinks is False  # invariant under test
 
-        # Create target file and symlink
-        target_file = tmp_path / "target.txt"
-        target_file.write_text("secret")
-        symlink_path = tmp_path / "link.txt"
-        symlink_path.symlink_to(target_file)
+        created = self._try_create_symlink(tmp_path)
+        if created is not None:
+            # Real symlink path — full end-to-end check
+            _target, link = created
+            with pytest.raises(ValueError, match="Symlinks not allowed"):
+                _validate_uri(link.as_uri(), config)
+            return
 
-        # Symlink should be blocked
+        # Fallback: mock os.path.islink to simulate the rejected branch.
+        # This still exercises the actual _validate_uri rejection logic.
+        fake_file = tmp_path / "pseudo_link.txt"
+        fake_file.write_text("data")
+
+        import os.path as _ospath
+        original_islink = _ospath.islink
+
+        def fake_islink(p):
+            try:
+                if Path(p).resolve() == fake_file.resolve():
+                    return True
+            except (OSError, ValueError):
+                pass
+            return original_islink(p)
+
+        monkeypatch.setattr("markitdown_mcp.__main__.os.path.islink", fake_islink)
+
         with pytest.raises(ValueError, match="Symlinks not allowed"):
-            _validate_uri(f"file://{symlink_path}", config)
+            _validate_uri(fake_file.as_uri(), config)
 
     def test_whitelist_path_restriction(self, monkeypatch, tmp_path):
         """Test that only whitelisted paths are allowed."""
