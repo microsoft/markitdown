@@ -25,7 +25,46 @@ skip_remote = (
 
 
 # Don't run the llm tests without a key and the client library
-skip_llm = False if os.environ.get("OPENAI_API_KEY") else True
+# Supports either OpenAI-compatible keys (OPENAI_API_KEY) or Volcengine Ark
+# (ARK_API_KEY + MARKITDOWN_LLM_MODEL endpoint id).
+def _load_llm_env_from_windows_registry() -> None:
+    """Backfill ARK_*/OPENAI_* env vars from Windows user registry.
+
+    Git Bash / pytest subprocesses do not always inherit Windows user-level
+    environment variables. This helper reads HKCU\\Environment so persisted
+    keys (set via SystemPropertiesAdvanced or `setx`) become visible here.
+    """
+    if os.name != "nt":
+        return
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment") as k:
+            for name in (
+                "ARK_API_KEY",
+                "ARK_BASE_URL",
+                "MARKITDOWN_LLM_MODEL",
+                "OPENAI_API_KEY",
+                "OPENAI_BASE_URL",
+            ):
+                if os.environ.get(name):
+                    continue
+                try:
+                    val, _ = winreg.QueryValueEx(k, name)
+                    if val:
+                        os.environ[name] = val
+                except FileNotFoundError:
+                    pass
+    except Exception:
+        pass
+
+
+_load_llm_env_from_windows_registry()
+
+_has_openai_key = bool(os.environ.get("OPENAI_API_KEY"))
+_has_ark_key = bool(os.environ.get("ARK_API_KEY")) and bool(
+    os.environ.get("MARKITDOWN_LLM_MODEL")
+)
+skip_llm = not (_has_openai_key or _has_ark_key)
 try:
     import openai
 except ModuleNotFoundError:
@@ -531,8 +570,19 @@ def test_markitdown_llm_parameters() -> None:
     reason="do not run llm tests without a key",
 )
 def test_markitdown_llm() -> None:
-    client = openai.OpenAI()
-    markitdown = MarkItDown(llm_client=client, llm_model="gpt-4o")
+    # Prefer Volcengine Ark (OpenAI-compatible) if configured, otherwise OpenAI.
+    ark_key = os.environ.get("ARK_API_KEY")
+    ark_model = os.environ.get("MARKITDOWN_LLM_MODEL")
+    if ark_key and ark_model:
+        client = openai.OpenAI(
+            api_key=ark_key,
+            base_url=os.environ.get("ARK_BASE_URL") or "https://ark.cn-beijing.volces.com/api/v3",
+        )
+        model = ark_model
+    else:
+        client = openai.OpenAI()
+        model = "gpt-4o"
+    markitdown = MarkItDown(llm_client=client, llm_model=model)
 
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test_llm.jpg"))
     for test_string in LLM_TEST_STRINGS:

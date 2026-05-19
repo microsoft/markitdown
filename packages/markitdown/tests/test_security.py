@@ -35,26 +35,48 @@ class TestPathSecurity:
         result = md.convert(str(test_file), security_check=False)
         assert "hello" in result.markdown
 
-    def test_symlink_warning(self, tmp_path):
-        """Test that symlinks trigger a warning."""
-        if os.name == "nt":
-            pytest.skip("Symlink tests skipped on Windows (requires admin)")
+    def test_symlink_warning(self, tmp_path, monkeypatch):
+        """Test that symlinks trigger a warning.
 
+        On Windows without admin/dev-mode we cannot create a real symlink,
+        so we fall back to monkeypatching os.path.islink to exercise the
+        same warning-and-convert code path without elevated privileges.
+        """
         from markitdown import MarkItDown
 
         md = MarkItDown()
 
-        # Create target and symlink
+        # Create a real file to convert (and pretend it is a symlink)
         target_file = tmp_path / "target.txt"
         target_file.write_text("symlink target")
         symlink_file = tmp_path / "link.txt"
-        symlink_file.symlink_to(target_file)
+
+        real_symlink_ok = False
+        try:
+            symlink_file.symlink_to(target_file)
+            real_symlink_ok = True
+        except (OSError, NotImplementedError):
+            # Windows without admin / dev-mode: simulate via mock.
+            # Write the same content so the converter can still read it.
+            symlink_file.write_text("symlink target")
+            import os.path as _ospath
+            original_islink = _ospath.islink
+
+            def fake_islink(p):
+                try:
+                    if Path(p).resolve() == symlink_file.resolve():
+                        return True
+                except (OSError, ValueError):
+                    pass
+                return original_islink(p)
+
+            monkeypatch.setattr("markitdown._markitdown.os.path.islink", fake_islink)
 
         # Should warn about symlink but still convert
         with pytest.warns(UserWarning, match="Symbolic link detected"):
             result = md.convert(str(symlink_file))
 
-        assert "symlink target" in result
+        assert "symlink target" in str(result)
 
 
 class TestDownloadLimits:
