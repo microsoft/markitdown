@@ -35,6 +35,30 @@ ACCEPTED_XLS_MIME_TYPE_PREFIXES = [
 ACCEPTED_XLS_FILE_EXTENSIONS = [".xls"]
 
 
+def _clean_sheet(df):
+    """Strip fully-empty rows/columns and auto-generated `Unnamed: N` headers.
+
+    Real-world spreadsheets routinely contain:
+    - Trailing all-NaN rows (Excel "uses" cells the user never touched).
+    - Sparse 'note' columns that are 99% empty.
+    - Header rows that pandas read as `Unnamed: 0/1/...` because the real
+      header lives a few rows down.
+
+    Serializing all of this verbatim produces megabytes of noise (e.g. the
+    real-world fixture 威廉希尔赔率体系.xlsx produced 1.38M chars and 103 MiB
+    peak before this cleanup). After cleanup it drops to a few KB.
+    """
+    if df is None or df.empty:
+        return df
+    # Drop completely empty rows and columns
+    df = df.dropna(how="all").dropna(axis=1, how="all")
+    # Rename Unnamed columns to empty string so they don't pollute headers
+    rename_map = {c: "" for c in df.columns if str(c).startswith("Unnamed:")}
+    if rename_map:
+        df = df.rename(columns=rename_map)
+    return df
+
+
 class XlsxConverter(DocumentConverter):
     """
     Converts XLSX files to Markdown, with each sheet presented as a separate Markdown table.
@@ -77,8 +101,11 @@ class XlsxConverter(DocumentConverter):
         sheets = pd.read_excel(file_stream, sheet_name=None, engine="openpyxl")
         md_content = ""
         for s in sheets:
+            cleaned = _clean_sheet(sheets[s])
+            if cleaned is None or cleaned.empty:
+                continue
             md_content += f"## {s}\n"
-            html_content = sheets[s].to_html(index=False)
+            html_content = cleaned.to_html(index=False)
             md_content += (
                 self._html_converter.convert_string(
                     html_content, **kwargs
@@ -131,8 +158,11 @@ class XlsConverter(DocumentConverter):
         sheets = pd.read_excel(file_stream, sheet_name=None, engine="xlrd")
         md_content = ""
         for s in sheets:
+            cleaned = _clean_sheet(sheets[s])
+            if cleaned is None or cleaned.empty:
+                continue
             md_content += f"## {s}\n"
-            html_content = sheets[s].to_html(index=False)
+            html_content = cleaned.to_html(index=False)
             md_content += (
                 self._html_converter.convert_string(
                     html_content, **kwargs
