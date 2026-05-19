@@ -16,9 +16,10 @@ class TestToolDefinition:
         """Test that the convert_to_markdown tool exists."""
         from markitdown_mcp.__main__ import mcp
 
-        # Get tools should have the convert_to_markdown tool
+        # FastMCP exposes tools through _tool_manager
+        tools = mcp._tool_manager.list_tools()
         found = False
-        for tool in mcp._tool_registry.tools:
+        for tool in tools:
             if tool.name == "convert_to_markdown":
                 found = True
                 assert "Convert a resource" in tool.description
@@ -30,13 +31,13 @@ class TestToolDefinition:
         """Test that the tool has uri parameter."""
         from markitdown_mcp.__main__ import mcp
 
-        for tool in mcp._tool_registry.tools:
+        for tool in mcp._tool_manager.list_tools():
             if tool.name == "convert_to_markdown":
-                # Check that uri parameter exists
-                params = list(tool.parameters)
-                param_names = [p.name for p in params]
-                assert "uri" in param_names
-                assert "api_key" in param_names
+                # FastMCP Tool exposes parameters as a JSON schema dict
+                params = tool.parameters or {}
+                properties = params.get("properties", {})
+                assert "uri" in properties
+                assert "api_key" in properties
                 break
 
 
@@ -88,12 +89,8 @@ class TestLocalConversionIntegration:
         _SECURITY_CONFIG.api_key = None  # Disable API key for test
 
         try:
-            # On Windows, file URIs need special handling
-            uri_path = str(test_file).replace("\\", "/")
-            if not uri_path.startswith("/"):
-                uri_path = "/" + uri_path  # Add leading slash for Windows
-
-            result = await convert_to_markdown(uri=f"file://{uri_path}")
+            # Use Path.as_uri() for cross-platform file:// URIs
+            result = await convert_to_markdown(uri=test_file.as_uri())
             assert "Test Document" in result
             assert "Hello, World!" in result
         finally:

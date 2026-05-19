@@ -129,7 +129,7 @@ def _validate_uri(uri: str, config: SecurityConfig) -> str:
                     f"Max allowed: {config.max_file_size} bytes ({config.max_file_size / 1024 / 1024:.1f}MB)"
                 )
 
-        return str(path)
+        return path.as_uri()
 
     # For http/https/data: return as-is, size checked during fetch
     return uri

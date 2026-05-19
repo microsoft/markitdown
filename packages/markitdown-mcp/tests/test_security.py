@@ -97,7 +97,7 @@ class TestUriValidation:
 
         try:
             normalized = _validate_uri(Path(path).as_uri(), config)
-            assert normalized == path
+            assert normalized == Path(path).as_uri()
         finally:
             os.unlink(path)
 
@@ -124,7 +124,7 @@ class TestUriValidation:
         small_file = tmp_path / "small.txt"
         small_file.write_text("x" * 50)
         result = _validate_uri(small_file.as_uri(), config)
-        assert result == str(small_file)
+        assert result == small_file.as_uri()
 
         # Large file should be rejected
         large_file = tmp_path / "large.txt"
@@ -168,7 +168,7 @@ class TestUriValidation:
         allowed_file = allowed_dir / "test.txt"
         allowed_file.write_text("test")
         result = _validate_uri(allowed_file.as_uri(), config)
-        assert result == str(allowed_file)
+        assert result == allowed_file.as_uri()
 
         # File outside allowed directory should be blocked
         forbidden_file = forbidden_dir / "test.txt"
