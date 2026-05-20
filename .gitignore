@@ -171,3 +171,4 @@ src/.DS_Store
 .secrets.local
 *.secrets
 .env.local
+test-data/

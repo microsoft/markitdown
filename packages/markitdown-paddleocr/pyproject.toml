@@ -1,0 +1,58 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "markitdown-paddleocr"
+dynamic = ["version"]
+description = "Intelligent PDF/Image to Markdown converter using PaddleOCR cloud API"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+keywords = ["markitdown", "pdf", "ocr", "paddleocr", "baidu", "vision"]
+authors = [
+  { name = "Contributors", email = "noreply@github.com" },
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+]
+
+dependencies = [
+  "markitdown>=0.1.0",
+  "pdfminer.six>=20251230",
+  "pdfplumber>=0.11.9",
+  "Pillow>=9.0.0",
+  "requests>=2.28.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.0.0",
+]
+
+[project.urls]
+Documentation = "https://github.com/microsoft/markitdown#readme"
+Issues = "https://github.com/microsoft/markitdown/issues"
+Source = "https://github.com/microsoft/markitdown"
+
+[tool.hatch.version]
+path = "src/markitdown_paddleocr/__about__.py"
+
+# Plugin entry point - MarkItDown will discover this plugin
+[project.entry-points."markitdown.plugin"]
+markitdown_paddleocr = "markitdown_paddleocr"
+
+[tool.hatch.build.targets.sdist]
+only-include = ["src/markitdown_paddleocr"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/markitdown_paddleocr"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
