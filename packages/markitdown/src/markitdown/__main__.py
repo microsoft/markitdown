@@ -18,33 +18,23 @@ def main():
         usage=dedent(
             """
             SYNTAX:
-
-                markitdown <OPTIONAL: FILENAME>
-                If FILENAME is empty, markitdown reads from stdin.
+            markitdown <OPTIONAL: FILENAME>
+            If FILENAME is empty, markitdown reads from stdin.
 
             EXAMPLE:
-
-                markitdown example.pdf
-
-                OR
-
-                cat example.pdf | markitdown
-
-                OR
-
-                markitdown < example.pdf
-
-                OR to save to a file use
-
-                markitdown example.pdf -o example.md
-
-                OR
-
-                markitdown example.pdf > example.md
+            markitdown example.pdf
+            OR
+            cat example.pdf | markitdown
+            OR
+            markitdown < example.pdf
+            OR
+            to save to a file use
+            markitdown example.pdf -o example.md
+            OR
+            markitdown example.pdf > example.md
             """
         ).strip(),
     )
-
     parser.add_argument(
         "-v",
         "--version",
@@ -52,64 +42,64 @@ def main():
         version=f"%(prog)s {__version__}",
         help="show the version number and exit",
     )
-
     parser.add_argument(
         "-o",
         "--output",
         help="Output file name. If not provided, output is written to stdout.",
     )
-
     parser.add_argument(
         "-x",
         "--extension",
         help="Provide a hint about the file extension (e.g., when reading from stdin).",
     )
-
     parser.add_argument(
         "-m",
         "--mime-type",
         help="Provide a hint about the file's MIME type.",
     )
-
     parser.add_argument(
         "-c",
         "--charset",
         help="Provide a hint about the file's charset (e.g, UTF-8).",
     )
-
     parser.add_argument(
         "-d",
         "--use-docintel",
         action="store_true",
         help="Use Document Intelligence to extract text instead of offline conversion. Requires a valid Document Intelligence Endpoint.",
     )
-
     parser.add_argument(
         "-e",
         "--endpoint",
         type=str,
         help="Document Intelligence Endpoint. Required if using Document Intelligence.",
     )
-
     parser.add_argument(
         "-p",
         "--use-plugins",
         action="store_true",
         help="Use 3rd-party plugins to convert files. Use --list-plugins to see installed plugins.",
     )
-
     parser.add_argument(
         "--list-plugins",
         action="store_true",
         help="List installed 3rd-party plugins. Plugins are loaded when using the -p or --use-plugin option.",
     )
-
     parser.add_argument(
         "--keep-data-uris",
         action="store_true",
         help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
     )
-
+    parser.add_argument(
+        "--llm-client",
+        type=str,
+        help="LLM client to use for conversions (e.g., openai, litellm).",
+    )
+    parser.add_argument(
+        "--llm-model",
+        type=str,
+        help="LLM model to use for conversions (e.g., gpt-4, mistral-large).",
+    )
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
 
@@ -152,7 +142,9 @@ def main():
         or charset_hint is not None
     ):
         stream_info = StreamInfo(
-            extension=extension_hint, mimetype=mime_type_hint, charset=charset_hint
+            extension=extension_hint,
+            mimetype=mime_type_hint,
+            charset=charset_hint
         )
 
     if args.list_plugins:
@@ -160,13 +152,13 @@ def main():
         print("Installed MarkItDown 3rd-party Plugins:\n")
         plugin_entry_points = list(entry_points(group="markitdown.plugin"))
         if len(plugin_entry_points) == 0:
-            print("  * No 3rd-party plugins installed.")
+            print(" * No 3rd-party plugins installed.")
             print(
                 "\nFind plugins by searching for the hashtag #markitdown-plugin on GitHub.\n"
             )
         else:
             for entry_point in plugin_entry_points:
-                print(f"  * {entry_point.name:<16}\t(package: {entry_point.value})")
+                print(f" * {entry_point.name:<16}\t(package: {entry_point.value})")
             print(
                 "\nUse the -p (or --use-plugins) option to enable 3rd-party plugins.\n"
             )
@@ -181,10 +173,17 @@ def main():
             _exit_with_error("Filename is required when using Document Intelligence.")
 
         markitdown = MarkItDown(
-            enable_plugins=args.use_plugins, docintel_endpoint=args.endpoint
+            enable_plugins=args.use_plugins,
+            docintel_endpoint=args.endpoint,
+            llm_client=args.llm_client,
+            llm_model=args.llm_model,
         )
     else:
-        markitdown = MarkItDown(enable_plugins=args.use_plugins)
+        markitdown = MarkItDown(
+            enable_plugins=args.use_plugins,
+            llm_client=args.llm_client,
+            llm_model=args.llm_model,
+        )
 
     if args.filename is None:
         result = markitdown.convert_stream(
@@ -194,7 +193,9 @@ def main():
         )
     else:
         result = markitdown.convert(
-            args.filename, stream_info=stream_info, keep_data_uris=args.keep_data_uris
+            args.filename,
+            stream_info=stream_info,
+            keep_data_uris=args.keep_data_uris
         )
 
     _handle_output(args, result)
