@@ -142,9 +142,7 @@ def main():
         or charset_hint is not None
     ):
         stream_info = StreamInfo(
-            extension=extension_hint,
-            mimetype=mime_type_hint,
-            charset=charset_hint
+            extension=extension_hint, mimetype=mime_type_hint, charset=charset_hint
         )
 
     if args.list_plugins:
@@ -193,9 +191,7 @@ def main():
         )
     else:
         result = markitdown.convert(
-            args.filename,
-            stream_info=stream_info,
-            keep_data_uris=args.keep_data_uris
+            args.filename, stream_info=stream_info, keep_data_uris=args.keep_data_uris
         )
 
     _handle_output(args, result)
