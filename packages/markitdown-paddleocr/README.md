@@ -152,6 +152,54 @@ PaddleOcrConverter.convert()
 - `Pillow>=9.0.0` - 图像处理
 - `requests>=2.28.0` - HTTP 请求
 
+## 发布到 PyPI
+
+### 前置条件
+
+- 确保已安装 `build` 和 `twine`：
+
+```bash
+pip install build twine
+```
+
+- 确保环境变量 `PyPI_API_Token` 已设置为你的 PyPI API Token：
+
+```bash
+export PyPI_API_Token="pypi-..."
+```
+
+### 发布步骤
+
+```bash
+# 1. 进入项目根目录（包含 pyproject.toml）
+cd packages/markitdown-paddleocr
+
+# 2. 构建分发包（生成 dist/ 目录下的 .tar.gz 和 .whl 文件）
+python -m build
+
+# 3. 检查包的元数据和内容
+twine check dist/*
+
+# 4. 上传到 PyPI（使用环境变量中的 Token 认证）
+twine upload dist/* -u __token__ -p "$PyPI_API_Token"
+```
+
+### 发布到 TestPyPI（测试）
+
+```bash
+# 先上传到 TestPyPI 验证包是否正确
+twine upload --repository testpypi dist/* -u __token__ -p "$PyPI_API_Token"
+
+# 从 TestPyPI 安装验证
+pip install --index-url https://test.pypi.org/simple/ markitdown-paddleocr
+```
+
+### 注意事项
+
+- 发布前确保 `pyproject.toml` 中的版本号已更新
+- 同一版本号不能重复上传，如需修正必须 bump 版本号
+- `PyPI_API_Token` 环境变量切勿硬编码到脚本或提交到代码仓库
+
 ## 许可证
 
 MIT
