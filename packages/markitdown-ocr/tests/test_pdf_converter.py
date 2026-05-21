@@ -47,11 +47,15 @@ def svc() -> MockOCRService:
     return MockOCRService()
 
 
-def _convert(filename: str, ocr_service: MockOCRService) -> str:
+def _convert(
+    filename: str,
+    ocr_service: MockOCRService,
+    max_workers: int = 1,
+) -> str:
     path = TEST_DATA_DIR / filename
     if not path.exists():
         pytest.skip(f"Test file not found: {path}")
-    converter = PdfConverterWithOCR()
+    converter = PdfConverterWithOCR(max_workers=max_workers)
     with open(path, "rb") as f:
         return converter.convert(
             f, StreamInfo(extension=".pdf"), ocr_service=ocr_service
@@ -232,3 +236,63 @@ def test_pdf_no_ocr_service_no_tags() -> None:
         md = converter.convert(f, StreamInfo(extension=".pdf")).text_content
     assert "*[Image OCR]" not in md
     assert "[End OCR]*" not in md
+
+
+# ---------------------------------------------------------------------------
+# workers = 1 and workers > 1 no difference
+# ---------------------------------------------------------------------------
+
+
+def _available_test_files() -> list[str]:
+    if not TEST_DATA_DIR.exists():
+        return []
+    return sorted(p.name for p in TEST_DATA_DIR.glob("*.pdf"))
+
+
+@pytest.mark.parametrize("filename", _available_test_files())
+def test_concurrent_matches_serial(
+    svc: MockOCRService, filename: str
+) -> None:
+    serial = _convert(filename, svc, max_workers=1)
+    concurrent = _convert(filename, svc, max_workers=4)
+    assert serial == concurrent
+
+
+def test_concurrent_uses_thread_pool(svc: MockOCRService) -> None:
+    path = TEST_DATA_DIR / "pdf_image_middle.pdf"
+    if not path.exists():
+        pytest.skip(f"Test file not found: {path}")
+
+    with patch(
+        "markitdown_ocr._pdf_converter_with_ocr.ThreadPoolExecutor"
+    ) as mock_tpe:
+        mock_executor = MagicMock()
+        mock_executor.map.return_value = iter([])
+        mock_executor.__enter__ = lambda s: s
+        mock_executor.__exit__ = MagicMock(return_value=False)
+        mock_tpe.return_value = mock_executor
+
+        converter = PdfConverterWithOCR(max_workers=4)
+        with open(path, "rb") as f:
+            converter.convert(
+                f, StreamInfo(extension=".pdf"), ocr_service=svc
+            )
+
+        mock_tpe.assert_called_once_with(max_workers=4)
+
+
+def test_serial_does_not_use_thread_pool(svc: MockOCRService) -> None:
+    path = TEST_DATA_DIR / "pdf_image_middle.pdf"
+    if not path.exists():
+        pytest.skip(f"Test file not found: {path}")
+
+    with patch(
+        "markitdown_ocr._pdf_converter_with_ocr.ThreadPoolExecutor"
+    ) as mock_tpe:
+        converter = PdfConverterWithOCR(max_workers=1)
+        with open(path, "rb") as f:
+            converter.convert(
+                f, StreamInfo(extension=".pdf"), ocr_service=svc
+            )
+
+        mock_tpe.assert_not_called()
