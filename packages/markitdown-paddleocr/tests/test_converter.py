@@ -10,27 +10,34 @@ from markitdown_paddleocr._converter import PaddleOcrConverter
 class TestPaddleOcrConverterAccepts:
     """Accepts method tests."""
 
-    def test_accepts_pdf_extension(self):
-        """Accept .pdf extension."""
-        converter = PaddleOcrConverter()
+    def test_accepts_pdf_extension_with_token(self):
+        """Accept .pdf extension when token is available."""
+        converter = PaddleOcrConverter(token="test-token")
         stream = io.BytesIO(b"%PDF-1.4")
         stream_info = MagicMock(extension=".pdf", mimetype=None)
         assert converter.accepts(stream, stream_info) is True
 
-    def test_accepts_pdf_mimetype(self):
-        """Accept PDF MIME type."""
-        converter = PaddleOcrConverter()
+    def test_accepts_pdf_mimetype_with_token(self):
+        """Accept PDF MIME type when token is available."""
+        converter = PaddleOcrConverter(token="test-token")
         stream = io.BytesIO(b"%PDF-1.4")
         stream_info = MagicMock(extension=None, mimetype="application/pdf")
         assert converter.accepts(stream, stream_info) is True
 
-    def test_accepts_image_extensions(self):
-        """Accept image extensions."""
-        converter = PaddleOcrConverter()
+    def test_accepts_image_extensions_with_token(self):
+        """Accept image extensions when token is available."""
+        converter = PaddleOcrConverter(token="test-token")
         for ext in [".jpg", ".jpeg", ".png"]:
             stream = io.BytesIO(b"fake")
             stream_info = MagicMock(extension=ext, mimetype=None)
             assert converter.accepts(stream, stream_info) is True
+
+    def test_rejects_without_token(self):
+        """Reject all files when no token is available."""
+        converter = PaddleOcrConverter()  # no token
+        stream = io.BytesIO(b"%PDF-1.4")
+        stream_info = MagicMock(extension=".pdf", mimetype="application/pdf")
+        assert converter.accepts(stream, stream_info) is False
 
     def test_rejects_non_supported(self):
         """Reject non-supported files."""
@@ -92,8 +99,8 @@ class TestPaddleOcrConverterImage:
         assert "# Image Title" in result.markdown
         mock_client.ocr.assert_called_once()
 
-    def test_convert_image_error(self):
-        """Convert image with PaddleOCR error returns comment."""
+    def test_convert_image_error_raises(self):
+        """Convert image with PaddleOCR error raises exception (for framework fallback)."""
         converter = PaddleOcrConverter(token="test-token")
 
         mock_client = MagicMock()
@@ -102,9 +109,8 @@ class TestPaddleOcrConverterImage:
 
         stream = io.BytesIO(b"fake-image")
         stream_info = MagicMock(extension=".png", mimetype="image/png")
-        result = converter.convert(stream, stream_info)
-
-        assert "Error converting image" in result.markdown
+        with pytest.raises(Exception, match="API Error"):
+            converter.convert(stream, stream_info)
 
 
 class TestPaddleOcrConverterPdf:

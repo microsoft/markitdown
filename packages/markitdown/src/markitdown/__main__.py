@@ -2,12 +2,14 @@
 #
 # SPDX-License-Identifier: MIT
 import argparse
-import sys
 import codecs
-from textwrap import dedent
+import logging
+import sys
 from importlib.metadata import entry_points
+from textwrap import dedent
+
 from .__about__ import __version__
-from ._markitdown import MarkItDown, StreamInfo, DocumentConverterResult
+from ._markitdown import DocumentConverterResult, MarkItDown, StreamInfo
 
 
 def main():
@@ -105,6 +107,14 @@ def main():
     )
 
     parser.add_argument(
+        "--log-level",
+        type=str,
+        default="WARNING",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        help="Set the logging level (default: WARNING). Use INFO or DEBUG to see plugin logs.",
+    )
+
+    parser.add_argument(
         "--keep-data-uris",
         action="store_true",
         help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
@@ -112,6 +122,13 @@ def main():
 
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
+
+    # Configure logging
+    logging.basicConfig(
+        level=getattr(logging, args.log_level),
+        format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
+        datefmt="%H:%M:%S",
+    )
 
     # Parse the extension hint
     extension_hint = args.extension

@@ -1,11 +1,15 @@
 """GlmOcr PDF/Image Converter - Intelligent PDF and Image to Markdown conversion."""
 
 import io
+import logging
 import sys
 from typing import Any, BinaryIO, Optional
 
 from markitdown import DocumentConverter, DocumentConverterResult, StreamInfo
-from markitdown._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+from markitdown._exceptions import (
+    MISSING_DEPENDENCY_MESSAGE,
+    MissingDependencyException,
+)
 
 from ._config import GlmOcrConfig
 
@@ -37,10 +41,13 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 ACCEPTED_FILE_EXTENSIONS = [".pdf", ".jpg", ".jpeg", ".png"]
 
 
+logger = logging.getLogger(__name__)
+
+
 class GlmOcrConverter(DocumentConverter):
     """
     Intelligent PDF/Image converter using glmocr SDK.
-    
+
     Features:
     - Auto-detect page content type (plain text vs images/tables)
     - Plain text pages use pdfplumber/pdfminer (fast, free)
@@ -71,19 +78,21 @@ class GlmOcrConverter(DocumentConverter):
             raise ImportError(
                 "glmocr is required. Install with: pip install markitdown-glmocr[glmocr]"
             )
-        
+
         # Use config if provided
         if config:
             self.api_key = api_key or config.api_key
             self.timeout = timeout if timeout != 1800 else config.timeout
-            self.enable_layout = enable_layout if enable_layout else config.enable_layout
+            self.enable_layout = (
+                enable_layout if enable_layout else config.enable_layout
+            )
             self.force_ai = force_ai or config.force_ai
         else:
             self.api_key = api_key
             self.timeout = timeout
             self.enable_layout = enable_layout
             self.force_ai = force_ai
-        
+
         # Lazy init GlmOcr instance
         self._glmocr: Optional[GlmOcr] = None
 
@@ -127,11 +136,11 @@ class GlmOcrConverter(DocumentConverter):
                     extension=".pdf",
                     feature="pdf",
                 )
-            ) from _dependency_exc_info[1].with_traceback(
-                _dependency_exc_info[2]
-            )
+            ) from _dependency_exc_info[1].with_traceback(_dependency_exc_info[2])
 
         extension = (stream_info.extension or "").lower()
+
+        logger.info("GlmOcrConverter: 开始转换, 文件类型=%s", extension)
 
         # Image files: use glmocr directly
         if extension in (".jpg", ".jpeg", ".png"):
@@ -140,61 +149,77 @@ class GlmOcrConverter(DocumentConverter):
         # PDF files: use hybrid approach
         return self._convert_pdf(file_stream)
 
-    def _convert_image(self, file_stream: BinaryIO, extension: str = ".png") -> DocumentConverterResult:
+    def _convert_image(
+        self, file_stream: BinaryIO, extension: str = ".png"
+    ) -> DocumentConverterResult:
         """Convert image file using glmocr SDK."""
         img_bytes = file_stream.read()
 
+        logger.info("GlmOcrConverter: 开始 OCR 识别图片, 格式=%s", extension)
         try:
             result = self._get_glmocr().parse(img_bytes)
-
-            # Check for errors
-            d = result.to_dict()
-            if "error" in d:
-                return DocumentConverterResult(markdown="")
-
-            return DocumentConverterResult(
-                markdown=result.markdown_result or ""
-            )
         except Exception as e:
-            return DocumentConverterResult(
-                markdown=f"<!-- Error converting image: {e} -->"
+            logger.error(
+                "GlmOcrConverter: 图片 OCR 识别异常, 格式=%s, 错误=%s", extension, e
             )
+            raise
+
+        # Check for errors
+        d = result.to_dict()
+        if "error" in d:
+            logger.error(
+                "GlmOcrConverter: 图片 OCR 返回错误, 格式=%s, 错误=%s",
+                extension,
+                d["error"],
+            )
+            raise RuntimeError(
+                f"GlmOcrConverter: glmocr SDK returned error: {d['error']}"
+            )
+
+        markdown = result.markdown_result or ""
+        logger.info("GlmOcrConverter: 图片 OCR 识别完成, 输出长度=%d", len(markdown))
+        return DocumentConverterResult(markdown=markdown)
 
     def _convert_pdf(self, file_stream: BinaryIO) -> DocumentConverterResult:
         pdf_stream = io.BytesIO(file_stream.read())
         markdown_parts = []
 
-        try:
-            with pdfplumber.open(pdf_stream) as pdf:
-                for page_num, page in enumerate(pdf.pages):
-                    # Analyze page type
-                    page_type = self._analyze_page(page)
+        with pdfplumber.open(pdf_stream) as pdf:
+            total_pages = len(pdf.pages)
+            logger.info("GlmOcrConverter: 开始处理 PDF, 总页数=%d", total_pages)
 
-                    # Choose processing method
-                    if self.force_ai or page_type != "plain_text":
-                        # Complex content: use glmocr
-                        markdown = self._convert_with_glmocr(page, page_num)
-                    else:
-                        # Plain text: use pdfplumber
-                        markdown = self._extract_text_with_tables(page)
+            for page_num, page in enumerate(pdf.pages):
+                # Analyze page type
+                page_type = self._analyze_page(page)
 
-                    if markdown.strip():
-                        markdown_parts.append(f"## Page {page_num + 1}\n\n{markdown}")
+                # Choose processing method
+                if self.force_ai or page_type != "plain_text":
+                    # Complex content: use glmocr
+                    # Let exceptions propagate so the framework can try the next converter
+                    logger.info(
+                        "GlmOcrConverter: 第 %d/%d 页, 类型=%s, 使用 glmocr OCR",
+                        page_num + 1,
+                        total_pages,
+                        page_type,
+                    )
+                    markdown = self._convert_with_glmocr(page, page_num)
+                else:
+                    # Plain text: use pdfplumber
+                    logger.info(
+                        "GlmOcrConverter: 第 %d/%d 页, 类型=%s, 使用 pdfplumber",
+                        page_num + 1,
+                        total_pages,
+                        page_type,
+                    )
+                    markdown = self._extract_text_with_tables(page)
 
-                    page.close()
+                if markdown.strip():
+                    markdown_parts.append(f"## Page {page_num + 1}\n\n{markdown}")
 
-            markdown = "\n\n".join(markdown_parts).strip()
+                page.close()
 
-        except Exception:
-            # Fallback to pdfminer
-            pdf_stream.seek(0)
-            markdown = pdfminer.high_level.extract_text(pdf_stream) or ""
-
-        # Final fallback
-        if not markdown:
-            pdf_stream.seek(0)
-            markdown = pdfminer.high_level.extract_text(pdf_stream) or ""
-
+        markdown = "\n\n".join(markdown_parts).strip()
+        logger.info("GlmOcrConverter: PDF 转换完成, 输出长度=%d", len(markdown))
         return DocumentConverterResult(markdown=markdown)
 
     def _analyze_page(self, page: Any) -> str:
@@ -202,36 +227,56 @@ class GlmOcrConverter(DocumentConverter):
         # Check for images
         if hasattr(page, "images") and page.images:
             return "complex"
-        
+
         # Check for tables
         tables = page.find_tables()
         if tables:
             return "complex"
-        
+
         # Check for graphics/curves
         if hasattr(page, "curves") and page.curves:
             return "complex"
-        
+
         return "plain_text"
 
     def _convert_with_glmocr(self, page: Any, page_num: int) -> str:
-        """Convert page using glmocr SDK."""
+        """Convert page using glmocr SDK.
+
+        Raises RuntimeError on OCR failure so the framework can try the next converter.
+        """
+        # Render page to image
+        img = page.to_image(resolution=150)
+        img_bytes = io.BytesIO()
+        img.save(img_bytes, format="PNG")
+
+        logger.info("GlmOcrConverter: glmocr SDK 开始识别第 %d 页", page_num + 1)
         try:
-            # Render page to image
-            img = page.to_image(resolution=150)
-            img_bytes = io.BytesIO()
-            img.save(img_bytes, format="PNG")
             result = self._get_glmocr().parse(img_bytes.getvalue())
-            
-            # Check for errors
-            d = result.to_dict()
-            if "error" in d:
-                return self._extract_text_with_tables(page)
-            
-            return result.markdown_result or ""
-            
-        except Exception:
-            return self._extract_text_with_tables(page)
+        except Exception as e:
+            logger.error(
+                "GlmOcrConverter: glmocr SDK 第 %d 页识别异常, 错误=%s", page_num + 1, e
+            )
+            raise
+
+        # Check for errors
+        d = result.to_dict()
+        if "error" in d:
+            logger.error(
+                "GlmOcrConverter: glmocr SDK 第 %d 页返回错误, 错误=%s",
+                page_num + 1,
+                d["error"],
+            )
+            raise RuntimeError(
+                f"GlmOcrConverter: glmocr SDK returned error on page {page_num + 1}: {d['error']}"
+            )
+
+        markdown = result.markdown_result or ""
+        logger.info(
+            "GlmOcrConverter: glmocr SDK 第 %d 页识别完成, 输出长度=%d",
+            page_num + 1,
+            len(markdown),
+        )
+        return markdown
 
     def _extract_text_with_tables(self, page: Any) -> str:
         """Extract text and tables from page."""
@@ -280,9 +325,14 @@ class GlmOcrConverter(DocumentConverter):
         lines = []
         for row_idx, row in enumerate(table):
             padded_row = row + [""] * (len(col_widths) - len(row))
-            line = "| " + " | ".join(
-                str(cell).ljust(width) for cell, width in zip(padded_row, col_widths)
-            ) + " |"
+            line = (
+                "| "
+                + " | ".join(
+                    str(cell).ljust(width)
+                    for cell, width in zip(padded_row, col_widths)
+                )
+                + " |"
+            )
             lines.append(line)
 
             if row_idx == 0:
@@ -290,15 +340,15 @@ class GlmOcrConverter(DocumentConverter):
                 lines.append(sep)
 
         return "\n".join(lines)
-    
+
     def close(self):
         """Close the GlmOcr instance."""
         if self._glmocr:
             self._glmocr.close()
             self._glmocr = None
-    
+
     def __enter__(self):
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()

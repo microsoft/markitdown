@@ -1,11 +1,15 @@
 """PaddleOcr Converter - PDF/Image to Markdown using PaddleOCR cloud API."""
 
 import io
+import logging
 import sys
 from typing import Any, BinaryIO, Optional
 
 from markitdown import DocumentConverter, DocumentConverterResult, StreamInfo
-from markitdown._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+from markitdown._exceptions import (
+    MISSING_DEPENDENCY_MESSAGE,
+    MissingDependencyException,
+)
 
 from ._config import PaddleOcrConfig
 from ._paddle_client import PaddleClient
@@ -28,6 +32,9 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 ]
 
 ACCEPTED_FILE_EXTENSIONS = [".pdf", ".jpg", ".jpeg", ".png"]
+
+
+logger = logging.getLogger(__name__)
 
 
 class PaddleOcrConverter(DocumentConverter):
@@ -70,12 +77,20 @@ class PaddleOcrConverter(DocumentConverter):
         if config:
             self.token = token or config.token
             self.model = model if model != "PaddleOCR-VL-1.5" else config.model
-            self.poll_interval = poll_interval if poll_interval != 2.0 else config.poll_interval
-            self.poll_timeout = poll_timeout if poll_timeout != 300.0 else config.poll_timeout
+            self.poll_interval = (
+                poll_interval if poll_interval != 2.0 else config.poll_interval
+            )
+            self.poll_timeout = (
+                poll_timeout if poll_timeout != 300.0 else config.poll_timeout
+            )
             self.force_ai = force_ai or config.force_ai
-            self.use_doc_orientation_classify = use_doc_orientation_classify or config.use_doc_orientation_classify
+            self.use_doc_orientation_classify = (
+                use_doc_orientation_classify or config.use_doc_orientation_classify
+            )
             self.use_doc_unwarping = use_doc_unwarping or config.use_doc_unwarping
-            self.use_chart_recognition = use_chart_recognition or config.use_chart_recognition
+            self.use_chart_recognition = (
+                use_chart_recognition or config.use_chart_recognition
+            )
         else:
             self.token = token
             self.model = model
@@ -105,12 +120,25 @@ class PaddleOcrConverter(DocumentConverter):
             self._client = PaddleClient(config=config)
         return self._client
 
+    def _has_token(self) -> bool:
+        """Check if a valid token is available."""
+        if self.token:
+            return True
+        import os
+
+        return bool(os.environ.get("BAIDU_PADDLE_TOKEN", ""))
+
     def accepts(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
         **kwargs: Any,
     ) -> bool:
+        # Without a token, PaddleOCR API cannot work — decline so other
+        # converters (e.g. GlmOcrConverter) get a chance.
+        if not self._has_token():
+            return False
+
         mimetype = (stream_info.mimetype or "").lower()
         extension = (stream_info.extension or "").lower()
 
@@ -136,11 +164,11 @@ class PaddleOcrConverter(DocumentConverter):
                     extension=".pdf",
                     feature="pdf",
                 )
-            ) from _dependency_exc_info[1].with_traceback(
-                _dependency_exc_info[2]
-            )
+            ) from _dependency_exc_info[1].with_traceback(_dependency_exc_info[2])
 
         extension = (stream_info.extension or "").lower()
+
+        logger.info("PaddleOcrConverter: 开始转换, 文件类型=%s", extension)
 
         # Image files: use PaddleOCR directly
         if extension in (".jpg", ".jpeg", ".png"):
@@ -149,36 +177,68 @@ class PaddleOcrConverter(DocumentConverter):
         # PDF files: use hybrid approach
         return self._convert_pdf(file_stream)
 
-    def _convert_image(self, file_stream: BinaryIO, extension: str = ".png") -> DocumentConverterResult:
+    def _convert_image(
+        self, file_stream: BinaryIO, extension: str = ".png"
+    ) -> DocumentConverterResult:
         """Convert image file using PaddleOCR API."""
         img_bytes = file_stream.read()
         filename = f"image{extension}"
 
+        logger.info("PaddleOcrConverter: 开始 OCR 识别图片, 格式=%s", extension)
         try:
             markdown = self._get_client().ocr(file_bytes=img_bytes, filename=filename)
-            return DocumentConverterResult(markdown=markdown)
         except Exception as e:
-            return DocumentConverterResult(
-                markdown=f"<!-- Error converting image with PaddleOCR: {e} -->"
+            logger.error(
+                "PaddleOcrConverter: 图片 OCR 识别异常, 格式=%s, 错误=%s", extension, e
             )
+            raise
+
+        logger.info("PaddleOcrConverter: 图片 OCR 识别完成, 输出长度=%d", len(markdown))
+        return DocumentConverterResult(markdown=markdown)
 
     def _convert_pdf(self, file_stream: BinaryIO) -> DocumentConverterResult:
         """Convert PDF using hybrid approach (pdfplumber for text, PaddleOCR for complex pages)."""
         pdf_stream = io.BytesIO(file_stream.read())
         markdown_parts = []
+        ocr_failed = False
 
         try:
             with pdfplumber.open(pdf_stream) as pdf:
+                total_pages = len(pdf.pages)
+                logger.info("PaddleOcrConverter: 开始处理 PDF, 总页数=%d", total_pages)
+
                 for page_num, page in enumerate(pdf.pages):
                     # Analyze page type
                     page_type = self._analyze_page(page)
 
                     # Choose processing method
                     if self.force_ai or page_type != "plain_text":
-                        # Complex content: use PaddleOCR
-                        markdown = self._convert_with_paddleocr(page, page_num)
+                        # Complex content: try PaddleOCR, fallback to pdfplumber on failure
+                        logger.info(
+                            "PaddleOcrConverter: 第 %d/%d 页, 类型=%s, 使用 PaddleOCR",
+                            page_num + 1,
+                            total_pages,
+                            page_type,
+                        )
+                        try:
+                            markdown = self._convert_with_paddleocr(page, page_num)
+                        except Exception as e:
+                            logger.warning(
+                                "PaddleOcrConverter: 第 %d/%d 页 OCR 失败, 降级为 pdfplumber, 错误=%s",
+                                page_num + 1,
+                                total_pages,
+                                e,
+                            )
+                            ocr_failed = True
+                            markdown = self._extract_text_with_tables(page)
                     else:
                         # Plain text: use pdfplumber
+                        logger.info(
+                            "PaddleOcrConverter: 第 %d/%d 页, 类型=%s, 使用 pdfplumber",
+                            page_num + 1,
+                            total_pages,
+                            page_type,
+                        )
                         markdown = self._extract_text_with_tables(page)
 
                     if markdown.strip():
@@ -188,7 +248,10 @@ class PaddleOcrConverter(DocumentConverter):
 
             markdown = "\n\n".join(markdown_parts).strip()
 
-        except Exception:
+        except Exception as e:
+            logger.error(
+                "PaddleOcrConverter: PDF 处理异常, 降级为 pdfminer, 错误=%s", e
+            )
             # Fallback to pdfminer
             pdf_stream.seek(0)
             markdown = pdfminer.high_level.extract_text(pdf_stream) or ""
@@ -198,6 +261,15 @@ class PaddleOcrConverter(DocumentConverter):
             pdf_stream.seek(0)
             markdown = pdfminer.high_level.extract_text(pdf_stream) or ""
 
+        # If OCR failed and result is empty, raise so the framework can try
+        # the next converter (e.g. GlmOcrConverter) instead of returning empty.
+        if ocr_failed and not markdown.strip():
+            logger.error("PaddleOcrConverter: OCR 失败且所有兜底结果为空, 抛出异常")
+            raise RuntimeError(
+                "PaddleOcrConverter: OCR failed and all fallbacks returned empty"
+            )
+
+        logger.info("PaddleOcrConverter: PDF 转换完成, 输出长度=%d", len(markdown))
         return DocumentConverterResult(markdown=markdown)
 
     def _analyze_page(self, page: Any) -> str:
@@ -219,21 +291,31 @@ class PaddleOcrConverter(DocumentConverter):
 
     def _convert_with_paddleocr(self, page: Any, page_num: int) -> str:
         """Convert page using PaddleOCR API."""
-        try:
-            # Render page to image
-            img = page.to_image(resolution=150)
-            img_bytes = io.BytesIO()
-            img.save(img_bytes, format="PNG")
+        # Render page to image
+        img = page.to_image(resolution=150)
+        img_bytes = io.BytesIO()
+        img.save(img_bytes, format="PNG")
 
+        logger.info("PaddleOcrConverter: PaddleOCR API 开始识别第 %d 页", page_num + 1)
+        try:
             markdown = self._get_client().ocr(
                 file_bytes=img_bytes.getvalue(),
                 filename=f"page_{page_num + 1}.png",
             )
-            return markdown
+        except Exception as e:
+            logger.error(
+                "PaddleOcrConverter: PaddleOCR API 第 %d 页识别异常, 错误=%s",
+                page_num + 1,
+                e,
+            )
+            raise
 
-        except Exception:
-            # Fallback to pdfplumber text extraction
-            return self._extract_text_with_tables(page)
+        logger.info(
+            "PaddleOcrConverter: PaddleOCR API 第 %d 页识别完成, 输出长度=%d",
+            page_num + 1,
+            len(markdown),
+        )
+        return markdown
 
     def _extract_text_with_tables(self, page: Any) -> str:
         """Extract text and tables from page."""
@@ -282,9 +364,14 @@ class PaddleOcrConverter(DocumentConverter):
         lines = []
         for row_idx, row in enumerate(table):
             padded_row = row + [""] * (len(col_widths) - len(row))
-            line = "| " + " | ".join(
-                str(cell).ljust(width) for cell, width in zip(padded_row, col_widths)
-            ) + " |"
+            line = (
+                "| "
+                + " | ".join(
+                    str(cell).ljust(width)
+                    for cell, width in zip(padded_row, col_widths)
+                )
+                + " |"
+            )
             lines.append(line)
 
             if row_idx == 0:
