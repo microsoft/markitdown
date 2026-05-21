@@ -2,6 +2,19 @@
 
 import os
 from dataclasses import dataclass
+from enum import Enum
+
+
+class ScanDetectionMode(str, Enum):
+    """扫描检测模式。
+
+    - PAGE_BY_PAGE: 逐页分析，当前默认行为
+    - FIRST_PAGE_HINT: 首页是扫描件则全文档使用OCR
+    - SAMPLING: 抽样前N页，多数是扫描件则全部OCR
+    """
+    PAGE_BY_PAGE = "page_by_page"
+    FIRST_PAGE_HINT = "first_page_hint"
+    SAMPLING = "sampling"
 
 
 @dataclass
@@ -34,6 +47,11 @@ class PaddleOcrConfig:
 
     # Processing strategy
     force_ai: bool = False
+
+    # Scan detection mode for optimization
+    scan_detection_mode: ScanDetectionMode = ScanDetectionMode.SAMPLING
+    scan_sample_pages: int = 3  # Number of pages to sample in SAMPLING mode
+    scan_text_threshold: int = 50  # Min text length to consider page as non-scanned
 
     @classmethod
     def from_env(cls, **overrides) -> "PaddleOcrConfig":
