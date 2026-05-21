@@ -1,7 +1,8 @@
 import sys
 import io
 import re
-from typing import BinaryIO, Any
+import base64
+from typing import BinaryIO, Any, Optional
 
 from .._base_converter import DocumentConverter, DocumentConverterResult, ConversionProgress
 from .._stream_info import StreamInfo
@@ -492,11 +493,83 @@ def _extract_tables_from_words(page: Any) -> list[list[list[str]]]:
     return [table_rows]
 
 
+def _describe_page_image(
+    page: Any,
+    llm_client: Any,
+    llm_model: str,
+    *,
+    page_num: int = 1,
+    total_pages: int = 1,
+    prompt: Optional[str] = None,
+) -> Optional[str]:
+    """Rasterise a pdfplumber page to PNG and describe it via a vision LLM.
+
+    Uses ``page.to_image()`` (Pillow-backed) to render the page at 150 DPI,
+    encodes the result as a base64 data-URI, and sends it to the LLM.
+
+    Returns:
+        A Markdown description of the page content, or *None* on failure.
+    """
+    if prompt is None:
+        prompt = (
+            "You are a document extraction assistant. "
+            "Describe the visible content of this document page "
+            "in a structured and factual way using Markdown. "
+            "Include all text, tables, diagrams, screenshots "
+            "and visual elements you observe. "
+            "Use Markdown headings, lists and tables where appropriate."
+        )
+
+    try:
+        # Render the page to a PIL Image (resolution in DPI)
+        page_image = page.to_image(resolution=150)
+        buf = io.BytesIO()
+        page_image.original.save(buf, format="PNG")
+        png_bytes = buf.getvalue()
+        b64_image = base64.b64encode(png_bytes).decode("ascii")
+
+        response = llm_client.chat.completions.create(
+            model=llm_model,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": (
+                                f"Page {page_num}/{total_pages}. {prompt}"
+                            ),
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/png;base64,{b64_image}",
+                                "detail": "high",
+                            },
+                        },
+                    ],
+                },
+            ],
+            max_tokens=1500,
+            temperature=0.1,
+        )
+
+        description = response.choices[0].message.content
+        return description.strip() if description and description.strip() else None
+
+    except Exception:
+        return None
+
+
 class PdfConverter(DocumentConverter):
     """
     Converts PDFs to Markdown.
     Supports extracting tables into aligned Markdown format (via pdfplumber).
     Falls back to pdfminer if pdfplumber is missing or fails.
+
+    When an ``llm_client`` and ``llm_model`` are provided (via *kwargs*),
+    pages that contain no extractable text (scanned images, screenshots)
+    are rasterised and described by the vision LLM.
     """
 
     def accepts(
@@ -573,6 +646,20 @@ class PdfConverter(DocumentConverter):
                         text = page.extract_text()
                         if text and text.strip():
                             markdown_chunks.append(text.strip())
+                        else:
+                            # Page without extractable text (scan/screenshot)
+                            # → describe via vision LLM if available
+                            _llm_client = kwargs.get("llm_client")
+                            _llm_model = kwargs.get("llm_model")
+                            if _llm_client and _llm_model:
+                                description = _describe_page_image(
+                                    page, _llm_client, _llm_model,
+                                    page_num=page_idx + 1,
+                                    total_pages=total_pages,
+                                    prompt=kwargs.get("llm_prompt"),
+                                )
+                                if description:
+                                    markdown_chunks.append(description)
 
                     page.close()  # Free cached page data immediately
 
