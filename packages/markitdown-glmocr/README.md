@@ -195,39 +195,78 @@ glmocr SDK 返回的结构化数据支持以下标签：
 
 ### 前置条件
 
-- 确保已安装 `build` 和 `twine`：
+1. 安装构建工具：
 
 ```bash
-pip install build twine
+pip install build twine hatch
 ```
 
-- 确保环境变量 `PyPI_API_Token` 已设置为你的 PyPI API Token：
+2. 配置 PyPI API Token（Windows 用户环境变量）：
 
-```bash
-export PyPI_API_Token="pypi-..."
+```powershell
+# PowerShell 设置用户环境变量
+[System.Environment]::SetEnvironmentVariable('PYPI_API_TOKEN', 'pypi-...', 'User')
 ```
 
-### 发布步骤
+或在 Bash/Zsh 中：
 
 ```bash
-# 1. 进入项目根目录（包含 pyproject.toml）
+export PYPI_API_TOKEN="pypi-..."
+```
+
+### 快速发布（推荐）
+
+项目根目录提供了上传脚本，可一键发布两个插件：
+
+**Bash / Git Bash:**
+```bash
+# 构建两个插件
+cd packages/markitdown-glmocr && hatch build
+
+cd ../markitdown-paddleocr && hatch build
+
+# 上传（自动上传所有构建的版本）
+cd ../..
+./scripts/pypi-upload.sh
+
+# 或指定版本号
+./scripts/pypi-upload.sh 0.2.0
+```
+
+**PowerShell:**
+```powershell
+# 构建两个插件
+cd packages/markitdown-glmocr; hatch build
+cd ../markitdown-paddleocr; hatch build
+
+# 上传
+cd ../..
+.\scripts\pypi-upload.ps1
+
+# 或指定版本号
+.\scripts\pypi-upload.ps1 -Version "0.2.0"
+```
+
+### 手动发布
+
+```bash
+# 1. 进入项目目录
 cd packages/markitdown-glmocr
 
-# 2. 构建分发包（生成 dist/ 目录下的 .tar.gz 和 .whl 文件）
-python -m build
+# 2. 构建
+hatch build
 
-# 3. 检查包的元数据和内容
+# 3. 检查
 twine check dist/*
 
-# 4. 上传到 PyPI（使用环境变量中的 Token 认证）
-twine upload dist/* -u __token__ -p "$PyPI_API_Token"
+# 4. 上传
+twine upload --username __token__ --password "$PYPI_API_TOKEN" --disable-progress-bar dist/*
 ```
 
 ### 发布到 TestPyPI（测试）
 
 ```bash
-# 先上传到 TestPyPI 验证包是否正确
-twine upload --repository testpypi dist/* -u __token__ -p "$PyPI_API_Token"
+twine upload --repository testpypi --username __token__ --password "$PYPI_API_TOKEN" --disable-progress-bar dist/*
 
 # 从 TestPyPI 安装验证
 pip install --index-url https://test.pypi.org/simple/ markitdown-glmocr
@@ -235,9 +274,9 @@ pip install --index-url https://test.pypi.org/simple/ markitdown-glmocr
 
 ### 注意事项
 
-- 发布前确保 `pyproject.toml` 中的版本号已更新
+- 发布前确保 `src/markitdown_glmocr/__about__.py` 中的版本号已更新
 - 同一版本号不能重复上传，如需修正必须 bump 版本号
-- `PyPI_API_Token` 环境变量切勿硬编码到脚本或提交到代码仓库
+- `PYPI_API_TOKEN` 切勿提交到代码仓库
 
 ## 许可证
 
