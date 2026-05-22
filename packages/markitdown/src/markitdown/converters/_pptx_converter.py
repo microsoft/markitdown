@@ -5,6 +5,7 @@ import os
 import io
 import re
 import html
+import posixpath
 import warnings
 
 from typing import BinaryIO, Any, Dict, Optional, Set, Tuple
@@ -89,19 +90,28 @@ class PptxConverter(DocumentConverter):
         extract_images_to: Optional[str] = kwargs.get("extract_images_to")
         keep_data_uris: bool = bool(kwargs.get("keep_data_uris", False))
 
-        extract_dir: Optional[str] = None
+        # ``extract_dir_resolved`` is the absolute path used for actual file
+        # I/O (so we can ``os.makedirs`` and ``open`` reliably regardless of
+        # the caller's CWD). ``extract_dir_for_link`` preserves the user's
+        # original input verbatim and is used to build the markdown image
+        # references, so consumers can locate the rendered files relative to
+        # whatever path they passed in (e.g. ``imgs/`` stays relative).
+        extract_dir_resolved: Optional[str] = None
+        extract_dir_for_link: Optional[str] = None
         if extract_images_to and not keep_data_uris:
-            extract_dir = os.path.abspath(extract_images_to)
+            extract_dir_resolved = os.path.abspath(extract_images_to)
+            extract_dir_for_link = extract_images_to
             try:
-                os.makedirs(extract_dir, exist_ok=True)
+                os.makedirs(extract_dir_resolved, exist_ok=True)
             except OSError as exc:
                 warnings.warn(
                     f"Could not create image extraction directory "
-                    f"{extract_dir!r}: {exc}; falling back to placeholder "
+                    f"{extract_dir_resolved!r}: {exc}; falling back to placeholder "
                     f"filenames.",
                     stacklevel=2,
                 )
-                extract_dir = None
+                extract_dir_resolved = None
+                extract_dir_for_link = None
 
         # Track filename uniqueness across the deck and reuse identical images
         # by content hash so duplicate blobs are written to disk only once.
@@ -184,12 +194,12 @@ class PptxConverter(DocumentConverter):
                         content_type = shape.image.content_type or "image/png"
                         b64_string = base64.b64encode(blob).decode("utf-8")
                         md_content += f"\n![{alt_text}](data:{content_type};base64,{b64_string})\n"
-                    elif extract_dir is not None:
+                    elif extract_dir_resolved is not None:
                         # Try to write the image to disk; fall back to the
                         # legacy placeholder if anything goes wrong.
                         try:
                             target_path, ref_name = self._resolve_image_target(
-                                extract_dir,
+                                extract_dir_resolved,
                                 slide_num,
                                 current_shape_idx,
                                 shape,
@@ -197,9 +207,21 @@ class PptxConverter(DocumentConverter):
                                 hash_to_name,
                             )
                             if target_path is not None:
+                                # Write first; only commit dedup/uniqueness
+                                # state to the shared dicts after a
+                                # successful write so a write failure does
+                                # not strand future references on a
+                                # non-existent file.
                                 with open(target_path, "wb") as fh:
                                     fh.write(shape.image.blob)
-                            md_content += f"\n![{alt_text}]({ref_name})\n"
+                                used_names.add(ref_name)
+                                sha1 = getattr(shape.image, "sha1", None)
+                                if sha1:
+                                    hash_to_name[sha1] = ref_name
+                            link = self._build_markdown_link(
+                                extract_dir_for_link, ref_name
+                            )
+                            md_content += f"\n![{alt_text}]({link})\n"
                         except Exception as exc:
                             warnings.warn(
                                 f"Failed to extract embedded PPTX image "
@@ -305,9 +327,14 @@ class PptxConverter(DocumentConverter):
 
         If the image's content hash has been seen before, returns
         ``(None, existing_reference)`` so the caller skips writing and reuses
-        the previous filename. Otherwise allocates a unique filename in
+        the previous filename. Otherwise computes a unique filename in
         ``extract_dir`` and returns the absolute path to write to plus the
         relative filename to embed in the markdown.
+
+        This method does **not** mutate ``used_names`` or ``hash_to_name``.
+        The caller is expected to commit the returned ``ref_name`` to those
+        dicts only after the file has been successfully written, so a write
+        failure does not poison the dedup state for subsequent shapes.
         """
         image = shape.image
 
@@ -316,16 +343,38 @@ class PptxConverter(DocumentConverter):
         if sha1 and sha1 in hash_to_name:
             return None, hash_to_name[sha1]
 
-        # Pick an extension (python-pptx returns a lowercase, dot-less
-        # extension such as ``"png"`` or ``"jpeg"``). Fall back to
-        # ``mimetypes.guess_extension`` based on the content type, then to
-        # ``"bin"`` if nothing else works.
-        ext = (getattr(image, "ext", None) or "").lstrip(".").lower()
+        # Pick an extension. python-pptx normally returns a lowercase
+        # dot-less extension via ``image.ext`` (e.g. ``"png"`` / ``"jpeg"``)
+        # but for image types it does not recognise (SVG, EMF, ICO, ...) it
+        # raises ``ValueError`` instead of returning ``None``. Wrap each
+        # source in its own ``try`` so we can fall through cleanly.
+        ext = ""
+        try:
+            raw_ext = getattr(image, "ext", None)
+        except Exception:
+            raw_ext = None
+        if raw_ext:
+            ext = str(raw_ext).lstrip(".").lower()
+
         if not ext:
-            content_type = getattr(image, "content_type", None) or ""
-            guessed = mimetypes.guess_extension(content_type) if content_type else None
-            if guessed:
-                ext = guessed.lstrip(".").lower()
+            try:
+                content_type = getattr(image, "content_type", None) or ""
+            except Exception:
+                content_type = ""
+            if content_type:
+                guessed = mimetypes.guess_extension(content_type)
+                if guessed:
+                    ext = guessed.lstrip(".").lower()
+
+        if not ext:
+            try:
+                image_filename = getattr(image, "filename", None) or ""
+            except Exception:
+                image_filename = ""
+            if image_filename:
+                _, fname_ext = os.path.splitext(image_filename)
+                ext = fname_ext.lstrip(".").lower()
+
         if not ext:
             ext = "bin"
 
@@ -337,15 +386,40 @@ class PptxConverter(DocumentConverter):
         base_name = f"slide{slide_num:02d}_{shape_idx}_{sanitized}"
         candidate = f"{base_name}.{ext}"
         suffix = 2
-        while candidate in used_names:
+        # Avoid collisions with names this conversion has already allocated
+        # *and* with files that already exist on disk from a previous run or
+        # another caller. ``used_names`` covers in-process allocations (which
+        # also live on disk after we write them); ``os.path.exists`` covers
+        # files we did not put there ourselves so we never silently overwrite
+        # them.
+        while candidate in used_names or os.path.exists(
+            os.path.join(extract_dir, candidate)
+        ):
             candidate = f"{base_name}_{suffix}.{ext}"
             suffix += 1
-        used_names.add(candidate)
-        if sha1:
-            hash_to_name[sha1] = candidate
 
         target_path = os.path.join(extract_dir, candidate)
         return target_path, candidate
+
+    @staticmethod
+    def _build_markdown_link(extract_dir_for_link: Optional[str], filename: str) -> str:
+        """Compose the markdown image reference.
+
+        Joins the user-supplied ``extract_images_to`` value (``imgs/`` or
+        ``/abs/path``) with ``filename`` using forward slashes so the
+        resulting markdown is portable and never contains backslashes on
+        Windows. Falls back to the bare filename when no directory is
+        configured (this branch is mainly defensive — callers only invoke
+        this when extraction is enabled).
+        """
+        if not extract_dir_for_link:
+            return filename
+        # Normalise any backslashes the caller may have used (Windows-style
+        # input) and strip trailing separators before joining.
+        prefix = extract_dir_for_link.replace("\\", "/").rstrip("/")
+        if not prefix:
+            return filename
+        return posixpath.join(prefix, filename)
 
     def _convert_table_to_markdown(self, table, **kwargs):
         # Write the table as HTML, then convert it to Markdown

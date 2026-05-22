@@ -53,10 +53,12 @@ def test_extract_images_to(tmp_path) -> None:
     assert out_dir.is_dir(), "extraction directory should be created"
     written = [p for p in out_dir.iterdir() if p.is_file()]
     assert written, "at least one image should have been extracted"
+    # Markdown links use the user-supplied path joined with the filename
+    # (forward-slash form), matching whatever was passed on the CLI.
+    expected_prefix = str(out_dir).replace("\\", "/")
     for path in written:
         assert path.stat().st_size > 0, f"{path} is empty"
-        # The stdout markdown should reference the written filename.
-        assert f"]({path.name})" in result.stdout
+        assert f"]({expected_prefix}/{path.name})" in result.stdout
 
 
 if __name__ == "__main__":

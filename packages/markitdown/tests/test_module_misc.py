@@ -549,44 +549,158 @@ def test_pptx_extract_images_to_dir(tmp_path) -> None:
     for path in written:
         assert path.stat().st_size > 0, f"{path} is empty"
 
-    # The markdown should reference the actual file names that were written,
-    # not the legacy "Picture4.jpg" placeholder.
+    # The markdown should reference the actual file names that were written
+    # joined with the user-supplied extract_images_to path (forward-slash
+    # form), not the legacy "Picture4.jpg" placeholder.
     written_names = {p.name for p in written}
+    expected_prefix = str(out_dir).replace("\\", "/")
     for name in written_names:
+        expected_link = f"{expected_prefix}/{name}"
         assert (
-            f"]({name})" in result.markdown
-        ), f"markdown should reference written file {name}"
+            f"]({expected_link})" in result.markdown
+        ), f"markdown should reference {expected_link}"
     assert "](Picture4.jpg)" not in result.markdown
 
 
-def test_pptx_extract_images_dedup(tmp_path) -> None:
-    """Identical embedded images should be written to disk only once even
-    when referenced multiple times by the markdown."""
-    import hashlib
+def test_pptx_extract_images_to_relative_dir(tmp_path, monkeypatch) -> None:
+    """A relative ``extract_images_to`` should appear verbatim in the
+    markdown output (so consumers can resolve images relative to the
+    rendered markdown), while the files themselves still land in the
+    expected directory on disk."""
+    monkeypatch.chdir(tmp_path)
 
-    out_dir = tmp_path / "imgs"
     markitdown = MarkItDown()
     result = markitdown.convert(
+        os.path.join(TEST_FILES_DIR, "test.pptx"),
+        extract_images_to="imgs",
+    )
+
+    out_dir = tmp_path / "imgs"
+    assert out_dir.is_dir(), "extract directory should be created"
+    written_names = {p.name for p in out_dir.iterdir() if p.is_file()}
+    assert written_names, "at least one image should have been written"
+
+    for name in written_names:
+        assert (
+            f"](imgs/{name})" in result.markdown
+        ), f"markdown should reference imgs/{name} verbatim"
+    # The absolute, resolved path must NOT leak into the markdown.
+    assert str(out_dir) not in result.markdown
+
+
+def test_pptx_extract_images_does_not_overwrite_existing(tmp_path) -> None:
+    """If a file with the would-be target name already exists on disk and
+    was not produced by this conversion, the converter must allocate a
+    new (suffixed) name instead of silently overwriting it."""
+    out_dir = tmp_path / "imgs"
+    out_dir.mkdir()
+
+    # Pre-seed the directory with a sentinel that uses the slide01 prefix
+    # we expect the converter to allocate. The exact filename does not
+    # matter — we just need to guarantee at least one collision.
+    sentinel_payload = b"PRE_EXISTING_DO_NOT_OVERWRITE"
+    pre_existing: list[tuple] = []
+    for entry in out_dir.iterdir():
+        pre_existing.append((entry.name, entry.read_bytes()))
+
+    markitdown = MarkItDown()
+    # Run once to discover what filenames the converter wants to use,
+    # capture them, then re-run with those names pre-populated.
+    first = markitdown.convert(
+        os.path.join(TEST_FILES_DIR, "test.pptx"),
+        extract_images_to=str(out_dir),
+    )
+    discovered = sorted(p.name for p in out_dir.iterdir() if p.is_file())
+    assert discovered, "expected at least one extracted image"
+
+    # Wipe and reseed: pre-create the would-be targets with sentinel bytes.
+    for entry in out_dir.iterdir():
+        entry.unlink()
+    for name in discovered:
+        (out_dir / name).write_bytes(sentinel_payload)
+
+    second = markitdown.convert(
         os.path.join(TEST_FILES_DIR, "test.pptx"),
         extract_images_to=str(out_dir),
     )
 
-    # Build a map of {sha1: [files...]} for everything that landed on disk.
-    digests: dict[str, list[str]] = {}
-    for path in out_dir.iterdir():
-        if not path.is_file():
-            continue
-        sha1 = hashlib.sha1(path.read_bytes()).hexdigest()
-        digests.setdefault(sha1, []).append(path.name)
+    # The sentinel files must still contain the sentinel payload (i.e. were
+    # not overwritten). The new files must have been written under
+    # suffixed names.
+    for name in discovered:
+        assert (
+            out_dir / name
+        ).read_bytes() == sentinel_payload, f"sentinel file {name} was overwritten"
 
-    # No two written files should share the same content.
-    duplicates = {h: names for h, names in digests.items() if len(names) > 1}
-    assert not duplicates, f"duplicate image content written to disk: {duplicates}"
+    # Verify at least one suffixed (_2) variant exists alongside the
+    # originals.
+    final_names = {p.name for p in out_dir.iterdir() if p.is_file()}
+    assert any(
+        "_2." in n for n in final_names
+    ), f"expected suffixed filenames among {final_names}"
 
-    # Sanity-check that the markdown actually reuses each written name at
-    # least once. (A duplicate reference would point to the same file.)
-    for name in digests.values():
-        assert f"]({name[0]})" in result.markdown
+    # Markdown should reference the suffixed paths.
+    expected_prefix = str(out_dir).replace("\\", "/")
+    suffixed = [n for n in final_names if "_2." in n]
+    assert any(
+        f"]({expected_prefix}/{n})" in second.markdown for n in suffixed
+    ), "markdown should reference at least one suffixed filename"
+
+
+def test_pptx_extract_images_dedup(tmp_path) -> None:
+    """Identical embedded images should be written to disk only once even
+    when referenced multiple times by the markdown.
+
+    We programmatically build a deck that embeds the same image on three
+    different slides — the existing ``test.pptx`` fixture happens not to
+    contain duplicate blobs, so without this synthetic fixture the
+    deduplication path would not actually exercise.
+    """
+    import hashlib
+
+    pytest.importorskip("pptx")
+    from pptx import Presentation
+    from pptx.util import Inches
+
+    # Use a real image from the test corpus so python-pptx accepts it.
+    src_image = os.path.join(TEST_FILES_DIR, "test.jpg")
+    assert os.path.exists(src_image), "expected test.jpg fixture"
+    image_bytes = open(src_image, "rb").read()
+    expected_sha1 = hashlib.sha1(image_bytes).hexdigest()
+
+    prs = Presentation()
+    blank_layout = prs.slide_layouts[6]  # blank layout
+    for _ in range(3):
+        slide = prs.slides.add_slide(blank_layout)
+        slide.shapes.add_picture(src_image, Inches(1), Inches(1))
+
+    deck_path = tmp_path / "dedup.pptx"
+    prs.save(str(deck_path))
+
+    out_dir = tmp_path / "imgs"
+    markitdown = MarkItDown()
+    result = markitdown.convert(
+        str(deck_path),
+        extract_images_to=str(out_dir),
+    )
+
+    written = [p for p in out_dir.iterdir() if p.is_file()]
+    assert (
+        len(written) == 1
+    ), f"expected dedup to leave exactly one file on disk, got {written}"
+    only_file = written[0]
+    assert (
+        hashlib.sha1(only_file.read_bytes()).hexdigest() == expected_sha1
+    ), "written blob should match the source image"
+
+    # The markdown should reference the same filename multiple times (one
+    # per slide) rather than emitting a fresh name for every duplicate.
+    expected_prefix = str(out_dir).replace("\\", "/")
+    expected_link = f"]({expected_prefix}/{only_file.name})"
+    assert result.markdown.count(expected_link) >= 2, (
+        f"expected the deduplicated link {expected_link!r} to appear at "
+        f"least twice in the markdown output:\n{result.markdown}"
+    )
 
 
 def test_pptx_extract_images_keep_data_uris_takes_precedence(tmp_path) -> None:
