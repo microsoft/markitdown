@@ -98,6 +98,28 @@ If you want to mount a directory, adjust it accordingly:
 }
 ```
 
+## Behind a corporate proxy
+
+If you are behind a corporate proxy that performs TLS interception (a "man-in-the-middle" proxy that re-signs HTTPS traffic with an internal CA), `uvx` and `pip` may fail to download `markitdown-mcp` or its dependencies because Python's bundled `certifi` trust store does not include the proxy's CA certificate. The error typically surfaces as an SSL verification failure during package install.
+
+Point Python at a certificate bundle that includes your corporate CA by setting `SSL_CERT_FILE` in the MCP server's `env` block. For example, in `mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "markitdown": {
+      "command": "uvx",
+      "args": ["markitdown-mcp"],
+      "env": {
+        "SSL_CERT_FILE": "/Library/Application Support/VPNCLIENT/Agent/data/cacert_combined.pem"
+      }
+    }
+  }
+}
+```
+
+Replace the path with the location of a PEM bundle on your machine that contains your corporate root CA (your IT team can usually provide this). The same `SSL_CERT_FILE` variable works for any client that uses Python's `ssl` module, including `pip` and `uv`.
+
 ## Debugging
 
 To debug the MCP server you can use the `MCP Inspector` tool.
