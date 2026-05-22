@@ -27,6 +27,8 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 
 ACCEPTED_FILE_EXTENSIONS = [".docx"]
 
+DEFAULT_STYLE_MAP = "u => u"
+
 
 class DocxConverter(HtmlConverter):
     """
@@ -76,6 +78,13 @@ class DocxConverter(HtmlConverter):
             )
 
         style_map = kwargs.get("style_map", None)
+        if style_map is None:
+            style_map = DEFAULT_STYLE_MAP
+        elif isinstance(style_map, str) and not any(
+            line.strip().startswith("u =>") for line in style_map.splitlines()
+        ):
+            style_map = f"{style_map}\n{DEFAULT_STYLE_MAP}"
+
         pre_process_stream = pre_process_docx(file_stream)
         return self._html_converter.convert_string(
             mammoth.convert_to_html(pre_process_stream, style_map=style_map).value,

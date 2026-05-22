@@ -3,6 +3,7 @@ import io
 import os
 import re
 import shutil
+import zipfile
 import pytest
 from unittest.mock import MagicMock
 
@@ -274,6 +275,40 @@ def test_docx_equations() -> None:
     assert block_equations, "No block equations found in the document."
 
 
+def test_docx_underline(tmp_path) -> None:
+    docx_file = tmp_path / "underlined.docx"
+    files = {
+        "[Content_Types].xml": """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>""",
+        "_rels/.rels": """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>""",
+        "word/_rels/document.xml.rels": """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>""",
+        "word/document.xml": """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:t>plain </w:t></w:r>
+      <w:r><w:rPr><w:u w:val="single"/></w:rPr><w:t>underlined</w:t></w:r>
+    </w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>""",
+    }
+    with zipfile.ZipFile(docx_file, "w", zipfile.ZIP_DEFLATED) as docx:
+        for name, content in files.items():
+            docx.writestr(name, content)
+
+    result = MarkItDown().convert(str(docx_file))
+    assert "plain <u>underlined</u>" in result.text_content
+
+
 def test_input_as_strings() -> None:
     markitdown = MarkItDown()
 
@@ -286,6 +321,13 @@ def test_input_as_strings() -> None:
     input_data = b"   \n\n\n<html><body><h1>Test</h1></body></html>"
     result = markitdown.convert_stream(io.BytesIO(input_data))
     assert "# Test" in result.text_content
+
+
+def test_html_underline() -> None:
+    markitdown = MarkItDown()
+    input_data = b"<html><body><p>plain <u>underlined</u></p></body></html>"
+    result = markitdown.convert_stream(io.BytesIO(input_data), file_extension=".html")
+    assert "plain <u>underlined</u>" in result.text_content
 
 
 def test_deeply_nested_html_fallback() -> None:
