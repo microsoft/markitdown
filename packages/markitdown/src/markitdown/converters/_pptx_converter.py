@@ -1,11 +1,13 @@
 import sys
 import base64
+import mimetypes
 import os
 import io
 import re
 import html
+import warnings
 
-from typing import BinaryIO, Any
+from typing import BinaryIO, Any, Dict, Optional, Set, Tuple
 from operator import attrgetter
 
 from ._html_converter import HtmlConverter
@@ -78,6 +80,34 @@ class PptxConverter(DocumentConverter):
                 _dependency_exc_info[2]
             )
 
+        # Resolve the optional image extraction directory.
+        # When ``extract_images_to`` is provided (and ``keep_data_uris`` is not
+        # set), embedded images are written to this directory and referenced
+        # by relative filename in the markdown output. When neither option is
+        # set the legacy placeholder behaviour is preserved for backwards
+        # compatibility.
+        extract_images_to: Optional[str] = kwargs.get("extract_images_to")
+        keep_data_uris: bool = bool(kwargs.get("keep_data_uris", False))
+
+        extract_dir: Optional[str] = None
+        if extract_images_to and not keep_data_uris:
+            extract_dir = os.path.abspath(extract_images_to)
+            try:
+                os.makedirs(extract_dir, exist_ok=True)
+            except OSError as exc:
+                warnings.warn(
+                    f"Could not create image extraction directory "
+                    f"{extract_dir!r}: {exc}; falling back to placeholder "
+                    f"filenames.",
+                    stacklevel=2,
+                )
+                extract_dir = None
+
+        # Track filename uniqueness across the deck and reuse identical images
+        # by content hash so duplicate blobs are written to disk only once.
+        used_names: Set[str] = set()
+        hash_to_name: Dict[str, str] = {}
+
         # Perform the conversion
         presentation = pptx.Presentation(file_stream)
         md_content = ""
@@ -89,8 +119,15 @@ class PptxConverter(DocumentConverter):
 
             title = slide.shapes.title
 
+            # Per-slide counter incremented for every visited shape (including
+            # nested group children) so each image gets a stable, monotonic
+            # index for filename construction.
+            shape_counter = [0]
+
             def get_shape_content(shape, **kwargs):
                 nonlocal md_content
+                shape_counter[0] += 1
+                current_shape_idx = shape_counter[0]
                 # Pictures
                 if self._is_picture(shape):
                     # https://github.com/scanny/python-pptx/pull/512#issuecomment-1713100069
@@ -140,14 +177,40 @@ class PptxConverter(DocumentConverter):
                     alt_text = re.sub(r"[\r\n\[\]]", " ", alt_text)
                     alt_text = re.sub(r"\s+", " ", alt_text).strip()
 
-                    # If keep_data_uris is True, use base64 encoding for images
-                    if kwargs.get("keep_data_uris", False):
+                    # If keep_data_uris is True, use base64 encoding for images.
+                    # keep_data_uris takes precedence over extract_images_to.
+                    if keep_data_uris:
                         blob = shape.image.blob
                         content_type = shape.image.content_type or "image/png"
                         b64_string = base64.b64encode(blob).decode("utf-8")
                         md_content += f"\n![{alt_text}](data:{content_type};base64,{b64_string})\n"
+                    elif extract_dir is not None:
+                        # Try to write the image to disk; fall back to the
+                        # legacy placeholder if anything goes wrong.
+                        try:
+                            target_path, ref_name = self._resolve_image_target(
+                                extract_dir,
+                                slide_num,
+                                current_shape_idx,
+                                shape,
+                                used_names,
+                                hash_to_name,
+                            )
+                            if target_path is not None:
+                                with open(target_path, "wb") as fh:
+                                    fh.write(shape.image.blob)
+                            md_content += f"\n![{alt_text}]({ref_name})\n"
+                        except Exception as exc:
+                            warnings.warn(
+                                f"Failed to extract embedded PPTX image "
+                                f"(slide {slide_num}, shape {shape.name!r}): "
+                                f"{exc}; falling back to placeholder filename.",
+                                stacklevel=2,
+                            )
+                            filename = re.sub(r"\W", "", shape.name) + ".jpg"
+                            md_content += "\n![" + alt_text + "](" + filename + ")\n"
                     else:
-                        # A placeholder name
+                        # A placeholder name (legacy behaviour).
                         filename = re.sub(r"\W", "", shape.name) + ".jpg"
                         md_content += "\n![" + alt_text + "](" + filename + ")\n"
 
@@ -211,6 +274,78 @@ class PptxConverter(DocumentConverter):
         if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.TABLE:
             return True
         return False
+
+    def _sanitize_image_basename(self, name: str, fallback: str) -> str:
+        """Return a filesystem-safe basename for an embedded image.
+
+        Keeps Unicode word characters (including CJK) and ``-``; replaces any
+        other character with ``_``. Path separators and ``..`` are scrubbed
+        defensively. When the resulting string is empty, ``fallback`` is used.
+        """
+        cleaned = (name or "").strip()
+        # Defensively strip path separators / parent-directory traversals
+        # before regex sanitisation.
+        cleaned = cleaned.replace("/", "_").replace("\\", "_").replace("..", "_")
+        cleaned = re.sub(r"[^\w\-]", "_", cleaned, flags=re.UNICODE)
+        cleaned = cleaned.strip("._")
+        if not cleaned:
+            cleaned = fallback
+        return cleaned
+
+    def _resolve_image_target(
+        self,
+        extract_dir: str,
+        slide_num: int,
+        shape_idx: int,
+        shape: Any,
+        used_names: Set[str],
+        hash_to_name: Dict[str, str],
+    ) -> Tuple[Optional[str], str]:
+        """Return ``(absolute_path_to_write_or_None, markdown_reference)``.
+
+        If the image's content hash has been seen before, returns
+        ``(None, existing_reference)`` so the caller skips writing and reuses
+        the previous filename. Otherwise allocates a unique filename in
+        ``extract_dir`` and returns the absolute path to write to plus the
+        relative filename to embed in the markdown.
+        """
+        image = shape.image
+
+        # Deduplicate by content hash when available.
+        sha1 = getattr(image, "sha1", None)
+        if sha1 and sha1 in hash_to_name:
+            return None, hash_to_name[sha1]
+
+        # Pick an extension (python-pptx returns a lowercase, dot-less
+        # extension such as ``"png"`` or ``"jpeg"``). Fall back to
+        # ``mimetypes.guess_extension`` based on the content type, then to
+        # ``"bin"`` if nothing else works.
+        ext = (getattr(image, "ext", None) or "").lstrip(".").lower()
+        if not ext:
+            content_type = getattr(image, "content_type", None) or ""
+            guessed = mimetypes.guess_extension(content_type) if content_type else None
+            if guessed:
+                ext = guessed.lstrip(".").lower()
+        if not ext:
+            ext = "bin"
+
+        sanitized = self._sanitize_image_basename(
+            getattr(shape, "name", "") or "",
+            fallback=f"image{shape_idx}",
+        )
+
+        base_name = f"slide{slide_num:02d}_{shape_idx}_{sanitized}"
+        candidate = f"{base_name}.{ext}"
+        suffix = 2
+        while candidate in used_names:
+            candidate = f"{base_name}_{suffix}.{ext}"
+            suffix += 1
+        used_names.add(candidate)
+        if sha1:
+            hash_to_name[sha1] = candidate
+
+        target_path = os.path.join(extract_dir, candidate)
+        return target_path, candidate
 
     def _convert_table_to_markdown(self, table, **kwargs):
         # Write the table as HTML, then convert it to Markdown

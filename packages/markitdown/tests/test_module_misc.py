@@ -532,6 +532,85 @@ def test_markitdown_llm() -> None:
     validate_strings(result, PPTX_TEST_STRINGS)
 
 
+def test_pptx_extract_images_to_dir(tmp_path) -> None:
+    """When extract_images_to is provided, embedded PPTX images should be
+    written to the target directory and referenced from the markdown."""
+    out_dir = tmp_path / "imgs"
+    markitdown = MarkItDown()
+    result = markitdown.convert(
+        os.path.join(TEST_FILES_DIR, "test.pptx"),
+        extract_images_to=str(out_dir),
+    )
+
+    assert out_dir.is_dir(), "extract directory should be created"
+    written = sorted(p for p in out_dir.iterdir() if p.is_file())
+    assert written, "at least one image should have been written to disk"
+    # Every written file must be non-empty.
+    for path in written:
+        assert path.stat().st_size > 0, f"{path} is empty"
+
+    # The markdown should reference the actual file names that were written,
+    # not the legacy "Picture4.jpg" placeholder.
+    written_names = {p.name for p in written}
+    for name in written_names:
+        assert (
+            f"]({name})" in result.markdown
+        ), f"markdown should reference written file {name}"
+    assert "](Picture4.jpg)" not in result.markdown
+
+
+def test_pptx_extract_images_dedup(tmp_path) -> None:
+    """Identical embedded images should be written to disk only once even
+    when referenced multiple times by the markdown."""
+    import hashlib
+
+    out_dir = tmp_path / "imgs"
+    markitdown = MarkItDown()
+    result = markitdown.convert(
+        os.path.join(TEST_FILES_DIR, "test.pptx"),
+        extract_images_to=str(out_dir),
+    )
+
+    # Build a map of {sha1: [files...]} for everything that landed on disk.
+    digests: dict[str, list[str]] = {}
+    for path in out_dir.iterdir():
+        if not path.is_file():
+            continue
+        sha1 = hashlib.sha1(path.read_bytes()).hexdigest()
+        digests.setdefault(sha1, []).append(path.name)
+
+    # No two written files should share the same content.
+    duplicates = {h: names for h, names in digests.items() if len(names) > 1}
+    assert not duplicates, f"duplicate image content written to disk: {duplicates}"
+
+    # Sanity-check that the markdown actually reuses each written name at
+    # least once. (A duplicate reference would point to the same file.)
+    for name in digests.values():
+        assert f"]({name[0]})" in result.markdown
+
+
+def test_pptx_extract_images_keep_data_uris_takes_precedence(tmp_path) -> None:
+    """When both keep_data_uris and extract_images_to are passed, the
+    base64 inline behaviour wins and no files are written to the target
+    directory."""
+    out_dir = tmp_path / "imgs"
+    markitdown = MarkItDown()
+    result = markitdown.convert(
+        os.path.join(TEST_FILES_DIR, "test.pptx"),
+        extract_images_to=str(out_dir),
+        keep_data_uris=True,
+    )
+
+    # base64 payloads are present in the markdown
+    assert "data:image/jpeg;base64," in result.markdown
+
+    # The extraction directory either was never created, or contains no files.
+    if out_dir.exists():
+        assert not any(
+            p.is_file() for p in out_dir.iterdir()
+        ), "no files should be written when keep_data_uris is set"
+
+
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     for test in [
