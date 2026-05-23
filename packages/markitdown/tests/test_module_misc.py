@@ -3,9 +3,12 @@ import io
 import os
 import re
 import shutil
+import struct
+import zipfile
 import pytest
 from unittest.mock import MagicMock
 
+from markitdown.converter_utils.docx.pre_process import pre_process_docx
 from markitdown._uri_utils import parse_data_uri, file_uri_to_path
 
 from markitdown import (
@@ -272,6 +275,33 @@ def test_docx_equations() -> None:
     # Find block equations wrapped with double $$ and check if they are present
     block_equations = re.findall(r"\$\$(.+?)\$\$", result.text_content)
     assert block_equations, "No block equations found in the document."
+
+
+def test_docx_preprocess_repairs_case_mismatched_zip_names() -> None:
+    docx = io.BytesIO()
+    with zipfile.ZipFile(docx, mode="w") as zf:
+        zf.writestr("[Content_Types].xml", b"<Types/>")
+        zf.writestr("word/document.xml", b"<w:document/>")
+        zf.writestr("customXml/item2.xml", b"<item/>")
+
+    raw = bytearray(docx.getvalue())
+    with zipfile.ZipFile(io.BytesIO(raw), mode="r") as zf:
+        info = zf.getinfo("customXml/item2.xml")
+
+    name_len = struct.unpack_from("<H", raw, info.header_offset + 26)[0]
+    name_start = info.header_offset + 30
+    name_end = name_start + name_len
+    assert raw[name_start:name_end] == b"customXml/item2.xml"
+    raw[name_start:name_end] = b"customXML/item2.xml"
+
+    with zipfile.ZipFile(io.BytesIO(raw), mode="r") as zf:
+        with pytest.raises(zipfile.BadZipFile):
+            zf.read("customXml/item2.xml")
+
+    processed = pre_process_docx(io.BytesIO(raw))
+    with zipfile.ZipFile(processed, mode="r") as zf:
+        assert zf.read("customXml/item2.xml") == b"<item/>"
+        assert zf.read("word/document.xml")
 
 
 def test_input_as_strings() -> None:

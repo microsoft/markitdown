@@ -1,3 +1,4 @@
+import struct
 import zipfile
 from io import BytesIO
 from typing import BinaryIO
@@ -115,6 +116,39 @@ def _pre_process_math(content: bytes) -> bytes:
     return str(soup).encode()
 
 
+def _fix_zip_name_casing(input_docx: BinaryIO) -> BinaryIO:
+    input_docx.seek(0)
+    raw = bytearray(input_docx.read())
+    patched = False
+
+    with zipfile.ZipFile(BytesIO(raw), mode="r") as zip_input:
+        for info in zip_input.infolist():
+            offset = info.header_offset
+            if raw[offset : offset + 4] != b"PK\x03\x04":
+                continue
+
+            name_len = struct.unpack_from("<H", raw, offset + 26)[0]
+            name_start = offset + 30
+            name_end = name_start + name_len
+            local_name = raw[name_start:name_end]
+            encoding = "utf-8" if info.flag_bits & 0x800 else "cp437"
+            central_name = info.filename.encode(encoding)
+
+            if (
+                local_name != central_name
+                and len(local_name) == len(central_name)
+                and local_name.lower() == central_name.lower()
+            ):
+                raw[name_start:name_end] = central_name
+                patched = True
+
+    if patched:
+        return BytesIO(bytes(raw))
+
+    input_docx.seek(0)
+    return input_docx
+
+
 def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
     """
     Pre-processes a DOCX file with provided steps.
@@ -129,6 +163,7 @@ def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
     Returns:
         BinaryIO: A binary output stream representing the processed DOCX file.
     """
+    input_docx = _fix_zip_name_casing(input_docx)
     output_docx = BytesIO()
     # The files that need to be pre-processed from .docx
     pre_process_enable_files = [
