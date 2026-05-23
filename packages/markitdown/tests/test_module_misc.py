@@ -552,3 +552,35 @@ if __name__ == "__main__":
         test()
         print("OK")
     print("All tests passed!")
+
+
+def test_ipynb_accepts_returns_false_on_non_decodable_content() -> None:
+    """IpynbConverter.accepts() should return False (not raise) on non-decodable content.
+
+    When a file has an application/json mimetype but contains non-ASCII bytes
+    that can't be decoded (e.g. a French PDF misidentified as JSON), accepts()
+    should gracefully return False instead of propagating UnicodeDecodeError.
+    Regression test for https://github.com/microsoft/markitdown/issues/1894
+    """
+    from markitdown.converters._ipynb_converter import IpynbConverter
+    from markitdown._stream_info import StreamInfo
+    import io
+
+    converter = IpynbConverter()
+
+    # French text bytes (e.g. "é", "è", "à") that fail ASCII decode
+    fake_french_pdf_bytes = "Bonjour, comment allez-vous? Ça marche très bien.".encode("utf-8")
+
+    stream = io.BytesIO(fake_french_pdf_bytes)
+    stream_info = StreamInfo(mimetype="application/json", extension=".bin", charset="ascii")
+
+    # Should return False, not raise UnicodeDecodeError
+    result = converter.accepts(stream, stream_info)
+    assert result is False
+
+    # Also verify it doesn't raise ValueError from bad JSON
+    bad_json_bytes = b'{"not": "a notebook", \xff\xfe}'
+    stream2 = io.BytesIO(bad_json_bytes)
+    stream_info2 = StreamInfo(mimetype="application/json", extension=".txt", charset="utf-8")
+    result2 = converter.accepts(stream2, stream_info2)
+    assert result2 is False
