@@ -234,6 +234,21 @@ GENERAL_TEST_VECTORS = [
         ],
         must_not_include=[],
     ),
+    FileTestVector(
+        filename="test_hyperlinks.pptx",
+        mimetype="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        charset=None,
+        url=None,
+        must_include=[
+            "[Visit Microsoft](https://microsoft.com)",
+            "  - Second level item",
+            "    - Third level item",
+            "  - [GitHub link in list](https://github.com)",
+        ],
+        must_not_include=[
+            "Visit Microsofthttps://microsoft.com",  # ensure hyperlink is formatted, not plain text concatenation
+        ],
+    ),
 ]
 
 

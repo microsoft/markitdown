@@ -161,10 +161,11 @@ class PptxConverter(DocumentConverter):
 
                 # Text areas
                 elif shape.has_text_frame:
+                    text = self._convert_text_frame_to_markdown(shape.text_frame)
                     if shape == title:
-                        md_content += "# " + shape.text.lstrip() + "\n"
+                        md_content += "# " + text.lstrip() + "\n"
                     else:
-                        md_content += shape.text + "\n"
+                        md_content += text + "\n"
 
                 # Group Shapes
                 if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.GROUP:
@@ -211,6 +212,35 @@ class PptxConverter(DocumentConverter):
         if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.TABLE:
             return True
         return False
+
+    def _convert_text_frame_to_markdown(self, text_frame):
+        """Convert a text frame to markdown, preserving hyperlinks and list hierarchy."""
+        paragraphs_md = []
+        for para in text_frame.paragraphs:
+            para_md = self._convert_paragraph_to_markdown(para)
+            if para_md.strip():
+                paragraphs_md.append(para_md)
+        return "\n".join(paragraphs_md)
+
+    def _convert_paragraph_to_markdown(self, paragraph):
+        """Convert a single paragraph to markdown, preserving hyperlinks."""
+        runs_md = []
+        for run in paragraph.runs:
+            run_text = run.text
+            if run.hyperlink.address:
+                # Escape brackets in link text to avoid breaking markdown syntax
+                escaped_text = run_text.replace("[", "\\[").replace("]", "\\]")
+                run_text = f"[{escaped_text}]({run.hyperlink.address})"
+            runs_md.append(run_text)
+
+        text = "".join(runs_md)
+
+        # Handle list indentation based on paragraph level
+        if paragraph.level > 0 and text.strip():
+            indent = "  " * paragraph.level
+            text = indent + "- " + text
+
+        return text
 
     def _convert_table_to_markdown(self, table, **kwargs):
         # Write the table as HTML, then convert it to Markdown
