@@ -22,6 +22,7 @@ from ._uri_utils import parse_data_uri, file_uri_to_path
 from .converters import (
     PlainTextConverter,
     HtmlConverter,
+    WeChatConverter,
     RssConverter,
     WikipediaConverter,
     YouTubeConverter,
@@ -58,6 +59,16 @@ PRIORITY_SPECIFIC_FILE_FORMAT = (
 PRIORITY_GENERIC_FILE_FORMAT = (
     10.0  # Near catch-all converters for mimetypes like text/*, etc.
 )
+WECHAT_ARTICLE_URL_RE = re.compile(r"^https?://mp\.weixin\.qq\.com/s/")
+WECHAT_ARTICLE_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/123.0.0.0 Safari/537.36"
+    ),
+    "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+    "Referer": "https://mp.weixin.qq.com/",
+}
 
 
 _plugins: Union[None, List[Any]] = None  # If None, plugins have not been loaded yet.
@@ -188,6 +199,7 @@ class MarkItDown:
             self.register_converter(
                 HtmlConverter(), priority=PRIORITY_GENERIC_FILE_FORMAT
             )
+            self.register_converter(WeChatConverter())
             self.register_converter(RssConverter())
             self.register_converter(WikipediaConverter())
             self.register_converter(YouTubeConverter())
@@ -472,7 +484,10 @@ class MarkItDown:
             )
         # HTTP/HTTPS URIs
         elif uri.startswith("http:") or uri.startswith("https:"):
-            response = self._requests_session.get(uri, stream=True)
+            request_kwargs: Dict[str, Any] = {"stream": True}
+            if WECHAT_ARTICLE_URL_RE.search(uri):
+                request_kwargs["headers"] = WECHAT_ARTICLE_HEADERS
+            response = self._requests_session.get(uri, **request_kwargs)
             response.raise_for_status()
             return self.convert_response(
                 response,
