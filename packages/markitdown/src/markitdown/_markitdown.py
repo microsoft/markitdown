@@ -38,6 +38,7 @@ from .converters import (
     ZipConverter,
     EpubConverter,
     DocumentIntelligenceConverter,
+    ContentUnderstandingConverter,
     CsvConverter,
 )
 
@@ -223,6 +224,28 @@ class MarkItDown:
 
                 self.register_converter(
                     DocumentIntelligenceConverter(**docintel_args),
+                )
+
+            # Register Content Understanding converter at the top of the stack if endpoint is provided
+            cu_endpoint = kwargs.get("cu_endpoint")
+            if cu_endpoint is not None:
+                cu_args: Dict[str, Any] = {}
+                cu_args["endpoint"] = cu_endpoint
+
+                cu_credential = kwargs.get("cu_credential")
+                if cu_credential is not None:
+                    cu_args["credential"] = cu_credential
+
+                cu_analyzer_id = kwargs.get("cu_analyzer_id")
+                if cu_analyzer_id is not None:
+                    cu_args["analyzer_id"] = cu_analyzer_id
+
+                cu_file_types = kwargs.get("cu_file_types")
+                if cu_file_types is not None:
+                    cu_args["file_types"] = cu_file_types
+
+                self.register_converter(
+                    ContentUnderstandingConverter(**cu_args),
                 )
 
             self._builtins_enabled = True

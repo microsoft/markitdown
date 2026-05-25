@@ -4,6 +4,7 @@
 import argparse
 import sys
 import codecs
+from typing import Any, Dict
 from textwrap import dedent
 from importlib.metadata import entry_points
 from .__about__ import __version__
@@ -77,11 +78,20 @@ def main():
         help="Provide a hint about the file's charset (e.g, UTF-8).",
     )
 
-    parser.add_argument(
+    cloud_group = parser.add_mutually_exclusive_group()
+    cloud_group.add_argument(
         "-d",
         "--use-docintel",
         action="store_true",
         help="Use Document Intelligence to extract text instead of offline conversion. Requires a valid Document Intelligence Endpoint.",
+    )
+
+    cloud_group.add_argument(
+        "--use-cu",
+        "--use-content-understanding",
+        action="store_true",
+        dest="use_cu",
+        help="Use Azure Content Understanding to extract text. Requires --cu-endpoint.",
     )
 
     parser.add_argument(
@@ -89,6 +99,24 @@ def main():
         "--endpoint",
         type=str,
         help="Document Intelligence Endpoint. Required if using Document Intelligence.",
+    )
+
+    parser.add_argument(
+        "--cu-endpoint",
+        type=str,
+        help="Content Understanding Endpoint. Required if using --use-cu.",
+    )
+
+    parser.add_argument(
+        "--cu-analyzer",
+        type=str,
+        help="Content Understanding analyzer ID. If not specified, auto-selects by file type.",
+    )
+
+    parser.add_argument(
+        "--cu-file-types",
+        type=str,
+        help="Comma-separated list of file types to route to Content Understanding (e.g., pdf,jpeg,mp4). If omitted, all supported types are routed.",
     )
 
     parser.add_argument(
@@ -183,6 +211,36 @@ def main():
         markitdown = MarkItDown(
             enable_plugins=args.use_plugins, docintel_endpoint=args.endpoint
         )
+    elif args.use_cu:
+        if args.cu_endpoint is None:
+            _exit_with_error(
+                "Content Understanding Endpoint (--cu-endpoint) is required when using --use-cu."
+            )
+        elif args.filename is None:
+            _exit_with_error("Filename is required when using Content Understanding.")
+
+        cu_kwargs: Dict[str, Any] = {
+            "cu_endpoint": args.cu_endpoint,
+        }
+        if args.cu_analyzer is not None:
+            cu_kwargs["cu_analyzer_id"] = args.cu_analyzer
+        if args.cu_file_types is not None:
+            # Parse comma-separated file types into ContentUnderstandingFileType list
+            from .converters import ContentUnderstandingFileType
+
+            type_names = [
+                t.strip().lower() for t in args.cu_file_types.split(",") if t.strip()
+            ]
+            cu_types = []
+            for name in type_names:
+                # Try matching by value (e.g., "pdf", "jpeg", "mp4")
+                try:
+                    cu_types.append(ContentUnderstandingFileType(name))
+                except ValueError:
+                    _exit_with_error(f"Unknown file type: {name}")
+            cu_kwargs["cu_file_types"] = cu_types
+
+        markitdown = MarkItDown(enable_plugins=args.use_plugins, **cu_kwargs)
     else:
         markitdown = MarkItDown(enable_plugins=args.use_plugins)
 
