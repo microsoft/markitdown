@@ -23,7 +23,6 @@ from markitdown.converters._doc_intel_converter import (
     _yaml_dump,
 )
 
-
 # --------- helpers ---------------------------------------------------------
 
 
@@ -91,7 +90,9 @@ def test_user_agent_string_format():
 def test_client_constructed_with_user_agent_and_api_version():
     """__init__ should pass user_agent and api_version to DocumentIntelligenceClient."""
     fake_client = mock.MagicMock()
-    with mock.patch.object(di_mod, "DocumentIntelligenceClient", return_value=fake_client) as ctor:
+    with mock.patch.object(
+        di_mod, "DocumentIntelligenceClient", return_value=fake_client
+    ) as ctor:
         DocumentIntelligenceConverter(
             endpoint="https://example.cognitiveservices.azure.com/",
             credential=mock.MagicMock(),
@@ -120,7 +121,9 @@ def test_convert_uses_default_model_id():
     client.begin_analyze_document.return_value = fake_poller
 
     conv = _bare_converter(client=client)
-    conv.convert(io.BytesIO(b"data"), StreamInfo(extension=".pdf", mimetype="application/pdf"))
+    conv.convert(
+        io.BytesIO(b"data"), StreamInfo(extension=".pdf", mimetype="application/pdf")
+    )
 
     args, kwargs = client.begin_analyze_document.call_args
     assert kwargs["model_id"] == "prebuilt-layout"
@@ -133,9 +136,13 @@ def test_convert_uses_overridden_model_id():
     client.begin_analyze_document.return_value = fake_poller
 
     conv = _bare_converter(model_id="prebuilt-invoice", client=client)
-    conv.convert(io.BytesIO(b"data"), StreamInfo(extension=".pdf", mimetype="application/pdf"))
+    conv.convert(
+        io.BytesIO(b"data"), StreamInfo(extension=".pdf", mimetype="application/pdf")
+    )
 
-    assert client.begin_analyze_document.call_args.kwargs["model_id"] == "prebuilt-invoice"
+    assert (
+        client.begin_analyze_document.call_args.kwargs["model_id"] == "prebuilt-invoice"
+    )
 
 
 # --------- Phase 3: YAML front matter --------------------------------------
@@ -234,7 +241,9 @@ def test_convert_prepends_front_matter_when_fields_present():
 
 def test_convert_no_front_matter_when_no_documents():
     fake_poller = mock.MagicMock()
-    fake_poller.result.return_value = SimpleNamespace(content="# Layout", documents=None)
+    fake_poller.result.return_value = SimpleNamespace(
+        content="# Layout", documents=None
+    )
     client = mock.MagicMock()
     client.begin_analyze_document.return_value = fake_poller
 
@@ -252,7 +261,9 @@ def test_convert_no_front_matter_when_no_documents():
 
 def test_query_fields_adds_feature_for_ocr_types():
     conv = _bare_converter(query_fields=["VendorName", "Total"])
-    features = conv._analysis_features(StreamInfo(extension=".pdf", mimetype="application/pdf"))
+    features = conv._analysis_features(
+        StreamInfo(extension=".pdf", mimetype="application/pdf")
+    )
     from azure.ai.documentintelligence.models import DocumentAnalysisFeature
 
     assert DocumentAnalysisFeature.QUERY_FIELDS in features
@@ -277,9 +288,14 @@ def test_query_fields_passed_to_begin_analyze_document_for_pdf():
     client.begin_analyze_document.return_value = fake_poller
 
     conv = _bare_converter(query_fields=["A", "B"], client=client)
-    conv.convert(io.BytesIO(b"data"), StreamInfo(extension=".pdf", mimetype="application/pdf"))
+    conv.convert(
+        io.BytesIO(b"data"), StreamInfo(extension=".pdf", mimetype="application/pdf")
+    )
 
-    assert client.begin_analyze_document.call_args.kwargs.get("query_fields") == ["A", "B"]
+    assert client.begin_analyze_document.call_args.kwargs.get("query_fields") == [
+        "A",
+        "B",
+    ]
 
 
 def test_query_fields_not_passed_for_office_types():

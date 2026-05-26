@@ -16,8 +16,7 @@ def main():
         description="Convert various file formats to markdown.",
         prog="markitdown",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        usage=dedent(
-            """
+        usage=dedent("""
             SYNTAX:
 
                 markitdown <OPTIONAL: FILENAME>
@@ -42,8 +41,7 @@ def main():
                 OR
 
                 markitdown example.pdf > example.md
-            """
-        ).strip(),
+            """).strip(),
     )
 
     parser.add_argument(
@@ -234,9 +232,7 @@ def main():
             if fields:
                 docintel_kwargs["docintel_query_fields"] = fields
 
-        markitdown = MarkItDown(
-            enable_plugins=args.use_plugins, **docintel_kwargs
-        )
+        markitdown = MarkItDown(enable_plugins=args.use_plugins, **docintel_kwargs)
     elif args.use_cu:
         if args.cu_endpoint is None:
             _exit_with_error(

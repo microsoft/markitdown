@@ -164,7 +164,9 @@ def _field_value(field: Any) -> Any:
     cur = getattr(field, "value_currency", None)
     if cur is not None:
         amount = getattr(cur, "amount", None)
-        code = getattr(cur, "currency_code", None) or getattr(cur, "currency_symbol", None)
+        code = getattr(cur, "currency_code", None) or getattr(
+            cur, "currency_symbol", None
+        )
         if amount is not None and code:
             return f"{amount} {code}"
         if amount is not None:
@@ -207,7 +209,13 @@ def _yaml_scalar(value: Any) -> str:
         or s.lower() in ("null", "true", "false", "yes", "no", "~")
     ):
         # Escape backslashes and double quotes; collapse newlines.
-        escaped = s.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
+        escaped = (
+            s.replace("\\", "\\\\")
+            .replace('"', '\\"')
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+            .replace("\t", "\\t")
+        )
         return f'"{escaped}"'
     return s
 
@@ -225,7 +233,9 @@ def _yaml_dump(value: Any, indent: int = 0) -> str:
                 lines.append(f"{pad}{key}:")
                 lines.append(_yaml_dump(v, indent + 1))
             else:
-                lines.append(f"{pad}{key}: {_yaml_scalar(v) if not isinstance(v, (dict, list)) else ('{}' if isinstance(v, dict) else '[]')}")
+                lines.append(
+                    f"{pad}{key}: {_yaml_scalar(v) if not isinstance(v, (dict, list)) else ('{}' if isinstance(v, dict) else '[]')}"
+                )
         return "\n".join(lines)
     if isinstance(value, list):
         if not value:
@@ -236,7 +246,9 @@ def _yaml_dump(value: Any, indent: int = 0) -> str:
                 lines.append(f"{pad}-")
                 lines.append(_yaml_dump(item, indent + 1))
             else:
-                lines.append(f"{pad}- {_yaml_scalar(item) if not isinstance(item, (dict, list)) else ('{}' if isinstance(item, dict) else '[]')}")
+                lines.append(
+                    f"{pad}- {_yaml_scalar(item) if not isinstance(item, (dict, list)) else ('{}' if isinstance(item, dict) else '[]')}"
+                )
         return "\n".join(lines)
     return f"{pad}{_yaml_scalar(value)}"
 
