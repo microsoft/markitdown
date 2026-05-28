@@ -2,7 +2,7 @@ import base64
 import os
 from typing import Tuple, Dict
 from urllib.request import url2pathname
-from urllib.parse import urlparse, unquote_to_bytes
+from urllib.parse import urlparse, unquote, unquote_to_bytes
 
 
 def file_uri_to_path(file_uri: str) -> Tuple[str | None, str]:
@@ -12,7 +12,8 @@ def file_uri_to_path(file_uri: str) -> Tuple[str | None, str]:
         raise ValueError(f"Not a file URL: {file_uri}")
 
     netloc = parsed.netloc if parsed.netloc else None
-    path = os.path.abspath(url2pathname(parsed.path))
+    decoded_path = unquote(parsed.path)
+    path = os.path.abspath(url2pathname(decoded_path))
     return netloc, path
 
 
