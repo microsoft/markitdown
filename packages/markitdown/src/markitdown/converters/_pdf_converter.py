@@ -6,6 +6,7 @@ from typing import BinaryIO, Any
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+from ._llm_caption import llm_caption
 
 # Pattern for MasterFormat-style partial numbering (e.g., ".1", ".2", ".10")
 PARTIAL_NUMBERING_PATTERN = re.compile(r"^\.\d+$")
@@ -74,6 +75,23 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 
 ACCEPTED_FILE_EXTENSIONS = [".pdf"]
 
+_PDF_IMAGE_LLM_PROMPT = (
+    "You are an advanced document extraction AI. Extract and reproduce all text "
+    "visible in this image exactly as it appears. Do not translate or generate new "
+    "content. Preserve the original structure including sections, titles, headers, "
+    "tables, lists, and code snippets in Markdown format. Only output valid Markdown."
+)
+
+_PDF_FULL_LLM_PROMPT = (
+    "You are an advanced document extraction AI. Your task is to analyze the provided "
+    "document, understand its content and context, and produce a perfectly structured "
+    "Markdown document from the text within it. Do not translate or generate new text. "
+    "Retain the structure of the original content, ensuring that sections, titles, "
+    "headers and important details are clearly separated. If the document contains any "
+    "tables, lists and code snippets format them correctly to preserve their original "
+    "meaning. Only a valid Markdown-formatted output is allowed."
+)
+
 
 def _to_markdown_table(table: list[list[str]], include_separator: bool = True) -> str:
     """Convert a 2D list (rows/columns) into a nicely aligned Markdown table.
@@ -115,6 +133,51 @@ def _to_markdown_table(table: list[list[str]], include_separator: bool = True) -
         md = [fmt_row(row) for row in table]
 
     return "\n".join(md)
+
+
+def _collect_lt_images(element: Any) -> list[Any]:
+    """Recursively collect LTImage objects from a pdfminer layout element."""
+    try:
+        from pdfminer.layout import LTFigure, LTImage
+    except ImportError:
+        return []
+
+    images = []
+    if isinstance(element, LTImage):
+        images.append(element)
+    elif isinstance(element, LTFigure):
+        for child in element:
+            images.extend(_collect_lt_images(child))
+    return images
+
+
+def _get_lt_image_data(lt_image: Any) -> tuple[bytes, str] | None:
+    """
+    Extract raw bytes and MIME type from a pdfminer LTImage.
+
+    Returns (bytes, mime_type) for JPEG and JPEG2000 images whose compressed
+    stream bytes can be sent directly to an LLM vision API. Returns None for
+    other formats (e.g. raw bitmap, JBIG2) that cannot be used as-is.
+
+    Uses pdfminer's own filter literals for comparison to avoid fragile
+    string conversion of PSLiteral objects.
+    """
+    try:
+        from pdfminer.pdftypes import LITERALS_DCT_DECODE, LITERALS_JPX_DECODE
+
+        stream = lt_image.stream
+        for f, _ in stream.get_filters():
+            if f in LITERALS_DCT_DECODE:
+                data = stream.get_rawdata()
+                if data:
+                    return data, "image/jpeg"
+            elif f in LITERALS_JPX_DECODE:
+                data = stream.get_rawdata()
+                if data:
+                    return data, "image/jp2"
+    except Exception:
+        pass
+    return None
 
 
 def _extract_form_content_from_words(page: Any) -> str | None:
@@ -565,25 +628,75 @@ class PdfConverter(DocumentConverter):
 
                     page.close()  # Free cached page data immediately
 
-            # If no pages had form-style content, use pdfminer for
-            # the whole document (better text spacing for prose).
+            # If no pages had form-style content, discard pdfplumber results and
+            # use pdfminer for the whole document (better text spacing for prose).
             if form_page_count == 0:
+                markdown_chunks = []
                 pdf_bytes.seek(0)
-                markdown = pdfminer.high_level.extract_text(pdf_bytes)
-            else:
-                markdown = "\n\n".join(markdown_chunks).strip()
+                text = pdfminer.high_level.extract_text(pdf_bytes)
+                if text and text.strip():
+                    markdown_chunks.append(text)
+
+                # Second pass: scan for LTFigure elements containing embedded
+                # images and caption them with the LLM when available. This
+                # handles PDFs with mixed content (extractable text + images).
+                llm_client = kwargs.get("llm_client")
+                llm_model = kwargs.get("llm_model")
+                if llm_client and llm_model:
+                    from pdfminer.layout import LTFigure
+
+                    pdf_bytes.seek(0)
+                    for page_layout in pdfminer.high_level.extract_pages(pdf_bytes):
+                        for element in page_layout:
+                            # LTImage is always a child of LTFigure, never a
+                            # direct child of LTPage (PDFPageAggregator wraps
+                            # every image in begin_figure/end_figure).
+                            if isinstance(element, LTFigure):
+                                for lt_img in _collect_lt_images(element):
+                                    img_data = _get_lt_image_data(lt_img)
+                                    if img_data:
+                                        img_bytes, img_mime = img_data
+                                        ext = (
+                                            ".jpg"
+                                            if img_mime == "image/jpeg"
+                                            else ".jp2"
+                                        )
+                                        caption = llm_caption(
+                                            io.BytesIO(img_bytes),
+                                            StreamInfo(
+                                                mimetype=img_mime, extension=ext
+                                            ),
+                                            client=llm_client,
+                                            model=llm_model,
+                                            prompt=_PDF_IMAGE_LLM_PROMPT,
+                                        )
+                                        if caption:
+                                            markdown_chunks.append(caption)
+
+            markdown = "\n\n".join(markdown_chunks).strip()
 
         except Exception:
             # Fallback if pdfplumber fails
             pdf_bytes.seek(0)
             markdown = pdfminer.high_level.extract_text(pdf_bytes)
 
-        # Fallback if still empty
-        if not markdown:
-            pdf_bytes.seek(0)
-            markdown = pdfminer.high_level.extract_text(pdf_bytes)
+        # Last-resort fallback: send entire PDF to LLM when no text could be
+        # extracted at all (e.g. fully scanned PDFs with no recognized images).
+        if not markdown or not markdown.strip():
+            llm_client = kwargs.get("llm_client")
+            llm_model = kwargs.get("llm_model")
+            if llm_client and llm_model:
+                pdf_bytes.seek(0)
+                markdown = llm_caption(
+                    pdf_bytes,
+                    stream_info,
+                    client=llm_client,
+                    model=llm_model,
+                    prompt=_PDF_FULL_LLM_PROMPT,
+                )
 
         # Post-process to merge MasterFormat-style partial numbering with following text
-        markdown = _merge_partial_numbering_lines(markdown)
+        if markdown:
+            markdown = _merge_partial_numbering_lines(markdown)
 
-        return DocumentConverterResult(markdown=markdown)
+        return DocumentConverterResult(markdown=markdown or "")
