@@ -1,7 +1,7 @@
 import zipfile
 from io import BytesIO
 from typing import BinaryIO
-from xml.etree import ElementTree as ET
+from defusedxml import ElementTree as ET
 
 from bs4 import BeautifulSoup, Tag
 
