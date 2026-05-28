@@ -63,7 +63,8 @@ def _make_plain_page():
             "bottom": 20,
         },
     ]
-    page.extract_text.return_value = "This is a long paragraph of plain text."
+    plain_text = "This is a long paragraph of plain text."
+    page.extract_text.side_effect = lambda *args, **kwargs: plain_text
     return page
 
 
@@ -146,6 +147,32 @@ class TestPdfMemoryOptimization:
             "plain-text PDFs should fall back to pdfminer"
         )
         assert result.text_content is not None
+
+    def test_plain_text_pdf_uses_pdfplumber_if_pdfminer_whitespace_collapses(self):
+        """Fallback to pdfplumber output when pdfminer concatenates words."""
+        pages = [_make_plain_page() for _ in range(3)]
+        collapsed_output = "DataContaminationandEvaluation" * 20
+
+        with patch(
+            "markitdown.converters._pdf_converter.pdfplumber"
+        ) as mock_pdfplumber, patch(
+            "markitdown.converters._pdf_converter.pdfminer"
+        ) as mock_pdfminer:
+            mock_pdfplumber.open.side_effect = _mock_pdfplumber_open(pages)
+            mock_pdfminer.high_level.extract_text.return_value = collapsed_output
+
+            md = MarkItDown()
+            buf = io.BytesIO(b"fake pdf content")
+            from markitdown import StreamInfo
+
+            result = md.convert_stream(
+                buf,
+                stream_info=StreamInfo(extension=".pdf", mimetype="application/pdf"),
+            )
+
+        assert mock_pdfminer.high_level.extract_text.called
+        assert "This is a long paragraph of plain text." in result.text_content
+        assert "DataContaminationandEvaluation" not in result.text_content
 
     def test_plain_text_pdf_still_closes_all_pages(self):
         """Even for plain-text PDFs, page.close() must be called on every page."""

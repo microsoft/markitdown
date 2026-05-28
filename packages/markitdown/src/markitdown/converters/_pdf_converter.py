@@ -9,6 +9,7 @@ from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 
 # Pattern for MasterFormat-style partial numbering (e.g., ".1", ".2", ".10")
 PARTIAL_NUMBERING_PATTERN = re.compile(r"^\.\d+$")
+COLLAPSED_WHITESPACE_TOKEN_PATTERN = re.compile(r"[A-Za-z]{20,}")
 
 
 def _merge_partial_numbering_lines(text: str) -> str:
@@ -55,6 +56,33 @@ def _merge_partial_numbering_lines(text: str) -> str:
             i += 1
 
     return "\n".join(result_lines)
+
+
+def _looks_whitespace_collapsed(text: str) -> bool:
+    """Detect pathological extraction where words are concatenated without spaces."""
+    if not text:
+        return False
+
+    # Ignore short texts where long contiguous tokens can be legitimate.
+    if len(text) < 200:
+        return False
+
+    long_tokens = COLLAPSED_WHITESPACE_TOKEN_PATTERN.findall(text)
+    long_token_count = len(long_tokens)
+    max_long_token_length = max((len(token) for token in long_tokens), default=0)
+
+    # In collapsed output, spaces are nearly absent even for long documents.
+    space_ratio = text.count(" ") / len(text)
+    if space_ratio >= 0.02:
+        return False
+
+    return long_token_count >= 5 or max_long_token_length >= 80
+
+
+def _extract_plain_text_from_page(page: Any) -> str:
+    """Extract plain page text with conservative x-tolerance to preserve spacing."""
+    text = page.extract_text(x_tolerance=1, y_tolerance=3)
+    return text or ""
 
 
 # Load dependencies
@@ -247,8 +275,8 @@ def _extract_form_content_from_words(page: Any) -> str | None:
 
         # Adaptive max: allow more columns for wider pages
         # Standard letter is 612pt wide, so scale accordingly
-        adaptive_max_columns = int(20 * (page_width / 612))
-        adaptive_max_columns = max(15, adaptive_max_columns)  # At least 15
+        adaptive_max_columns = int(12 * (page_width / 612))
+        adaptive_max_columns = max(10, adaptive_max_columns)  # At least 10
 
         if len(global_columns) > adaptive_max_columns:
             return None
@@ -547,7 +575,6 @@ class PdfConverter(DocumentConverter):
             # keep memory usage constant regardless of page count.
             markdown_chunks: list[str] = []
             form_page_count = 0
-            plain_page_indices: list[int] = []
 
             with pdfplumber.open(pdf_bytes) as pdf:
                 for page_idx, page in enumerate(pdf.pages):
@@ -558,8 +585,7 @@ class PdfConverter(DocumentConverter):
                         if page_content.strip():
                             markdown_chunks.append(page_content)
                     else:
-                        plain_page_indices.append(page_idx)
-                        text = page.extract_text()
+                        text = _extract_plain_text_from_page(page)
                         if text and text.strip():
                             markdown_chunks.append(text.strip())
 
@@ -569,7 +595,17 @@ class PdfConverter(DocumentConverter):
             # the whole document (better text spacing for prose).
             if form_page_count == 0:
                 pdf_bytes.seek(0)
-                markdown = pdfminer.high_level.extract_text(pdf_bytes)
+                pdfminer_markdown = pdfminer.high_level.extract_text(pdf_bytes)
+                if _looks_whitespace_collapsed(pdfminer_markdown):
+                    pdfplumber_markdown = "\n\n".join(markdown_chunks).strip()
+                    if pdfplumber_markdown and not _looks_whitespace_collapsed(
+                        pdfplumber_markdown
+                    ):
+                        markdown = pdfplumber_markdown
+                    else:
+                        markdown = pdfminer_markdown
+                else:
+                    markdown = pdfminer_markdown
             else:
                 markdown = "\n\n".join(markdown_chunks).strip()
 
