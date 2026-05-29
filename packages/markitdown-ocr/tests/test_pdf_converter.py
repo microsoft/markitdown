@@ -144,17 +144,30 @@ def test_pdf_complex_layout(svc: MockOCRService) -> None:
 
 
 # ---------------------------------------------------------------------------
-# pdf_multipage.pdf — pdfplumber/pdfminer fail (EOF); PyMuPDF fallback used
+# pdf_multipage.pdf
 # ---------------------------------------------------------------------------
 
 
 def test_pdf_multipage(svc: MockOCRService) -> None:
-    # pdfplumber cannot open this file (Unexpected EOF), so _ocr_full_pages
-    # falls back to PyMuPDF for page rendering.  Each page becomes one OCR block.
     expected = (
-        f"## Page 1\n\n\n{_OCR_BLOCK}\n\n\n"
-        f"## Page 2\n\n\n{_OCR_BLOCK}\n\n\n"
-        f"## Page 3\n\n\n{_OCR_BLOCK}"
+        "## Page 1\n\n\n"
+        "Page 1 - Content before image\n\n"
+        "This is important text that appears BEFORE the image.\n\n\n\n"
+        f"{_OCR_BLOCK}\n\n\n"
+        "This text appears AFTER the image on page 1.\n\n"
+        "More content follows here.\n\n\n"
+        "## Page 2\n\n\n"
+        "Page 2 - Content with image at end\n\n"
+        "Main content of page 2 starts here.\n\n"
+        "This is paragraph 1.\n\n"
+        "This is paragraph 2.\n\n"
+        "Final paragraph before image.\n\n\n\n"
+        f"{_OCR_BLOCK}\n\n\n\n"
+        "## Page 3\n\n\n"
+        "Page 3 - Image at top\n\n\n\n"
+        f"{_OCR_BLOCK}\n\n\n"
+        "Content that follows the image.\n\n"
+        "This text is AFTER the image."
     )
     assert _convert("pdf_multipage.pdf", svc) == expected
 
@@ -216,6 +229,44 @@ def test_pdf_scanned_fallback_format(svc: MockOCRService) -> None:
     assert (
         md == expected
     ), f"_ocr_full_pages must produce:\n{expected!r}\nActual:\n{md!r}"
+
+
+def test_pdf_headers_only_triggers_full_page_ocr(svc: MockOCRService) -> None:
+    """Page headings alone must not suppress full-page OCR fallback."""
+    path = TEST_DATA_DIR / "pdf_image_start.pdf"
+    if not path.exists():
+        pytest.skip(f"Test file not found: {path}")
+
+    converter = PdfConverterWithOCR()
+
+    with (
+        patch("pdfplumber.open") as mock_plumber,
+        patch("pdfminer.high_level.extract_text", return_value=""),
+        patch.object(
+            converter,
+            "_extract_page_images",
+            return_value=[],
+        ),
+        patch.object(
+            converter,
+            "_ocr_full_pages",
+            return_value="## Page 1\n\n\n" + _OCR_BLOCK,
+        ) as mock_full_page_ocr,
+    ):
+        mock_pdf = MagicMock()
+        mock_page = MagicMock()
+        mock_page.extract_text.return_value = ""
+        mock_pdf.pages = [mock_page]
+        mock_pdf.__enter__.return_value = mock_pdf
+        mock_plumber.return_value = mock_pdf
+
+        with open(path, "rb") as f:
+            md = converter.convert(
+                f, StreamInfo(extension=".pdf"), ocr_service=svc
+            ).text_content
+
+    assert md == "## Page 1\n\n\n" + _OCR_BLOCK
+    mock_full_page_ocr.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
