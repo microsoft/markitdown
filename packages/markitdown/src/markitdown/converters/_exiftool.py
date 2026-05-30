@@ -32,6 +32,8 @@ def exiftool_metadata(
                 f"ExifTool version {version_output} is vulnerable to CVE-2021-22204. "
                 "Please upgrade to version 12.24 or later."
             )
+    except FileNotFoundError:
+        return {}
     except (subprocess.CalledProcessError, ValueError) as e:
         raise RuntimeError("Failed to verify ExifTool version.") from e
 
@@ -48,5 +50,7 @@ def exiftool_metadata(
         return json.loads(
             output.decode(locale.getpreferredencoding(False)),
         )[0]
+    except FileNotFoundError:
+        return {}
     finally:
         file_stream.seek(cur_pos)

@@ -7,6 +7,7 @@ import pytest
 from unittest.mock import MagicMock
 
 from markitdown._uri_utils import parse_data_uri, file_uri_to_path
+from markitdown.converters._exiftool import exiftool_metadata
 
 from markitdown import (
     MarkItDown,
@@ -460,6 +461,21 @@ def test_markitdown_exiftool() -> None:
     for key in MP3_TEST_EXIFTOOL:
         target = f"{key}: {MP3_TEST_EXIFTOOL[key]}"
         assert target in result.text_content
+
+
+def test_exiftool_metadata_ignores_missing_binary() -> None:
+    stream = io.BytesIO(b"not really an image")
+
+    assert exiftool_metadata(stream, exiftool_path="missing-exiftool-binary") == {}
+    assert stream.tell() == 0
+
+
+def test_markitdown_missing_exiftool_path_keeps_image_conversion() -> None:
+    markitdown = MarkItDown(exiftool_path="missing-exiftool-binary")
+
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.jpg"))
+
+    assert result.text_content == ""
 
 
 def test_markitdown_llm_parameters() -> None:
