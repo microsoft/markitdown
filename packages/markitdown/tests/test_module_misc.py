@@ -462,6 +462,27 @@ def test_markitdown_exiftool() -> None:
         assert target in result.text_content
 
 
+def test_exiftool_metadata_decodes_utf8() -> None:
+    """ExifTool JSON output must be decoded as UTF-8 per RFC 8259."""
+    from unittest.mock import patch, MagicMock
+    from markitdown.converters._exiftool import exiftool_metadata
+
+    version_mock = MagicMock(stdout="13.0\n")
+    # JSON with non-ASCII characters encoded in UTF-8 (C3 89 = É, C3 A9 = é)
+    metadata_mock = MagicMock(
+        stdout=b'[{"Author":"\xc3\x89lena","Title":"Caf\xc3\xa9 R\xc3\xa9sum\xc3\xa9"}]'
+    )
+
+    with patch("subprocess.run") as mock_run:
+        mock_run.side_effect = [version_mock, metadata_mock]
+        result = exiftool_metadata(
+            io.BytesIO(b"fake-data"), exiftool_path="/fake/exiftool"
+        )
+
+    assert result["Author"] == "Élena"
+    assert result["Title"] == "Café Résumé"
+
+
 def test_markitdown_llm_parameters() -> None:
     """Test that LLM parameters are correctly passed to the client."""
     mock_client = MagicMock()
@@ -545,6 +566,7 @@ if __name__ == "__main__":
         test_exceptions,
         test_doc_rlink,
         test_markitdown_exiftool,
+        test_exiftool_metadata_decodes_utf8,
         test_markitdown_llm_parameters,
         test_markitdown_llm,
     ]:
