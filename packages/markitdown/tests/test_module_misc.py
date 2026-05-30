@@ -7,6 +7,7 @@ import pytest
 from unittest.mock import MagicMock
 
 from markitdown._uri_utils import parse_data_uri, file_uri_to_path
+from markitdown.converters._wikipedia_converter import WikipediaConverter
 
 from markitdown import (
     MarkItDown,
@@ -94,6 +95,17 @@ PPTX_TEST_STRINGS = [
     "a3f6004b-6f4f-4ea8-bee3-3741f4dc385f",  # chart title
     "2003",  # chart value
 ]
+
+
+def test_wikipedia_converter_no_title() -> None:
+    """WikipediaConverter should not render '# None' when page has no title."""
+    converter = WikipediaConverter()
+    html = b"<html><body><div id='mw-content-text'><p>Hello</p></div></body></html>"
+    stream_info = StreamInfo(mimetype="text/html", url="https://en.wikipedia.org/wiki/Test")
+    result = converter.convert(io.BytesIO(html), stream_info)
+    assert "# None" not in result.markdown
+    assert "Hello" in result.markdown
+    assert result.text_content.strip() == "Hello"
 
 
 # --- Helper Functions ---
