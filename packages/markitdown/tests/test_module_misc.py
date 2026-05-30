@@ -274,6 +274,33 @@ def test_docx_equations() -> None:
     assert block_equations, "No block equations found in the document."
 
 
+def test_docx_zip_name_casing() -> None:
+    # Test that docx files with case-mismatched zip entries are handled
+    import struct
+    import zipfile
+
+    from markitdown.converter_utils.docx.pre_process import pre_process_docx
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("word/document.xml", "<w:document/>")
+    raw = bytearray(buf.getvalue())
+
+    # Patch local file header to have wrong case (word -> Word)
+    for i in range(len(raw) - 4):
+        if raw[i:i+4] == b"PK\x03\x04":
+            fname_len = struct.unpack_from("<H", raw, i + 26)[0]
+            local_name = raw[i+30:i+30+fname_len]
+            if local_name == b"word/document.xml":
+                raw[i+30] = ord("W")
+                break
+
+    corrupted = io.BytesIO(bytes(raw))
+    result = pre_process_docx(corrupted)
+    with zipfile.ZipFile(result, "r") as zf:
+        assert "word/document.xml" in zf.namelist()
+
+
 def test_input_as_strings() -> None:
     markitdown = MarkItDown()
 
