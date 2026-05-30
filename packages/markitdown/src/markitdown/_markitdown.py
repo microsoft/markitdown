@@ -472,7 +472,7 @@ class MarkItDown:
             )
         # HTTP/HTTPS URIs
         elif uri.startswith("http:") or uri.startswith("https:"):
-            response = self._requests_session.get(uri, stream=True)
+            response = self._requests_session.get(uri, stream=True, timeout=30)
             response.raise_for_status()
             return self.convert_response(
                 response,
