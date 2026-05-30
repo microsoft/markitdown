@@ -288,6 +288,26 @@ def test_input_as_strings() -> None:
     assert "# Test" in result.text_content
 
 
+def test_rss_without_channel_title() -> None:
+    markitdown = MarkItDown()
+    feed = b"""<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <description>Updates without a channel title</description>
+    <item>
+      <title>First item</title>
+      <description>Item body</description>
+    </item>
+  </channel>
+</rss>"""
+
+    result = markitdown.convert_stream(io.BytesIO(feed), file_extension=".rss")
+
+    assert "Updates without a channel title" in result.text_content
+    assert "## First item" in result.text_content
+    assert "Item body" in result.text_content
+
+
 def test_deeply_nested_html_fallback() -> None:
     """Large, deeply nested HTML should fall back to plain-text extraction
     instead of silently returning unconverted HTML (issue #1636).
