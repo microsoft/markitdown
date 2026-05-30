@@ -1,4 +1,4 @@
-import sys
+﻿import sys
 import base64
 import os
 import io
@@ -162,9 +162,9 @@ class PptxConverter(DocumentConverter):
                 # Text areas
                 elif shape.has_text_frame:
                     if shape == title:
-                        md_content += "# " + shape.text.lstrip() + "\n"
+                        md_content += "# " + (shape.text or "").lstrip() + "\n"
                     else:
-                        md_content += shape.text + "\n"
+                        md_content += (shape.text or "") + "\n"
 
                 # Group Shapes
                 if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.GROUP:
@@ -194,7 +194,7 @@ class PptxConverter(DocumentConverter):
                 md_content += "\n\n### Notes:\n"
                 notes_frame = slide.notes_slide.notes_text_frame
                 if notes_frame is not None:
-                    md_content += notes_frame.text
+                    md_content += (notes_frame.text or "")
                 md_content = md_content.strip()
 
         return DocumentConverterResult(markdown=md_content.strip())
@@ -220,9 +220,9 @@ class PptxConverter(DocumentConverter):
             html_table += "<tr>"
             for cell in row.cells:
                 if first_row:
-                    html_table += "<th>" + html.escape(cell.text) + "</th>"
+                    html_table += "<th>" + html.escape(cell.text or "") + "</th>"
                 else:
-                    html_table += "<td>" + html.escape(cell.text) + "</td>"
+                    html_table += "<td>" + html.escape(cell.text or "") + "</td>"
             html_table += "</tr>"
             first_row = False
         html_table += "</table></body></html>"
@@ -236,7 +236,7 @@ class PptxConverter(DocumentConverter):
         try:
             md = "\n\n### Chart"
             if chart.has_title:
-                md += f": {chart.chart_title.text_frame.text}"
+                md += f": {chart.chart_title.text_frame.text or ""}"
             md += "\n\n"
             data = []
             category_names = [c.label for c in chart.plots[0].categories]
