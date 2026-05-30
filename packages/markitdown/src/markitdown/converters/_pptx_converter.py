@@ -236,7 +236,10 @@ class PptxConverter(DocumentConverter):
         try:
             md = "\n\n### Chart"
             if chart.has_title:
-                md += f": {chart.chart_title.text_frame.text}"
+                title_frame = chart.chart_title.text_frame
+                title_text = title_frame.text if title_frame is not None else ""
+                if title_text:
+                    md += f": {title_text}"
             md += "\n\n"
             data = []
             category_names = [c.label for c in chart.plots[0].categories]

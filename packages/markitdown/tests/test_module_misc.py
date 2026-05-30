@@ -4,9 +4,11 @@ import os
 import re
 import shutil
 import pytest
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from markitdown._uri_utils import parse_data_uri, file_uri_to_path
+from markitdown.converters import PptxConverter
 
 from markitdown import (
     MarkItDown,
@@ -530,6 +532,21 @@ def test_markitdown_llm() -> None:
         assert test_string in result.text_content
     # Standard alt text is included
     validate_strings(result, PPTX_TEST_STRINGS)
+
+
+def test_pptx_chart_title_without_text_frame_keeps_chart_data() -> None:
+    chart = MagicMock()
+    chart.has_title = True
+    chart.chart_title.text_frame = None
+    chart.plots = [SimpleNamespace(categories=[SimpleNamespace(label="FY2026")])]
+    chart.series = [SimpleNamespace(name="Revenue", values=[42])]
+
+    result = PptxConverter()._convert_chart_to_markdown(chart)
+
+    assert "[unsupported chart]" not in result
+    assert "### Chart\n\n" in result
+    assert "| Category | Revenue |" in result
+    assert "| FY2026 | 42 |" in result
 
 
 if __name__ == "__main__":
