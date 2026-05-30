@@ -1,4 +1,6 @@
 import sys
+import re
+import numbers
 from typing import BinaryIO, Any
 from ._html_converter import HtmlConverter
 from .._base_converter import DocumentConverter, DocumentConverterResult
@@ -10,7 +12,7 @@ from .._stream_info import StreamInfo
 _xlsx_dependency_exc_info = None
 try:
     import pandas as pd
-    import openpyxl  # noqa: F401
+    import openpyxl
 except ImportError:
     _xlsx_dependency_exc_info = sys.exc_info()
 
@@ -31,6 +33,30 @@ ACCEPTED_XLS_MIME_TYPE_PREFIXES = [
     "application/excel",
 ]
 ACCEPTED_XLS_FILE_EXTENSIONS = [".xls"]
+
+_CURRENCY_SYMBOL_RE = re.compile(
+    r"(?<!\\)([$\u20ac\u00a3\u00a5])|\[\$([^-\]]+)(?:-[^\]]+)?\]"
+)
+
+
+def _format_currency_value(value: Any, number_format: str) -> str | None:
+    match = _CURRENCY_SYMBOL_RE.search(number_format)
+    if (
+        match is None
+        or isinstance(value, bool)
+        or not isinstance(value, numbers.Real)
+        or pd.isna(value)
+    ):
+        return None
+
+    symbol = match.group(1) or match.group(2)
+    positive_format = number_format.split(";", 1)[0]
+    decimal_part = positive_format.split(".", 1)[1] if "." in positive_format else ""
+    precision = sum(1 for char in decimal_part if char in "0#")
+    use_grouping = "," in positive_format.split(".", 1)[0]
+
+    grouping = "," if use_grouping else ""
+    return f"{symbol}{value:{grouping}.{precision}f}"
 
 
 class XlsxConverter(DocumentConverter):
@@ -81,8 +107,25 @@ class XlsxConverter(DocumentConverter):
             )
 
         sheets = pd.read_excel(file_stream, sheet_name=None, engine="openpyxl")
+        file_stream.seek(0)
+        workbook = openpyxl.load_workbook(file_stream, read_only=True, data_only=True)
+
         md_content = ""
         for s in sheets:
+            worksheet = workbook[s]
+            for row_idx in range(len(sheets[s].index)):
+                for col_idx in range(len(sheets[s].columns)):
+                    cell = worksheet.cell(row=row_idx + 2, column=col_idx + 1)
+                    currency_value = _format_currency_value(
+                        sheets[s].iat[row_idx, col_idx],
+                        cell.number_format,
+                    )
+                    if currency_value is not None:
+                        sheets[s][sheets[s].columns[col_idx]] = sheets[s][
+                            sheets[s].columns[col_idx]
+                        ].astype(object)
+                        sheets[s].iat[row_idx, col_idx] = currency_value
+
             md_content += f"## {s}\n"
             html_content = sheets[s].to_html(index=False)
             md_content += (
