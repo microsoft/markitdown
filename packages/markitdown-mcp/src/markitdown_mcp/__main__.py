@@ -2,6 +2,7 @@ import contextlib
 import sys
 import os
 from collections.abc import AsyncIterator
+from urllib.parse import urlparse
 from mcp.server.fastmcp import FastMCP
 from starlette.applications import Starlette
 from mcp.server.sse import SseServerTransport
@@ -19,12 +20,26 @@ mcp = FastMCP("markitdown")
 
 @mcp.tool()
 async def convert_to_markdown(uri: str) -> str:
-    """Convert a resource described by an http:, https:, file: or data: URI to markdown"""
+    """Convert a resource described by an http:, https:, or data: URI to markdown"""
+    if urlparse(uri).scheme == "file":
+        if not check_local_files_allowed():
+            raise ValueError(
+                "file:// URIs are disabled by default. "
+                "Start the server with --allow-local-files to enable local file access."
+            )
     return MarkItDown(enable_plugins=check_plugins_enabled()).convert_uri(uri).markdown
 
 
 def check_plugins_enabled() -> bool:
     return os.getenv("MARKITDOWN_ENABLE_PLUGINS", "false").strip().lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+
+
+def check_local_files_allowed() -> bool:
+    return os.getenv("MARKITDOWN_ALLOW_LOCAL_FILES", "false").strip().lower() in (
         "true",
         "1",
         "yes",
@@ -102,6 +117,11 @@ def main():
     parser.add_argument(
         "--port", type=int, default=None, help="Port to listen on (default: 3001)"
     )
+    parser.add_argument(
+        "--allow-local-files",
+        action="store_true",
+        help="Allow file:// URIs to be converted. Only use this in trusted environments (default: False)",
+    )
     args = parser.parse_args()
 
     use_http = args.http or args.sse
@@ -111,6 +131,16 @@ def main():
             "Host and port arguments are only valid when using streamable HTTP or SSE transport (see: --http)."
         )
         sys.exit(1)
+
+    if args.allow_local_files:
+        os.environ["MARKITDOWN_ALLOW_LOCAL_FILES"] = "true"
+        print(
+            "\n"
+            "WARNING: Local file access is enabled (--allow-local-files).\n"
+            "Any process on this machine can request files accessible to this user via this server.\n"
+            "Only proceed if you understand the security implications.\n",
+            file=sys.stderr,
+        )
 
     if use_http:
         host = args.host if args.host else "127.0.0.1"
