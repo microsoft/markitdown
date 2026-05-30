@@ -272,7 +272,7 @@ class oMath2Latex(Tag2Method):
                 if FUNC.get(t):
                     latex_chars.append(FUNC[t])
                 else:
-                    raise NotImplementedError("Not support func %s" % t)
+                    latex_chars.append(f"\\operatorname{{{t}}}({FUNC_PLACE})")
             else:
                 latex_chars.append(t)
         t = BLANK.join(latex_chars)
