@@ -1,3 +1,4 @@
+import struct
 import zipfile
 from io import BytesIO
 from typing import BinaryIO
@@ -28,6 +29,42 @@ MATH_ROOT_TEMPLATE = "".join(
         "{0}</w:document>",
     )
 )
+
+
+def _fix_zip_name_casing(input_docx: BinaryIO) -> BinaryIO:
+    """Fix case mismatches between zip local file headers and central directory.
+
+    Some .docx producers (certain legal document systems, older Word versions)
+    write filenames with inconsistent casing between local file headers and the
+    central directory. Python's ``zipfile`` module strictly validates this and
+    raises ``BadZipFile``. This function patches local headers to match the
+    central directory before opening the zip.
+
+    Args:
+        input_docx: A binary input stream representing the DOCX file.
+
+    Returns:
+        The original stream if no patch was needed, or a new stream with
+        corrected local header names.
+    """
+    input_docx.seek(0)
+    raw = bytearray(input_docx.read())
+    patched = False
+    with zipfile.ZipFile(BytesIO(bytes(raw)), mode="r") as zf:
+        for info in zf.infolist():
+            offset = info.header_offset
+            if raw[offset:offset + 4] != b"PK\x03\x04":
+                continue
+            fname_len = struct.unpack_from("<H", raw, offset + 26)[0]
+            local_name = raw[offset + 30:offset + 30 + fname_len]
+            central_name = info.filename.encode("utf-8")
+            if local_name != central_name and len(local_name) == len(central_name):
+                raw[offset + 30:offset + 30 + fname_len] = central_name
+                patched = True
+    if patched:
+        return BytesIO(bytes(raw))
+    input_docx.seek(0)
+    return input_docx
 
 
 def _convert_omath_to_latex(tag: Tag) -> str:
@@ -129,6 +166,7 @@ def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
     Returns:
         BinaryIO: A binary output stream representing the processed DOCX file.
     """
+    input_docx = _fix_zip_name_casing(input_docx)
     output_docx = BytesIO()
     # The files that need to be pre-processed from .docx
     pre_process_enable_files = [
