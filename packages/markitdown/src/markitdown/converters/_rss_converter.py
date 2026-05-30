@@ -107,7 +107,7 @@ class RssConverter(DocumentConverter):
         title = self._get_data_by_tag_name(root, "title")
         subtitle = self._get_data_by_tag_name(root, "subtitle")
         entries = root.getElementsByTagName("entry")
-        md_text = f"# {title}\n"
+        md_text = f"# {title}\n" if title else ""
         if subtitle:
             md_text += f"{subtitle}\n"
         for entry in entries:
@@ -143,6 +143,7 @@ class RssConverter(DocumentConverter):
         channel_title = self._get_data_by_tag_name(channel, "title")
         channel_description = self._get_data_by_tag_name(channel, "description")
         items = channel.getElementsByTagName("item")
+        md_text = ""
         if channel_title:
             md_text = f"# {channel_title}\n"
         if channel_description:
