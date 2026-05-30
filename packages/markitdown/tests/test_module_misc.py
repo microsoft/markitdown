@@ -532,6 +532,36 @@ def test_markitdown_llm() -> None:
     validate_strings(result, PPTX_TEST_STRINGS)
 
 
+def test_ipynb_converter_accepts_non_ascii():
+    """Test that IpynbConverter.accepts() handles non-ASCII bytes gracefully.
+
+    Regression test for https://github.com/microsoft/markitdown/issues/1894.
+    Non-ASCII files (e.g. French PDFs with accented characters) should not
+    crash the conversion pipeline with UnicodeDecodeError.
+    """
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    converter = IpynbConverter()
+
+    # Non-ASCII bytes that could be mistaken for JSON
+    non_ascii_data = b'{"data": "caf\xe9 cr\xe8me"}\n'
+    stream = io.BytesIO(non_ascii_data)
+    stream_info = StreamInfo(mimetype="application/json")
+
+    result = converter.accepts(stream, stream_info)
+    assert result is False
+    assert stream.tell() == 0  # stream position restored
+
+    # Normal notebook should still be accepted
+    notebook_data = b'{"nbformat": 4, "nbformat_minor": 5, "cells": []}'
+    stream2 = io.BytesIO(notebook_data)
+    stream_info2 = StreamInfo(mimetype="application/json")
+
+    result2 = converter.accepts(stream2, stream_info2)
+    assert result2 is True
+    assert stream2.tell() == 0
+
+
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     for test in [
