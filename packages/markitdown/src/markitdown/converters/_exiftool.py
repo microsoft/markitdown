@@ -32,18 +32,24 @@ def exiftool_metadata(
                 f"ExifTool version {version_output} is vulnerable to CVE-2021-22204. "
                 "Please upgrade to version 12.24 or later."
             )
+    except OSError:
+        # Binary not found or not executable — no metadata available
+        return {}
     except (subprocess.CalledProcessError, ValueError) as e:
         raise RuntimeError("Failed to verify ExifTool version.") from e
 
     # Run exiftool
     cur_pos = file_stream.tell()
     try:
-        output = subprocess.run(
-            [exiftool_path, "-json", "-"],
-            input=file_stream.read(),
-            capture_output=True,
-            text=False,
-        ).stdout
+        try:
+            output = subprocess.run(
+                [exiftool_path, "-json", "-"],
+                input=file_stream.read(),
+                capture_output=True,
+                text=False,
+            ).stdout
+        except OSError:
+            return {}
 
         return json.loads(
             output.decode(locale.getpreferredencoding(False)),
