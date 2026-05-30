@@ -274,6 +274,69 @@ def test_docx_equations() -> None:
     assert block_equations, "No block equations found in the document."
 
 
+def test_docx_malformed_equations() -> None:
+    """Malformed equations should not crash the converter (issue #1979)."""
+    import zipfile
+    from io import BytesIO
+
+    docx_xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"
+            xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+            mc:Ignorable="w14 wp14">
+  <w:body>
+    <w:p>
+      <w:r><w:t>Normal text</w:t></w:r>
+    </w:p>
+    <m:oMathPara>
+      <m:oMath>
+        <m:r><m:t>x+1</m:t></m:r>
+      </m:oMath>
+    </m:oMathPara>
+    <w:p>
+      <w:r><w:t>After good equation</w:t></w:r>
+    </w:p>
+    <m:oMathPara>
+      <!-- oMathPara with no oMath child -->
+    </m:oMathPara>
+    <w:p>
+      <w:r><w:t>After empty oMathPara</w:t></w:r>
+    </w:p>
+    <m:oMath>
+      <!-- empty inline oMath -->
+    </m:oMath>
+    <w:p>
+      <w:r><w:t>After empty inline oMath</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"""
+
+    buf = BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("word/document.xml", docx_xml.encode("utf-8"))
+        z.writestr("[Content_Types].xml", """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>""")
+        z.writestr("word/_rels/document.xml.rels", """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+</Relationships>""")
+        z.writestr("_rels/.rels", """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>""")
+
+    buf.seek(0)
+    markitdown = MarkItDown()
+    result = markitdown.convert(buf)
+    assert "Normal text" in result.text_content
+    assert "$x+1$" in result.text_content or "$$x+1$$" in result.text_content
+    assert "After empty oMathPara" in result.text_content
+    assert "After empty inline oMath" in result.text_content
+
+
 def test_input_as_strings() -> None:
     markitdown = MarkItDown()
 

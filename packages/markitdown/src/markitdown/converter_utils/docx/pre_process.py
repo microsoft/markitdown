@@ -44,6 +44,8 @@ def _convert_omath_to_latex(tag: Tag) -> str:
     math_root = ET.fromstring(MATH_ROOT_TEMPLATE.format(str(tag)))
     # Find the 'oMath' element within the XML document
     math_element = math_root.find(OMML_NS + "oMath")
+    if math_element is None:
+        return ""
     # Convert the 'oMath' element to LaTeX using the oMath2Latex function
     latex = oMath2Latex(math_element).latex
     return latex
