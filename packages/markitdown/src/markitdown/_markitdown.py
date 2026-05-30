@@ -126,6 +126,7 @@ class MarkItDown:
         self._llm_prompt: Union[str | None] = None
         self._exiftool_path: Union[str | None] = None
         self._style_map: Union[str | None] = None
+        self._keep_data_uris = kwargs.get("keep_data_uris", False)
 
         # Register the converters
         self._converters: List[ConverterRegistration] = []
@@ -151,6 +152,7 @@ class MarkItDown:
             self._llm_prompt = kwargs.get("llm_prompt")
             self._exiftool_path = kwargs.get("exiftool_path")
             self._style_map = kwargs.get("style_map")
+            self._keep_data_uris = kwargs.get("keep_data_uris", False)
 
             if self._exiftool_path is None:
                 self._exiftool_path = os.getenv("EXIFTOOL_PATH")
@@ -599,6 +601,9 @@ class MarkItDown:
 
                 if "exiftool_path" not in _kwargs and self._exiftool_path is not None:
                     _kwargs["exiftool_path"] = self._exiftool_path
+
+                if "keep_data_uris" not in _kwargs and self._keep_data_uris:
+                    _kwargs["keep_data_uris"] = self._keep_data_uris
 
                 # Add the list of converters for nested processing
                 _kwargs["_parent_converters"] = self._converters
