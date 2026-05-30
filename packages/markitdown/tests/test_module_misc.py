@@ -288,6 +288,24 @@ def test_input_as_strings() -> None:
     assert "# Test" in result.text_content
 
 
+def test_xlsx_currency_format_is_preserved(tmp_path) -> None:
+    from openpyxl import Workbook
+
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = "Invoice"
+    worksheet.append(["Item", "Count", "Cost"])
+    worksheet.append(["Breakfast", 20, 5])
+    worksheet["C2"].number_format = "$#,##0.00"
+
+    xlsx_path = tmp_path / "currency.xlsx"
+    workbook.save(xlsx_path)
+
+    result = MarkItDown().convert(str(xlsx_path))
+
+    assert "| Breakfast | 20 | $5.00 |" in result.markdown
+
+
 def test_deeply_nested_html_fallback() -> None:
     """Large, deeply nested HTML should fall back to plain-text extraction
     instead of silently returning unconverted HTML (issue #1636).
