@@ -552,3 +552,30 @@ if __name__ == "__main__":
         test()
         print("OK")
     print("All tests passed!")
+
+
+def test_ipynb_accepts_non_decodable_content() -> None:
+    """IpynbConverter.accepts() returns False (not raises) on non-decodable content.
+
+    Regression test for https://github.com/microsoft/markitdown/issues/1894.
+    """
+    from markitdown.converters._ipynb_converter import IpynbConverter
+    from markitdown._stream_info import StreamInfo
+
+    converter = IpynbConverter()
+
+    # French text bytes that fail ASCII decode
+    french_bytes = "Bonjour, ça va très bien?".encode("utf-8")
+    result = converter.accepts(
+        io.BytesIO(french_bytes),
+        StreamInfo(mimetype="application/json", extension=".bin", charset="ascii"),
+    )
+    assert result is False
+
+    # Bad JSON bytes that cause ValueError
+    bad_json = b'{"not": "a notebook", \xff\xfe}'
+    result = converter.accepts(
+        io.BytesIO(bad_json),
+        StreamInfo(mimetype="application/json", extension=".txt", charset="utf-8"),
+    )
+    assert result is False
