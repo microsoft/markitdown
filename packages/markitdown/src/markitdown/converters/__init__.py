@@ -18,6 +18,7 @@ from ._image_converter import ImageConverter
 from ._audio_converter import AudioConverter
 from ._outlook_msg_converter import OutlookMsgConverter
 from ._zip_converter import ZipConverter
+from ._eml_converter import EmlConverter
 from ._doc_intel_converter import (
     DocumentIntelligenceConverter,
     DocumentIntelligenceFileType,
@@ -47,4 +48,5 @@ __all__ = [
     "DocumentIntelligenceFileType",
     "EpubConverter",
     "CsvConverter",
+    "EmlConverter",
 ]
