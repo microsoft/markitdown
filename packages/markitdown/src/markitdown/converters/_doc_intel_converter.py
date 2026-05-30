@@ -134,7 +134,7 @@ class DocumentIntelligenceConverter(DocumentConverter):
         self,
         *,
         endpoint: str,
-        api_version: str = "2024-07-31-preview",
+        api_version: str | None = None,
         credential: AzureKeyCredential | TokenCredential | None = None,
         file_types: List[DocumentIntelligenceFileType] = [
             DocumentIntelligenceFileType.DOCX,
@@ -152,7 +152,7 @@ class DocumentIntelligenceConverter(DocumentConverter):
 
         Args:
             endpoint (str): The endpoint for the Document Intelligence service.
-            api_version (str): The API version to use. Defaults to "2024-07-31-preview".
+            api_version (str | None): The API version to use. When None (default), the Azure SDK's default is used.
             credential (AzureKeyCredential | TokenCredential | None): The credential to use for authentication.
             file_types (List[DocumentIntelligenceFileType]): The file types to accept. Defaults to all supported file types.
         """
@@ -180,11 +180,13 @@ class DocumentIntelligenceConverter(DocumentConverter):
 
         self.endpoint = endpoint
         self.api_version = api_version
-        self.doc_intel_client = DocumentIntelligenceClient(
+        client_kwargs = dict(
             endpoint=self.endpoint,
-            api_version=self.api_version,
             credential=credential,
         )
+        if self.api_version is not None:
+            client_kwargs["api_version"] = self.api_version
+        self.doc_intel_client = DocumentIntelligenceClient(**client_kwargs)
 
     def accepts(
         self,
