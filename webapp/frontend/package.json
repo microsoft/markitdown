@@ -1,0 +1,28 @@
+{
+  "name": "markitdown-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbo",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "^16.2.6",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "react-dropzone": "^14.3.5",
+    "react-syntax-highlighter": "^15.6.1",
+    "lucide-react": "^0.503.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/react-syntax-highlighter": "^15.5.13",
+    "typescript": "^5",
+    "tailwindcss": "^4.1.4",
+    "@tailwindcss/postcss": "^4.1.4",
+    "postcss": "^8"
+  }
+}

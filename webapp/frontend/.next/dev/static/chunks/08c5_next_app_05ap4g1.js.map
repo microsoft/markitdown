@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 3, "column": 0}, "map": {"version":3,"sources":["file:///Users/mac/Desktop/markitdown/webapp/frontend/node_modules/.pnpm/next%4016.2.6_react-dom%4019.2.6_react%4019.2.6__react%4019.2.6/node_modules/next/app.js"],"sourcesContent":["module.exports = require('./dist/pages/_app')\n"],"names":["module","exports"],"mappings":"AAAAA,OAAOC,OAAO","ignoreList":[0]}}]
+}

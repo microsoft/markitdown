@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 4, "column": 0}, "map": {"version":3,"sources":["file:///Users/mac/Desktop/markitdown/webapp/frontend/node_modules/.pnpm/next%4016.2.6_react-dom%4019.2.6_react%4019.2.6__react%4019.2.6/node_modules/next/src/client/components/builtin/unauthorized.tsx"],"sourcesContent":["import { HTTPAccessErrorFallback } from '../http-access-fallback/error-fallback'\n\nexport default function Unauthorized() {\n  return (\n    <HTTPAccessErrorFallback\n      status={401}\n      message=\"You're not authorized to access this page.\"\n    />\n  )\n}\n"],"names":["Unauthorized","HTTPAccessErrorFallback","status","message"],"mappings":";;;+BAEA,WAAA;;;eAAwBA;;;;+BAFgB;AAEzB,SAASA;IACtB,OAAA,WAAA,GACE,CAAA,GAAA,YAAA,GAAA,EAACC,eAAAA,uBAAuB,EAAA;QACtBC,QAAQ;QACRC,SAAQ;;AAGd","ignoreList":[0]}}]
+}
