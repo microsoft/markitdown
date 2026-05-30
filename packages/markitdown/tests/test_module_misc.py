@@ -3,6 +3,7 @@ import io
 import os
 import re
 import shutil
+import zipfile
 import pytest
 from unittest.mock import MagicMock
 
@@ -272,6 +273,72 @@ def test_docx_equations() -> None:
     # Find block equations wrapped with double $$ and check if they are present
     block_equations = re.findall(r"\$\$(.+?)\$\$", result.text_content)
     assert block_equations, "No block equations found in the document."
+
+
+def test_docx_zip_filename_casing_mismatch() -> None:
+    """Test that DOCX files with inconsistent ZIP filename casing are handled.
+
+    Some document generators produce .docx files where the central directory
+    records one casing (e.g. 'word/document.xml') but the local file headers
+    record another (e.g. 'Word/Document.XML'). Python's zipfile module raises
+    BadZipFile when reading such files. This test verifies that MarkItDown
+    handles this gracefully.
+
+    See: https://github.com/microsoft/markitdown/issues/1812
+    """
+    import struct
+
+    markitdown = MarkItDown()
+    docx_file = os.path.join(TEST_FILES_DIR, "test.docx")
+
+    # Read the original docx and get its expected content
+    original_result = markitdown.convert(docx_file)
+    assert original_result.markdown.strip(), "Original DOCX should have content"
+
+    # Read raw bytes and corrupt the local file header filenames
+    with open(docx_file, "rb") as f:
+        raw = bytearray(f.read())
+
+    # Find all local file headers and uppercase their filenames
+    corrupted = bytearray(raw)
+    offset = 0
+    patched_count = 0
+    while offset + 30 <= len(corrupted):
+        if corrupted[offset : offset + 4] != b"PK\x03\x04":
+            break
+        fname_len = struct.unpack_from("<H", corrupted, offset + 26)[0]
+        extra_len = struct.unpack_from("<H", corrupted, offset + 28)[0]
+        if offset + 30 + fname_len > len(corrupted):
+            break
+        # Uppercase the filename in the local header
+        old_name = corrupted[offset + 30 : offset + 30 + fname_len]
+        new_name = old_name.upper()
+        if old_name != new_name:
+            corrupted[offset + 30 : offset + 30 + fname_len] = new_name
+            patched_count += 1
+        comp_size = struct.unpack_from("<I", corrupted, offset + 18)[0]
+        offset = offset + 30 + fname_len + extra_len + comp_size
+
+    assert patched_count > 0, "Should have patched at least one local file header"
+
+    # Verify the corrupted file would fail with plain zipfile
+    with pytest.raises(zipfile.BadZipFile):
+        with zipfile.ZipFile(io.BytesIO(bytes(corrupted)), "r") as zf:
+            for name in zf.namelist():
+                zf.read(name)
+
+    # Verify MarkItDown can still convert it
+    corrupted_result = markitdown.convert_stream(
+        io.BytesIO(bytes(corrupted)),
+        file_extension=".docx",
+    )
+    assert (
+        corrupted_result.markdown.strip()
+    ), "Corrupted DOCX should still produce content"
+    # Content should be equivalent to the original
+    assert (
+        original_result.markdown.strip() == corrupted_result.markdown.strip()
+    ), "Corrupted DOCX should produce the same output as original"
 
 
 def test_input_as_strings() -> None:
