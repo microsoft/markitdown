@@ -34,6 +34,8 @@ def exiftool_metadata(
             )
     except (subprocess.CalledProcessError, ValueError) as e:
         raise RuntimeError("Failed to verify ExifTool version.") from e
+    except OSError:
+        return {}
 
     # Run exiftool
     cur_pos = file_stream.tell()
