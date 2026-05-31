@@ -57,20 +57,23 @@ class CsvConverter(DocumentConverter):
         # Create markdown table
         markdown_table = []
 
+        def _escape_cell(value: str) -> str:
+            """Escape pipe characters so they don't break GFM table structure."""
+            value = value.replace("|", r"\|")
+            return value
+
         # Add header row
-        markdown_table.append("| " + " | ".join(rows[0]) + " |")
+        markdown_table.append("| " + " | ".join(_escape_cell(c) for c in rows[0]) + " |")
 
         # Add separator row
         markdown_table.append("| " + " | ".join(["---"] * len(rows[0])) + " |")
 
         # Add data rows
         for row in rows[1:]:
-            # Make sure row has the same number of columns as header
             while len(row) < len(rows[0]):
                 row.append("")
-            # Truncate if row has more columns than header
             row = row[: len(rows[0])]
-            markdown_table.append("| " + " | ".join(row) + " |")
+            markdown_table.append("| " + " | ".join(_escape_cell(c) for c in row) + " |")
 
         result = "\n".join(markdown_table)
 
