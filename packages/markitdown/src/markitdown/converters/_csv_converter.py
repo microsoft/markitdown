@@ -8,8 +8,9 @@ from .._stream_info import StreamInfo
 ACCEPTED_MIME_TYPE_PREFIXES = [
     "text/csv",
     "application/csv",
+    "text/tab-separated-values",
 ]
-ACCEPTED_FILE_EXTENSIONS = [".csv"]
+ACCEPTED_FILE_EXTENSIONS = [".csv", ".tsv"]
 
 
 class CsvConverter(DocumentConverter):
@@ -48,7 +49,12 @@ class CsvConverter(DocumentConverter):
             content = str(from_bytes(file_stream.read()).best())
 
         # Parse CSV content
-        reader = csv.reader(io.StringIO(content))
+        delimiter = "\t" if (stream_info.extension or "").lower() == ".tsv" else ","
+
+        reader = csv.reader(
+            io.StringIO(content),
+            delimiter=delimiter
+        )
         rows = list(reader)
 
         if not rows:
