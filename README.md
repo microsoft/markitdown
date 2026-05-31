@@ -40,15 +40,47 @@ With the standard Python installation, you can create and activate a virtual env
 
 ```bash
 python -m venv .venv
+```
+
+Activate the environment:
+
+```bash
+# macOS/Linux (bash/zsh)
 source .venv/bin/activate
+```
+
+```powershell
+# Windows (PowerShell)
+.\.venv\Scripts\Activate.ps1
+```
+
+```bat
+:: Windows (cmd.exe)
+.venv\Scripts\activate.bat
 ```
 
 If using `uv`, you can create a virtual environment with:
 
 ```bash
 uv venv --python=3.12 .venv
+```
+
+Activate the environment:
+
+```bash
+# macOS/Linux (bash/zsh)
 source .venv/bin/activate
 # NOTE: Be sure to use 'uv pip install' rather than just 'pip install' to install packages in this virtual environment
+```
+
+```powershell
+# Windows (PowerShell)
+.\.venv\Scripts\Activate.ps1
+```
+
+```bat
+:: Windows (cmd.exe)
+.venv\Scripts\activate.bat
 ```
 
 If you are using Anaconda, you can create a virtual environment with:
@@ -63,9 +95,9 @@ conda activate markitdown
 To install MarkItDown, use pip: `pip install 'markitdown[all]'`. Alternatively, you can install it from the source:
 
 ```bash
-git clone git@github.com:microsoft/markitdown.git
+git clone https://github.com/microsoft/markitdown.git
 cd markitdown
-pip install -e 'packages/markitdown[all]'
+pip install -e "packages/markitdown[all]"
 ```
 
 ## Usage
