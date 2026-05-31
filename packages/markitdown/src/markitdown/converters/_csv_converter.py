@@ -42,10 +42,14 @@ class CsvConverter(DocumentConverter):
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
         # Read the file content
+        data = file_stream.read()
         if stream_info.charset:
-            content = file_stream.read().decode(stream_info.charset)
+            try:
+                content = data.decode(stream_info.charset)
+            except UnicodeDecodeError:
+                content = str(from_bytes(data).best())
         else:
-            content = str(from_bytes(file_stream.read()).best())
+            content = str(from_bytes(data).best())
 
         # Parse CSV content
         reader = csv.reader(io.StringIO(content))
