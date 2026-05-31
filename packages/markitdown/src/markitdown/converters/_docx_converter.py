@@ -27,6 +27,8 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 
 ACCEPTED_FILE_EXTENSIONS = [".docx"]
 
+_UNDERLINE_STYLE_MAP = "u => u"
+
 
 class DocxConverter(HtmlConverter):
     """
@@ -76,6 +78,10 @@ class DocxConverter(HtmlConverter):
             )
 
         style_map = kwargs.get("style_map", None)
+        if style_map:
+            style_map = f"{style_map}\n{_UNDERLINE_STYLE_MAP}"
+        else:
+            style_map = _UNDERLINE_STYLE_MAP
         pre_process_stream = pre_process_docx(file_stream)
         return self._html_converter.convert_string(
             mammoth.convert_to_html(pre_process_stream, style_map=style_map).value,
