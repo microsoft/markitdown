@@ -66,5 +66,8 @@ exclude_lines = [
   "if TYPE_CHECKING:",
 ]
 
+[tool.uv.sources]
+markitdown = { workspace = true }
+
 [tool.hatch.build.targets.sdist]
 only-include = ["src/markitdown_sample_plugin"]

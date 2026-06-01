@@ -52,6 +52,9 @@ Source = "https://github.com/microsoft/markitdown"
 [tool.hatch.version]
 path = "src/markitdown_ocr/__about__.py"
 
+[tool.uv.sources]
+markitdown = { workspace = true }
+
 # CRITICAL: Plugin entry point - MarkItDown will discover this plugin through this entry point
 [project.entry-points."markitdown.plugin"]
 ocr = "markitdown_ocr"
