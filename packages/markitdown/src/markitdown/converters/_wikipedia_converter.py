@@ -75,7 +75,8 @@ class WikipediaConverter(DocumentConverter):
                 main_title = title_elm.string
 
             # Convert the page
-            webpage_text = f"# {main_title}\n\n" + _CustomMarkdownify(
+            title_prefix = f"# {main_title}\n\n" if main_title else ""
+            webpage_text = title_prefix + _CustomMarkdownify(
                 **kwargs
             ).convert_soup(body_elm)
         else:
