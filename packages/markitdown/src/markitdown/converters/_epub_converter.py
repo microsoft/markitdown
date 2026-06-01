@@ -1,13 +1,19 @@
+"""EPUB converter module."""
+# nosemgrep: use-defused-xml
+# The xml.dom.minidom imports below are ONLY for type annotations (TYPE_CHECKING block).
+# All actual XML parsing uses defusedxml.minidom.parse() which is secure.
 import os
 import zipfile
 from defusedxml import minidom
-from xml.dom.minidom import Document
 
-from typing import BinaryIO, Any, Dict, List
+from typing import TYPE_CHECKING, BinaryIO, Any, Dict, List
 
 from ._html_converter import HtmlConverter
 from .._base_converter import DocumentConverterResult
 from .._stream_info import StreamInfo
+
+if TYPE_CHECKING:
+    from xml.dom.minidom import Document  # nosemgrep: use-defused-xml
 
 ACCEPTED_MIME_TYPE_PREFIXES = [
     "application/epub",

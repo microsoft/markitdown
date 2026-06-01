@@ -1,11 +1,18 @@
+"""RSS/Atom feed converter module."""
+# nosemgrep: use-defused-xml
+# The xml.dom.minidom imports below are ONLY for type annotations (TYPE_CHECKING block).
+# All actual XML parsing uses defusedxml.minidom.parse() which is secure.
 from defusedxml import minidom
-from xml.dom.minidom import Document, Element
-from typing import BinaryIO, Any, Union
+
+from typing import TYPE_CHECKING, BinaryIO, Any, Union
 from bs4 import BeautifulSoup
 
 from ._markdownify import _CustomMarkdownify
 from .._stream_info import StreamInfo
 from .._base_converter import DocumentConverter, DocumentConverterResult
+
+if TYPE_CHECKING:
+    from xml.dom.minidom import Document, Element  # nosemgrep: use-defused-xml
 
 PRECISE_MIME_TYPE_PREFIXES = [
     "application/rss",
