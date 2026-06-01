@@ -4,6 +4,9 @@ import os
 
 from typing import BinaryIO, Any, TYPE_CHECKING
 
+from packages.markitdown.src.markitdown._exceptions import FileConversionException
+from packages.markitdown.src.markitdown.converters._zip_converter import (
+    ZIP_UNCOMPRESSED_SIZE_THRESHOLD)
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
 from .._exceptions import UnsupportedFormatException, FileConversionException
@@ -18,6 +21,7 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 
 ACCEPTED_FILE_EXTENSIONS = [".zip"]
 
+ZIP_UNCOMPRESSED_SIZE_THRESHOLD = 500
 
 class ZipConverter(DocumentConverter):
     """Converts ZIP files to markdown by extracting and converting all contained files.
@@ -93,7 +97,20 @@ class ZipConverter(DocumentConverter):
         file_path = stream_info.url or stream_info.local_path or stream_info.filename
         md_content = f"Content from the zip file `{file_path}`:\n\n"
 
+#files in zip more than 10000 files
+#zips in zips dont recurse forever , depth counter/limit
+
+
         with zipfile.ZipFile(file_stream, "r") as zipObj:
+            track_uncompressed = 0
+            for file in zipObj.infolist():
+                track_uncompressed += file.file_size
+                #check for zip bomb
+                if track_uncompressed > ZIP_UNCOMPRESSED_SIZE_THRESHOLD:
+                    raise FileConversionException(message= "total zip uncmpressed exceeds compressed by threshold")
+
+
+
             for name in zipObj.namelist():
                 try:
                     z_file_stream = io.BytesIO(zipObj.read(name))
