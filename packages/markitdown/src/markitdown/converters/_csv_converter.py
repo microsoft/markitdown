@@ -12,6 +12,14 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 ACCEPTED_FILE_EXTENSIONS = [".csv"]
 
 
+def _escape_cell(value: str) -> str:
+    # A literal pipe or newline inside a cell would split it into extra
+    # columns or rows when rendered, so escape pipes and flatten newlines.
+    return value.replace("|", "\\|").replace("\r\n", " ").replace("\n", " ").replace(
+        "\r", " "
+    )
+
+
 class CsvConverter(DocumentConverter):
     """
     Converts CSV files to Markdown tables.
@@ -58,7 +66,9 @@ class CsvConverter(DocumentConverter):
         markdown_table = []
 
         # Add header row
-        markdown_table.append("| " + " | ".join(rows[0]) + " |")
+        markdown_table.append(
+            "| " + " | ".join(_escape_cell(cell) for cell in rows[0]) + " |"
+        )
 
         # Add separator row
         markdown_table.append("| " + " | ".join(["---"] * len(rows[0])) + " |")
@@ -70,7 +80,9 @@ class CsvConverter(DocumentConverter):
                 row.append("")
             # Truncate if row has more columns than header
             row = row[: len(rows[0])]
-            markdown_table.append("| " + " | ".join(row) + " |")
+            markdown_table.append(
+                "| " + " | ".join(_escape_cell(cell) for cell in row) + " |"
+            )
 
         result = "\n".join(markdown_table)
 
