@@ -4,9 +4,6 @@ import os
 
 from typing import BinaryIO, Any, TYPE_CHECKING
 
-from packages.markitdown.src.markitdown._exceptions import FileConversionException
-from packages.markitdown.src.markitdown.converters._zip_converter import (
-    ZIP_UNCOMPRESSED_SIZE_THRESHOLD)
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
 from .._exceptions import UnsupportedFormatException, FileConversionException
@@ -21,7 +18,9 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 
 ACCEPTED_FILE_EXTENSIONS = [".zip"]
 
-ZIP_UNCOMPRESSED_SIZE_THRESHOLD = 500
+ZIP_UNCOMPRESSED_SIZE_THRESHOLD = 100 * 1024 * 1024  # 100 MB
+MAX_FILE_COUNT = 1000
+MAX_DEPTH = 3
 
 class ZipConverter(DocumentConverter):
     """Converts ZIP files to markdown by extracting and converting all contained files.
@@ -94,17 +93,24 @@ class ZipConverter(DocumentConverter):
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
+        *,
+        _depth = 0,
         **kwargs: Any,  # Options to pass to the converter
+
     ) -> DocumentConverterResult:
+        #base case recursion
+        if _depth > MAX_DEPTH:
+            raise FileConversionException(message="Max zip nesting depth exceeded")
+        
         file_path = stream_info.url or stream_info.local_path or stream_info.filename
         md_content = f"Content from the zip file `{file_path}`:\n\n"
 
-#files in zip more than 10000 files
-#zips in zips dont recurse forever , depth counter/limit
-
-
         with zipfile.ZipFile(file_stream, "r") as zipObj:
             track_uncompressed = 0
+
+            if len(zipObj.namelist()) > MAX_FILE_COUNT:
+                raise FileConversionException(message="Too many files in zip")
+
             for file in zipObj.infolist():
                 track_uncompressed += file.file_size
                 #check for zip bomb
@@ -123,6 +129,7 @@ class ZipConverter(DocumentConverter):
                     result = self._markitdown.convert_stream(
                         stream=z_file_stream,
                         stream_info=z_file_stream_info,
+                        _depth = _depth+1,
                     )
                     if result is not None:
                         md_content += f"## File: {name}\n\n"
