@@ -6,6 +6,8 @@ import shutil
 import traceback
 import io
 from dataclasses import dataclass
+from email.message import Message
+from email.utils import collapse_rfc2231_value
 from importlib.metadata import entry_points
 from typing import Any, List, Dict, Optional, Union, BinaryIO
 from pathlib import Path
@@ -44,11 +46,29 @@ from .converters import (
 
 from ._base_converter import DocumentConverter, DocumentConverterResult
 
+
 from ._exceptions import (
     FileConversionException,
     UnsupportedFormatException,
     FailedConversionAttempt,
 )
+
+
+def _get_content_disposition_filename(content_disposition: str) -> Optional[str]:
+    message = Message()
+    message["content-disposition"] = content_disposition
+
+    fallback_filename: Optional[str] = None
+    extended_filename: Optional[str] = None
+    for key, value in message.get_params(header="content-disposition", unquote=True):
+        if key != "filename":
+            continue
+        if isinstance(value, tuple):
+            extended_filename = collapse_rfc2231_value(value)
+        elif fallback_filename is None:
+            fallback_filename = value
+
+    return extended_filename or fallback_filename
 
 
 # Lower priority values are tried first.
@@ -512,9 +532,10 @@ class MarkItDown:
         filename: Optional[str] = None
         extension: Optional[str] = None
         if "content-disposition" in response.headers:
-            m = re.search(r"filename=([^;]+)", response.headers["content-disposition"])
-            if m:
-                filename = m.group(1).strip("\"'")
+            filename = _get_content_disposition_filename(
+                response.headers["content-disposition"]
+            )
+            if filename is not None:
                 _, _extension = os.path.splitext(filename)
                 if len(_extension) > 0:
                     extension = _extension

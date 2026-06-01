@@ -288,6 +288,45 @@ def test_input_as_strings() -> None:
     assert "# Test" in result.text_content
 
 
+def _mock_response(content_disposition: str) -> MagicMock:
+    response = MagicMock()
+    response.headers = {"content-disposition": content_disposition}
+    response.url = "https://example.com/download"
+    response.iter_content.return_value = [b"name,value\nalpha,beta\n"]
+    response.raise_for_status.return_value = None
+    return response
+
+
+def test_convert_response_uses_rfc5987_content_disposition_filename() -> None:
+    markitdown = MarkItDown()
+    result = markitdown.convert_response(
+        _mock_response("attachment; filename*=UTF-8''data.csv")
+    )
+
+    assert result.markdown == "\n".join(
+        [
+            "| name | value |",
+            "| --- | --- |",
+            "| alpha | beta |",
+        ]
+    )
+
+
+def test_convert_response_prefers_extended_content_disposition_filename() -> None:
+    markitdown = MarkItDown()
+    result = markitdown.convert_response(
+        _mock_response("attachment; filename=fallback.txt; filename*=UTF-8''data.csv")
+    )
+
+    assert result.markdown == "\n".join(
+        [
+            "| name | value |",
+            "| --- | --- |",
+            "| alpha | beta |",
+        ]
+    )
+
+
 def test_deeply_nested_html_fallback() -> None:
     """Large, deeply nested HTML should fall back to plain-text extraction
     instead of silently returning unconverted HTML (issue #1636).
