@@ -25,6 +25,8 @@ ZIP_UNCOMPRESSED_SIZE_THRESHOLD = 500
 
 class ZipConverter(DocumentConverter):
     """Converts ZIP files to markdown by extracting and converting all contained files.
+    
+    Before extracting markdown validate no zip bomb exist in zip file
 
     The converter extracts the ZIP contents to a temporary directory, processes each file
     using appropriate converters based on file extensions, and then combines the results
@@ -107,7 +109,7 @@ class ZipConverter(DocumentConverter):
                 track_uncompressed += file.file_size
                 #check for zip bomb
                 if track_uncompressed > ZIP_UNCOMPRESSED_SIZE_THRESHOLD:
-                    raise FileConversionException(message= "total zip uncmpressed exceeds compressed by threshold")
+                    raise FileConversionException(message= "total zip uncompressed exceeds compressed by threshold")
 
 
 
