@@ -552,3 +552,74 @@ if __name__ == "__main__":
         test()
         print("OK")
     print("All tests passed!")
+
+
+# ---------------------------------------------------------------------------
+# Regression test for issue #1958:
+# chart_title.text_frame is None used to raise AttributeError, which was
+# swallowed by a broad `except Exception` in _convert_chart_to_markdown,
+# silently dropping valid chart data.
+# ---------------------------------------------------------------------------
+
+
+def _make_chart_mock(text_frame=None, has_title=True):
+    """Build a chart mock with valid data and an optional title text_frame.
+
+    The data section is intentionally valid (not MagicMocks), so we can
+    distinguish "the chart was processed" from "the chart was silently
+    replaced with [unsupported chart]".
+    """
+    chart = MagicMock()
+    chart.has_title = has_title
+    if has_title:
+        chart.chart_title.text_frame = text_frame
+    chart.plots[0].categories = [MagicMock(label="Q1"), MagicMock(label="Q2")]
+    chart.series = [MagicMock(name="Sales"), MagicMock(name="Profit")]
+    chart.series[0].values = [100, 200]
+    chart.series[1].values = [50, 80]
+    return chart
+
+
+def test_pptx_chart_title_without_text_frame():
+    """#1958: has_title=True but text_frame=None must not drop chart data."""
+    from markitdown.converters._pptx_converter import PptxConverter
+
+    converter = PptxConverter()
+    chart = _make_chart_mock(text_frame=None, has_title=True)
+
+    result = converter._convert_chart_to_markdown(chart)
+
+    assert "[unsupported chart]" not in result, (
+        "Chart data was silently dropped — bug #1958 has regressed"
+    )
+    assert "Q1" in result
+    assert "100" in result
+    assert "### Chart" in result
+
+
+def test_pptx_chart_title_with_text_frame():
+    """Sanity check: a chart with a real title emits the title text."""
+    from markitdown.converters._pptx_converter import PptxConverter
+
+    converter = PptxConverter()
+    title_frame = MagicMock()
+    title_frame.text = "Quarterly Results"
+    chart = _make_chart_mock(text_frame=title_frame, has_title=True)
+
+    result = converter._convert_chart_to_markdown(chart)
+
+    assert "[unsupported chart]" not in result
+    assert "Quarterly Results" in result
+
+
+def test_pptx_chart_without_title():
+    """Sanity check: a chart with no title at all works as before."""
+    from markitdown.converters._pptx_converter import PptxConverter
+
+    converter = PptxConverter()
+    chart = _make_chart_mock(has_title=False)
+
+    result = converter._convert_chart_to_markdown(chart)
+
+    assert "[unsupported chart]" not in result
+    assert "Q1" in result

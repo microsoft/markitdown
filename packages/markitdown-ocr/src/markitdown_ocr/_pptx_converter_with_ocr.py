@@ -222,7 +222,7 @@ class PptxConverterWithOCR(DocumentConverter):
     def _convert_chart_to_markdown(self, chart):
         try:
             md = "\\n\\n### Chart"
-            if chart.has_title:
+            if chart.has_title and chart.chart_title.text_frame is not None:
                 md += f": {chart.chart_title.text_frame.text}"
             md += "\\n\\n"
             data = []
