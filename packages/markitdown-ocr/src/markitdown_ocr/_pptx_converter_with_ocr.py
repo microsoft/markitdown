@@ -10,7 +10,7 @@ from typing import Any, BinaryIO, Optional
 from typing import BinaryIO, Any, Optional
 
 from markitdown.converters import HtmlConverter
-from markitdown import DocumentConverter, DocumentConverterResult, StreamInfo
+from markitdown import DocumentConverter, DocumentConverterResult, PageInfo, StreamInfo
 from markitdown._exceptions import (
     MissingDependencyException,
     MISSING_DEPENDENCY_MESSAGE,
@@ -74,13 +74,18 @@ class PptxConverterWithOCR(DocumentConverter):
         )
         llm_client = kwargs.get("llm_client")
 
+        # Check if page-level extraction is requested
+        extract_pages = kwargs.get("extract_pages", False)
+
         presentation = pptx.Presentation(file_stream)
         md_content = ""
+        pages = [] if extract_pages else None
         slide_num = 0
 
         for slide in presentation.slides:
             slide_num += 1
             md_content += f"\\n\\n<!-- Slide number: {slide_num} -->\\n"
+            slide_content_start = len(md_content)
 
             title = slide.shapes.title
 
@@ -183,7 +188,13 @@ class PptxConverterWithOCR(DocumentConverter):
                     md_content += notes_frame.text
                 md_content = md_content.strip()
 
-        return DocumentConverterResult(markdown=md_content.strip())
+            if extract_pages:
+                slide_content = md_content[slide_content_start:]
+                pages.append(
+                    PageInfo(page_number=slide_num, content=slide_content.strip())
+                )
+
+        return DocumentConverterResult(markdown=md_content.strip(), pages=pages)
 
     def _is_picture(self, shape):
         if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.PICTURE:
