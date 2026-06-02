@@ -49,7 +49,15 @@ class CsvConverter(DocumentConverter):
             content = str(from_bytes(file_stream.read()).best())
 
         # Parse CSV content
-        delimiter = "\t" if (stream_info.extension or "").lower() == ".tsv" else ","
+        extension = (stream_info.extension or "").lower()
+        mimetype = (stream_info.mimetype or "").lower()
+
+        is_tsv = (
+            extension == ".tsv"
+            or mimetype.startswith("text/tab-separated-values")
+        )
+
+        delimiter = "\t" if is_tsv else ","
 
         reader = csv.reader(
             io.StringIO(content),
