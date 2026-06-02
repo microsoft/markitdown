@@ -4,14 +4,8 @@
 ![PyPI - Downloads](https://img.shields.io/pypi/dd/markitdown)
 [![Built by AutoGen Team](https://img.shields.io/badge/Built%20by-AutoGen%20Team-blue)](https://github.com/microsoft/autogen)
 
-> [!TIP]
-> MarkItDown now offers an MCP (Model Context Protocol) server for integration with LLM applications like Claude Desktop. See [markitdown-mcp](https://github.com/microsoft/markitdown/tree/main/packages/markitdown-mcp) for more information.
-
 > [!IMPORTANT]
-> Breaking changes between 0.0.1 to 0.1.0:
-> * Dependencies are now organized into optional feature-groups (further details below). Use `pip install 'markitdown[all]'` to have backward-compatible behavior.
-> * convert\_stream() now requires a binary file-like object (e.g., a file opened in binary mode, or an io.BytesIO object). This is a breaking change from the previous version, where it previously also accepted text file-like objects, like io.StringIO.
-> * The DocumentConverter class interface has changed to read from file-like streams rather than file paths. *No temporary files are created anymore*. If you are the maintainer of a plugin, or custom DocumentConverter, you likely need to update your code. Otherwise, if only using the MarkItDown class or CLI (as in these examples), you should not need to change anything.
+> MarkItDown performs I/O with the privileges of the current process. Like open() or requests.get(), it will access resources that the process itself can access. Sanitize your inputs in untrusted environments, and call the narrowest `convert_*` function needed for your use case (e.g., `convert_stream()`, or `convert_local()`). See the [Security Considerations](#security-considerations) section of the documentation for more information.
 
 MarkItDown is a lightweight Python utility for converting various files to Markdown for use with LLMs and related text analysis pipelines. To this end, it is most comparable to [textract](https://github.com/deanmalmgren/textract), but with a focus on preserving important document structure and content as Markdown (including: headings, lists, tables, links, etc.) While the output is often reasonably presentable and human-friendly, it is meant to be consumed by text analysis tools -- and may not be the best option for high-fidelity document conversions for human consumption.
 
@@ -113,6 +107,7 @@ At the moment, the following optional dependencies are available:
 * `[pdf]` Installs dependencies for PDF files
 * `[outlook]` Installs dependencies for Outlook messages
 * `[az-doc-intel]` Installs dependencies for Azure Document Intelligence
+* `[az-content-understanding]` Installs dependencies for Azure Content Understanding
 * `[audio-transcription]` Installs dependencies for audio transcription of wav and mp3 files
 * `[youtube-transcription]` Installs dependencies for fetching YouTube video transcription
 
@@ -163,6 +158,83 @@ print(result.text_content)
 If no `llm_client` is provided the plugin still loads, but OCR is silently skipped and the standard built-in converter is used instead.
 
 See [`packages/markitdown-ocr/README.md`](packages/markitdown-ocr/README.md) for detailed documentation.
+
+### Azure Content Understanding
+
+[Azure Content Understanding](https://learn.microsoft.com/azure/ai-services/content-understanding/) provides higher-quality conversion with structured field extraction (YAML front matter), multi-modal support (documents, images, audio, video), and configurable analyzers.
+
+Install: `pip install 'markitdown[az-content-understanding]'`
+
+#### When to use Content Understanding
+
+Content Understanding is ideal when you need capabilities beyond what built-in or Document Intelligence converters provide:
+
+- **Audio and video files** — CU is the only option for video, and the higher-quality cloud option for audio. Built-in converters have no video support and only basic audio transcription.
+- **Structured field extraction** — [Prebuilt](https://learn.microsoft.com/azure/ai-services/content-understanding/concepts/prebuilt-analyzers) or [custom-built](https://learn.microsoft.com/azure/ai-services/content-understanding/how-to/customize-analyzer-content-understanding-studio?tabs=portal) analyzers extract domain-specific fields (invoice amounts, receipt dates, contract clauses) serialized as YAML front matter. Neither built-in nor Doc Intel integration exposes fields.
+- **Higher-quality document extraction** — Cloud-based layout analysis and OCR for scanned PDFs, complex tables, and multi-page documents.
+- **Single API for all modalities** — One `cu_endpoint` handles documents, images, audio, and video with automatic analyzer routing.
+
+| Capability | Built-in converters | Azure Document Intelligence | Azure Content Understanding |
+|------------|---------------------|-----------------------------|-----------------------------|
+| Document conversion | Offline, format-specific extraction | Cloud layout extraction | Cloud multimodal extraction |
+| Structured fields | Not available | Not exposed by this integration | YAML front matter from analyzer fields |
+| Custom analyzers | Not available | Not configurable in this integration | Supported with `cu_analyzer_id` |
+| Audio and video | Basic audio, no video | Not supported | Audio and video analyzers |
+| Cost | Local compute only | Billable Azure API calls | Billable Azure API calls |
+
+**CLI:**
+
+```bash
+markitdown path-to-file.pdf --use-cu --cu-endpoint "<content_understanding_endpoint>"
+```
+
+**Python API:**
+
+```python
+from markitdown import MarkItDown
+
+# Zero-config — auto-selects analyzer per file type
+md = MarkItDown(cu_endpoint="<content_understanding_endpoint>")
+result = md.convert("report.pdf")   # documents → prebuilt-documentSearch
+result = md.convert("meeting.mp4")  # video → prebuilt-videoSearch
+result = md.convert("call.wav")     # audio → prebuilt-audioSearch
+print(result.markdown)
+```
+
+**With a custom analyzer** (for domain-specific field extraction):
+
+```python
+md = MarkItDown(
+    cu_endpoint="<content_understanding_endpoint>",
+    cu_analyzer_id="my-invoice-analyzer",
+)
+result = md.convert("invoice.pdf")
+print(result.markdown)
+# Output includes YAML front matter with extracted fields:
+# ---
+# contentType: document
+# fields:
+#   VendorName: CONTOSO LTD.
+#   InvoiceDate: '2019-11-15'
+# ---
+# <!-- page 1 -->
+# ...
+```
+
+When `cu_analyzer_id` is set, the converter automatically scopes it to compatible file types based on the analyzer's modality. Incompatible types (e.g., audio files with a document analyzer) auto-route to default prebuilt analyzers.
+
+**Cost note:** Each `convert()` call for a CU-routed format is a billable Azure API call. Use `cu_file_types` to restrict which formats route to CU:
+
+```python
+from markitdown.converters import ContentUnderstandingFileType
+
+md = MarkItDown(
+    cu_endpoint="<content_understanding_endpoint>",
+    cu_file_types=[ContentUnderstandingFileType.PDF],  # only PDFs use CU
+)
+```
+
+More information about Azure Content Understanding can be found [here](https://learn.microsoft.com/azure/ai-services/content-understanding/).
 
 ### Azure Document Intelligence
 
@@ -266,6 +338,14 @@ You can help by looking at issues or helping review PRs. Any issue or PR is welc
   ```
 
 - Run pre-commit checks before submitting a PR: `pre-commit run --all-files`
+
+### Security Considerations
+
+MarkItDown performs I/O with the privileges of the current process. Like `open()` or `requests.get()`, it will access resources that the process itself can access. 
+
+**Sanitize your inputs:** Do not pass untrusted input directly to MarkItDown. If any part of the input may be controlled by an untrusted user or system, such as in hosted or server-side applications, it must be validated and restricted before calling MarkItDown. Depending on your environment, this may include restricting file paths, limiting URI schemes and network destinations, and blocking access to private, loopback, link-local, or metadata-service addresses. 
+
+**Call only the conversion method you need:** Prefer the narrowest conversion API that fits your use case. MarkItDown's `convert()` method is intentionally permissive and can handle local files, remote URIs, and byte streams. If your application only needs to read local files, call `convert_local()` instead. If you need more control over URI fetching, call `requests.get()` yourself and pass the response object to `convert_response()`. For maximum control, open a stream to the input you want converted and call `convert_stream()`.
 
 ### Contributing 3rd-party Plugins
 

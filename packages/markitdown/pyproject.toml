@@ -47,6 +47,7 @@ all = [
   "SpeechRecognition",
   "youtube-transcript-api~=1.0.0",
   "azure-ai-documentintelligence",
+  "azure-ai-contentunderstanding>=1.2.0b1",
   "azure-identity",
 ]
 pptx = ["python-pptx"]
@@ -58,6 +59,8 @@ outlook = ["olefile"]
 audio-transcription = ["pydub", "SpeechRecognition"]
 youtube-transcription = ["youtube-transcript-api"]
 az-doc-intel = ["azure-ai-documentintelligence", "azure-identity"]
+# >=1.2.0b1 required for to_llm_input() helper used by ContentUnderstandingConverter
+az-content-understanding = ["azure-ai-contentunderstanding>=1.2.0b1", "azure-identity"]
 
 [project.urls]
 Documentation = "https://github.com/microsoft/markitdown#readme"
