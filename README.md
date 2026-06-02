@@ -43,6 +43,12 @@ python -m venv .venv
 source .venv/bin/activate
 ```
 
+On Windows PowerShell, activate the virtual environment with:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
 If using `uv`, you can create a virtual environment with:
 
 ```bash
@@ -60,12 +66,30 @@ conda activate markitdown
 
 ## Installation
 
-To install MarkItDown, use pip: `pip install 'markitdown[all]'`. Alternatively, you can install it from the source:
+To install MarkItDown, use pip:
+
+```bash
+pip install 'markitdown[all]'
+```
+
+On Windows PowerShell, use double quotes for the optional dependencies:
+
+```powershell
+pip install "markitdown[all]"
+```
+
+Alternatively, you can install it from the source:
 
 ```bash
 git clone git@github.com:microsoft/markitdown.git
 cd markitdown
 pip install -e 'packages/markitdown[all]'
+```
+
+On Windows PowerShell, install the source checkout with:
+
+```powershell
+pip install -e "packages/markitdown[all]"
 ```
 
 ## Usage
@@ -74,6 +98,12 @@ pip install -e 'packages/markitdown[all]'
 
 ```bash
 markitdown path-to-file.pdf > document.md
+```
+
+If the `markitdown` command is not on your `PATH`, run it through Python:
+
+```bash
+python -m markitdown path-to-file.pdf > document.md
 ```
 
 Or use `-o` to specify the output file:
