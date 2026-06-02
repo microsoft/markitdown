@@ -94,7 +94,8 @@ md = MarkItDown(
         api_key="YOUR_MINIMAX_API_KEY",
         base_url="https://api.minimax.io/v1",
     ),
-    llm_model="MiniMax-M2.7",
+    # Default to MiniMax-M3 (latest flagship); "MiniMax-M2.7" is also supported.
+    llm_model="MiniMax-M3",
 )
 ```
 
