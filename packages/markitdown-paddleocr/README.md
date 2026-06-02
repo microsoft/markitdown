@@ -25,7 +25,7 @@ pip install markitdown-paddleocr
 export BAIDU_PADDLE_TOKEN="your-paddle-token"
 
 # 可选
-export PADDLE_OCR_MODEL="PaddleOCR-VL-1.5"   # 模型名称
+export PADDLE_OCR_MODEL="PaddleOCR-VL-1.6"   # 模型名称
 ```
 
 ### 配置优先级
@@ -103,7 +103,7 @@ print(markdown)
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `token` | str | 环境变量 `BAIDU_PADDLE_TOKEN` | PaddleOCR Token |
-| `model` | str | `PaddleOCR-VL-1.5` | OCR 模型名称 |
+| `model` | str | `PaddleOCR-VL-1.6` | OCR 模型名称 |
 | `poll_interval` | float | 2.0 | 轮询间隔（秒） |
 | `poll_timeout` | float | 300.0 | 轮询超时（秒） |
 | `force_ai` | bool | False | 强制所有页面使用 OCR |
@@ -116,7 +116,7 @@ print(markdown)
 | 变量 | 说明 | 示例 |
 |------|------|------|
 | `BAIDU_PADDLE_TOKEN` | Token（必需） | `7963b85a...` |
-| `PADDLE_OCR_MODEL` | 模型名称 | `PaddleOCR-VL-1.5` |
+| `PADDLE_OCR_MODEL` | 模型名称 | `PaddleOCR-VL-1.6` |
 
 ## 工作原理
 

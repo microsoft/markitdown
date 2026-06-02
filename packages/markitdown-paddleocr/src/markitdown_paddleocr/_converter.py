@@ -51,7 +51,7 @@ class PaddleOcrConverter(DocumentConverter):
     def __init__(
         self,
         token: Optional[str] = None,
-        model: str = "PaddleOCR-VL-1.5",
+        model: str = "PaddleOCR-VL-1.6",
         poll_interval: float = 2.0,
         poll_timeout: float = 300.0,
         force_ai: bool = False,
@@ -67,7 +67,7 @@ class PaddleOcrConverter(DocumentConverter):
 
         Args:
             token: Baidu PaddleOCR token (reads from BAIDU_PADDLE_TOKEN env var if not provided)
-            model: OCR model name (default: PaddleOCR-VL-1.5)
+            model: OCR model name (default: PaddleOCR-VL-1.6)
             poll_interval: Seconds between status polls (default: 2.0)
             poll_timeout: Max seconds to wait for job completion (default: 300.0)
             force_ai: Force all pages to use OCR (default: False)
@@ -82,7 +82,7 @@ class PaddleOcrConverter(DocumentConverter):
         # Build config from explicit params or provided config
         if config:
             self.token = token or config.token
-            self.model = model if model != "PaddleOCR-VL-1.5" else config.model
+            self.model = model if model != "PaddleOCR-VL-1.6" else config.model
             self.poll_interval = (
                 poll_interval if poll_interval != 2.0 else config.poll_interval
             )
@@ -126,7 +126,9 @@ class PaddleOcrConverter(DocumentConverter):
                 if scan_detection_mode is not None
                 else ScanDetectionMode.SAMPLING
             )
-            self.scan_sample_pages = scan_sample_pages if scan_sample_pages is not None else 3
+            self.scan_sample_pages = (
+                scan_sample_pages if scan_sample_pages is not None else 3
+            )
             self.scan_text_threshold = (
                 scan_text_threshold if scan_text_threshold is not None else 50
             )
@@ -357,7 +359,9 @@ class PaddleOcrConverter(DocumentConverter):
         Returns:
             Markdown text from all pages.
         """
-        logger.info("PaddleOcrConverter: 批量上传PDF到OCR API, 大小=%d bytes", len(pdf_bytes))
+        logger.info(
+            "PaddleOcrConverter: 批量上传PDF到OCR API, 大小=%d bytes", len(pdf_bytes)
+        )
         markdown = self._get_client().ocr(
             file_bytes=pdf_bytes,
             filename="document.pdf",

@@ -1,10 +1,14 @@
 """DualOcrConverter - glmocr (primary) → paddleocr (fallback) automatic degradation."""
 
 import logging
-from typing import Optional
+from typing import Any, BinaryIO, Optional
 
-from markitdown import MarkItDown, DocumentConverter, DocumentConverterResult, StreamInfo
-from typing import BinaryIO, Any
+from markitdown import (
+    DocumentConverter,
+    DocumentConverterResult,
+    MarkItDown,
+    StreamInfo,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +32,7 @@ class DualOcrConverter(DocumentConverter):
         glmocr_force_ai: bool = False,
         # paddleocr kwargs
         paddleocr_token: Optional[str] = None,
-        paddleocr_model: str = "PaddleOCR-VL-1.5",
+        paddleocr_model: str = "PaddleOCR-VL-1.6",
         paddleocr_poll_interval: float = 2.0,
         paddleocr_poll_timeout: float = 300.0,
         paddleocr_force_ai: bool = False,
@@ -61,6 +65,7 @@ class DualOcrConverter(DocumentConverter):
         """Lazily init both converters."""
         try:
             from markitdown_glmocr import GlmOcrConverter
+
             # Filter out None values
             kwargs = {k: v for k, v in self.glmocr_kwargs.items() if v is not None}
             self._primary = GlmOcrConverter(**kwargs)
@@ -71,6 +76,7 @@ class DualOcrConverter(DocumentConverter):
 
         try:
             from markitdown_paddleocr import PaddleOcrConverter
+
             kwargs = {k: v for k, v in self.paddleocr_kwargs.items() if v is not None}
             self._fallback = PaddleOcrConverter(**kwargs)
             logger.info("paddleocr converter initialized (fallback)")
@@ -155,6 +161,7 @@ class DualOcrConverter(DocumentConverter):
 def io_bytes(data: bytes):
     """Create a seekable BytesIO from bytes."""
     import io
+
     buf = io.BytesIO(data)
     buf.seek(0)
     return buf

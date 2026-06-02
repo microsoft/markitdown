@@ -28,7 +28,7 @@ def register_converters(markitdown: MarkItDown, **kwargs: Any) -> None:
     try:
         converter = PaddleOcrConverter(
             token=kwargs.get("token"),
-            model=kwargs.get("model", "PaddleOCR-VL-1.5"),
+            model=kwargs.get("model", "PaddleOCR-VL-1.6"),
             poll_interval=kwargs.get("poll_interval", 2.0),
             poll_timeout=kwargs.get("poll_timeout", 300.0),
             force_ai=kwargs.get("force_ai", False),

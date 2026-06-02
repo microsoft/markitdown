@@ -12,6 +12,7 @@ class ScanDetectionMode(str, Enum):
     - FIRST_PAGE_HINT: 首页是扫描件则全文档使用OCR
     - SAMPLING: 抽样前N页，多数是扫描件则全部OCR
     """
+
     PAGE_BY_PAGE = "page_by_page"
     FIRST_PAGE_HINT = "first_page_hint"
     SAMPLING = "sampling"
@@ -31,7 +32,7 @@ class PaddleOcrConfig:
     token: str = ""  # Reads from BAIDU_PADDLE_TOKEN by default
 
     # OCR model
-    model: str = "PaddleOCR-VL-1.5"
+    model: str = "PaddleOCR-VL-1.6"
 
     # API endpoint
     job_url: str = "https://paddleocr.aistudio-app.com/api/v2/ocr/jobs"
@@ -58,7 +59,7 @@ class PaddleOcrConfig:
         """Create config from environment variables with optional overrides."""
         defaults = {
             "token": os.environ.get("BAIDU_PADDLE_TOKEN", ""),
-            "model": os.environ.get("PADDLE_OCR_MODEL", "PaddleOCR-VL-1.5"),
+            "model": os.environ.get("PADDLE_OCR_MODEL", "PaddleOCR-VL-1.6"),
         }
         defaults.update(overrides)
         return cls(**defaults)
