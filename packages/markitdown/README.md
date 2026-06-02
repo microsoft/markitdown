@@ -13,7 +13,7 @@
 From PyPI:
 
 ```bash
-pip install markitdown[all]
+pip install 'markitdown[all]'
 ```
 
 From source:
@@ -21,7 +21,7 @@ From source:
 ```bash
 git clone git@github.com:microsoft/markitdown.git
 cd markitdown
-pip install -e packages/markitdown[all]
+pip install -e 'packages/markitdown[all]'
 ```
 
 ## Usage
