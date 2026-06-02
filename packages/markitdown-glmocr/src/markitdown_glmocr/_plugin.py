@@ -25,9 +25,9 @@ def register_converters(markitdown: MarkItDown, **kwargs: Any) -> None:
     logger.info("markitdown-glmocr: 开始注册插件")
 
     # Register converter
-    # Priority -2.0: higher priority than PaddleOcrConverter (-1.0),
-    # so glmocr is tried first and paddleocr serves as fallback.
-    PRIORITY_GLMOCR = -2.0
+    # Priority -1.0: same level as PaddleOcrConverter,
+    # the upper-level agent's skills control which plugin to call first.
+    PRIORITY_GLMOCR = -1.0
 
     try:
         converter = GlmOcrConverter(
