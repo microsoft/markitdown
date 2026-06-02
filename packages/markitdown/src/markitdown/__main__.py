@@ -214,6 +214,13 @@ def main():
             )
         sys.exit(0)
 
+    markitdown_kwargs: Dict[str, Any] = {
+        "enable_plugins": args.use_plugins,
+    }
+    if args.extract_images:
+        markitdown_kwargs["extract_images"] = True
+        markitdown_kwargs["output_dir"] = args.output_dir
+
     if args.use_docintel:
         if args.endpoint is None:
             _exit_with_error(
@@ -223,10 +230,8 @@ def main():
             _exit_with_error("Filename is required when using Document Intelligence.")
 
         markitdown = MarkItDown(
-            enable_plugins=args.use_plugins,
+            **markitdown_kwargs,
             docintel_endpoint=args.endpoint,
-            extract_images=args.extract_images,
-            output_dir=args.output_dir,
         )
     elif args.use_cu:
         if args.cu_endpoint is None:
@@ -258,17 +263,11 @@ def main():
             cu_kwargs["cu_file_types"] = cu_types
 
         markitdown = MarkItDown(
-            enable_plugins=args.use_plugins,
-            extract_images=args.extract_images,
-            output_dir=args.output_dir,
+            **markitdown_kwargs,
             **cu_kwargs,
         )
     else:
-        markitdown = MarkItDown(
-            enable_plugins=args.use_plugins,
-            extract_images=args.extract_images,
-            output_dir=args.output_dir,
-        )
+        markitdown = MarkItDown(**markitdown_kwargs)
 
     if args.filename is None:
         result = markitdown.convert_stream(
