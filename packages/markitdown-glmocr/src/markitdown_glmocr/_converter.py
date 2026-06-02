@@ -118,7 +118,9 @@ class GlmOcrConverter(DocumentConverter):
                 if scan_detection_mode is not None
                 else ScanDetectionMode.SAMPLING
             )
-            self.scan_sample_pages = scan_sample_pages if scan_sample_pages is not None else 3
+            self.scan_sample_pages = (
+                scan_sample_pages if scan_sample_pages is not None else 3
+            )
             self.scan_text_threshold = (
                 scan_text_threshold if scan_text_threshold is not None else 50
             )
@@ -237,11 +239,11 @@ class GlmOcrConverter(DocumentConverter):
                         )
                         return DocumentConverterResult(markdown=markdown)
                 except Exception as e:
-                    logger.warning(
-                        "GlmOcrConverter: 批量OCR失败, 降级为逐页处理, 错误=%s",
+                    logger.error(
+                        "GlmOcrConverter: 批量OCR失败, 抛出异常让框架fallback到下一个converter, 错误=%s",
                         e,
                     )
-                    # Fall through to per-page processing
+                    raise
 
             # Per-page processing (PAGE_BY_PAGE mode or batch failed)
             for page_num, page in enumerate(pdf.pages):
@@ -311,7 +313,9 @@ class GlmOcrConverter(DocumentConverter):
         Returns:
             Markdown text from all pages.
         """
-        logger.info("GlmOcrConverter: 批量上传PDF到glmocr SDK, 大小=%d bytes", len(pdf_bytes))
+        logger.info(
+            "GlmOcrConverter: 批量上传PDF到glmocr SDK, 大小=%d bytes", len(pdf_bytes)
+        )
         result = self._get_glmocr().parse(pdf_bytes)
 
         # Check for errors
