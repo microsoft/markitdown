@@ -152,6 +152,23 @@ GENERAL_TEST_VECTORS = [
         ],
         must_not_include=[],
     ),
+        FileTestVector(
+        filename="test_pipe_chars.csv",
+        mimetype="text/csv",
+        charset="ascii",
+        url=None,
+        must_include=[
+            "| Name | Formula | Notes |",
+            "| --- | --- | --- |",
+            "| OR Gate | A \\| B | Pipe character should be escaped |",
+            "| AND Gate | A & B | Regular value |",
+            "| Regex | foo\\|bar | Pipe in regex-like value |",
+        ],
+        must_not_include=[
+            "| OR Gate | A | B | Pipe character should be escaped |",
+            "| Regex | foo|bar | Pipe in regex-like value |",
+        ],
+    ),
     FileTestVector(
         filename="test.json",
         mimetype="application/json",

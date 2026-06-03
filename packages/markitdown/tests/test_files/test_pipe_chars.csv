@@ -1,0 +1,4 @@
+Name,Formula,Notes
+OR Gate,A | B,Pipe character should be escaped
+AND Gate,A & B,Regular value
+Regex,foo|bar,Pipe in regex-like value
