@@ -57,8 +57,7 @@ class CsvConverter(DocumentConverter):
             
         delimiter = self.get_delimiter(stream_info, kwargs.get("delimiter", ""), sample_chunk) # Option to specify delimiter.
 
-        # Parse CSV content
-      
+        # Parse CSV content using the determined delimiter
         reader = csv.reader(io.StringIO(content), delimiter=delimiter) 
         rows = list(reader)
 
@@ -69,24 +68,24 @@ class CsvConverter(DocumentConverter):
         markdown_table = []
 
         # Add header row
-        markdown_table.append("| " + " | ".join(rows[0]) + " |")
+        safe_header = [self.sanitize_cell(cell) for cell in rows[0]]
+        markdown_table.append("| " + " | ".join(safe_header) + " |")
 
         # Add separator row
-        markdown_table.append("| " + " | ".join(["---"] * len(rows[0])) + " |")
-
+        markdown_table.append("| " + " | ".join(["---"] * len(safe_header)) + " |")
         # Add data rows
         for row in rows[1:]:
             # Make sure row has the same number of columns as header
-            while len(row) < len(rows[0]):
+            while len(row) < len(safe_header):
                 row.append("")
             # Truncate if row has more columns than header
-            row = row[: len(rows[0])]
-            markdown_table.append("| " + " | ".join(row) + " |")
-
+            row = row[: len(safe_header)]
+            markdown_table.append("| " + " | ".join([self.sanitize_cell(cell) for cell in row]) + " |")
         result = "\n".join(markdown_table)
 
         return DocumentConverterResult(markdown=result)
     
+    # Determine the delimiter using the provided option, CSV sniffer, or file extension and MIME type as fallbacks.
     def get_delimiter(self, stream_info: StreamInfo, delimiter: str, sample_chunk: str) -> str:
         if delimiter:
             return delimiter
@@ -101,4 +100,11 @@ class CsvConverter(DocumentConverter):
             if stream_info.extension.lower() == ".ssv":
                 return ";"
             return ","
+        
+    # makes sure to escape pipes and newlines in cell values to prevent breaking the markdown table format
+    def sanitize_cell(self, cell_value: Any) -> str:
+            val = str(cell_value)
+            val = val.replace("|", "\\|")
+            val = val.replace("\n", " ").replace("\r", "")
+            return val
             

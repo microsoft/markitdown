@@ -160,8 +160,8 @@ GENERAL_TEST_VECTORS = [
         must_include=[
             "| ID | Name | Role | Location |",
             "| --- | --- | --- | --- |",
-            "| 101 | Shekhar | Developer | India |",
-            "| 102 | Raghu | Designer | Canada |",
+            "| 101 | Shekhar | Developer \| Backend | India (New Delhi) |",
+            "| 102 | Raghu | UI \| UX Designer | Canada |",
             "| 103 | Shubham | Engineer | United Kingdom |"
         ],
         must_not_include=[],
