@@ -9,7 +9,7 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
     "text/csv",
     "application/csv",
     "text/tab-separated-values",
-    "text/tsv"
+    "text/tsv",
 ]
 ACCEPTED_FILE_EXTENSIONS = [".csv", ".tsv", ".psv", ".ssv"]
 
@@ -48,17 +48,19 @@ class CsvConverter(DocumentConverter):
             content = file_stream.read().decode(stream_info.charset)
         else:
             content = str(from_bytes(file_stream.read()).best())
-        
+
         SAMPLE_SNIFF_SIZE = 8192
         try:
             sample_chunk = content[:SAMPLE_SNIFF_SIZE]
         except IndexError:
             sample_chunk = content
-            
-        delimiter = self.get_delimiter(stream_info, kwargs.get("delimiter", ""), sample_chunk) # Option to specify delimiter.
+
+        delimiter = self.get_delimiter(
+            stream_info, kwargs.get("delimiter", ""), sample_chunk
+        )  # Option to specify delimiter.
 
         # Parse CSV content using the determined delimiter
-        reader = csv.reader(io.StringIO(content), delimiter=delimiter) 
+        reader = csv.reader(io.StringIO(content), delimiter=delimiter)
         rows = list(reader)
 
         if not rows:
@@ -80,31 +82,37 @@ class CsvConverter(DocumentConverter):
                 row.append("")
             # Truncate if row has more columns than header
             row = row[: len(safe_header)]
-            markdown_table.append("| " + " | ".join([self.sanitize_cell(cell) for cell in row]) + " |")
+            markdown_table.append(
+                "| " + " | ".join([self.sanitize_cell(cell) for cell in row]) + " |"
+            )
         result = "\n".join(markdown_table)
 
         return DocumentConverterResult(markdown=result)
-    
+
     # Determine the delimiter using the provided option, CSV sniffer, or file extension and MIME type as fallbacks.
-    def get_delimiter(self, stream_info: StreamInfo, delimiter: str, sample_chunk: str) -> str:
+    def get_delimiter(
+        self, stream_info: StreamInfo, delimiter: str, sample_chunk: str
+    ) -> str:
         if delimiter:
             return delimiter
         try:
             dialect = csv.Sniffer().sniff(sample_chunk or "", delimiters=",\t|;")
             return dialect.delimiter
         except csv.Error:
-            if stream_info.mimetype == "text/tab-separated-values" or stream_info.extension.lower() == ".tsv":
+            if (
+                stream_info.mimetype == "text/tab-separated-values"
+                or stream_info.extension.lower() == ".tsv"
+            ):
                 return "\t"
             if stream_info.extension.lower() == ".psv":
                 return "|"
             if stream_info.extension.lower() == ".ssv":
                 return ";"
             return ","
-        
+
     # makes sure to escape pipes and newlines in cell values to prevent breaking the markdown table format
     def sanitize_cell(self, cell_value: Any) -> str:
-            val = str(cell_value)
-            val = val.replace("|", "\\|")
-            val = val.replace("\n", " ").replace("\r", "")
-            return val
-            
+        val = str(cell_value)
+        val = val.replace("|", "\\|")
+        val = val.replace("\n", " ").replace("\r", "")
+        return val

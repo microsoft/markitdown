@@ -162,7 +162,7 @@ GENERAL_TEST_VECTORS = [
             "| --- | --- | --- | --- |",
             "| 101 | Shekhar | Developer \| Backend | India (New Delhi) |",
             "| 102 | Raghu | UI \| UX Designer | Canada |",
-            "| 103 | Shubham | Engineer | United Kingdom |"
+            "| 103 | Shubham | Engineer | United Kingdom |",
         ],
         must_not_include=[],
     ),
@@ -176,11 +176,10 @@ GENERAL_TEST_VECTORS = [
             "| --- | --- | --- | --- |",
             "| 101 | Shekhar | Developer | India |",
             "| 102 | Raghu | Designer | Canada |",
-            "| 103 | Shubham | Engineer | United Kingdom |"
+            "| 103 | Shubham | Engineer | United Kingdom |",
         ],
         must_not_include=[],
     ),
-    
     FileTestVector(
         filename="test.json",
         mimetype="application/json",
