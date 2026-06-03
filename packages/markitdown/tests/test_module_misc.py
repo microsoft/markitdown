@@ -3,6 +3,7 @@ import io
 import os
 import re
 import shutil
+import zipfile
 import pytest
 from unittest.mock import MagicMock
 
@@ -272,6 +273,37 @@ def test_docx_equations() -> None:
     # Find block equations wrapped with double $$ and check if they are present
     block_equations = re.findall(r"\$\$(.+?)\$\$", result.text_content)
     assert block_equations, "No block equations found in the document."
+
+
+def test_xlsx_legacy_show_zeroes_sheetview(tmp_path) -> None:
+    from openpyxl import Workbook
+
+    base_path = tmp_path / "base.xlsx"
+    xlsx_path = tmp_path / "legacy_show_zeroes.xlsx"
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Data"
+    sheet["A1"] = "hello"
+    sheet["B1"] = "world"
+    workbook.save(base_path)
+
+    with zipfile.ZipFile(base_path) as source:
+        with zipfile.ZipFile(xlsx_path, "w", zipfile.ZIP_DEFLATED) as target:
+            for item in source.infolist():
+                data = source.read(item.filename)
+                if item.filename == "xl/worksheets/sheet1.xml":
+                    data = data.replace(
+                        b"<sheetView ", b'<sheetView showZeroes="0" ', 1
+                    )
+                    assert b"showZeroes" in data
+                target.writestr(item, data)
+
+    result = MarkItDown().convert(str(xlsx_path))
+
+    assert "## Data" in result.markdown
+    assert "hello" in result.markdown
+    assert "world" in result.markdown
 
 
 def test_input_as_strings() -> None:

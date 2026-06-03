@@ -1,4 +1,6 @@
+import io
 import sys
+import zipfile
 from typing import BinaryIO, Any
 from ._html_converter import HtmlConverter
 from .._base_converter import DocumentConverter, DocumentConverterResult
@@ -31,6 +33,36 @@ ACCEPTED_XLS_MIME_TYPE_PREFIXES = [
     "application/excel",
 ]
 ACCEPTED_XLS_FILE_EXTENSIONS = [".xls"]
+
+
+def _read_xlsx_sheets(file_stream: BinaryIO) -> dict[str, Any]:
+    try:
+        return pd.read_excel(file_stream, sheet_name=None, engine="openpyxl")
+    except TypeError as exc:
+        if "showZeroes" not in str(exc):
+            raise
+
+        repaired_stream = _repair_sheetview_show_zeroes(file_stream)
+        return pd.read_excel(repaired_stream, sheet_name=None, engine="openpyxl")
+
+
+def _repair_sheetview_show_zeroes(file_stream: BinaryIO) -> io.BytesIO:
+    file_stream.seek(0)
+    repaired_stream = io.BytesIO()
+
+    with zipfile.ZipFile(file_stream) as source:
+        with zipfile.ZipFile(repaired_stream, "w", zipfile.ZIP_DEFLATED) as target:
+            for item in source.infolist():
+                data = source.read(item.filename)
+                if (
+                    item.filename.startswith("xl/worksheets/")
+                    and item.filename.endswith(".xml")
+                ):
+                    data = data.replace(b" showZeroes=", b" showZeros=")
+                target.writestr(item, data)
+
+    repaired_stream.seek(0)
+    return repaired_stream
 
 
 class XlsxConverter(DocumentConverter):
@@ -80,7 +112,7 @@ class XlsxConverter(DocumentConverter):
                 _xlsx_dependency_exc_info[2]
             )
 
-        sheets = pd.read_excel(file_stream, sheet_name=None, engine="openpyxl")
+        sheets = _read_xlsx_sheets(file_stream)
         md_content = ""
         for s in sheets:
             md_content += f"## {s}\n"
