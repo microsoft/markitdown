@@ -1,15 +1,23 @@
 import csv
 import io
 from typing import BinaryIO, Any
+
 from charset_normalizer import from_bytes
+
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
+
 
 ACCEPTED_MIME_TYPE_PREFIXES = [
     "text/csv",
     "application/csv",
 ]
+
 ACCEPTED_FILE_EXTENSIONS = [".csv"]
+
+
+def _escape_markdown_table_cell(cell: str) -> str:
+    return cell.replace("|", r"\|")
 
 
 class CsvConverter(DocumentConverter):
@@ -28,11 +36,14 @@ class CsvConverter(DocumentConverter):
     ) -> bool:
         mimetype = (stream_info.mimetype or "").lower()
         extension = (stream_info.extension or "").lower()
+
         if extension in ACCEPTED_FILE_EXTENSIONS:
             return True
+
         for prefix in ACCEPTED_MIME_TYPE_PREFIXES:
             if mimetype.startswith(prefix):
                 return True
+
         return False
 
     def convert(
@@ -58,7 +69,8 @@ class CsvConverter(DocumentConverter):
         markdown_table = []
 
         # Add header row
-        markdown_table.append("| " + " | ".join(rows[0]) + " |")
+        header_row = [_escape_markdown_table_cell(cell) for cell in rows[0]]
+        markdown_table.append("| " + " | ".join(header_row) + " |")
 
         # Add separator row
         markdown_table.append("| " + " | ".join(["---"] * len(rows[0])) + " |")
@@ -68,10 +80,14 @@ class CsvConverter(DocumentConverter):
             # Make sure row has the same number of columns as header
             while len(row) < len(rows[0]):
                 row.append("")
+
             # Truncate if row has more columns than header
             row = row[: len(rows[0])]
-            markdown_table.append("| " + " | ".join(row) + " |")
+
+            escaped_row = [_escape_markdown_table_cell(cell) for cell in row]
+            markdown_table.append("| " + " | ".join(escaped_row) + " |")
 
         result = "\n".join(markdown_table)
 
         return DocumentConverterResult(markdown=result)
+    
