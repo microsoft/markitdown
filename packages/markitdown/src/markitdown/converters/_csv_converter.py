@@ -17,6 +17,9 @@ ACCEPTED_FILE_EXTENSIONS = [".csv", ".tsv", ".psv", ".ssv"]
 class CsvConverter(DocumentConverter):
     """
     Converts CSV and TSV files to Markdown tables.
+    Param : delimiter: Optional parameter to specify the delimiter used in the CSV file.
+    If not provided, the converter will attempt to auto-detect the delimiter using the csv.Sniffer
+    class or fall back to common delimiters based on file extension and MIME type.
     """
 
     def __init__(self):
