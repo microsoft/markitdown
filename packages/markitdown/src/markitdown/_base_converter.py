@@ -61,7 +61,7 @@ class DocumentConverter:
 
         IMPORTANT: In rare cases, (e.g., OutlookMsgConverter) we need to read more from the stream to make a final
         determination. Read operations inevitably advances the position in file_stream. In these case, the position
-        MUST be reset it MUST be reset before returning. This is because the convert() method may be called immediately
+        MUST be reset before returning. This is because the convert() method may be called immediately
         after accepts(), and will expect the file_stream to be at the original position.
 
         E.g.,

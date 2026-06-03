@@ -8,13 +8,18 @@ from .._stream_info import StreamInfo
 ACCEPTED_MIME_TYPE_PREFIXES = [
     "text/csv",
     "application/csv",
+    "text/tab-separated-values",
+    "text/tsv",
 ]
-ACCEPTED_FILE_EXTENSIONS = [".csv"]
+ACCEPTED_FILE_EXTENSIONS = [".csv", ".tsv", ".psv", ".ssv"]
 
 
 class CsvConverter(DocumentConverter):
     """
-    Converts CSV files to Markdown tables.
+    Converts CSV and TSV files to Markdown tables.
+    Param : delimiter: Optional parameter to specify the delimiter used in the CSV file.
+    If not provided, the converter will attempt to auto-detect the delimiter using the csv.Sniffer
+    class or fall back to common delimiters based on file extension and MIME type.
     """
 
     def __init__(self):
@@ -47,8 +52,18 @@ class CsvConverter(DocumentConverter):
         else:
             content = str(from_bytes(file_stream.read()).best())
 
-        # Parse CSV content
-        reader = csv.reader(io.StringIO(content))
+        SAMPLE_SNIFF_SIZE = 8192
+        try:
+            sample_chunk = content[:SAMPLE_SNIFF_SIZE]
+        except IndexError:
+            sample_chunk = content
+
+        delimiter = self.get_delimiter(
+            stream_info, kwargs.get("delimiter", ""), sample_chunk
+        )  # Option to specify delimiter.
+
+        # Parse CSV content using the determined delimiter
+        reader = csv.reader(io.StringIO(content), delimiter=delimiter)
         rows = list(reader)
 
         if not rows:
@@ -58,20 +73,49 @@ class CsvConverter(DocumentConverter):
         markdown_table = []
 
         # Add header row
-        markdown_table.append("| " + " | ".join(rows[0]) + " |")
+        safe_header = [self.sanitize_cell(cell) for cell in rows[0]]
+        markdown_table.append("| " + " | ".join(safe_header) + " |")
 
         # Add separator row
-        markdown_table.append("| " + " | ".join(["---"] * len(rows[0])) + " |")
-
+        markdown_table.append("| " + " | ".join(["---"] * len(safe_header)) + " |")
         # Add data rows
         for row in rows[1:]:
             # Make sure row has the same number of columns as header
-            while len(row) < len(rows[0]):
+            while len(row) < len(safe_header):
                 row.append("")
             # Truncate if row has more columns than header
-            row = row[: len(rows[0])]
-            markdown_table.append("| " + " | ".join(row) + " |")
-
+            row = row[: len(safe_header)]
+            markdown_table.append(
+                "| " + " | ".join([self.sanitize_cell(cell) for cell in row]) + " |"
+            )
         result = "\n".join(markdown_table)
 
         return DocumentConverterResult(markdown=result)
+
+    # Determine the delimiter using the provided option, CSV sniffer, or file extension and MIME type as fallbacks.
+    def get_delimiter(
+        self, stream_info: StreamInfo, delimiter: str, sample_chunk: str
+    ) -> str:
+        if delimiter:
+            return delimiter
+        try:
+            dialect = csv.Sniffer().sniff(sample_chunk or "", delimiters=",\t|;")
+            return dialect.delimiter
+        except csv.Error:
+            if (
+                stream_info.mimetype == "text/tab-separated-values"
+                or stream_info.extension.lower() == ".tsv"
+            ):
+                return "\t"
+            if stream_info.extension.lower() == ".psv":
+                return "|"
+            if stream_info.extension.lower() == ".ssv":
+                return ";"
+            return ","
+
+    # makes sure to escape pipes and newlines in cell values to prevent breaking the markdown table format
+    def sanitize_cell(self, cell_value: Any) -> str:
+        val = str(cell_value)
+        val = val.replace("|", "\\|")
+        val = val.replace("\n", " ").replace("\r", "")
+        return val
