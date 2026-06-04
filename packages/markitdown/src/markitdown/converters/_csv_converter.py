@@ -35,6 +35,10 @@ class CsvConverter(DocumentConverter):
                 return True
         return False
 
+    def _escape_pipe(self, cell: str) -> str:
+        """Escape pipe characters in CSV cells for Markdown tables."""
+        return cell.replace("|", "\\|")
+
     def convert(
         self,
         file_stream: BinaryIO,
@@ -58,7 +62,8 @@ class CsvConverter(DocumentConverter):
         markdown_table = []
 
         # Add header row
-        markdown_table.append("| " + " | ".join(rows[0]) + " |")
+        escaped_header = [self._escape_pipe(cell) for cell in rows[0]]
+        markdown_table.append("| " + " | ".join(escaped_header) + " |")
 
         # Add separator row
         markdown_table.append("| " + " | ".join(["---"] * len(rows[0])) + " |")
@@ -70,7 +75,8 @@ class CsvConverter(DocumentConverter):
                 row.append("")
             # Truncate if row has more columns than header
             row = row[: len(rows[0])]
-            markdown_table.append("| " + " | ".join(row) + " |")
+            escaped_row = [self._escape_pipe(cell) for cell in row]
+            markdown_table.append("| " + " | ".join(escaped_row) + " |")
 
         result = "\n".join(markdown_table)
 
