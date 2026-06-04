@@ -1,5 +1,6 @@
 from pathlib import Path
 from types import SimpleNamespace
+import tomllib
 
 import pytest
 
@@ -78,3 +79,11 @@ def test_convert_file_to_markdown_preserves_conversion_error(tmp_path):
             output_path,
             converter=FakeConverter(error=RuntimeError("boom")),
         )
+
+
+def test_markitdown_gui_script_points_to_gui_main():
+    pyproject = tomllib.loads(
+        Path("pyproject.toml").read_text(encoding="utf-8")
+    )
+
+    assert pyproject["project"]["scripts"]["markitdown-gui"] == "markitdown.gui:main"
