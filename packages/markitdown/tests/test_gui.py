@@ -4,12 +4,7 @@ import tomllib
 
 import pytest
 
-from markitdown.gui import (
-    APPEARANCE_MODE,
-    ModernFilePicker,
-    convert_file_to_markdown,
-    list_directory_entries,
-)
+from markitdown.gui import APPEARANCE_MODE, convert_file_to_markdown
 
 
 class FakeConverter:
@@ -104,21 +99,3 @@ def test_markitdown_gui_depends_on_customtkinter():
     )
 
     assert "customtkinter>=5.2.2" in pyproject["project"]["dependencies"]
-
-
-def test_list_directory_entries_sorts_directories_before_files(tmp_path):
-    (tmp_path / "z-file.md").write_text("z", encoding="utf-8")
-    (tmp_path / "a-dir").mkdir()
-    (tmp_path / ".hidden").write_text("hidden", encoding="utf-8")
-
-    entries = list_directory_entries(tmp_path)
-
-    assert [entry.name for entry in entries] == ["a-dir", ".hidden", "z-file.md"]
-    assert [entry.is_dir for entry in entries] == [True, False, False]
-
-
-def test_gui_uses_custom_picker_instead_of_native_filedialog():
-    source = Path("src/markitdown/gui.py").read_text(encoding="utf-8")
-
-    assert "filedialog" not in source
-    assert ModernFilePicker.__name__ == "ModernFilePicker"

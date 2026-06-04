@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import threading
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Literal, Protocol
+from tkinter import filedialog
+from typing import Protocol
 
 import customtkinter as ctk
 
@@ -12,23 +12,6 @@ from ._markitdown import MarkItDown
 
 APPEARANCE_MODE = "dark"
 COLOR_THEME = "blue"
-
-
-@dataclass(frozen=True)
-class DirectoryEntry:
-    path: Path
-    name: str
-    is_dir: bool
-
-
-def list_directory_entries(directory: str | Path) -> list[DirectoryEntry]:
-    path = Path(directory).expanduser().resolve()
-    entries = [
-        DirectoryEntry(child, child.name, child.is_dir())
-        for child in path.iterdir()
-        if not child.name.startswith("__pycache__")
-    ]
-    return sorted(entries, key=lambda entry: (not entry.is_dir, entry.name.lower()))
 
 
 class Converter(Protocol):
@@ -182,31 +165,26 @@ class MarkItDownGUI:
         self.output_path.trace_add("write", lambda *_: self._update_convert_state())
 
     def _browse_input(self) -> None:
-        ModernFilePicker(
-            self.root,
-            mode="open",
-            title="Choose input file",
-            initial_path=Path(self.input_path.get()).parent
-            if self.input_path.get()
-            else Path.cwd(),
-            on_select=self._set_input_file,
-        )
+        selected = filedialog.askopenfilename(title="Choose input file")
+        if not selected:
+            return
 
-    def _choose_output(self) -> None:
-        initial = Path(self.output_path.get()) if self.output_path.get() else None
-        ModernFilePicker(
-            self.root,
-            mode="save",
-            title="Choose output Markdown file",
-            initial_path=initial.parent if initial else Path.cwd(),
-            initial_name=initial.name if initial else "output.md",
-            on_select=lambda path: self.output_path.set(str(path)),
-        )
-
-    def _set_input_file(self, path: Path) -> None:
+        path = Path(selected)
         self.input_path.set(str(path))
         self.output_path.set(str(path.with_suffix(".md")))
         self.status.set("Ready to convert.")
+
+    def _choose_output(self) -> None:
+        initial = Path(self.output_path.get()) if self.output_path.get() else None
+        selected = filedialog.asksaveasfilename(
+            title="Choose output Markdown file",
+            defaultextension=".md",
+            filetypes=[("Markdown files", "*.md"), ("All files", "*.*")],
+            initialdir=str(initial.parent) if initial else None,
+            initialfile=initial.name if initial else None,
+        )
+        if selected:
+            self.output_path.set(selected)
 
     def _set_busy(self, busy: bool) -> None:
         state = "disabled" if busy else "normal"
@@ -242,156 +220,6 @@ class MarkItDownGUI:
         self._set_busy(False)
         self.status.set(f"Error: {exc}")
         self._update_convert_state()
-
-
-class ModernFilePicker(ctk.CTkToplevel):
-    def __init__(
-        self,
-        parent: ctk.CTk,
-        *,
-        mode: Literal["open", "save"],
-        title: str,
-        initial_path: str | Path,
-        on_select: Callable[[Path], None],
-        initial_name: str = "",
-    ):
-        super().__init__(parent)
-        self.mode = mode
-        self.current_dir = Path(initial_path).expanduser().resolve()
-        self.on_select = on_select
-        self.filename = ctk.StringVar(value=initial_name)
-        self.path_label = ctk.StringVar(value=str(self.current_dir))
-
-        self.title(title)
-        self.geometry("760x520")
-        self.minsize(640, 440)
-        self.configure(fg_color="#0f172a")
-        self.transient(parent)
-        self.grab_set()
-
-        self._build(title)
-        self._refresh()
-
-    def _build(self, title: str) -> None:
-        self.columnconfigure(0, weight=1)
-        self.rowconfigure(1, weight=1)
-
-        header = ctk.CTkFrame(self, fg_color="transparent")
-        header.grid(row=0, column=0, sticky="ew", padx=22, pady=(22, 12))
-        header.columnconfigure(1, weight=1)
-
-        ctk.CTkLabel(
-            header,
-            text=title,
-            font=ctk.CTkFont(size=22, weight="bold"),
-            text_color="#f8fafc",
-        ).grid(row=0, column=0, sticky="w")
-        ctk.CTkButton(
-            header,
-            text="Up",
-            width=74,
-            fg_color="#334155",
-            hover_color="#475569",
-            command=self._go_up,
-        ).grid(row=0, column=2, sticky="e")
-
-        path_bar = ctk.CTkEntry(
-            header,
-            textvariable=self.path_label,
-            state="disabled",
-            height=36,
-            fg_color="#111827",
-            border_color="#334155",
-            text_color="#cbd5e1",
-        )
-        path_bar.grid(row=1, column=0, columnspan=3, sticky="ew", pady=(12, 0))
-
-        self.list_frame = ctk.CTkScrollableFrame(
-            self,
-            fg_color="#111827",
-            corner_radius=14,
-            scrollbar_button_color="#334155",
-            scrollbar_button_hover_color="#475569",
-        )
-        self.list_frame.grid(row=1, column=0, sticky="nsew", padx=22, pady=(0, 14))
-        self.list_frame.columnconfigure(0, weight=1)
-
-        footer = ctk.CTkFrame(self, fg_color="transparent")
-        footer.grid(row=2, column=0, sticky="ew", padx=22, pady=(0, 22))
-        footer.columnconfigure(0, weight=1)
-
-        self.name_entry = ctk.CTkEntry(
-            footer,
-            textvariable=self.filename,
-            placeholder_text="File name",
-            height=40,
-            fg_color="#111827",
-            border_color="#334155",
-            text_color="#f8fafc",
-        )
-        self.name_entry.grid(row=0, column=0, sticky="ew", padx=(0, 12))
-        ctk.CTkButton(
-            footer,
-            text="Cancel",
-            width=100,
-            height=40,
-            fg_color="#334155",
-            hover_color="#475569",
-            command=self.destroy,
-        ).grid(row=0, column=1, padx=(0, 10))
-        ctk.CTkButton(
-            footer,
-            text="Open" if self.mode == "open" else "Save",
-            width=100,
-            height=40,
-            command=self._confirm,
-        ).grid(row=0, column=2)
-
-    def _refresh(self) -> None:
-        self.path_label.set(str(self.current_dir))
-        for child in self.list_frame.winfo_children():
-            child.destroy()
-
-        for row, entry in enumerate(list_directory_entries(self.current_dir)):
-            label = f"{'Folder' if entry.is_dir else 'File'}  {entry.name}"
-            button = ctk.CTkButton(
-                self.list_frame,
-                text=label,
-                anchor="w",
-                height=38,
-                fg_color="transparent",
-                hover_color="#1e293b",
-                text_color="#e5e7eb",
-                command=lambda item=entry: self._choose_entry(item),
-            )
-            button.grid(row=row, column=0, sticky="ew", padx=8, pady=3)
-
-    def _go_up(self) -> None:
-        parent = self.current_dir.parent
-        if parent != self.current_dir:
-            self.current_dir = parent
-            self._refresh()
-
-    def _choose_entry(self, entry: DirectoryEntry) -> None:
-        if entry.is_dir:
-            self.current_dir = entry.path
-            self._refresh()
-            return
-        self.filename.set(entry.name)
-        if self.mode == "open":
-            self._confirm()
-
-    def _confirm(self) -> None:
-        name = self.filename.get().strip()
-        if not name:
-            return
-        selected = self.current_dir / name
-        if self.mode == "open" and not selected.is_file():
-            return
-        if self.mode == "save" and selected.suffix == "":
-            selected = selected.with_suffix(".md")
-        self.on_select(selected)
-        self.destroy()
 
 
 def main() -> None:
