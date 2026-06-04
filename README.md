@@ -70,6 +70,38 @@ pip install -e 'packages/markitdown[all]'
 
 ## Usage
 
+### Desktop GUI
+
+This fork includes a desktop GUI for one-shot file conversion. It lets you choose
+an input file and output Markdown path without writing the CLI command manually.
+
+From the repository root:
+
+```bash
+cd packages/markitdown
+python -m venv .venv
+source .venv/bin/activate
+uv pip install -e .
+markitdown-gui
+```
+
+If you already have `.venv` active, refresh the editable install after pulling
+new changes:
+
+```bash
+cd packages/markitdown
+uv pip install -e .
+markitdown-gui
+```
+
+If you use `pip` instead of `uv`:
+
+```bash
+cd packages/markitdown
+pip install -e .
+markitdown-gui
+```
+
 ### Command-Line
 
 ```bash

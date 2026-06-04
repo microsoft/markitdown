@@ -26,6 +26,19 @@ pip install -e packages/markitdown[all]
 
 ## Usage
 
+### Desktop GUI
+
+This fork includes a desktop GUI for one-shot file conversion:
+
+```bash
+cd packages/markitdown
+uv pip install -e .
+markitdown-gui
+```
+
+If your `.venv` is already active, run `uv pip install -e .` again after pulling
+new changes so GUI and PDF dependencies are installed.
+
 ### Command-Line
 
 ```bash
