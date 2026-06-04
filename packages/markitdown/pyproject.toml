@@ -30,6 +30,7 @@ dependencies = [
   "magika~=0.6.1",
   "charset-normalizer",
   "defusedxml",
+  "customtkinter>=5.2.2",
 ]
 
 [project.optional-dependencies]

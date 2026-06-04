@@ -4,7 +4,7 @@ import tomllib
 
 import pytest
 
-from markitdown.gui import convert_file_to_markdown
+from markitdown.gui import APPEARANCE_MODE, convert_file_to_markdown
 
 
 class FakeConverter:
@@ -87,3 +87,15 @@ def test_markitdown_gui_script_points_to_gui_main():
     )
 
     assert pyproject["project"]["scripts"]["markitdown-gui"] == "markitdown.gui:main"
+
+
+def test_markitdown_gui_uses_dark_appearance_mode():
+    assert APPEARANCE_MODE == "dark"
+
+
+def test_markitdown_gui_depends_on_customtkinter():
+    pyproject = tomllib.loads(
+        Path("pyproject.toml").read_text(encoding="utf-8")
+    )
+
+    assert "customtkinter>=5.2.2" in pyproject["project"]["dependencies"]

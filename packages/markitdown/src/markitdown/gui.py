@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import threading
 from pathlib import Path
-from tkinter import Tk, StringVar, filedialog, ttk
+from tkinter import filedialog
 from typing import Protocol
+
+import customtkinter as ctk
 
 from ._base_converter import DocumentConverterResult
 from ._markitdown import MarkItDown
+
+APPEARANCE_MODE = "dark"
+COLOR_THEME = "blue"
 
 
 class Converter(Protocol):
@@ -38,46 +43,123 @@ def convert_file_to_markdown(
 
 
 class MarkItDownGUI:
-    def __init__(self, root: Tk):
+    def __init__(self, root: ctk.CTk):
         self.root = root
         self.root.title("MarkItDown GUI")
-        self.input_path = StringVar()
-        self.output_path = StringVar()
-        self.status = StringVar(value="Choose an input file and output path.")
+        self.root.geometry("760x430")
+        self.root.minsize(680, 390)
+        self.input_path = ctk.StringVar()
+        self.output_path = ctk.StringVar()
+        self.status = ctk.StringVar(value="Choose an input file and output path.")
 
         self._build()
         self._update_convert_state()
 
     def _build(self) -> None:
-        frame = ttk.Frame(self.root, padding=16)
-        frame.grid(row=0, column=0, sticky="nsew")
+        self.root.configure(fg_color="#0f172a")
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
-        frame.columnconfigure(1, weight=1)
 
-        ttk.Label(frame, text="Input file").grid(row=0, column=0, sticky="w", pady=4)
-        self.input_entry = ttk.Entry(
-            frame, textvariable=self.input_path, state="readonly", width=56
+        frame = ctk.CTkFrame(self.root, fg_color="#111827", corner_radius=18)
+        frame.grid(row=0, column=0, sticky="nsew", padx=28, pady=28)
+        frame.columnconfigure(0, weight=1)
+
+        header = ctk.CTkFrame(frame, fg_color="transparent")
+        header.grid(row=0, column=0, sticky="ew", padx=28, pady=(28, 18))
+        header.columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(
+            header,
+            text="MarkItDown",
+            font=ctk.CTkFont(size=28, weight="bold"),
+            text_color="#f8fafc",
+        ).grid(row=0, column=0, sticky="w")
+        ctk.CTkLabel(
+            header,
+            text="Convert one document into Markdown",
+            font=ctk.CTkFont(size=14),
+            text_color="#94a3b8",
+        ).grid(row=1, column=0, sticky="w", pady=(4, 0))
+
+        fields = ctk.CTkFrame(frame, fg_color="#0b1220", corner_radius=14)
+        fields.grid(row=1, column=0, sticky="ew", padx=28, pady=(0, 18))
+        fields.columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(
+            fields,
+            text="Input file",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            text_color="#e5e7eb",
+        ).grid(row=0, column=0, sticky="w", padx=(18, 12), pady=(18, 8))
+        self.input_entry = ctk.CTkEntry(
+            fields,
+            textvariable=self.input_path,
+            state="disabled",
+            height=40,
+            fg_color="#111827",
+            border_color="#334155",
+            text_color="#f8fafc",
         )
-        self.input_entry.grid(row=0, column=1, sticky="ew", padx=8, pady=4)
-        self.browse_button = ttk.Button(
-            frame, text="Browse", command=self._browse_input
+        self.input_entry.grid(row=0, column=1, sticky="ew", padx=0, pady=(18, 8))
+        self.browse_button = ctk.CTkButton(
+            fields,
+            text="Browse",
+            command=self._browse_input,
+            width=108,
+            height=40,
         )
-        self.browse_button.grid(row=0, column=2, pady=4)
+        self.browse_button.grid(row=0, column=2, padx=(12, 18), pady=(18, 8))
 
-        ttk.Label(frame, text="Output file").grid(row=1, column=0, sticky="w", pady=4)
-        self.output_entry = ttk.Entry(frame, textvariable=self.output_path, width=56)
-        self.output_entry.grid(row=1, column=1, sticky="ew", padx=8, pady=4)
-        self.choose_button = ttk.Button(
-            frame, text="Choose", command=self._choose_output
+        ctk.CTkLabel(
+            fields,
+            text="Output file",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            text_color="#e5e7eb",
+        ).grid(row=1, column=0, sticky="w", padx=(18, 12), pady=(8, 18))
+        self.output_entry = ctk.CTkEntry(
+            fields,
+            textvariable=self.output_path,
+            height=40,
+            fg_color="#111827",
+            border_color="#334155",
+            text_color="#f8fafc",
         )
-        self.choose_button.grid(row=1, column=2, pady=4)
+        self.output_entry.grid(row=1, column=1, sticky="ew", padx=0, pady=(8, 18))
+        self.choose_button = ctk.CTkButton(
+            fields,
+            text="Choose",
+            command=self._choose_output,
+            width=108,
+            height=40,
+            fg_color="#334155",
+            hover_color="#475569",
+        )
+        self.choose_button.grid(row=1, column=2, padx=(12, 18), pady=(8, 18))
 
-        self.convert_button = ttk.Button(frame, text="Convert", command=self._convert)
-        self.convert_button.grid(row=2, column=1, sticky="e", padx=8, pady=(12, 4))
+        actions = ctk.CTkFrame(frame, fg_color="transparent")
+        actions.grid(row=2, column=0, sticky="ew", padx=28, pady=(0, 18))
+        actions.columnconfigure(0, weight=1)
 
-        self.status_label = ttk.Label(frame, textvariable=self.status, wraplength=520)
-        self.status_label.grid(row=3, column=0, columnspan=3, sticky="ew", pady=(12, 0))
+        self.status_label = ctk.CTkLabel(
+            actions,
+            textvariable=self.status,
+            font=ctk.CTkFont(size=13),
+            text_color="#cbd5e1",
+            anchor="w",
+            justify="left",
+            wraplength=480,
+        )
+        self.status_label.grid(row=0, column=0, sticky="ew", padx=(0, 18))
+
+        self.convert_button = ctk.CTkButton(
+            actions,
+            text="Convert",
+            command=self._convert,
+            width=148,
+            height=44,
+            font=ctk.CTkFont(size=15, weight="bold"),
+        )
+        self.convert_button.grid(row=0, column=1, sticky="e")
 
         self.input_path.trace_add("write", lambda *_: self._update_convert_state())
         self.output_path.trace_add("write", lambda *_: self._update_convert_state())
@@ -141,6 +223,8 @@ class MarkItDownGUI:
 
 
 def main() -> None:
-    root = Tk()
+    ctk.set_appearance_mode(APPEARANCE_MODE)
+    ctk.set_default_color_theme(COLOR_THEME)
+    root = ctk.CTk()
     MarkItDownGUI(root)
     root.mainloop()
