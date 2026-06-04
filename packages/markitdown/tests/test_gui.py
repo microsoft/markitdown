@@ -4,7 +4,7 @@ import tomllib
 
 import pytest
 
-from markitdown.gui import APPEARANCE_MODE, convert_file_to_markdown
+from markitdown.gui import APPEARANCE_MODE, GUI_BACKEND, convert_file_to_markdown
 
 
 class FakeConverter:
@@ -93,9 +93,23 @@ def test_markitdown_gui_uses_dark_appearance_mode():
     assert APPEARANCE_MODE == "dark"
 
 
-def test_markitdown_gui_depends_on_customtkinter():
+def test_markitdown_gui_uses_pyside_backend():
+    assert GUI_BACKEND == "pyside6"
+
+
+def test_markitdown_gui_depends_on_pyside6_not_customtkinter():
     pyproject = tomllib.loads(
         Path("pyproject.toml").read_text(encoding="utf-8")
     )
 
-    assert "customtkinter>=5.2.2" in pyproject["project"]["dependencies"]
+    dependencies = pyproject["project"]["dependencies"]
+    assert "PySide6-Essentials>=6.8.0" in dependencies
+    assert "customtkinter>=5.2.2" not in dependencies
+
+
+def test_gui_uses_qfiledialog_instead_of_tk_filedialog():
+    source = Path("src/markitdown/gui.py").read_text(encoding="utf-8")
+
+    assert "QFileDialog" in source
+    assert "filedialog" not in source
+    assert "customtkinter" not in source

@@ -30,7 +30,7 @@ dependencies = [
   "magika~=0.6.1",
   "charset-normalizer",
   "defusedxml",
-  "customtkinter>=5.2.2",
+  "PySide6-Essentials>=6.8.0",
 ]
 
 [project.optional-dependencies]
