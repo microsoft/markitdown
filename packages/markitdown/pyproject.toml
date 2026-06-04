@@ -31,6 +31,8 @@ dependencies = [
   "charset-normalizer",
   "defusedxml",
   "PySide6-Essentials>=6.8.0",
+  "pdfminer.six>=20251230",
+  "pdfplumber>=0.11.9",
 ]
 
 [project.optional-dependencies]

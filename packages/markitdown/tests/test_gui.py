@@ -113,3 +113,13 @@ def test_gui_uses_qfiledialog_instead_of_tk_filedialog():
     assert "QFileDialog" in source
     assert "filedialog" not in source
     assert "customtkinter" not in source
+
+
+def test_markitdown_gui_installs_pdf_dependencies_by_default():
+    pyproject = tomllib.loads(
+        Path("pyproject.toml").read_text(encoding="utf-8")
+    )
+
+    dependencies = pyproject["project"]["dependencies"]
+    assert "pdfminer.six>=20251230" in dependencies
+    assert "pdfplumber>=0.11.9" in dependencies
