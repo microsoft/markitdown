@@ -22,9 +22,7 @@ ACCEPTED_FILE_EXTENSIONS = [".zip"]
 class ZipConverter(DocumentConverter):
     """Converts ZIP files to markdown by extracting and converting all contained files.
 
-    The converter extracts the ZIP contents to a temporary directory, processes each file
-    using appropriate converters based on file extensions, and then combines the results
-    into a single markdown document. The temporary directory is cleaned up after processing.
+    The converter processes the ZIP contents directly in memory, routes each file to the appropriate converter based on its file extension, and combines the results into a single markdown document.
 
     Example output format:
     ```markdown
@@ -95,16 +93,24 @@ class ZipConverter(DocumentConverter):
 
         with zipfile.ZipFile(file_stream, "r") as zipObj:
             for name in zipObj.namelist():
+                # Skip directories to only process actual files
+                if name.endswith('/'):
+                    continue
+                    
                 try:
-                    z_file_stream = io.BytesIO(zipObj.read(name))
-                    z_file_stream_info = StreamInfo(
-                        extension=os.path.splitext(name)[1],
-                        filename=os.path.basename(name),
-                    )
-                    result = self._markitdown.convert_stream(
-                        stream=z_file_stream,
-                        stream_info=z_file_stream_info,
-                    )
+                    # Stream the file content to prevent high memory usage (OOM) on large files
+                    with zipObj.open(name) as member_file:
+                        z_file_stream = io.BytesIO(member_file.read())
+                        
+                        z_file_stream_info = StreamInfo(
+                            extension=os.path.splitext(name)[1],
+                            filename=os.path.basename(name),
+                        )
+                        
+                        result = self._markitdown.convert_stream(
+                            stream=z_file_stream,
+                            stream_info=z_file_stream_info,
+                        )
                     if result is not None:
                         md_content += f"## File: {name}\n\n"
                         md_content += result.markdown + "\n\n"
