@@ -552,3 +552,26 @@ if __name__ == "__main__":
         test()
         print("OK")
     print("All tests passed!")
+
+
+# ---------------------------------------------------------------------------
+# Regression test for issue #1960:
+# exiftool_path pointing to a nonexistent binary used to leak a raw
+# FileNotFoundError. It should now be wrapped in RuntimeError with a
+# message that includes the path.
+# ---------------------------------------------------------------------------
+
+
+def test_exiftool_metadata_with_nonexistent_binary():
+    """#1960: nonexistent exiftool_path raises RuntimeError, not FileNotFoundError."""
+    from markitdown.converters._exiftool import exiftool_metadata
+
+    with pytest.raises(RuntimeError, match="Failed to invoke exiftool"):
+        exiftool_metadata(io.BytesIO(b""), exiftool_path="/this/does/not/exist/exiftool")
+
+
+def test_exiftool_metadata_with_no_path():
+    """Sanity check: exiftool_path=None still returns {} (early return)."""
+    from markitdown.converters._exiftool import exiftool_metadata
+
+    assert exiftool_metadata(io.BytesIO(b""), exiftool_path=None) == {}
