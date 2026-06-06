@@ -16,6 +16,7 @@ def main():
         description="Convert various file formats to markdown.",
         prog="markitdown",
         formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="LLM agent? Use --agent-help for token-optimized usage.",
         usage=dedent(
             """
             SYNTAX:
@@ -138,8 +139,18 @@ def main():
         help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
     )
 
+    parser.add_argument(
+        "--agent-help",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
+
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
+
+    if args.agent_help:
+        _print_agent_help()
+        sys.exit(0)
 
     # Parse the extension hint
     extension_hint = args.extension
@@ -270,6 +281,37 @@ def _handle_output(args, result: DocumentConverterResult):
                 sys.stdout.encoding
             )
         )
+
+
+def _print_agent_help() -> None:
+    print(
+        "\n".join(
+            [
+                "ah1 markitdown :: convert files and streams to markdown",
+                "cmd markitdown [filename] [--output path] [--extension str] [--mime-type str] [--charset str] :: convert input to markdown",
+                "more? markitdown --agent-help",
+                "ah2 markitdown",
+                "use markitdown [filename] [--output path] [--extension str] [--mime-type str] [--charset str]",
+                "arg filename:path opt :: input file path; omit to read from stdin",
+                "flag --output:path opt :: write markdown to file instead of stdout",
+                "flag --extension:str opt :: input extension hint, with or without leading dot",
+                "flag --mime-type:str opt :: input MIME type hint",
+                "flag --charset:str opt :: input charset hint",
+                "flag --use-plugins:bool opt :: enable installed third-party plugins",
+                "flag --list-plugins:bool opt :: list installed third-party plugins and exit",
+                "flag --keep-data-uris:bool opt :: keep base64 data URIs in markdown output",
+                "flag --use-docintel:bool opt :: use Azure Document Intelligence; requires --endpoint and filename",
+                "flag --endpoint:url opt :: Azure Document Intelligence endpoint",
+                "flag --use-cu:bool opt :: use Azure Content Understanding; requires --cu-endpoint and filename",
+                "flag --cu-endpoint:url opt :: Azure Content Understanding endpoint",
+                "flag --cu-analyzer:str opt :: Azure Content Understanding analyzer ID",
+                "flag --cu-file-types:str opt :: comma-separated file types routed to Content Understanding",
+                "ex markitdown example.pdf",
+                "ex markitdown example.pdf -o example.md",
+                "ex cat example.html | markitdown --extension html",
+            ]
+        )
+    )
 
 
 def _exit_with_error(message: str):
