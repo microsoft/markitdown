@@ -32,6 +32,11 @@ on:
   push:
     tags: ["app-v*"]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag/name for the Release published by a manual run (a prerelease is created)."
+        required: false
+        default: "app-dev"
 
 concurrency:
   group: app-release-${{ github.ref }}
@@ -205,14 +210,36 @@ jobs:
           )
           # Desktop installers (only the types that exist for this platform).
           BUNDLE="app/desktop/src-tauri/target/$TRIPLE/release/bundle"
+          echo "::group::bundle tree for $LABEL"
+          [[ -d "$BUNDLE" ]] && find "$BUNDLE" | sort || echo "NO BUNDLE DIR at $BUNDLE"
+          echo "::endgroup::"
+
+          installers=0
           if [[ -d "$BUNDLE" ]]; then
-            find "$BUNDLE" -type f \
+            while IFS= read -r -d '' f; do
+              cp "$f" out/ && installers=$((installers + 1))
+            done < <(find "$BUNDLE" -type f \
               \( -name '*.dmg' -o -name '*.AppImage' -o -name '*.deb' \
-                 -o -name '*.rpm' -o -name '*.msi' -o -name '*.exe' \) \
-              -exec cp {} out/ \;
+                 -o -name '*.rpm' -o -name '*.msi' -o -name '*.exe' \) -print0)
           fi
-          echo "--- packaged for $LABEL ---"
+
+          # macOS: also ship a zipped, ready-to-run .app — guaranteed even if
+          # the .dmg styling step is flaky on a headless runner.
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            APP=$(find "$BUNDLE/macos" -maxdepth 1 -name '*.app' -type d 2>/dev/null | head -1 || true)
+            if [[ -n "$APP" ]]; then
+              ditto -c -k --keepParent "$APP" "out/MarkItDown-$LABEL.app.zip"
+              installers=$((installers + 1))
+            fi
+          fi
+
+          echo "--- packaged for $LABEL ($installers desktop artifact(s)) ---"
           ls -la out
+          # Fail loudly rather than silently shipping binaries with no app.
+          if [[ "$installers" -eq 0 ]]; then
+            echo "::error::no desktop installer/app was produced for $LABEL (check the Build desktop app step)"
+            exit 1
+          fi
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -221,13 +248,17 @@ jobs:
           path: out/*
           if-no-files-found: error
 
-  # Gather every platform's artifacts and attach them to the GitHub Release.
-  # Only runs for tag pushes; workflow_dispatch stops after the build job
-  # (artifacts are still downloadable from the run).
+  # Gather every platform's artifacts and publish them as ONE GitHub Release.
+  # Runs both for `app-v*` tag pushes (normal release) AND for manual
+  # workflow_dispatch runs (publishes a prerelease named by the `tag` input),
+  # so the .dmg / installers / binaries are always visible on the Releases
+  # page — not buried under the Actions run's Artifacts.
   release:
     name: publish release
     needs: build
-    if: startsWith(github.ref, 'refs/tags/')
+    if: >-
+      always() && needs.build.result == 'success' &&
+      (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     steps:
       - name: Download all build artifacts
@@ -236,32 +267,52 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: Generate checksums
+      - name: List + checksum everything being released
         run: |
           set -euo pipefail
           cd dist
+          echo "=== assets to publish ==="
           ls -la
           sha256sum * > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
+      - name: Resolve release tag
+        id: rel
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create / update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.rel.outputs.tag }}
+          prerelease: ${{ steps.rel.outputs.prerelease }}
           files: dist/*
           generate_release_notes: true
           fail_on_unmatched_files: true
           body: |
-            ## MarkItDown (Rust suite) — ${{ github.ref_name }}
+            ## MarkItDown (Rust suite) — ${{ steps.rel.outputs.tag }}
 
             Native builds for Linux (x86_64 / aarch64), Windows (x86_64) and
             macOS (Intel / Apple Silicon). Each artifact was tested and
             smoke-checked on its own OS/arch runner before release.
 
-            **Assets**
-            - `markitdown-cli-mcp-<platform>.{tar.gz,zip}` — the standalone
-              `markitdown` CLI + `markitdown-mcp` server (no dependencies).
-            - `*.dmg` / `*.deb` / `*.AppImage` / `*.msi` / `*.exe` — the
-              MarkItDown desktop app installers.
+            **Standalone binaries** (no dependencies):
+            - `markitdown-cli-mcp-linux-x86_64.tar.gz`
+            - `markitdown-cli-mcp-linux-aarch64.tar.gz`
+            - `markitdown-cli-mcp-windows-x86_64.zip`
+            - `markitdown-cli-mcp-macos-x86_64.tar.gz` (Intel)
+            - `markitdown-cli-mcp-macos-aarch64.tar.gz` (Apple Silicon)
+
+            **Desktop app installers:**
+            - macOS: `*.dmg` + `MarkItDown-macos-*.app.zip` (Intel & Apple Silicon)
+            - Linux: `*.deb` (x86_64 & aarch64) + `*.AppImage` (x86_64)
+            - Windows: `*.msi` + `*-setup.exe`
             - `SHA256SUMS.txt` — checksums for every asset.
 
             macOS builds are unsigned; right-click → Open (or

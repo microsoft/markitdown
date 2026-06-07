@@ -137,6 +137,34 @@ fn convert_batch(md: &MarkItDown, args: &Cli) -> ExitCode {
     }
 }
 
+/// The final file-name component of an input.
+///
+/// Must be platform-aware: a batch input is either a URI (`https://…/x.html`)
+/// or a local filesystem path, and on Windows local paths use `\` separators.
+/// Splitting only on `/` left a full `C:\dir\file.docx` intact, which then
+/// escaped the output directory when joined (an absolute path replaces the
+/// base) — the Windows batch failure. URIs keep the `/`-split + query strip.
+fn last_segment(input: &str) -> String {
+    if input.contains("://") {
+        // URI-like: strip query/fragment from the last `/` segment.
+        return input
+            .trim_end_matches('/')
+            .rsplit('/')
+            .next()
+            .unwrap_or(input)
+            .split(['?', '#'])
+            .next()
+            .unwrap_or(input)
+            .to_string();
+    }
+    // Local path: let std handle the platform's separators.
+    Path::new(input)
+        .file_name()
+        .map(|s| s.to_string_lossy().into_owned())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| input.to_string())
+}
+
 /// Output names for a batch; when two inputs share a stem (test.docx and
 /// test.xlsx), the original extension is kept: test.docx.md / test.xlsx.md.
 fn output_names(inputs: &[String]) -> Vec<PathBuf> {
@@ -146,15 +174,7 @@ fn output_names(inputs: &[String]) -> Vec<PathBuf> {
         .zip(&plain)
         .map(|(input, name)| {
             if plain.iter().filter(|n| *n == name).count() > 1 {
-                let last = input
-                    .trim_end_matches('/')
-                    .rsplit('/')
-                    .next()
-                    .unwrap_or(input)
-                    .split(['?', '#'])
-                    .next()
-                    .unwrap_or(input);
-                PathBuf::from(format!("{last}.md"))
+                PathBuf::from(format!("{}.md", last_segment(input)))
             } else {
                 name.clone()
             }
@@ -164,15 +184,8 @@ fn output_names(inputs: &[String]) -> Vec<PathBuf> {
 
 /// `dir/report.pdf` → `report.md`; URIs use their last path segment.
 fn output_name(input: &str) -> PathBuf {
-    let last = input
-        .trim_end_matches('/')
-        .rsplit('/')
-        .next()
-        .unwrap_or(input)
-        .split(['?', '#'])
-        .next()
-        .unwrap_or(input);
-    let stem = Path::new(last)
+    let last = last_segment(input);
+    let stem = Path::new(&last)
         .file_stem()
         .map(|s| s.to_string_lossy().into_owned())
         .filter(|s| !s.is_empty())
@@ -221,16 +234,76 @@ fn print_or_pipe_ok(bytes: &[u8]) -> ExitCode {
 
 #[cfg(test)]
 mod tests {
-    use super::output_name;
-    use std::path::PathBuf;
+    use super::{output_name, output_names};
+    use std::path::{Path, PathBuf};
 
     #[test]
-    fn output_names() {
+    fn output_name_basic() {
         assert_eq!(output_name("dir/report.pdf"), PathBuf::from("report.md"));
         assert_eq!(
             output_name("https://x.io/a/page.html?q=1"),
             PathBuf::from("page.md")
         );
         assert_eq!(output_name(".hidden"), PathBuf::from(".hidden.md"));
+    }
+
+    #[test]
+    fn duplicate_stems_keep_extension() {
+        // The case the Windows batch test exercises (test.docx + test.xlsx).
+        let inputs = vec![
+            "a/test.docx".to_string(),
+            "b/test.xlsx".to_string(),
+            "c/blog.html".to_string(),
+        ];
+        assert_eq!(
+            output_names(&inputs),
+            vec![
+                PathBuf::from("test.docx.md"),
+                PathBuf::from("test.xlsx.md"),
+                PathBuf::from("blog.md"),
+            ]
+        );
+    }
+
+    /// Core invariant (runs on every platform, incl. macOS & Linux):
+    /// a batch output name is ALWAYS a single relative component — never a
+    /// path that could escape the `--output-dir` when joined. This is exactly
+    /// what broke on Windows, where an un-split `C:\dir\test.docx` produced an
+    /// absolute name that replaced the output directory.
+    #[test]
+    fn output_names_never_escape_output_dir() {
+        // Forward-slash paths + URIs are valid on every platform (Windows
+        // accepts `/` too). Backslash paths are exercised by the
+        // windows-only test, since `\` is not a separator on Unix.
+        let inputs = vec![
+            "/abs/unix/test.docx".to_string(),
+            "/abs/unix/test.xlsx".to_string(), // duplicate stem -> collision branch
+            "relative/report.pdf".to_string(),
+            "https://example.com/a/b/page.html?x=1#frag".to_string(),
+        ];
+        for name in output_names(&inputs) {
+            assert!(name.is_relative(), "{name:?} must be relative");
+            assert_eq!(
+                Path::new(&name).components().count(),
+                1,
+                "{name:?} must be a single path component (no separators)"
+            );
+            let s = name.to_string_lossy();
+            assert!(!s.contains('/') && !s.contains('\\'), "{s} contains a separator");
+            assert!(s.ends_with(".md"));
+        }
+    }
+
+    // Windows-only: backslash is a real separator there, so the last segment
+    // is the bare file name. (On Unix `\` is an ordinary character, so these
+    // exact equalities only hold on Windows.)
+    #[cfg(windows)]
+    #[test]
+    fn windows_backslash_paths() {
+        assert_eq!(output_name(r"C:\tmp\test.docx"), PathBuf::from("test.md"));
+        assert_eq!(
+            output_names(&[r"C:\tmp\test.docx".to_string(), r"D:\x\test.xlsx".to_string()]),
+            vec![PathBuf::from("test.docx.md"), PathBuf::from("test.xlsx.md")]
+        );
     }
 }
