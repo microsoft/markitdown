@@ -1,0 +1,6 @@
+node_modules
+dist
+src-tauri/target
+src-tauri/gen
+app-icon.png
+*.log

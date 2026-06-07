@@ -1,0 +1,21 @@
+[package]
+name = "markitdown-cli"
+description = "Self-contained CLI for converting files to Markdown (Rust port of Microsoft MarkItDown)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "markitdown"
+path = "src/main.rs"
+
+[dependencies]
+markitdown-core = { workspace = true }
+clap = { workspace = true }
+rayon = { workspace = true }
+anyhow = { workspace = true }
+
+[build-dependencies]
+clap = { workspace = true }
+clap_mangen = { workspace = true }

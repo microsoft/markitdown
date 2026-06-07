@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MarkItDown</title>
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark ico" data-icon="file-text"></span>
+          <span class="brand-name">MarkItDown</span>
+        </div>
+        <div class="topbar-actions">
+          <label class="engine-select" title="Conversion engine">
+            <span class="engine-label">Engine</span>
+            <select id="engine-select" aria-label="Conversion engine">
+              <option value="auto">Auto</option>
+              <option value="rust">Rust</option>
+              <option value="python">Python</option>
+            </select>
+          </label>
+          <button id="browse-btn" class="btn" title="Browse for files">
+            <span class="ico" data-icon="folder-open"></span>
+            <span>Add files</span>
+          </button>
+          <button id="theme-btn" class="btn icon-only" title="Toggle theme">
+            <span class="ico" data-icon="moon"></span>
+          </button>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="panel queue-panel">
+          <div
+            id="dropzone"
+            class="dropzone"
+            role="button"
+            tabindex="0"
+            aria-label="Drop files here or click to browse for files"
+          >
+            <span class="ico ico-lg" data-icon="cloud-upload"></span>
+            <p class="dropzone-title">Drop files here</p>
+            <p class="dropzone-sub">or click to pick documents</p>
+          </div>
+          <form id="url-form" class="url-bar">
+            <span class="ico url-icon" data-icon="link"></span>
+            <input
+              id="url-input"
+              class="url-input"
+              type="text"
+              inputmode="url"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="Paste an http(s) URL to convert"
+              aria-label="URL to convert"
+            />
+            <button id="url-btn" class="btn icon-only" type="submit" title="Convert URL">
+              <span class="ico" data-icon="link"></span>
+            </button>
+          </form>
+
+          <div class="tabbar" role="tablist" aria-label="Sidebar view">
+            <button id="tab-queue" class="tab active" role="tab" aria-selected="true">
+              <span class="ico" data-icon="list"></span><span>Queue</span>
+            </button>
+            <button id="tab-logs" class="tab" role="tab" aria-selected="false">
+              <span class="ico" data-icon="scroll-text"></span><span>Logs</span>
+            </button>
+          </div>
+
+          <div id="view-queue" class="tab-view" role="tabpanel">
+            <div id="batch-progress" class="batch-progress" hidden aria-hidden="true">
+              <div class="batch-progress-head">
+                <span class="ico" data-icon="filter"></span>
+                <span id="batch-progress-text" class="batch-progress-text"></span>
+              </div>
+              <div class="progress" role="progressbar" aria-label="Batch progress">
+                <div id="batch-progress-fill" class="progress-fill"></div>
+              </div>
+            </div>
+            <div class="filters" role="tablist" aria-label="Filter jobs">
+              <button id="filter-all" class="pill active" role="tab" aria-selected="true" data-filter="all">
+                All <span class="pill-count" id="count-all">0</span>
+              </button>
+              <button id="filter-done" class="pill" role="tab" aria-selected="false" data-filter="done">
+                Done <span class="pill-count" id="count-done">0</span>
+              </button>
+              <button id="filter-failed" class="pill" role="tab" aria-selected="false" data-filter="failed">
+                Failed <span class="pill-count" id="count-failed">0</span>
+              </button>
+            </div>
+            <ul id="queue" class="queue" aria-label="Conversion queue"></ul>
+          </div>
+
+          <div id="view-logs" class="tab-view logs-view" role="tabpanel" hidden>
+            <div class="logs-toolbar">
+              <button id="logs-copy" class="btn icon-only" title="Copy logs" aria-label="Copy logs">
+                <span class="ico" data-icon="copy"></span>
+              </button>
+              <button id="logs-clear" class="btn icon-only" title="Clear logs" aria-label="Clear logs">
+                <span class="ico" data-icon="trash-2"></span>
+              </button>
+            </div>
+            <div id="logs" class="logs" aria-label="Activity logs" tabindex="0"></div>
+          </div>
+        </section>
+
+        <section class="panel preview-panel">
+          <div class="preview-head">
+            <div class="preview-title" id="preview-title">Preview</div>
+            <div class="preview-controls">
+              <div class="seg" role="tablist">
+                <button id="view-rendered" class="seg-btn active" role="tab">Rendered</button>
+                <button id="view-raw" class="seg-btn" role="tab">Raw</button>
+              </div>
+              <button id="copy-btn" class="btn icon-only" title="Copy markdown" disabled>
+                <span class="ico" data-icon="copy"></span>
+              </button>
+              <button id="save-btn" class="btn icon-only" title="Save as .md" disabled>
+                <span class="ico" data-icon="save"></span>
+              </button>
+            </div>
+          </div>
+          <div id="preview" class="preview">
+            <div class="preview-empty">Select a finished job to preview its Markdown.</div>
+          </div>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <span class="footer-label">Supported:</span>
+        <span id="formats" class="formats"></span>
+        <span class="footer-caps" id="capabilities">
+          <span class="cap" id="cap-python" data-on="false">
+            <span class="ico cap-ico" data-icon="terminal"></span>
+            <span class="cap-label">Python engine</span>
+          </span>
+          <span class="cap" id="cap-llm" data-on="false">
+            <span class="ico cap-ico" data-icon="sparkles"></span>
+            <span class="cap-label">LLM captions</span>
+          </span>
+        </span>
+      </footer>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

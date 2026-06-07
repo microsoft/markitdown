@@ -1,0 +1,34 @@
+# Build artifacts and generated files for the Rust MarkItDown suite.
+# Source, Cargo.lock (committed on purpose for the binary/app workspace),
+# READMEs, the skill and the python-engine build scripts ARE tracked.
+
+# --- Rust ---
+# Workspace + Tauri build outputs (the desktop app uses its own target dir).
+target/
+**/*.rs.bk
+# Coverage / profiling
+*.profraw
+
+# --- Node / Tauri frontend (desktop/) ---
+node_modules/
+dist/
+.vite/
+# Tauri's generated platform projects and bundles
+src-tauri/gen/
+src-tauri/target/
+
+# --- Optional Python fallback engine (python-engine/) ---
+# Everything PyInstaller and the venv produce; the .sh/.ps1 scripts stay.
+.venv/
+build/
+dist/
+__pycache__/
+*.spec
+_entry.py
+markitdown-py.spec
+
+# --- Editors / OS ---
+.DS_Store
+.idea/
+*.swp
+*.log

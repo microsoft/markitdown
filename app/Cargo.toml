@@ -1,0 +1,66 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/markitdown-core",
+    "crates/markitdown-cli",
+    "crates/markitdown-mcp",
+]
+# desktop/src-tauri is intentionally NOT a workspace member: Tauri pins its own
+# dependency tree and build profile. It depends on markitdown-core by path.
+exclude = ["desktop/src-tauri"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/microsoft/markitdown"
+
+[workspace.dependencies]
+markitdown-core = { path = "crates/markitdown-core" }
+
+# Parsing / conversion
+pdf-extract = "0.10"
+calamine = "0.35"
+zip = { version = "8", default-features = false, features = ["deflate"] }
+quick-xml = "0.40"
+htmd = "0.5"
+scraper = "0.27"
+kamadak-exif = "0.6"
+imagesize = "0.14"
+lofty = "0.24"
+msg_parser = "0.3"
+csv = "1.4"
+chardetng = "1"
+encoding_rs = "0.8"
+file-format = { version = "0.29", features = ["reader"] }
+base64 = "0.22"
+percent-encoding = "2"
+
+# HTTP (optional, behind `net` feature in core)
+ureq = { version = "3.3", features = ["gzip", "json"] }
+
+# Plumbing
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+rayon = "1"
+anyhow = "1"
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+clap_mangen = "0.3"
+
+# MCP
+rmcp = { version = "1.7", features = ["server", "macros", "transport-io"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-std"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[profile.release]
+# Size + speed tuned for a small, fast static binary.
+# NOTE: panic stays "unwind" on purpose — pdf parsing is wrapped in
+# catch_unwind so one malformed file can never take down a batch job.
+lto = true
+codegen-units = 1
+strip = true
+opt-level = "s"

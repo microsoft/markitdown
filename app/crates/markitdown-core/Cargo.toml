@@ -1,0 +1,35 @@
+[package]
+name = "markitdown-core"
+description = "Pure-Rust port of Microsoft MarkItDown: convert files (PDF, DOCX, XLSX, PPTX, HTML, images, audio, …) to Markdown"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = ["net"]
+# URL fetching (http/https inputs, Wikipedia/Bing/YouTube live pages).
+# Disable for a fully offline build: cargo build --no-default-features
+net = ["dep:ureq"]
+
+[dependencies]
+pdf-extract = { workspace = true }
+calamine = { workspace = true }
+zip = { workspace = true }
+quick-xml = { workspace = true }
+htmd = { workspace = true }
+scraper = { workspace = true }
+kamadak-exif = { workspace = true }
+imagesize = { workspace = true }
+lofty = { workspace = true }
+msg_parser = { workspace = true }
+csv = { workspace = true }
+chardetng = { workspace = true }
+encoding_rs = { workspace = true }
+file-format = { workspace = true }
+base64 = { workspace = true }
+percent-encoding = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+ureq = { workspace = true, optional = true }

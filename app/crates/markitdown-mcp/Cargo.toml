@@ -1,0 +1,25 @@
+[package]
+name = "markitdown-mcp"
+description = "MCP server exposing MarkItDown file-to-Markdown conversion tools (rmcp, stdio transport)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "markitdown-mcp"
+path = "src/main.rs"
+
+[dependencies]
+markitdown-core = { workspace = true }
+rmcp = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+rayon = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
