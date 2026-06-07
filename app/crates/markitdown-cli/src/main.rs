@@ -18,18 +18,22 @@ fn main() -> ExitCode {
     let args = Cli::parse();
 
     if args.version {
-        println!("markitdown {}", env!("CARGO_PKG_VERSION"));
-        return ExitCode::SUCCESS;
+        return print_or_pipe_ok(format!("markitdown {}\n", env!("CARGO_PKG_VERSION")).as_bytes());
     }
     if args.emit_man {
-        let _ = std::io::stdout().write_all(MAN_PAGE);
-        return ExitCode::SUCCESS;
+        return print_or_pipe_ok(MAN_PAGE);
     }
     if args.list_formats {
+        let mut buf = String::new();
         for f in SUPPORTED_FORMATS {
-            println!("{:<24} {:<44} {}", f.name, f.extensions.join(" "), f.notes);
+            buf.push_str(&format!(
+                "{:<24} {:<44} {}\n",
+                f.name,
+                f.extensions.join(" "),
+                f.notes
+            ));
         }
-        return ExitCode::SUCCESS;
+        return print_or_pipe_ok(buf.as_bytes());
     }
 
     let opts = ConvertOptions {
@@ -186,14 +190,31 @@ fn emit(result: &ConvertResult, output: Option<&Path>) -> ExitCode {
             ExitCode::SUCCESS
         }
         None => {
-            let mut stdout = std::io::stdout().lock();
-            if stdout.write_all(result.markdown.as_bytes()).is_err() {
-                return ExitCode::FAILURE; // broken pipe
-            }
+            let mut bytes = result.markdown.clone().into_bytes();
             if !result.markdown.ends_with('\n') {
-                let _ = stdout.write_all(b"\n");
+                bytes.push(b'\n');
             }
-            ExitCode::SUCCESS
+            print_or_pipe_ok(&bytes)
+        }
+    }
+}
+
+/// Write `bytes` to stdout, treating a closed downstream pipe as a clean exit.
+///
+/// A normal Unix CLI piped into `head`/`grep -q` should not crash when the
+/// reader closes early; Rust otherwise turns the resulting `BrokenPipe` write
+/// error into a panic ("failed printing to stdout"). We map BrokenPipe to a
+/// success exit (the consumer already got what it wanted) and surface any
+/// other I/O error as a failure. Cross-platform: Windows reports the same
+/// `ErrorKind::BrokenPipe` when the pipe peer goes away.
+fn print_or_pipe_ok(bytes: &[u8]) -> ExitCode {
+    let mut stdout = std::io::stdout().lock();
+    match stdout.write_all(bytes).and_then(|_| stdout.flush()) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(e) if e.kind() == std::io::ErrorKind::BrokenPipe => ExitCode::SUCCESS,
+        Err(e) => {
+            eprintln!("error: writing to stdout: {e}");
+            ExitCode::FAILURE
         }
     }
 }

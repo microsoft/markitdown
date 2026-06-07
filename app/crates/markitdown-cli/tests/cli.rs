@@ -134,3 +134,27 @@ fn missing_file_fails() {
     let out = run(&["/nonexistent/definitely-not-here.pdf"]);
     assert!(!out.status.success());
 }
+
+/// A reader that closes early (like `| head` or `| grep -q`) must not make the
+/// CLI panic with "failed printing to stdout: Broken pipe". We simulate it by
+/// giving the child a stdout pipe and dropping our read end immediately.
+#[test]
+fn broken_pipe_does_not_panic() {
+    use std::process::Stdio;
+    // --list-formats writes many lines; drop the pipe before reading.
+    let mut child = Command::new(BIN)
+        .arg("--list-formats")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    drop(child.stdout.take()); // close the read end right away
+    let out = child.wait_with_output().unwrap();
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        !err.contains("panic") && !err.contains("Broken pipe"),
+        "CLI panicked on a closed pipe: {err}"
+    );
+    // Killed-by-SIGPIPE would be a signal exit; we expect a graceful code.
+    assert!(out.status.code().is_some(), "should exit normally, not via signal");
+}

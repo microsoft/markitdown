@@ -104,9 +104,14 @@ jobs:
           set -euo pipefail
           EXE=""; [[ "$RUNNER_OS" == "Windows" ]] && EXE=".exe"
           BIN="app/target/debug"
+          # Capture to files before grepping: under `set -o pipefail`, a
+          # `cli | grep -q` pipeline fails when grep closes the pipe early
+          # (the writer sees EOF/BrokenPipe). Capturing avoids that entirely.
           "$BIN/markitdown$EXE" --version
-          "$BIN/markitdown$EXE" --list-formats | grep -qi PDF
-          "$BIN/markitdown$EXE" packages/markitdown/tests/test_files/test.docx | grep -q AutoGen
+          "$BIN/markitdown$EXE" --list-formats > formats.txt
+          grep -qi PDF formats.txt
+          "$BIN/markitdown$EXE" packages/markitdown/tests/test_files/test.docx > docx.txt
+          grep -q AutoGen docx.txt
           # MCP stdio handshake (capture to file so a downstream grep can't
           # SIGPIPE the server before it flushes).
           printf '%s\n%s\n%s\n' \
