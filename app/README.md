@@ -123,6 +123,39 @@ Every dependency is pure-Rust (or statically vendored), version-pinned in the
 workspace `Cargo.toml`. The release profile is size-tuned (LTO, `opt-level=s`,
 strip): ~6 MB CLI, ~7 MB MCP server.
 
+## Binary size & compression
+
+Two layers, chosen so nothing regresses:
+
+1. **Compile-time** (always on, in `[profile.release]`): `lto`,
+   `codegen-units=1`, `strip`, `opt-level="s"`. We deliberately *keep*
+   `opt-level="s"` (not `"z"`, which can slow PDF-heavy throughput) and
+   `panic="unwind"` (the PDF parser relies on `catch_unwind`).
+2. **Post-build** (release CI only): the standalone `markitdown` and
+   `markitdown-mcp` binaries are packed with **UPX `--best --lzma`** on Linux
+   and Windows (≈50% smaller; self-extracts in a few ms at launch). macOS is
+   intentionally left unpacked — UPX's Mach-O / Apple-Silicon support is
+   unreliable and packed binaries trip Gatekeeper. CI re-runs the smoke test
+   on the *packed* binary, so a release never ships a binary that can't start.
+
+Desktop installers use each bundler's native compression: the Windows NSIS
+installer already defaults to `lzma` (the strongest setting); `.dmg`, `.deb`
+and `.AppImage` use their standard compressed formats. They are not re-packed
+by hand (that would risk breaking installation).
+
+## Releases & CI
+
+- `.github/workflows/app-ci.yml` — runs on every PR/push touching `app/`:
+  tests + a debug build + a headless smoke test on Linux, Windows and macOS
+  (Apple Silicon). It is context-aware of runner limits: offline tests, no GUI
+  launch, and the `cfg(unix)` Python-fallback suite compiles away on Windows.
+- `.github/workflows/app-release.yml` — on an `app-v*` tag (or manual
+  dispatch), builds **natively** on five OS/arch runners (Linux x86_64 &
+  aarch64, Windows x86_64, macOS Intel & Apple Silicon), tests + smoke-tests
+  each, then publishes the CLI/MCP archives and the desktop installers
+  (`.dmg`/`.deb`/`.AppImage`/`.msi`/`.exe`) plus `SHA256SUMS.txt` to a GitHub
+  Release. Tag example: `git tag app-v0.1.0 && git push origin app-v0.1.0`.
+
 ## Tests
 
 - **Unit**: converter/helper logic inside each module (`cargo test -p markitdown-core --lib`).

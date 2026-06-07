@@ -1,0 +1,264 @@
+# Release pipeline for the Rust MarkItDown suite (app/): the standalone CLI
+# binary, the MCP server binary, and the Tauri desktop installers — built
+# NATIVELY on each OS/arch (no cross-compilation, so what we ship is what the
+# runner actually compiled and ran).
+#
+# Coverage:
+#   Linux   x86_64  (ubuntu-22.04)
+#   Linux   aarch64 (ubuntu-24.04-arm — GitHub-hosted Arm64 runner)
+#   Windows x86_64  (windows-latest)
+#   macOS   x86_64  Intel         (macos-13)
+#   macOS   aarch64 Apple Silicon (macos-14)
+#
+# Trigger: push a tag like `app-v0.1.0` (kept distinct from the Python
+# package's own tags), or run manually via workflow_dispatch (which produces
+# downloadable artifacts but does not create a GitHub Release).
+#
+# GitHub-runner limitations handled (context-aware):
+#   * Tests run BEFORE building, and a headless smoke test runs AFTER, so a
+#     platform only publishes artifacts that have been proven to start and
+#     convert a real fixture on that exact OS/arch.
+#   * No display server: the GUI is never launched — only built. The desktop
+#     unit tests cover the command layer.
+#   * No network / no Python engine needed: all tests are offline; the
+#     python_fallback suite is cfg(unix) + shell stubs.
+#   * macOS builds are unsigned (no certs in CI). They run locally after a
+#     Gatekeeper override; signing/notarization can be added later via secrets.
+#   * Arm64 Linux AppImage tooling is flaky on CI, so that arch ships a .deb
+#     only; x86_64 Linux ships both .deb and AppImage.
+name: app-release
+
+on:
+  push:
+    tags: ["app-v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: app-release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write # needed to create/update the GitHub Release
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: build (${{ matrix.label }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # `compress: true` UPX-packs the standalone CLI/MCP binaries.
+          # macOS is excluded: UPX's Mach-O / Apple-Silicon support is
+          # unreliable and packed binaries are killed by Gatekeeper, so
+          # compressing them would regress "it must run". Linux/Windows pack
+          # cleanly and we re-run the smoke test on the packed binary.
+          - os: ubuntu-22.04
+            label: linux-x86_64
+            target: x86_64-unknown-linux-gnu
+            bundles: deb,appimage
+            compress: true
+          - os: ubuntu-24.04-arm
+            label: linux-aarch64
+            target: aarch64-unknown-linux-gnu
+            bundles: deb
+            compress: true
+          - os: windows-latest
+            label: windows-x86_64
+            target: x86_64-pc-windows-msvc
+            bundles: msi,nsis
+            compress: true
+          - os: macos-13
+            label: macos-x86_64
+            target: x86_64-apple-darwin
+            bundles: app,dmg
+            compress: false
+          - os: macos-14
+            label: macos-aarch64
+            target: aarch64-apple-darwin
+            bundles: app,dmg
+            compress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Tauri system dependencies (Linux only)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            app
+            app/desktop/src-tauri
+          key: ${{ matrix.target }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/desktop/package-lock.json
+
+      # ---- gate: prove the code works on THIS os/arch before shipping ------
+      - name: Test core / CLI / MCP workspace
+        working-directory: app
+        run: cargo test --workspace --locked
+
+      - name: Test desktop backend
+        working-directory: app/desktop/src-tauri
+        run: cargo test --locked
+
+      # ---- build standalone CLI + MCP (release, native target) ------------
+      - name: Build CLI + MCP (release)
+        working-directory: app
+        run: cargo build --release --locked --target ${{ matrix.target }} -p markitdown-cli -p markitdown-mcp
+
+      # ---- compress the standalone binaries (UPX) -------------------------
+      # The release profile already does LTO + strip + opt-level="s". UPX
+      # --best --lzma roughly halves the on-disk size on top of that. It
+      # self-extracts into memory at launch (a few ms; fine for a CLI / a
+      # long-lived MCP server). Skipped on macOS (see matrix note).
+      - name: Install UPX
+        if: matrix.compress && runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y upx-ucl
+      - name: Install UPX (Windows)
+        if: matrix.compress && runner.os == 'Windows'
+        run: choco install upx -y
+
+      - name: Compress binaries (UPX --best --lzma)
+        if: matrix.compress
+        run: |
+          set -euo pipefail
+          EXE=""; [[ "$RUNNER_OS" == "Windows" ]] && EXE=".exe"
+          BIN="app/target/${{ matrix.target }}/release"
+          for b in markitdown markitdown-mcp; do
+            before=$(wc -c < "$BIN/$b$EXE")
+            upx --best --lzma "$BIN/$b$EXE"
+            after=$(wc -c < "$BIN/$b$EXE")
+            echo "$b: $before -> $after bytes ($(( 100 - after * 100 / before ))% smaller)"
+          done
+
+      # Smoke test runs AFTER compression, so it validates exactly the bytes
+      # that ship — a packed binary that can't start fails the release here.
+      - name: Smoke test released binaries
+        run: |
+          set -euo pipefail
+          EXE=""; [[ "$RUNNER_OS" == "Windows" ]] && EXE=".exe"
+          BIN="app/target/${{ matrix.target }}/release"
+          "$BIN/markitdown$EXE" --version
+          "$BIN/markitdown$EXE" --list-formats | grep -qi PDF
+          "$BIN/markitdown$EXE" packages/markitdown/tests/test_files/test.docx | grep -q AutoGen
+          printf '%s\n%s\n%s\n' \
+            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"ci","version":"0"}}}' \
+            '{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}' \
+            '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
+            > mcp_req.txt
+          "$BIN/markitdown-mcp$EXE" < mcp_req.txt > mcp_resp.txt
+          grep -q convert_to_markdown mcp_resp.txt
+          echo "binary smoke OK on ${{ matrix.label }}"
+
+      # ---- install frontend deps + build the Tauri desktop installers -----
+      - name: Install frontend dependencies
+        working-directory: app/desktop
+        run: npm ci
+
+      - name: Build desktop app (Tauri)
+        working-directory: app/desktop
+        # beforeBuildCommand in tauri.conf.json runs `npm run build` (the
+        # frontend) automatically. Unsigned on macOS (no CI certs).
+        run: npm run tauri build -- --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
+
+      # ---- collect everything into out/ -----------------------------------
+      - name: Package artifacts
+        run: |
+          set -euo pipefail
+          TRIPLE="${{ matrix.target }}"
+          LABEL="${{ matrix.label }}"
+          EXE=""; [[ "$RUNNER_OS" == "Windows" ]] && EXE=".exe"
+          mkdir -p out staging
+          cp "app/target/$TRIPLE/release/markitdown$EXE" staging/
+          cp "app/target/$TRIPLE/release/markitdown-mcp$EXE" staging/
+          (
+            cd staging
+            if [[ "$RUNNER_OS" == "Windows" ]]; then
+              7z a "../out/markitdown-cli-mcp-$LABEL.zip" "markitdown$EXE" "markitdown-mcp$EXE"
+            else
+              tar czf "../out/markitdown-cli-mcp-$LABEL.tar.gz" markitdown markitdown-mcp
+            fi
+          )
+          # Desktop installers (only the types that exist for this platform).
+          BUNDLE="app/desktop/src-tauri/target/$TRIPLE/release/bundle"
+          if [[ -d "$BUNDLE" ]]; then
+            find "$BUNDLE" -type f \
+              \( -name '*.dmg' -o -name '*.AppImage' -o -name '*.deb' \
+                 -o -name '*.rpm' -o -name '*.msi' -o -name '*.exe' \) \
+              -exec cp {} out/ \;
+          fi
+          echo "--- packaged for $LABEL ---"
+          ls -la out
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: markitdown-${{ matrix.label }}
+          path: out/*
+          if-no-files-found: error
+
+  # Gather every platform's artifacts and attach them to the GitHub Release.
+  # Only runs for tag pushes; workflow_dispatch stops after the build job
+  # (artifacts are still downloadable from the run).
+  release:
+    name: publish release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: |
+          set -euo pipefail
+          cd dist
+          ls -la
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Create / update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          body: |
+            ## MarkItDown (Rust suite) — ${{ github.ref_name }}
+
+            Native builds for Linux (x86_64 / aarch64), Windows (x86_64) and
+            macOS (Intel / Apple Silicon). Each artifact was tested and
+            smoke-checked on its own OS/arch runner before release.
+
+            **Assets**
+            - `markitdown-cli-mcp-<platform>.{tar.gz,zip}` — the standalone
+              `markitdown` CLI + `markitdown-mcp` server (no dependencies).
+            - `*.dmg` / `*.deb` / `*.AppImage` / `*.msi` / `*.exe` — the
+              MarkItDown desktop app installers.
+            - `SHA256SUMS.txt` — checksums for every asset.
+
+            macOS builds are unsigned; right-click → Open (or
+            `xattr -dr com.apple.quarantine <app>`) on first launch.
