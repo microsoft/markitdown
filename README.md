@@ -13,8 +13,9 @@ MarkItDown currently supports the conversion from:
 
 - PDF
 - PowerPoint
-- Word
-- Excel
+- Word (.docx)
+- Legacy Word (.doc) — requires `antiword` to be installed on the system (see issue #23)
+- Excel (.xlsx)
 - Images (EXIF metadata and OCR)
 - Audio (EXIF metadata and speech transcription)
 - HTML
