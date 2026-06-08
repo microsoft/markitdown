@@ -30,7 +30,13 @@ name: app-release
 
 on:
   push:
-    tags: ["app-v*"]
+    # Match the common release-tag forms so a normal `vX.Y.Z` works too, not
+    # only the `app-v*` prefix. IMPORTANT: a tag only triggers a workflow if
+    # the file exists in the *commit the tag points to* — create the tag on a
+    # commit that already contains this file (push the workflow first, then tag).
+    tags:
+      - "app-v*"
+      - "v*"
   workflow_dispatch:
     inputs:
       tag:

@@ -145,16 +145,73 @@ by hand (that would risk breaking installation).
 
 ## Releases & CI
 
-- `.github/workflows/app-ci.yml` — runs on every PR/push touching `app/`:
-  tests + a debug build + a headless smoke test on Linux, Windows and macOS
-  (Apple Silicon). It is context-aware of runner limits: offline tests, no GUI
-  launch, and the `cfg(unix)` Python-fallback suite compiles away on Windows.
-- `.github/workflows/app-release.yml` — on an `app-v*` tag (or manual
-  dispatch), builds **natively** on five OS/arch runners (Linux x86_64 &
-  aarch64, Windows x86_64, macOS Intel & Apple Silicon), tests + smoke-tests
-  each, then publishes the CLI/MCP archives and the desktop installers
-  (`.dmg`/`.deb`/`.AppImage`/`.msi`/`.exe`) plus `SHA256SUMS.txt` to a GitHub
-  Release. Tag example: `git tag app-v0.1.0 && git push origin app-v0.1.0`.
+Two GitHub Actions workflows live in `.github/workflows/`. They listen to
+**different events on purpose** (this trips people up — see *Why only CI ran*
+below):
+
+| Workflow | Triggers on | Does |
+|---|---|---|
+| `app-ci.yml` | push to **branch** `main` + pull requests touching `app/**` | tests + debug build + headless smoke test on Linux, Windows, macOS (Apple Silicon) |
+| `app-release.yml` | push of a **tag** `app-v*` or `v*`, **or** manual *Run workflow* | native build on 5 OS/arch runners → test → smoke-test → publish a GitHub Release |
+
+Both are *context-aware* of GitHub-runner limits: all tests are offline (the
+LLM-caption test uses a local mock server; web converters use local fixtures),
+the GUI is never launched (no display server — only built + command-layer unit
+tested), and the `#![cfg(unix)]` Python-fallback suite compiles away on
+Windows so it never needs a real Python binary.
+
+### Cut a release (recommended: a tag)
+
+```bash
+# 1. Make sure the workflow file is already committed & pushed to your branch.
+#    (A tag only triggers a workflow if the file exists in the commit the tag
+#     points to — tag AFTER the workflow is in history, never before.)
+git push
+
+# 2. Tag a commit that contains the workflow, and push the tag.
+git tag v0.1.0            # or app-v0.1.0
+git push origin v0.1.0
+```
+
+This runs `app-release`, which on each of the five runners runs the full test
+suite, builds the binaries + desktop installers, smoke-tests them, and then
+publishes one GitHub Release with every asset.
+
+### Cut a release without tagging (manual)
+
+GitHub → **Actions → app-release → Run workflow**. This builds everything and
+publishes a **prerelease** named by the `tag` input (default `app-dev`), so the
+assets show up on the Releases page without creating a permanent tag. Use this
+to smoke-test the whole pipeline end-to-end.
+
+### What a release contains
+
+On the repo's **Releases** page (one release, all platforms):
+
+- **Standalone binaries** (CLI + MCP, no dependencies) —
+  `markitdown-cli-mcp-{linux-x86_64,linux-aarch64,windows-x86_64,macos-x86_64,macos-aarch64}.{tar.gz,zip}`.
+- **Desktop app installers** — macOS `.dmg` **and** a zipped ready-to-run
+  `.app` (Intel & Apple Silicon); Linux `.deb` (x86_64 & aarch64) + `.AppImage`
+  (x86_64); Windows `.msi` + `-setup.exe`.
+- `SHA256SUMS.txt` — checksums for every asset.
+
+macOS builds are **unsigned** (no certs in CI): right-click → Open, or
+`xattr -dr com.apple.quarantine <app>` on first launch.
+
+### Why only CI ran when I pushed a tag
+
+A tag push does **not** match a `branches:` filter, so `app-ci` cannot fire
+from a tag — if you saw it run, it was triggered by the branch commits you
+pushed alongside the tag. If `app-release` *didn't* run, the cause is almost
+always one of:
+
+1. **Tag name** didn't match `app-v*` / `v*` (e.g. `app-0.1.0` without the `v`).
+2. **The tag points to a commit that doesn't contain `app-release.yml`** — push
+   the workflow first, then tag (see the steps above).
+
+`app-release` already runs the full test suite before building, so you do *not*
+need `app-ci` to also run on tags — a tagged release is test → build → publish
+in one workflow.
 
 ## Tests
 
