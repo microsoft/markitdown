@@ -193,6 +193,12 @@ On the repo's **Releases** page (one release, all platforms):
 - **Desktop app installers** — macOS `.dmg` **and** a zipped ready-to-run
   `.app` (Intel & Apple Silicon); Linux `.deb` (x86_64 & aarch64) + `.AppImage`
   (x86_64); Windows `.msi` + `-setup.exe`.
+
+> The macOS **Intel (x86_64)** artifacts are *cross-compiled on the Apple
+> Silicon runner* (`macos-14`), not on an Intel runner. GitHub's Intel macOS
+> runners (`macos-13`) are scarce and jobs can queue for hours; cross-building
+> on the plentiful arm64 runner avoids that. Rosetta 2 is installed in CI so
+> the x86_64 binary is still actually run in the smoke test before release.
 - `SHA256SUMS.txt` — checksums for every asset.
 
 macOS builds are **unsigned** (no certs in CI): right-click → Open, or

@@ -83,11 +83,18 @@ jobs:
             target: x86_64-pc-windows-msvc
             bundles: msi,nsis
             compress: true
-          - os: macos-13
+          # macOS x86_64 (Intel artifacts): CROSS-COMPILED on the Apple
+          # Silicon runner instead of the Intel `macos-13` runner. Intel
+          # macOS hosted runners are scarce / being phased down and jobs can
+          # sit queued for hours; macos-14 (arm64) is plentiful. We install
+          # Rosetta 2 so the x86_64 binary still actually runs in the smoke
+          # test. dmg/app packaging is arch-agnostic (hdiutil runs natively).
+          - os: macos-14
             label: macos-x86_64
             target: x86_64-apple-darwin
             bundles: app,dmg
             compress: false
+            rosetta: true
           - os: macos-14
             label: macos-aarch64
             target: aarch64-apple-darwin
@@ -161,6 +168,12 @@ jobs:
             after=$(wc -c < "$BIN/$b$EXE")
             echo "$b: $before -> $after bytes ($(( 100 - after * 100 / before ))% smaller)"
           done
+
+      # x86_64 binaries are cross-built on the Apple Silicon runner; Rosetta 2
+      # lets us actually run them in the smoke test below.
+      - name: Install Rosetta 2
+        if: matrix.rosetta
+        run: softwareupdate --install-rosetta --agree-to-license
 
       # Smoke test runs AFTER compression, so it validates exactly the bytes
       # that ship — a packed binary that can't start fails the release here.
