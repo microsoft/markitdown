@@ -20,6 +20,14 @@ pure-Rust engine intentionally does not bundle:
   pure-Rust EXIF/tag readers, so this only matters for Python-engine runs.)
 - Build per-OS; no cross-compilation.
 
+## Prebuilt binaries
+
+The release pipeline already publishes `markitdown-py-<platform>` binaries
+(Linux x86_64/aarch64, Windows x86_64, macOS Apple Silicon) on the GitHub
+Releases page — download one and point `MARKITDOWN_PY_BIN` at it instead of
+building. Intel macOS isn't prebuilt (PyInstaller can't cross-compile and an
+arm64 Python binary won't run on Intel), so build it locally there.
+
 ## Build
 
 ```bash

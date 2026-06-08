@@ -3,7 +3,7 @@ mod cli;
 use clap::Parser;
 use cli::{Cli, EngineArg};
 use markitdown_core::{
-    ConvertOptions, ConvertResult, Engine, MarkItDown, StreamInfo, SUPPORTED_FORMATS,
+    ConvertOptions, ConvertResult, Engine, LlmConfig, MarkItDown, StreamInfo, SUPPORTED_FORMATS,
 };
 use rayon::prelude::*;
 use std::io::{Read, Write};
@@ -35,6 +35,21 @@ fn main() -> ExitCode {
         }
         return print_or_pipe_ok(buf.as_bytes());
     }
+    if args.list_llm_providers {
+        let mut buf = String::from("LLM provider presets (any OpenAI-compatible endpoint works):\n\n");
+        for p in markitdown_core::LLM_PROVIDERS {
+            buf.push_str(&format!(
+                "{:<11} {:<32} key:{:<3} {}\n             models: {}\n             {}\n",
+                p.id,
+                if p.api_base.is_empty() { "(set --llm-api-base)" } else { p.api_base },
+                if p.requires_key { "yes" } else { "no" },
+                if p.local { "[local]" } else { "" },
+                if p.example_models.is_empty() { "(any)".to_string() } else { p.example_models.join(", ") },
+                p.notes,
+            ));
+        }
+        return print_or_pipe_ok(buf.as_bytes());
+    }
 
     let opts = ConvertOptions {
         keep_data_uris: args.keep_data_uris,
@@ -44,9 +59,13 @@ fn main() -> ExitCode {
             EngineArg::Auto => Engine::Auto,
         },
         python_bin: args.python_bin.clone(),
-        // LLM captions are env-driven (MARKITDOWN_LLM_API_KEY/MODEL).
-        llm: None,
+        llm: build_llm_config(&args),
     };
+
+    if args.check {
+        return print_capabilities(&opts);
+    }
+
     let md = MarkItDown::with_options(opts);
 
     match args.inputs.len() {
@@ -56,6 +75,68 @@ fn main() -> ExitCode {
         }
         _ => convert_batch(&md, &args),
     }
+}
+
+/// Build an [`LlmConfig`] from CLI flags. Returns `None` when no LLM flags are
+/// given, so the core falls back to the `MARKITDOWN_LLM_*` environment
+/// variables. A config is only complete with both a key and a model; a partial
+/// flag set still produces `Some` so the user gets a clear "model required"
+/// signal from the engine rather than silently doing nothing.
+fn build_llm_config(args: &Cli) -> Option<LlmConfig> {
+    let any = args.llm_provider.is_some()
+        || args.llm_api_key.is_some()
+        || args.llm_model.is_some()
+        || args.llm_api_base.is_some()
+        || args.llm_prompt.is_some();
+    if !any {
+        return None; // env-driven (or disabled)
+    }
+    // Base URL precedence: explicit --llm-api-base > --llm-provider preset >
+    // the OpenAI default.
+    let api_base = args
+        .llm_api_base
+        .clone()
+        .or_else(|| {
+            args.llm_provider
+                .as_deref()
+                .and_then(markitdown_core::llm_provider)
+                .map(|p| p.api_base.to_string())
+                .filter(|b| !b.is_empty())
+        })
+        .unwrap_or_else(|| "https://api.openai.com/v1".to_string());
+    Some(LlmConfig {
+        api_base,
+        api_key: args.llm_api_key.clone().unwrap_or_default(),
+        model: args.llm_model.clone().unwrap_or_default(),
+        prompt: args.llm_prompt.clone(),
+    })
+}
+
+/// `--check`: print engine + LLM capabilities (no secrets) and exit.
+fn print_capabilities(opts: &ConvertOptions) -> ExitCode {
+    let c = markitdown_core::capabilities(opts);
+    let mut out = String::new();
+    out.push_str(&format!("markitdown {}\n", env!("CARGO_PKG_VERSION")));
+    out.push_str(&format!(
+        "python fallback engine : {}\n",
+        match &c.python_engine_path {
+            Some(p) => format!("available  ({p})"),
+            None => "not configured  (set MARKITDOWN_PY_BIN or --python-bin)".to_string(),
+        }
+    ));
+    out.push_str(&format!(
+        "llm image captions     : {}\n",
+        if c.llm_captions {
+            format!(
+                "available  (model={}, endpoint={})",
+                c.llm_model.as_deref().unwrap_or("?"),
+                c.llm_api_base.as_deref().unwrap_or("?")
+            )
+        } else {
+            "not configured  (set --llm-api-key + --llm-model, or MARKITDOWN_LLM_*)".to_string()
+        }
+    ));
+    print_or_pipe_ok(out.as_bytes())
 }
 
 /// Convert stdin with optional -x/-m/-c hints.

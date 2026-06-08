@@ -25,6 +25,15 @@
             <span class="ico" data-icon="folder-open"></span>
             <span>Add files</span>
           </button>
+          <button
+            id="settings-btn"
+            class="btn icon-only"
+            title="LLM caption settings"
+            aria-label="LLM caption settings"
+            aria-haspopup="dialog"
+          >
+            <span class="ico" data-icon="sliders-horizontal"></span>
+          </button>
           <button id="theme-btn" class="btn icon-only" title="Toggle theme">
             <span class="ico" data-icon="moon"></span>
           </button>
@@ -128,6 +137,133 @@
           </div>
         </section>
       </main>
+
+      <div
+        id="settings-overlay"
+        class="modal-overlay"
+        hidden
+        aria-hidden="true"
+      >
+        <div
+          id="settings-modal"
+          class="modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="settings-title"
+        >
+          <div class="modal-head">
+            <div class="modal-title" id="settings-title">
+              <span class="ico" data-icon="sparkles"></span>
+              <span>LLM image captions</span>
+            </div>
+            <button
+              id="settings-close"
+              class="btn icon-only"
+              title="Close"
+              aria-label="Close settings"
+            >
+              <span class="ico" data-icon="x"></span>
+            </button>
+          </div>
+
+          <p class="modal-intro">
+            Describe images during conversion using any OpenAI-compatible
+            endpoint — including local models. Settings are stored on this
+            device only; your API key is never logged or displayed.
+          </p>
+
+          <form id="settings-form" class="settings-form">
+            <label class="field">
+              <span class="field-label">
+                <span class="ico field-ico" data-icon="boxes"></span> Provider
+              </span>
+              <select id="llm-provider" class="field-input field-select" aria-label="LLM provider">
+                <!-- options populated at startup from the llm_providers command -->
+              </select>
+              <span class="field-help" id="llm-provider-notes"></span>
+            </label>
+
+            <label class="field">
+              <span class="field-label">
+                <span class="ico field-ico" data-icon="server"></span> API Base URL
+              </span>
+              <input
+                id="llm-api-base"
+                class="field-input"
+                type="text"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="https://api.openai.com/v1"
+              />
+              <span class="field-help">
+                Editable for custom endpoints (vLLM, llama.cpp, LiteLLM, …).
+              </span>
+            </label>
+
+            <label class="field">
+              <span class="field-label">
+                <span class="ico field-ico" data-icon="sparkles"></span> Model
+              </span>
+              <input
+                id="llm-model"
+                class="field-input"
+                type="text"
+                list="llm-model-options"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="gpt-4o-mini"
+              />
+              <datalist id="llm-model-options"></datalist>
+              <span class="field-help">
+                Pick a suggested vision model or type any model id to swap freely.
+              </span>
+            </label>
+
+            <label class="field">
+              <span class="field-label">
+                <span class="ico field-ico" data-icon="key-round"></span> API Key
+              </span>
+              <input
+                id="llm-api-key"
+                class="field-input"
+                type="password"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="sk-… (leave blank for local models that need no key)"
+              />
+              <span class="field-help">Stored locally; never shown in logs or status.</span>
+            </label>
+
+            <label class="field">
+              <span class="field-label">
+                <span class="ico field-ico" data-icon="message-square"></span> Prompt
+                <span class="field-optional">(optional)</span>
+              </span>
+              <textarea
+                id="llm-prompt"
+                class="field-input field-textarea"
+                rows="2"
+                spellcheck="false"
+                placeholder="Write a detailed caption for this image."
+              ></textarea>
+            </label>
+
+            <div class="settings-status" id="settings-status" data-on="false">
+              <span class="ico" data-icon="sparkles"></span>
+              <span id="settings-status-text">Captions off</span>
+            </div>
+
+            <div class="settings-actions">
+              <button id="settings-clear" class="btn" type="button">
+                <span class="ico" data-icon="trash-2"></span><span>Clear</span>
+              </button>
+              <button id="settings-save" class="btn primary" type="submit">
+                <span class="ico" data-icon="save"></span><span>Save</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
 
       <footer class="footer">
         <span class="footer-label">Supported:</span>

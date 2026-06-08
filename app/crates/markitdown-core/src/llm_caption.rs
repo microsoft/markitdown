@@ -18,26 +18,40 @@ pub const LLM_API_KEY_ENV: &str = "MARKITDOWN_LLM_API_KEY";
 pub const LLM_MODEL_ENV: &str = "MARKITDOWN_LLM_MODEL";
 pub const LLM_API_BASE_ENV: &str = "MARKITDOWN_LLM_API_BASE";
 pub const LLM_PROMPT_ENV: &str = "MARKITDOWN_LLM_PROMPT";
+/// Pick a provider preset (`ollama`, `openai`, …) — its default base URL is
+/// used unless `MARKITDOWN_LLM_API_BASE` overrides it. See [`crate::llm_providers`].
+pub const LLM_PROVIDER_ENV: &str = "MARKITDOWN_LLM_PROVIDER";
 
 const DEFAULT_API_BASE: &str = "https://api.openai.com/v1";
 /// Same default prompt as Python's `_llm_caption.py`.
 const DEFAULT_PROMPT: &str = "Write a detailed caption for this image.";
 
+fn env_nonempty(key: &str) -> Option<String> {
+    std::env::var(key).ok().filter(|v| !v.is_empty())
+}
+
 /// Resolve the effective LLM configuration, if any.
+///
+/// Precedence for the base URL: explicit `MARKITDOWN_LLM_API_BASE` >
+/// `MARKITDOWN_LLM_PROVIDER`'s preset base > the OpenAI default. A programmatic
+/// `opts.llm` always wins over the environment.
 pub fn resolve(opts: &ConvertOptions) -> Option<LlmConfig> {
     if let Some(cfg) = &opts.llm {
         return Some(cfg.clone());
     }
-    let api_key = std::env::var(LLM_API_KEY_ENV).ok().filter(|v| !v.is_empty())?;
-    let model = std::env::var(LLM_MODEL_ENV).ok().filter(|v| !v.is_empty())?;
+    let api_key = env_nonempty(LLM_API_KEY_ENV)?;
+    let model = env_nonempty(LLM_MODEL_ENV)?;
+    let api_base = env_nonempty(LLM_API_BASE_ENV)
+        .or_else(|| {
+            env_nonempty(LLM_PROVIDER_ENV)
+                .and_then(|p| crate::llm_providers::api_base_for(&p).map(str::to_string))
+        })
+        .unwrap_or_else(|| DEFAULT_API_BASE.to_string());
     Some(LlmConfig {
-        api_base: std::env::var(LLM_API_BASE_ENV)
-            .ok()
-            .filter(|v| !v.is_empty())
-            .unwrap_or_else(|| DEFAULT_API_BASE.to_string()),
+        api_base,
         api_key,
         model,
-        prompt: std::env::var(LLM_PROMPT_ENV).ok().filter(|v| !v.is_empty()),
+        prompt: env_nonempty(LLM_PROMPT_ENV),
     })
 }
 

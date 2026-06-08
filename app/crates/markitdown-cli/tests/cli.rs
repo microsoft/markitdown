@@ -18,6 +18,55 @@ fn run(args: &[&str]) -> std::process::Output {
     Command::new(BIN).args(args).output().expect("spawn binary")
 }
 
+/// Minimal one-shot mock of an OpenAI-compatible `chat/completions` endpoint,
+/// so the LLM-caption path can be tested with no network and no real key.
+/// Returns the base URL (`http://127.0.0.1:<port>/v1`).
+fn mock_openai(caption: &'static str) -> String {
+    use std::io::{Read, Write};
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    std::thread::spawn(move || {
+        if let Ok((mut s, _)) = listener.accept() {
+            // Read the full request: headers, then exactly Content-Length bytes
+            // of body. The image POST is large, so responding before the client
+            // finishes writing would reset the connection and fail the request.
+            let mut buf = Vec::new();
+            let mut tmp = [0u8; 4096];
+            let header_end = loop {
+                let n = s.read(&mut tmp).unwrap_or(0);
+                if n == 0 {
+                    break buf.len();
+                }
+                buf.extend_from_slice(&tmp[..n]);
+                if let Some(p) = buf.windows(4).position(|w| w == b"\r\n\r\n") {
+                    break p + 4;
+                }
+            };
+            let headers = String::from_utf8_lossy(&buf[..header_end]).to_lowercase();
+            let len: usize = headers
+                .lines()
+                .find_map(|l| l.strip_prefix("content-length:").map(|v| v.trim().parse().unwrap_or(0)))
+                .unwrap_or(0);
+            while buf.len() < header_end + len {
+                let n = s.read(&mut tmp).unwrap_or(0);
+                if n == 0 {
+                    break;
+                }
+                buf.extend_from_slice(&tmp[..n]);
+            }
+            let body = format!(r#"{{"choices":[{{"message":{{"content":"{caption}"}}}}]}}"#);
+            let resp = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            let _ = s.write_all(resp.as_bytes());
+            let _ = s.flush();
+        }
+    });
+    format!("http://127.0.0.1:{port}/v1")
+}
+
 #[test]
 fn version_flag() {
     let out = run(&["--version"]);
@@ -133,6 +182,140 @@ fn unsupported_binary_fails() {
 fn missing_file_fails() {
     let out = run(&["/nonexistent/definitely-not-here.pdf"]);
     assert!(!out.status.success());
+}
+
+#[test]
+fn check_reports_unconfigured_without_secrets() {
+    // Force "not configured" deterministically regardless of ambient env.
+    let out = Command::new(BIN)
+        .args(["--check", "--python-bin", "/no/such/bin"])
+        .env_remove("MARKITDOWN_LLM_API_KEY")
+        .env_remove("MARKITDOWN_LLM_MODEL")
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let s = String::from_utf8_lossy(&out.stdout);
+    assert!(s.contains("python fallback engine"));
+    assert!(s.contains("llm image captions"));
+}
+
+#[test]
+fn check_reports_llm_endpoint_and_model_without_key() {
+    let out = run(&[
+        "--check",
+        "--llm-api-base",
+        "http://localhost:11434/v1",
+        "--llm-model",
+        "llava",
+        "--llm-api-key",
+        "sk-DO-NOT-LEAK",
+    ]);
+    assert!(out.status.success());
+    let s = String::from_utf8_lossy(&out.stdout);
+    assert!(s.contains("model=llava"));
+    assert!(s.contains("http://localhost:11434/v1"));
+    assert!(!s.contains("sk-DO-NOT-LEAK"), "API key must never be printed");
+}
+
+#[test]
+fn check_reports_python_engine_when_present() {
+    // Any existing executable file counts as "present" for resolution.
+    let out = Command::new(BIN)
+        .args(["--check", "--python-bin", BIN]) // BIN is a real executable
+        .output()
+        .unwrap();
+    let s = String::from_utf8_lossy(&out.stdout);
+    assert!(s.contains("python fallback engine : available"), "got: {s}");
+}
+
+#[test]
+fn list_llm_providers_shows_local_and_cloud() {
+    let out = run(&["--list-llm-providers"]);
+    assert!(out.status.success());
+    let s = String::from_utf8_lossy(&out.stdout);
+    assert!(s.contains("ollama") && s.contains("11434"), "local provider listed");
+    assert!(s.contains("openai") && s.contains("groq"), "cloud providers listed");
+    assert!(s.contains("custom"), "custom escape hatch listed");
+}
+
+#[test]
+fn llm_provider_sets_base_url() {
+    // --llm-provider ollama must select the Ollama base URL without --llm-api-base.
+    let out = run(&[
+        "--check",
+        "--llm-provider",
+        "ollama",
+        "--llm-model",
+        "llava",
+        "--llm-api-key",
+        "x",
+    ]);
+    let s = String::from_utf8_lossy(&out.stdout);
+    assert!(s.contains("http://localhost:11434/v1"), "got: {s}");
+    assert!(s.contains("model=llava"));
+}
+
+#[test]
+fn explicit_base_overrides_provider() {
+    let out = run(&[
+        "--check",
+        "--llm-provider",
+        "ollama",
+        "--llm-api-base",
+        "http://example.test/v1",
+        "--llm-model",
+        "m",
+        "--llm-api-key",
+        "x",
+    ]);
+    let s = String::from_utf8_lossy(&out.stdout);
+    assert!(s.contains("http://example.test/v1"), "explicit base must win: {s}");
+}
+
+#[test]
+fn caption_via_provider_custom_and_mock_server() {
+    // Use the `custom` provider with a mock base — proves provider selection +
+    // captioning compose. CI-safe: localhost ephemeral port, no real network.
+    let base = mock_openai("Caption via the custom provider.");
+    let out = run(&[
+        fixture("test.jpg").to_str().unwrap(),
+        "--engine",
+        "rust",
+        "--llm-provider",
+        "custom",
+        "--llm-api-base",
+        &base,
+        "--llm-model",
+        "test-vision",
+        "--llm-api-key",
+        "test-key",
+    ]);
+    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    let s = String::from_utf8_lossy(&out.stdout);
+    assert!(s.contains("# Description:") && s.contains("Caption via the custom provider."), "got:\n{s}");
+}
+
+#[test]
+fn llm_flags_caption_an_image_via_mock_server() {
+    let base = mock_openai("A mocked caption for the CI test image.");
+    let out = run(&[
+        fixture("test.jpg").to_str().unwrap(),
+        "--engine",
+        "rust", // keep it deterministic; no python fallback
+        "--llm-api-base",
+        &base,
+        "--llm-model",
+        "test-vision",
+        "--llm-api-key",
+        "test-key",
+    ]);
+    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    let s = String::from_utf8_lossy(&out.stdout);
+    assert!(s.contains("ImageSize:"), "EXIF metadata still present");
+    assert!(
+        s.contains("# Description:") && s.contains("A mocked caption for the CI test image."),
+        "LLM caption section expected, got:\n{s}"
+    );
 }
 
 /// A reader that closes early (like `| head` or `| grep -q`) must not make the

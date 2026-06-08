@@ -208,20 +208,30 @@ impl MarkitdownServer {
                 f.notes
             ));
         }
-        let opts = markitdown_core::ConvertOptions::default();
+        // Capabilities reflect the server's environment (MARKITDOWN_PY_BIN,
+        // MARKITDOWN_LLM_*). No secrets are included.
+        let caps = markitdown_core::capabilities(&markitdown_core::ConvertOptions::default());
         out.push_str(&format!(
-            "\npython fallback engine (OCR, transcription, RTF bodies, transcripts): {}\n\
-             llm image captions: {}\n",
-            if markitdown_core::python_engine_available(&opts) {
+            "\npython fallback engine (OCR, transcription, RTF bodies, transcripts): {}\n",
+            if caps.python_engine {
                 "AVAILABLE — degraded conversions retry automatically"
             } else {
                 "not configured (set MARKITDOWN_PY_BIN)"
-            },
-            if markitdown_core::llm_caption_available(&opts) {
-                "AVAILABLE — images get a '# Description:' section"
+            }
+        ));
+        out.push_str(&format!(
+            "llm image captions: {}\n",
+            if caps.llm_captions {
+                format!(
+                    "AVAILABLE — images get a '# Description:' section (model={}, endpoint={})",
+                    caps.llm_model.as_deref().unwrap_or("?"),
+                    caps.llm_api_base.as_deref().unwrap_or("?")
+                )
             } else {
-                "not configured (set MARKITDOWN_LLM_API_KEY + MARKITDOWN_LLM_MODEL)"
-            },
+                "not configured (set MARKITDOWN_LLM_API_KEY + MARKITDOWN_LLM_MODEL; \
+                 MARKITDOWN_LLM_API_BASE for local LLMs)"
+                    .to_string()
+            }
         ));
         Ok(ok_text(out))
     }

@@ -253,14 +253,71 @@ jobs:
           path: out/*
           if-no-files-found: error
 
+  # OPTIONAL Python fallback engine (OCR, transcription, Azure, plugins),
+  # packaged so users can enable `--engine auto` fallback without building it
+  # themselves. Best-effort: the whole job is `continue-on-error` so a flaky
+  # PyInstaller build NEVER blocks the lightweight Rust release. PyInstaller
+  # cannot cross-compile, so this covers the 4 natively-buildable targets;
+  # Intel macOS users build locally with python-engine/build_binary.sh (an
+  # Apple-Silicon Python binary can't run on Intel).
+  python-engine:
+    name: python fallback (${{ matrix.label }})
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-22.04, label: linux-x86_64 }
+          - { os: ubuntu-24.04-arm, label: linux-aarch64 }
+          - { os: windows-latest, label: windows-x86_64 }
+          - { os: macos-14, label: macos-aarch64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build the PyInstaller fallback binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            pwsh app/python-engine/build_binary.ps1
+          else
+            bash app/python-engine/build_binary.sh
+          fi
+
+      - name: Smoke test + stage the fallback binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXE=""; [[ "$RUNNER_OS" == "Windows" ]] && EXE=".exe"
+          PY="app/python-engine/dist/markitdown-py$EXE"
+          test -f "$PY" || { echo "::error::fallback binary not produced"; exit 1; }
+          # It must actually convert a real document.
+          "$PY" packages/markitdown/tests/test_files/test.docx > py_out.md
+          grep -q AutoGen py_out.md
+          mkdir -p out
+          cp "$PY" "out/markitdown-py-${{ matrix.label }}$EXE"
+          echo "fallback engine OK on ${{ matrix.label }} ($(du -h "$PY" | cut -f1))"
+
+      - name: Upload fallback binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: markitdown-py-${{ matrix.label }}
+          path: out/*
+          if-no-files-found: error
+
   # Gather every platform's artifacts and publish them as ONE GitHub Release.
   # Runs both for `app-v*` tag pushes (normal release) AND for manual
   # workflow_dispatch runs (publishes a prerelease named by the `tag` input),
   # so the .dmg / installers / binaries are always visible on the Releases
-  # page — not buried under the Actions run's Artifacts.
+  # page — not buried under the Actions run's Artifacts. Includes the Python
+  # fallback binaries when their (best-effort) job produced any.
   release:
     name: publish release
-    needs: build
+    needs: [build, python-engine]
     if: >-
       always() && needs.build.result == 'success' &&
       (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch')
@@ -318,6 +375,13 @@ jobs:
             - macOS: `*.dmg` + `MarkItDown-macos-*.app.zip` (Intel & Apple Silicon)
             - Linux: `*.deb` (x86_64 & aarch64) + `*.AppImage` (x86_64)
             - Windows: `*.msi` + `*-setup.exe`
+
+            **Optional Python fallback engine** (enables OCR / transcription /
+            Azure via `--engine auto` + `MARKITDOWN_PY_BIN`) — large, only needed
+            for those extras:
+            - `markitdown-py-{linux-x86_64,linux-aarch64,windows-x86_64,macos-aarch64}`
+            - Intel macOS: build locally with `app/python-engine/build_binary.sh`.
+
             - `SHA256SUMS.txt` — checksums for every asset.
 
             macOS builds are unsigned; right-click → Open (or

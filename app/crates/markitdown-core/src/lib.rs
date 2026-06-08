@@ -17,10 +17,12 @@
 //! println!("{}", result.markdown);
 //! ```
 
+mod capabilities;
 mod converter;
 mod detect;
 mod error;
 mod llm_caption;
+mod llm_providers;
 mod markitdown;
 mod options;
 mod python_engine;
@@ -31,10 +33,12 @@ mod uri;
 
 pub mod converters;
 
+pub use capabilities::{capabilities, Capabilities};
 pub use converter::Converter;
 pub use error::ConvertError;
 pub use markitdown::{FormatInfo, MarkItDown, SUPPORTED_FORMATS};
 pub use llm_caption::available as llm_caption_available;
+pub use llm_providers::{provider as llm_provider, LlmProvider, LLM_PROVIDERS};
 pub use options::{ConvertOptions, Engine, LlmConfig};
 pub use python_engine::python_engine_available;
 pub use result::ConvertResult;

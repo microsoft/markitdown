@@ -846,3 +846,171 @@ body {
   border-color: var(--ok);
   background: color-mix(in srgb, var(--ok) 12%, transparent);
 }
+
+/* ---- Settings modal ---- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(2px);
+}
+.modal-overlay[hidden] {
+  display: none;
+}
+.modal {
+  width: 100%;
+  max-width: 460px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 18px 20px 20px;
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.modal-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 15px;
+}
+.modal-title .ico {
+  color: var(--accent);
+  display: inline-flex;
+}
+.modal-title .ico svg {
+  width: 18px;
+  height: 18px;
+}
+.modal-intro {
+  margin: 10px 0 14px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.btn.primary:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+  filter: brightness(1.07);
+}
+
+/* ---- Settings form ---- */
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.field-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.field-ico {
+  display: inline-flex;
+  color: var(--text-dim);
+}
+.field-ico svg {
+  width: 14px;
+  height: 14px;
+}
+.field-optional {
+  font-weight: 400;
+  color: var(--text-dim);
+}
+.field-input {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+}
+.field-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.field-select {
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  font-weight: 500;
+  /* Chevron drawn via inline SVG so no extra asset is bundled. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b6b76' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+  padding-right: 30px;
+}
+.field-textarea {
+  resize: vertical;
+  min-height: 38px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+.field-help {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+.field-help code {
+  font-family: var(--mono);
+  font-size: 0.92em;
+  background: var(--bg-sunken);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+
+.settings-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  align-self: flex-start;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-dim);
+  background: var(--bg);
+}
+.settings-status .ico svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+.settings-status[data-on="true"] {
+  color: var(--ok);
+  border-color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 12%, transparent);
+}
+
+.settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 2px;
+}

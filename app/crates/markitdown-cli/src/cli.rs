@@ -71,6 +71,41 @@ pub struct Cli {
     #[arg(long, value_name = "PATH")]
     pub python_bin: Option<std::path::PathBuf>,
 
+    // ---- LLM image captions (any OpenAI-compatible API, incl. local LLMs) ----
+    /// Provider preset: openai | ollama | lmstudio | openrouter | groq | custom.
+    /// Sets the base URL (unless --llm-api-base is given). See --list-llm-providers.
+    #[arg(long, value_name = "ID")]
+    pub llm_provider: Option<String>,
+
+    /// LLM API key for image captioning (overrides MARKITDOWN_LLM_API_KEY).
+    #[arg(long, value_name = "KEY")]
+    pub llm_api_key: Option<String>,
+
+    /// Vision model for captioning, e.g. gpt-4o-mini, or a local model like
+    /// `llava` / `llama3.2-vision` (overrides MARKITDOWN_LLM_MODEL).
+    #[arg(long, value_name = "MODEL")]
+    pub llm_model: Option<String>,
+
+    /// OpenAI-compatible base URL (overrides MARKITDOWN_LLM_API_BASE). Point at
+    /// a local server for offline captions, e.g. Ollama
+    /// `http://localhost:11434/v1` or LM Studio `http://localhost:1234/v1`.
+    #[arg(long, value_name = "URL")]
+    pub llm_api_base: Option<String>,
+
+    /// Custom caption prompt (overrides MARKITDOWN_LLM_PROMPT).
+    #[arg(long, value_name = "TEXT")]
+    pub llm_prompt: Option<String>,
+
+    /// Report which engines/capabilities are available (Python fallback, LLM
+    /// captions, model, endpoint) and exit. No secrets are printed.
+    #[arg(long)]
+    pub check: bool,
+
+    /// List the built-in LLM provider presets (id, base URL, example models)
+    /// and exit.
+    #[arg(long)]
+    pub list_llm_providers: bool,
+
     /// List supported formats and exit.
     #[arg(long)]
     pub list_formats: bool,

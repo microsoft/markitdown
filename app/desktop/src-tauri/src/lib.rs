@@ -16,8 +16,9 @@ use std::path::Path;
 use std::sync::{Arc, Condvar, Mutex};
 
 use markitdown_core::{
-    llm_caption_available, python_engine_available, ConvertOptions, Engine, MarkItDown,
-    SUPPORTED_FORMATS,
+    capabilities as core_capabilities, llm_caption_available, python_engine_available,
+    Capabilities as CoreCapabilities, ConvertOptions, Engine, LlmConfig, MarkItDown,
+    LLM_PROVIDERS, SUPPORTED_FORMATS,
 };
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
@@ -34,6 +35,43 @@ pub struct ConvertRequest {
     pub path: String,
     #[serde(default)]
     pub engine: Option<String>,
+    /// Optional LLM image-caption settings supplied by the UI. Mapped to a core
+    /// [`LlmConfig`] only when api_base + api_key + model are all non-empty.
+    #[serde(default)]
+    pub llm: Option<LlmCfg>,
+}
+
+/// LLM image-caption settings as sent from the frontend. Every field is
+/// optional so a partially-filled settings form deserializes cleanly; the
+/// mapping to a core [`LlmConfig`] only succeeds when the required trio
+/// (api_base + api_key + model) is fully populated.
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct LlmCfg {
+    #[serde(default)]
+    pub api_base: Option<String>,
+    #[serde(default)]
+    pub api_key: Option<String>,
+    #[serde(default)]
+    pub model: Option<String>,
+    #[serde(default)]
+    pub prompt: Option<String>,
+}
+
+/// Build a core [`LlmConfig`] from the frontend settings. Returns `None` unless
+/// api_base, api_key and model are all present and non-empty (after trimming),
+/// so an empty or half-filled settings form leaves env-based config untouched.
+pub fn to_llm_config(cfg: Option<&LlmCfg>) -> Option<LlmConfig> {
+    /// Trimmed, non-empty value of an optional string field.
+    fn trimmed(o: &Option<String>) -> Option<String> {
+        o.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(str::to_string)
+    }
+    let cfg = cfg?;
+    Some(LlmConfig {
+        api_base: trimmed(&cfg.api_base)?,
+        api_key: trimmed(&cfg.api_key)?,
+        model: trimmed(&cfg.model)?,
+        prompt: trimmed(&cfg.prompt),
+    })
 }
 
 /// Map a frontend engine string to the core [`Engine`]. Unknown/absent values
@@ -111,6 +149,27 @@ impl JobUpdate {
 pub struct FormatInfo {
     pub name: String,
     pub extensions: Vec<String>,
+    pub notes: String,
+}
+
+/// An LLM provider preset surfaced to the UI for the Settings provider picker.
+/// Mirrors the core [`markitdown_core::LlmProvider`] with owned strings so the
+/// whole registry can cross the Tauri command boundary as JSON.
+#[derive(Debug, Clone, Serialize)]
+pub struct LlmProviderInfo {
+    /// Stable id (matches the core registry id), persisted by the UI.
+    pub id: String,
+    /// Human-friendly name for the dropdown.
+    pub name: String,
+    /// Default OpenAI-compatible base URL (may be empty for "custom").
+    pub api_base: String,
+    /// Whether a cloud API key is required.
+    pub requires_key: bool,
+    /// True for endpoints that run on the local machine.
+    pub local: bool,
+    /// Example vision-capable models to seed the model datalist.
+    pub example_models: Vec<String>,
+    /// One-line guidance shown under the dropdown.
     pub notes: String,
 }
 
@@ -194,6 +253,7 @@ fn run_one(app: &AppHandle, req: &ConvertRequest) {
 
     let md = MarkItDown::with_options(ConvertOptions {
         engine: parse_engine(req.engine.as_deref()),
+        llm: to_llm_config(req.llm.as_ref()),
         ..Default::default()
     });
 
@@ -257,6 +317,24 @@ fn list_supported() -> Vec<FormatInfo> {
         .collect()
 }
 
+/// Return the built-in LLM provider registry so the Settings modal can render a
+/// provider dropdown (and model suggestions) instead of hardcoded presets.
+#[tauri::command]
+fn llm_providers() -> Vec<LlmProviderInfo> {
+    LLM_PROVIDERS
+        .iter()
+        .map(|p| LlmProviderInfo {
+            id: p.id.to_string(),
+            name: p.name.to_string(),
+            api_base: p.api_base.to_string(),
+            requires_key: p.requires_key,
+            local: p.local,
+            example_models: p.example_models.iter().map(|m| m.to_string()).collect(),
+            notes: p.notes.to_string(),
+        })
+        .collect()
+}
+
 #[tauri::command]
 fn get_capabilities() -> Capabilities {
     // The desktop app relies on environment configuration only (no per-call
@@ -268,6 +346,21 @@ fn get_capabilities() -> Capabilities {
     }
 }
 
+/// Richer capability report that folds in the UI's current LLM settings.
+///
+/// Builds [`ConvertOptions`] from the passed `llm` block (falling back to the
+/// environment when it's empty) and returns the core [`Capabilities`], which
+/// includes the resolved model + api_base for status display but — by design
+/// of the core type — never the API key.
+#[tauri::command]
+fn capabilities(llm: Option<LlmCfg>) -> CoreCapabilities {
+    let opts = ConvertOptions {
+        llm: to_llm_config(llm.as_ref()),
+        ..Default::default()
+    };
+    core_capabilities(&opts)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -276,7 +369,9 @@ pub fn run() {
             convert_files,
             save_markdown,
             list_supported,
-            get_capabilities
+            get_capabilities,
+            capabilities,
+            llm_providers
         ])
         .run(tauri::generate_context!())
         .expect("error while running MarkItDown desktop");
@@ -408,6 +503,121 @@ mod tests {
         sem.release();
         // A third acquire after one release must succeed without blocking.
         sem.acquire();
+    }
+
+    #[test]
+    fn to_llm_config_none_when_empty_or_partial() {
+        // No settings block at all.
+        assert!(to_llm_config(None).is_none());
+        // Empty block.
+        assert!(to_llm_config(Some(&LlmCfg::default())).is_none());
+        // Missing model.
+        let partial = LlmCfg {
+            api_base: Some("https://api.openai.com/v1".into()),
+            api_key: Some("sk-x".into()),
+            model: None,
+            prompt: None,
+        };
+        assert!(to_llm_config(Some(&partial)).is_none());
+        // Whitespace-only fields count as empty.
+        let blanky = LlmCfg {
+            api_base: Some("   ".into()),
+            api_key: Some("sk-x".into()),
+            model: Some("gpt-4o-mini".into()),
+            prompt: None,
+        };
+        assert!(to_llm_config(Some(&blanky)).is_none());
+    }
+
+    #[test]
+    fn to_llm_config_some_when_complete() {
+        let full = LlmCfg {
+            api_base: Some("  http://localhost:11434/v1  ".into()),
+            api_key: Some("sk-secret".into()),
+            model: Some("llava".into()),
+            prompt: Some("  Describe this  ".into()),
+        };
+        let cfg = to_llm_config(Some(&full)).expect("complete config maps to Some");
+        // Required fields are trimmed.
+        assert_eq!(cfg.api_base, "http://localhost:11434/v1");
+        assert_eq!(cfg.api_key, "sk-secret");
+        assert_eq!(cfg.model, "llava");
+        assert_eq!(cfg.prompt.as_deref(), Some("Describe this"));
+    }
+
+    #[test]
+    fn to_llm_config_prompt_optional() {
+        let full = LlmCfg {
+            api_base: Some("https://api.openai.com/v1".into()),
+            api_key: Some("k".into()),
+            model: Some("gpt-4o-mini".into()),
+            prompt: Some("   ".into()), // blank prompt -> None
+        };
+        let cfg = to_llm_config(Some(&full)).unwrap();
+        assert!(cfg.prompt.is_none());
+    }
+
+    #[test]
+    fn convert_request_deserializes_with_llm() {
+        let req: ConvertRequest = serde_json::from_str(
+            r#"{"id":"x","path":"/tmp/img.png","engine":"rust","llm":{"api_base":"http://localhost:1234/v1","api_key":"k","model":"llava","prompt":"hi"}}"#,
+        )
+        .unwrap();
+        assert_eq!(req.engine.as_deref(), Some("rust"));
+        let llm = req.llm.as_ref().expect("llm block present");
+        assert_eq!(llm.api_base.as_deref(), Some("http://localhost:1234/v1"));
+        assert_eq!(llm.model.as_deref(), Some("llava"));
+        let cfg = to_llm_config(req.llm.as_ref()).unwrap();
+        assert_eq!(cfg.api_key, "k");
+        assert_eq!(cfg.model, "llava");
+    }
+
+    #[test]
+    fn convert_request_llm_defaults_to_none() {
+        // Absent llm block and absent individual fields both deserialize fine.
+        let req: ConvertRequest =
+            serde_json::from_str(r#"{"id":"x","path":"/p"}"#).unwrap();
+        assert!(req.llm.is_none());
+        let req2: ConvertRequest =
+            serde_json::from_str(r#"{"id":"x","path":"/p","llm":{}}"#).unwrap();
+        assert!(req2.llm.is_some());
+        assert!(to_llm_config(req2.llm.as_ref()).is_none());
+    }
+
+    #[test]
+    fn core_capabilities_never_serializes_api_key() {
+        let opts = ConvertOptions {
+            llm: to_llm_config(Some(&LlmCfg {
+                api_base: Some("http://localhost:11434/v1".into()),
+                api_key: Some("super-secret-key".into()),
+                model: Some("llava".into()),
+                prompt: None,
+            })),
+            ..Default::default()
+        };
+        let caps = core_capabilities(&opts);
+        assert!(caps.llm_captions);
+        assert_eq!(caps.llm_model.as_deref(), Some("llava"));
+        assert_eq!(caps.llm_api_base.as_deref(), Some("http://localhost:11434/v1"));
+        let json = serde_json::to_string(&caps).unwrap();
+        assert!(!json.contains("super-secret-key"));
+        assert!(!json.contains("api_key"));
+    }
+
+    #[test]
+    fn llm_providers_returns_registry() {
+        let providers = llm_providers();
+        // The registry ships several presets; the UI relies on at least these.
+        assert!(providers.len() >= 5, "expected >=5 providers");
+        assert!(providers.iter().any(|p| p.id == "ollama"));
+        assert!(providers.iter().any(|p| p.id == "openai"));
+        // Ollama is local and needs no key — drives the UI hints.
+        let ollama = providers.iter().find(|p| p.id == "ollama").unwrap();
+        assert!(ollama.local && !ollama.requires_key);
+        assert!(!ollama.example_models.is_empty());
+        // The whole list must serialize for the Tauri command boundary.
+        let json = serde_json::to_string(&providers).unwrap();
+        assert!(json.contains("\"ollama\"") && json.contains("11434"));
     }
 
     #[test]

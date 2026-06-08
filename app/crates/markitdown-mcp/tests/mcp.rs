@@ -24,12 +24,19 @@ struct McpClient {
 
 impl McpClient {
     fn start() -> Self {
-        let mut child = Command::new(BIN)
-            .stdin(Stdio::piped())
+        Self::start_with_env(&[])
+    }
+
+    /// Start the server with extra environment variables (e.g. MARKITDOWN_LLM_*).
+    fn start_with_env(env: &[(&str, &str)]) -> Self {
+        let mut cmd = Command::new(BIN);
+        cmd.stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .spawn()
-            .expect("spawn markitdown-mcp");
+            .stderr(Stdio::null());
+        for (k, v) in env {
+            cmd.env(k, v);
+        }
+        let mut child = cmd.spawn().expect("spawn markitdown-mcp");
         let stdin = child.stdin.take().unwrap();
         let stdout = BufReader::new(child.stdout.take().unwrap());
         let mut client = McpClient {
@@ -238,4 +245,86 @@ fn tool_error_is_reported_not_crash() {
     let still_alive = c.call_tool("list_supported_formats", json!({}));
     assert!(still_alive.contains("PDF"));
     let _ = result;
+}
+
+/// One-shot mock OpenAI-compatible endpoint that reads the full request
+/// (headers + Content-Length body — the image POST is large) then replies with
+/// a fixed caption. Returns the base URL.
+fn mock_openai(caption: &'static str) -> String {
+    use std::io::Read;
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    std::thread::spawn(move || {
+        if let Ok((mut s, _)) = listener.accept() {
+            let mut buf = Vec::new();
+            let mut tmp = [0u8; 4096];
+            let header_end = loop {
+                let n = s.read(&mut tmp).unwrap_or(0);
+                if n == 0 {
+                    break buf.len();
+                }
+                buf.extend_from_slice(&tmp[..n]);
+                if let Some(p) = buf.windows(4).position(|w| w == b"\r\n\r\n") {
+                    break p + 4;
+                }
+            };
+            let headers = String::from_utf8_lossy(&buf[..header_end]).to_lowercase();
+            let len: usize = headers
+                .lines()
+                .find_map(|l| l.strip_prefix("content-length:").map(|v| v.trim().parse().unwrap_or(0)))
+                .unwrap_or(0);
+            while buf.len() < header_end + len {
+                let n = s.read(&mut tmp).unwrap_or(0);
+                if n == 0 {
+                    break;
+                }
+                buf.extend_from_slice(&tmp[..n]);
+            }
+            let body = format!(r#"{{"choices":[{{"message":{{"content":"{caption}"}}}}]}}"#);
+            let resp = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            let _ = s.write_all(resp.as_bytes());
+        }
+    });
+    format!("http://127.0.0.1:{port}/v1")
+}
+
+#[test]
+fn capabilities_report_llm_when_env_configured() {
+    let base = mock_openai("ignored for the capability listing");
+    let mut c = McpClient::start_with_env(&[
+        ("MARKITDOWN_LLM_API_BASE", &base),
+        ("MARKITDOWN_LLM_MODEL", "test-vision"),
+        ("MARKITDOWN_LLM_API_KEY", "test-key"),
+    ]);
+    let formats = c.call_tool("list_supported_formats", json!({}));
+    assert!(formats.contains("llm image captions: AVAILABLE"), "got: {formats}");
+    assert!(formats.contains("model=test-vision"));
+    assert!(!formats.contains("test-key"), "API key must never be reported");
+}
+
+#[test]
+fn server_captions_image_via_llm_env() {
+    // Simulate a real deployment: the server is launched with MARKITDOWN_LLM_*
+    // pointing at a (mock) OpenAI-compatible endpoint; converting an image then
+    // yields a '# Description:' section — proving the MCP path honors LLM env.
+    let base = mock_openai("A simulated caption from the MCP integration test.");
+    let mut c = McpClient::start_with_env(&[
+        ("MARKITDOWN_LLM_API_BASE", &base),
+        ("MARKITDOWN_LLM_MODEL", "test-vision"),
+        ("MARKITDOWN_LLM_API_KEY", "test-key"),
+    ]);
+    let text = c.call_tool(
+        "convert_to_markdown",
+        json!({"uri": fixture("test.jpg").to_str().unwrap(), "engine": "rust"}),
+    );
+    assert!(text.contains("ImageSize:"), "EXIF metadata expected");
+    assert!(
+        text.contains("# Description:")
+            && text.contains("A simulated caption from the MCP integration test."),
+        "LLM caption expected, got: {text}"
+    );
 }

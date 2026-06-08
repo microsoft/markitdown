@@ -31,6 +31,35 @@ interface FormatInfo {
 interface Capabilities {
   python_engine: boolean;
   llm_captions: boolean;
+  /** Only present from the richer `capabilities` command. Never the api key. */
+  python_engine_path?: string | null;
+  llm_model?: string | null;
+  llm_api_base?: string | null;
+}
+
+/**
+ * LLM image-caption settings, persisted to localStorage. The api key is
+ * sensitive — it is stored here but never logged or rendered in plaintext.
+ */
+interface LlmConfig {
+  api_base: string;
+  api_key: string;
+  model: string;
+  prompt: string;
+}
+
+/**
+ * An LLM provider preset from the backend `llm_providers` registry command.
+ * Drives the Settings provider dropdown and model suggestions.
+ */
+interface LlmProviderInfo {
+  id: string;
+  name: string;
+  api_base: string;
+  requires_key: boolean;
+  local: boolean;
+  example_models: string[];
+  notes: string;
 }
 
 interface Job {
@@ -65,6 +94,12 @@ let activeTab: "queue" | "logs" = "queue";
 let filter: Filter = "all";
 /** Single ticker that refreshes elapsed times while ≥1 job is converting. */
 let ticker: number | null = null;
+/** Current LLM caption settings (empty until the user configures them). */
+let llmConfig: LlmConfig = emptyLlmConfig();
+/** Provider registry fetched from the backend; drives the picker + datalist. */
+let llmProviders: LlmProviderInfo[] = [];
+/** Currently selected provider id (persisted alongside llmConfig). */
+let llmProviderId = "";
 
 // ---- DOM refs ----
 
@@ -101,6 +136,21 @@ const countEls: Record<Filter, HTMLElement> = {
   done: $("count-done"),
   failed: $("count-failed"),
 };
+// Settings modal
+const settingsBtn = $<HTMLButtonElement>("settings-btn");
+const settingsOverlay = $("settings-overlay");
+const settingsClose = $<HTMLButtonElement>("settings-close");
+const settingsForm = $<HTMLFormElement>("settings-form");
+const settingsClear = $<HTMLButtonElement>("settings-clear");
+const llmProviderSelect = $<HTMLSelectElement>("llm-provider");
+const llmProviderNotes = $("llm-provider-notes");
+const llmModelOptions = $<HTMLDataListElement>("llm-model-options");
+const llmApiBaseInput = $<HTMLInputElement>("llm-api-base");
+const llmModelInput = $<HTMLInputElement>("llm-model");
+const llmApiKeyInput = $<HTMLInputElement>("llm-api-key");
+const llmPromptInput = $<HTMLTextAreaElement>("llm-prompt");
+const settingsStatus = $("settings-status");
+const settingsStatusText = $("settings-status-text");
 
 // ---- Helpers ----
 
@@ -128,6 +178,65 @@ function formatDuration(ms: number): string {
   const m = Math.floor(secs / 60);
   const s = Math.round(secs % 60);
   return `${m}m ${String(s).padStart(2, "0")}s`;
+}
+
+// ---- LLM caption settings (persisted to localStorage) ----
+
+const LLM_KEY = "llmConfig";
+const LLM_PROVIDER_KEY = "llmProvider";
+
+function emptyLlmConfig(): LlmConfig {
+  return { api_base: "", api_key: "", model: "", prompt: "" };
+}
+
+function loadLlmConfig(): void {
+  try {
+    const raw = localStorage.getItem(LLM_KEY);
+    if (raw) {
+      const p = JSON.parse(raw);
+      if (p && typeof p === "object") {
+        llmConfig = {
+          api_base: typeof p.api_base === "string" ? p.api_base : "",
+          api_key: typeof p.api_key === "string" ? p.api_key : "",
+          model: typeof p.model === "string" ? p.model : "",
+          prompt: typeof p.prompt === "string" ? p.prompt : "",
+        };
+      }
+    }
+  } catch {
+    llmConfig = emptyLlmConfig();
+  }
+  // Provider id is stored separately so the `llm` payload stays the original
+  // {api_base, api_key, model, prompt} shape.
+  const storedProvider = localStorage.getItem(LLM_PROVIDER_KEY);
+  if (typeof storedProvider === "string") llmProviderId = storedProvider;
+}
+
+function persistLlmConfig(): void {
+  try {
+    localStorage.setItem(LLM_KEY, JSON.stringify(llmConfig));
+    localStorage.setItem(LLM_PROVIDER_KEY, llmProviderId);
+  } catch {
+    /* quota / unavailable — best effort */
+  }
+}
+
+/**
+ * The `llm` payload to send with a conversion, or `undefined` when the config
+ * is incomplete (api base + model + key all required). When undefined the
+ * backend falls back to environment configuration.
+ */
+function llmPayload(): LlmConfig | undefined {
+  const c = llmConfig;
+  if (c.api_base.trim() && c.model.trim() && c.api_key.trim()) {
+    return {
+      api_base: c.api_base.trim(),
+      api_key: c.api_key,
+      model: c.model.trim(),
+      prompt: c.prompt.trim(),
+    };
+  }
+  return undefined;
 }
 
 // ---- Logs (persisted to localStorage, capped at 500 lines) ----
@@ -491,7 +600,7 @@ async function enqueue(paths: string[]): Promise<void> {
       edited: false,
     });
     log("info", `Queued ${name} (engine: ${engine})`);
-    return { id, path, engine };
+    return { id, path, engine, llm: llmPayload() };
   });
   renderQueue();
   syncTicker();
@@ -524,7 +633,7 @@ async function retry(id: string): Promise<void> {
   syncTicker();
   try {
     await invoke("convert_files", {
-      requests: [{ id: job.id, path: job.path, engine: job.engine }],
+      requests: [{ id: job.id, path: job.path, engine: job.engine, llm: llmPayload() }],
     });
   } catch (e) {
     console.error("convert_files (retry) failed", e);
@@ -653,39 +762,197 @@ async function loadFormats(): Promise<void> {
   }
 }
 
-async function loadCapabilities(): Promise<void> {
+async function loadCapabilities(quiet = false): Promise<void> {
   try {
-    const caps = await invoke<Capabilities>("get_capabilities");
+    // Fold the current UI settings into the report so the LLM badge reflects
+    // configured-in-app captions, not just environment variables. The command
+    // returns model + api_base but, by design of the core type, never the key.
+    const caps = await invoke<Capabilities>("capabilities", { llm: llmPayload() ?? null });
     setCap(
       "cap-python",
       caps.python_engine,
       caps.python_engine
-        ? "Python engine available"
+        ? `Python engine available${caps.python_engine_path ? ` (${caps.python_engine_path})` : ""}`
         : "Python engine not configured — set MARKITDOWN_PY_BIN to a markitdown binary",
     );
-    setCap(
-      "cap-llm",
-      caps.llm_captions,
-      caps.llm_captions
-        ? "LLM image captions available"
-        : "LLM captions not configured — set MARKITDOWN_LLM_API_KEY and MARKITDOWN_LLM_MODEL",
-    );
-    log(
-      "info",
-      `Capabilities — Python engine: ${caps.python_engine ? "on" : "off"}, LLM captions: ${
-        caps.llm_captions ? "on" : "off"
-      }`,
-    );
+    const llmTip = caps.llm_captions
+      ? `LLM image captions active — ${caps.llm_model ?? "model"} @ ${
+          caps.llm_api_base ?? "endpoint"
+        }`
+      : "LLM captions off — configure them in Settings (or set MARKITDOWN_LLM_API_KEY + MARKITDOWN_LLM_MODEL)";
+    setCap("cap-llm", caps.llm_captions, llmTip);
+    updateSettingsStatus(caps);
+    if (!quiet) {
+      log(
+        "info",
+        `Capabilities — Python engine: ${caps.python_engine ? "on" : "off"}, LLM captions: ${
+          caps.llm_captions
+            ? `on (${caps.llm_model ?? "?"} @ ${caps.llm_api_base ?? "?"})`
+            : "off"
+        }`,
+      );
+    }
   } catch (e) {
-    console.error("get_capabilities failed", e);
-    log("err", `get_capabilities failed: ${String(e)}`);
+    console.error("capabilities failed", e);
+    log("err", `capabilities failed: ${String(e)}`);
   }
+}
+
+/** Reflect live caption status inside the settings modal (never the key). */
+function updateSettingsStatus(caps: Capabilities): void {
+  settingsStatus.dataset.on = caps.llm_captions ? "true" : "false";
+  settingsStatusText.textContent = caps.llm_captions
+    ? `Captions on — ${caps.llm_model ?? "model"} @ ${caps.llm_api_base ?? "endpoint"}`
+    : "Captions off";
 }
 
 function setCap(id: string, on: boolean, tooltip: string): void {
   const el = $(id);
   el.dataset.on = on ? "true" : "false";
   el.title = tooltip;
+}
+
+// ---- Settings modal ----
+
+/** Find a provider preset by id, if loaded. */
+function providerById(id: string): LlmProviderInfo | undefined {
+  return llmProviders.find((p) => p.id === id);
+}
+
+/** Fetch the provider registry from the backend and build the dropdown. */
+async function loadProviders(): Promise<void> {
+  try {
+    llmProviders = await invoke<LlmProviderInfo[]>("llm_providers");
+  } catch (e) {
+    console.error("llm_providers failed", e);
+    log("err", `llm_providers failed: ${String(e)}`);
+    llmProviders = [];
+  }
+  // Build the <select> options once; selection is restored on open.
+  const frag = document.createDocumentFragment();
+  for (const p of llmProviders) {
+    const opt = document.createElement("option");
+    opt.value = p.id;
+    opt.textContent = p.name;
+    frag.appendChild(opt);
+  }
+  llmProviderSelect.replaceChildren(frag);
+}
+
+/** Refresh the model <datalist> + notes/hint for the selected provider. */
+function syncProviderUI(): void {
+  const p = providerById(llmProviderId);
+  // Model suggestions.
+  const frag = document.createDocumentFragment();
+  for (const m of p?.example_models ?? []) {
+    const opt = document.createElement("option");
+    opt.value = m;
+    frag.appendChild(opt);
+  }
+  llmModelOptions.replaceChildren(frag);
+  // Notes + local / no-key hint.
+  if (!p) {
+    llmProviderNotes.textContent = "";
+    return;
+  }
+  const hints: string[] = [];
+  if (p.local) hints.push("local");
+  if (!p.requires_key) hints.push("no key needed");
+  const hint = hints.length ? ` (${hints.join(" · ")})` : "";
+  llmProviderNotes.textContent = `${p.notes}${hint}`;
+}
+
+/**
+ * Handle a provider selection: fill the API base from the preset (when it has
+ * one) and prefill the first example model only when the Model field is empty,
+ * so an explicit model the user typed is never clobbered.
+ */
+function onProviderChange(id: string): void {
+  llmProviderId = id;
+  const p = providerById(id);
+  if (p) {
+    if (p.api_base) llmApiBaseInput.value = p.api_base;
+    if (!llmModelInput.value.trim() && p.example_models.length) {
+      llmModelInput.value = p.example_models[0];
+    }
+  }
+  syncProviderUI();
+}
+
+/** Populate the form inputs from the current in-memory config. */
+function syncSettingsForm(): void {
+  llmProviderSelect.value = llmProviderId;
+  // If the stored id is unknown (registry changed), fall back to no selection.
+  if (llmProviderSelect.value !== llmProviderId) llmProviderId = llmProviderSelect.value;
+  llmApiBaseInput.value = llmConfig.api_base;
+  llmModelInput.value = llmConfig.model;
+  llmApiKeyInput.value = llmConfig.api_key;
+  llmPromptInput.value = llmConfig.prompt;
+  syncProviderUI();
+}
+
+function openSettings(): void {
+  syncSettingsForm();
+  settingsOverlay.hidden = false;
+  settingsOverlay.setAttribute("aria-hidden", "false");
+  // Focus the first empty field for quicker entry.
+  (llmApiBaseInput.value ? llmModelInput : llmApiBaseInput).focus();
+}
+
+function closeSettings(): void {
+  settingsOverlay.hidden = true;
+  settingsOverlay.setAttribute("aria-hidden", "true");
+  settingsBtn.focus();
+}
+
+/** Read the form into the config, persist, and refresh status. */
+function saveSettings(): void {
+  llmConfig = {
+    api_base: llmApiBaseInput.value.trim(),
+    api_key: llmApiKeyInput.value,
+    model: llmModelInput.value.trim(),
+    prompt: llmPromptInput.value.trim(),
+  };
+  llmProviderId = llmProviderSelect.value;
+  persistLlmConfig();
+  // Log status without ever echoing the key.
+  const active = llmPayload() !== undefined;
+  log(
+    "info",
+    active
+      ? `LLM captions configured — ${llmConfig.model} @ ${llmConfig.api_base}`
+      : "LLM captions cleared/incomplete — captions off",
+  );
+  void loadCapabilities(true);
+}
+
+function clearSettings(): void {
+  llmConfig = emptyLlmConfig();
+  llmProviderId = "";
+  persistLlmConfig();
+  syncSettingsForm();
+  log("info", "LLM caption settings cleared");
+  void loadCapabilities(true);
+}
+
+function initSettings(): void {
+  settingsBtn.addEventListener("click", openSettings);
+  settingsClose.addEventListener("click", closeSettings);
+  settingsOverlay.addEventListener("click", (e) => {
+    if (e.target === settingsOverlay) closeSettings();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !settingsOverlay.hidden) closeSettings();
+  });
+  settingsForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    saveSettings();
+    closeSettings();
+  });
+  settingsClear.addEventListener("click", clearSettings);
+  llmProviderSelect.addEventListener("change", () =>
+    onProviderChange(llmProviderSelect.value),
+  );
 }
 
 // ---- Wire up events ----
@@ -700,10 +967,13 @@ function init(): void {
   hydrateIcons();
   loadLogs();
   renderLogs();
+  loadLlmConfig();
   initTheme();
   initEngine();
   initTab();
   initFilter();
+  initSettings();
+  void loadProviders();
   loadFormats();
   loadCapabilities();
 

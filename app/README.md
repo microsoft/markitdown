@@ -46,21 +46,91 @@ Wikipedia / Bing converters fully activate), local files as **paths**
 through `MARKITDOWN_PY_ARGS` — e.g. Azure Document Intelligence:
 `MARKITDOWN_PY_ARGS="-d -e https://<res>.cognitiveservices.azure.com/"`.
 
-## LLM image captions (works everywhere, no Python needed)
+## LLM image captions (works everywhere — cloud or local LLM)
 
 Python markitdown's image-description feature is library-only (no CLI flag);
 here it's built into the Rust engine as a plain OpenAI-compatible REST call,
-so the CLI, MCP server and desktop app all get it via environment:
+so the **CLI, MCP server and desktop app all expose it**. Images gain a
+`# Description:` section identical to Python's output, and caption failures
+never break a conversion (metadata is still returned). Any OpenAI-compatible
+endpoint works — including **local LLMs** (no key/cloud needed).
 
+Configure it three ways (CLI flags > environment > desktop settings):
+
+**Environment** (used by all three apps):
 ```bash
 export MARKITDOWN_LLM_API_KEY=sk-...
-export MARKITDOWN_LLM_MODEL=gpt-4o-mini          # any vision model
-# optional: MARKITDOWN_LLM_API_BASE (default https://api.openai.com/v1 —
-#           point it at any OpenAI-compatible server), MARKITDOWN_LLM_PROMPT
+export MARKITDOWN_LLM_MODEL=gpt-4o-mini      # any vision model
+export MARKITDOWN_LLM_PROVIDER=openai        # optional preset (sets the base URL)
+export MARKITDOWN_LLM_API_BASE=https://api.openai.com/v1   # optional; overrides the preset
+export MARKITDOWN_LLM_PROMPT="Describe this image."        # optional
 ```
 
-Images then gain a `# Description:` section identical to Python's output.
-Caption failures never break a conversion (metadata is still returned).
+**Provider presets** — instead of remembering base URLs, pick a provider with
+`--llm-provider` (or `MARKITDOWN_LLM_PROVIDER`). `markitdown --list-llm-providers`
+prints them:
+
+| id | base URL | key? | example models |
+|---|---|---|---|
+| `openai` | `https://api.openai.com/v1` | yes | gpt-4o-mini, gpt-4o |
+| `anthropic` | `https://api.anthropic.com/v1` | yes | claude-sonnet-4-6, claude-opus-4-8 |
+| `ollama` | `http://localhost:11434/v1` | no (local) | llama3.2-vision, llava, minicpm-v |
+| `lmstudio` | `http://localhost:1234/v1` | no (local) | (the loaded model) |
+| `openrouter` | `https://openrouter.ai/api/v1` | yes | openai/gpt-4o-mini, qwen/qwen-2-vl-7b-instruct |
+| `groq` | `https://api.groq.com/openai/v1` | yes | llama-3.2-11b-vision-preview |
+| `qwen` | `https://dashscope-intl.aliyuncs.com/compatible-mode/v1` | yes | qwen-vl-max, qwen2.5-vl-72b-instruct |
+| `zhipu` | `https://open.bigmodel.cn/api/paas/v4` | yes | glm-4v-plus, glm-4v |
+| `moonshot` | `https://api.moonshot.cn/v1` | yes | moonshot-v1-8k-vision-preview |
+| `custom` | (set `--llm-api-base`) | — | any |
+
+Claude uses Anthropic's **OpenAI-compatible** endpoint (not the native
+`/v1/messages` API). The Chinese providers (Qwen/DashScope, Zhipu GLM-4V,
+Moonshot Kimi) all expose OpenAI-compatible **vision** endpoints; for mainland
+China, set `--llm-api-base` to the `dashscope.aliyuncs.com` endpoint for Qwen.
+Only vision-capable, OpenAI-compatible providers are listed (e.g. Azure OpenAI
+and text-only DeepSeek are intentionally excluded for captioning).
+
+The registry is defined in `crates/markitdown-core/src/llm_providers.rs` — add
+or edit providers there; the CLI, MCP and desktop all read the same list. Any
+OpenAI-compatible server works even if it isn't listed (use `custom`).
+
+**CLI flags** (override the env per-invocation):
+```bash
+# Cloud (OpenAI):
+markitdown photo.jpg --llm-provider openai --llm-api-key sk-... --llm-model gpt-4o-mini
+
+# Local LLM via Ollama (no key, fully offline — `ollama pull llava` first):
+markitdown photo.jpg --llm-provider ollama --llm-model llava
+
+# Swap models freely — any model the endpoint serves:
+markitdown photo.jpg --llm-provider ollama --llm-model llama3.2-vision
+
+# Fully custom OpenAI-compatible endpoint (vLLM, llama.cpp server, LiteLLM, …):
+markitdown photo.jpg --llm-api-base http://my-host:8000/v1 --llm-model my-model --llm-api-key k
+```
+
+`--llm-api-base` always overrides a provider's default base.
+
+**MCP server**: set the `MARKITDOWN_LLM_*` env in the server's launch config
+(`claude mcp add markitdown -e MARKITDOWN_LLM_API_KEY=… -e MARKITDOWN_LLM_MODEL=… -- …`,
+or the `env` block in `claude_desktop_config.json`).
+
+**Desktop app**: the header ⚙ Settings panel takes the key/model/base/prompt
+(API key is a password field, never logged), with one-click **OpenAI / Ollama /
+LM Studio** presets and a live caption-status pill. Settings persist locally and
+are sent with each conversion.
+
+### Check what's available
+
+```bash
+markitdown --check
+# python fallback engine : not configured  (set MARKITDOWN_PY_BIN or --python-bin)
+# llm image captions     : available  (model=llava, endpoint=http://localhost:11434/v1)
+```
+
+`--check` (and the MCP `list_supported_formats` tool, and the desktop status
+badges) report engine + LLM availability — model and endpoint, **never the
+API key**.
 
 ## Engine support vs. upstream optional dependencies
 
@@ -226,6 +296,12 @@ On the repo's **Releases** page (one release, all platforms):
 - **Desktop app installers** — macOS `.dmg` **and** a zipped ready-to-run
   `.app` (Intel & Apple Silicon); Linux `.deb` (x86_64 & aarch64) + `.AppImage`
   (x86_64); Windows `.msi` + `-setup.exe`.
+- **Optional Python fallback binaries** (`markitdown-py-<platform>`) — only
+  needed to enable OCR / transcription / Azure via `--engine auto`; large, so
+  download only if you want those extras. Built best-effort for Linux
+  (x86_64/aarch64), Windows (x86_64) and macOS Apple Silicon; Intel macOS users
+  build locally with `python-engine/build_binary.sh` (PyInstaller can't
+  cross-compile, and an arm64 Python binary can't run on Intel).
 
 > The macOS **Intel (x86_64)** artifacts are *cross-compiled on the Apple
 > Silicon runner* (`macos-14`), not on an Intel runner. GitHub's Intel macOS
