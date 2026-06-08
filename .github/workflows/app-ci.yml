@@ -99,26 +99,11 @@ jobs:
         working-directory: app
         run: cargo build --locked -p markitdown-cli -p markitdown-mcp
 
-      - name: Smoke test the binaries
-        run: |
-          set -euo pipefail
-          EXE=""; [[ "$RUNNER_OS" == "Windows" ]] && EXE=".exe"
-          BIN="app/target/debug"
-          # Capture to files before grepping: under `set -o pipefail`, a
-          # `cli | grep -q` pipeline fails when grep closes the pipe early
-          # (the writer sees EOF/BrokenPipe). Capturing avoids that entirely.
-          "$BIN/markitdown$EXE" --version
-          "$BIN/markitdown$EXE" --list-formats > formats.txt
-          grep -qi PDF formats.txt
-          "$BIN/markitdown$EXE" packages/markitdown/tests/test_files/test.docx > docx.txt
-          grep -q AutoGen docx.txt
-          # MCP stdio handshake (capture to file so a downstream grep can't
-          # SIGPIPE the server before it flushes).
-          printf '%s\n%s\n%s\n' \
-            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"ci","version":"0"}}}' \
-            '{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}' \
-            '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
-            > mcp_req.txt
-          "$BIN/markitdown-mcp$EXE" < mcp_req.txt > mcp_resp.txt
-          grep -q convert_to_markdown mcp_resp.txt
-          echo "smoke OK on ${{ matrix.label }}"
+      # Per-format regression gate on the freshly built binary (same script as
+      # the release pipeline): converts one fixture per format group, asserts
+      # each is non-empty, that a non-document is rejected, and that the MCP
+      # server completes a stdio handshake. Capturing output to files avoids
+      # the `cli | grep -q` + pipefail broken-pipe trap.
+      - name: Smoke + format-regression test
+        shell: bash
+        run: BIN="app/target/debug" bash .github/scripts/smoke.sh "${{ matrix.label }}"

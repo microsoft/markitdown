@@ -177,26 +177,12 @@ jobs:
 
       # Smoke test runs AFTER compression, so it validates exactly the bytes
       # that ship — a packed binary that can't start fails the release here.
-      - name: Smoke test released binaries
-        run: |
-          set -euo pipefail
-          EXE=""; [[ "$RUNNER_OS" == "Windows" ]] && EXE=".exe"
-          BIN="app/target/${{ matrix.target }}/release"
-          # Capture to files before grepping: under `set -o pipefail` a
-          # `cli | grep -q` pipeline fails when grep closes the pipe early.
-          "$BIN/markitdown$EXE" --version
-          "$BIN/markitdown$EXE" --list-formats > formats.txt
-          grep -qi PDF formats.txt
-          "$BIN/markitdown$EXE" packages/markitdown/tests/test_files/test.docx > docx.txt
-          grep -q AutoGen docx.txt
-          printf '%s\n%s\n%s\n' \
-            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"ci","version":"0"}}}' \
-            '{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}' \
-            '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
-            > mcp_req.txt
-          "$BIN/markitdown-mcp$EXE" < mcp_req.txt > mcp_resp.txt
-          grep -q convert_to_markdown mcp_resp.txt
-          echo "binary smoke OK on ${{ matrix.label }}"
+      # This is a per-format REGRESSION gate on the actual shipped binary: it
+      # converts one real fixture for every format group and fails if any is
+      # empty or errors, and asserts a non-format binary is still rejected.
+      - name: Smoke + format-regression test on the released binary
+        shell: bash
+        run: BIN="app/target/${{ matrix.target }}/release" bash .github/scripts/smoke.sh "${{ matrix.label }}"
 
       # ---- install frontend deps + build the Tauri desktop installers -----
       - name: Install frontend dependencies

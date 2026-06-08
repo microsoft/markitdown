@@ -62,6 +62,39 @@ export MARKITDOWN_LLM_MODEL=gpt-4o-mini          # any vision model
 Images then gain a `# Description:` section identical to Python's output.
 Caption failures never break a conversion (metadata is still returned).
 
+## Engine support vs. upstream optional dependencies
+
+How each upstream `markitdown[...]` optional-dependency group maps to this
+suite. **Rust** = the pure-Rust engine (default, zero dependencies);
+**Hybrid** = Rust with the optional Python binary configured
+(`MARKITDOWN_PY_BIN`, built from `markitdown[all]` — see `python-engine/`),
+used automatically by `--engine auto`.
+
+| Upstream group | Rust engine | Hybrid (Rust + Python) | How |
+|---|---|---|---|
+| `[pptx]` PowerPoint | ✅ native | ✅ | custom OOXML parser (`converters/pptx.rs`) |
+| `[docx]` Word | ✅ native | ✅ full | OOXML parser; comments/equations are *degraded* → Python fills them in |
+| `[xlsx]` Excel | ✅ native | ✅ | `calamine` |
+| `[xls]` legacy Excel | ✅ native | ✅ | `calamine` (BIFF) |
+| `[pdf]` PDF | ✅ text | ✅ full | `pdf-extract`; scanned/OCR + complex tables are *degraded* → Python (OCR plugin / pdfplumber) |
+| `[outlook]` `.msg` | ✅ native | ✅ full | `msg_parser` (headers + plain-text body); RTF-only body *degraded* → Python |
+| `[audio-transcription]` wav/mp3 | ⚠️ tags only | ✅ transcription | audio is *degraded* → Python (`audio-transcription` extra) auto-runs |
+| `[youtube-transcription]` | ⚠️ page metadata | ✅ transcript | YouTube page is *degraded* → Python (`youtube-transcript-api`) auto-runs |
+| `[az-doc-intel]` Azure DI | ❌ (cloud) | ✅ | `MARKITDOWN_PY_ARGS="-d -e https://<res>.cognitiveservices.azure.com/"` |
+| `[az-content-understanding]` Azure CU | ❌ (cloud) | ✅ | `MARKITDOWN_PY_ARGS="--use-cu --cu-endpoint <endpoint>"` |
+| `[all]` everything | ✅ all local formats | ✅ everything | Rust handles local formats; Python adds OCR, transcription, Azure |
+| LLM image captions *(library-only upstream)* | ✅ native | ✅ | `MARKITDOWN_LLM_API_KEY` + `MARKITDOWN_LLM_MODEL` (see above) |
+
+Legend: ✅ supported · ⚠️ partial (metadata, no transcription/OCR) without the
+Python engine · ❌ not available in pure Rust.
+
+In short: every **local document format** (`pptx`, `docx`, `xlsx`, `xls`,
+`pdf`, `outlook`) works out of the box in pure Rust. The **cloud and
+transcription** groups (`az-doc-intel`, `az-content-understanding`,
+`audio-transcription`, `youtube-transcription`) require the hybrid Python
+engine and are reached automatically by `--engine auto` once it is configured —
+nothing is permanently unsupported.
+
 ## Build everything
 
 ```bash

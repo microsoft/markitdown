@@ -1,6 +1,11 @@
 //! Tests for the Auto-engine fallback chain using stub "Python engines"
 //! (tiny shell scripts), so the real PyInstaller binary is not required.
 //!
+//! UNIX-ONLY by design: the stubs are `#!/bin/sh` scripts with the exec bit,
+//! so this whole file is `#![cfg(unix)]` and compiles away on Windows. The
+//! Windows-safe counterpart — engine selection + "no fallback when the binary
+//! is absent" — lives in `engine_selection.rs`, which runs on every OS.
+//!
 //! Covers every decision in the Auto matrix:
 //!   rust Err            + python ok      -> python result
 //!   rust Ok(degraded)   + python ok      -> python result

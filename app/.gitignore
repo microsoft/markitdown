@@ -32,3 +32,10 @@ markitdown-py.spec
 .idea/
 *.swp
 *.log
+
+# --- Scratch output (smoke.sh now uses a temp dir; this is belt-and-suspenders
+#     in case a script or manual command is run from inside app/) ---
+formats.txt
+conv_out.md
+mcp_req.txt
+mcp_resp.txt
