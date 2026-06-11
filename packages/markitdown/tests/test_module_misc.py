@@ -6,6 +6,8 @@ import shutil
 import pytest
 from unittest.mock import MagicMock
 
+import markitdown.converters._pdf_converter as pdf_converter_module
+
 from markitdown._uri_utils import parse_data_uri, file_uri_to_path
 
 from markitdown import (
@@ -485,6 +487,67 @@ def test_exceptions() -> None:
         )
     assert len(exc_info.value.attempts) == 1
     assert type(exc_info.value.attempts[0].converter).__name__ == "PptxConverter"
+
+
+def test_pdf_converter_prefers_pymupdf_when_primary_extraction_is_truncated(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _FakePage:
+        images = [object()]
+
+        def extract_words(self, keep_blank_chars=True, x_tolerance=3, y_tolerance=3):
+            return []
+
+        def extract_text(self):
+            return "BEFORE_IMAGE: this text should be extracted"
+
+    class _FakePdf:
+        pages = [_FakePage()]
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    class _FakePyMuPdfPage:
+        def get_text(self, kind):
+            assert kind == "text"
+            return (
+                "BEFORE_IMAGE: this text should be extracted\n"
+                "AFTER_IMAGE: this text should also be extracted"
+            )
+
+    class _FakePyMuPdfDoc:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def __iter__(self):
+            return iter([_FakePyMuPdfPage()])
+
+    monkeypatch.setattr(pdf_converter_module.pdfplumber, "open", lambda _: _FakePdf())
+    monkeypatch.setattr(
+        pdf_converter_module.pdfminer.high_level,
+        "extract_text",
+        lambda _: "BEFORE_IMAGE: this text should be extracted",
+    )
+    monkeypatch.setattr(
+        pdf_converter_module.fitz,
+        "open",
+        lambda *args, **kwargs: _FakePyMuPdfDoc(),
+    )
+
+    converter = pdf_converter_module.PdfConverter()
+    result = converter.convert(
+        io.BytesIO(b"%PDF-1.4 fake"),
+        StreamInfo(mimetype="application/pdf", extension=".pdf"),
+    )
+
+    assert "BEFORE_IMAGE: this text should be extracted" in result.markdown
+    assert "AFTER_IMAGE: this text should also be extracted" in result.markdown
 
 
 @pytest.mark.skipif(

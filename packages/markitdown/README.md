@@ -16,6 +16,12 @@ From PyPI:
 pip install 'markitdown[all]'
 ```
 
+If you need the optional PyMuPDF fallback for some PDFs:
+
+```bash
+pip install markitdown[pymupdf]
+```
+
 From source:
 
 ```bash
