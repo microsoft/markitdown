@@ -42,6 +42,24 @@ result = md.convert("test.xlsx")
 print(result.text_content)
 ```
 
+### gRPC API
+
+Install the gRPC extra first: `pip install 'markitdown[grpc]'`
+
+- Protobuf definition: `proto/markitdown/v1/markitdown.proto`
+- Server entrypoint: `markitdown-grpc --bind-address 127.0.0.1:50051`
+- Stub regeneration: `./scripts/regenerate-grpc.sh`
+
+Three RPCs are available:
+
+- `Convert` returns the full Markdown in a single response.
+- `ConvertStream` returns the Markdown as an ordered stream of chunks.
+- `ConvertDocumentStream` returns the document as an ordered stream of structured elements (headings, paragraphs, tables, lists, code blocks, images, ...).
+
+Both streaming RPCs support EXPERIMENTAL incremental conversion (`streaming_options.experimental_incremental`): PDF and PPTX results stream as each page or slide is processed, backed by the `markitdown.streaming` package.
+
+The server is unauthenticated and performs I/O with the privileges of the server process; bind to localhost unless the network path is otherwise secured. See [Security Considerations](https://github.com/microsoft/markitdown#security-considerations).
+
 ### More Information
 
 For more information, and full documentation, see the project [README.md](https://github.com/microsoft/markitdown) on GitHub.

@@ -49,6 +49,10 @@ all = [
   "azure-ai-documentintelligence",
   "azure-ai-contentunderstanding>=1.2.0b1",
   "azure-identity",
+  "grpcio>=1.81.0",
+  "grpcio-health-checking>=1.81.0",
+  "grpcio-reflection>=1.81.0",
+  "protobuf>=6.33.5",
 ]
 pptx = ["python-pptx"]
 docx = ["mammoth~=1.11.0", "lxml"]
@@ -61,6 +65,12 @@ youtube-transcription = ["youtube-transcript-api"]
 az-doc-intel = ["azure-ai-documentintelligence", "azure-identity"]
 # >=1.2.0b1 required for to_llm_input() helper used by ContentUnderstandingConverter
 az-content-understanding = ["azure-ai-contentunderstanding>=1.2.0b1", "azure-identity"]
+grpc = [
+  "grpcio>=1.81.0",
+  "grpcio-health-checking>=1.81.0",
+  "grpcio-reflection>=1.81.0",
+  "protobuf>=6.33.5",
+]
 
 [project.urls]
 Documentation = "https://github.com/microsoft/markitdown#readme"
@@ -72,6 +82,8 @@ path = "src/markitdown/__about__.py"
 
 [project.scripts]
 markitdown = "markitdown.__main__:main"
+markitdown-grpc = "markitdown.grpc.server:main"
+markitdown-grpc-client = "markitdown.grpc.client:main"
 
 [tool.hatch.envs.default]
 features = ["all"]
@@ -112,4 +124,4 @@ exclude_lines = [
 ]
 
 [tool.hatch.build.targets.sdist]
-only-include = ["src/markitdown"]
+only-include = ["src/markitdown", "proto", "scripts"]

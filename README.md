@@ -287,6 +287,107 @@ docker build -t markitdown:latest .
 docker run --rm -i markitdown:latest < ~/your-file.pdf > output.md
 ```
 
+### gRPC
+
+MarkItDown includes a built-in gRPC server and client, available via the `[grpc]` optional dependency:
+
+```sh
+pip install 'markitdown[grpc]'
+```
+
+> [!IMPORTANT]
+> The gRPC server is unauthenticated and performs I/O with the privileges of the server process: requests can reference server-side file paths and URIs. Bind to localhost (the default) unless the network path is otherwise secured, and review the [Security Considerations](#security-considerations) section before deploying it.
+
+**Start the server:**
+
+```sh
+markitdown-grpc --bind-address 127.0.0.1:50051
+```
+
+The server registers the standard [gRPC health checking](https://grpc.io/docs/guides/health-checking/) and [server reflection](https://grpc.io/docs/guides/reflection/) services, so it works out of the box with Kubernetes health probes and tools like `grpcurl`.
+
+**CLI client** — send a convert request to the running server:
+
+```sh
+# Convert a local file
+markitdown-grpc-client path/to/file.pdf
+
+# Convert a remote URI
+markitdown-grpc-client --uri https://example.com/page.html
+
+# Pipe content from stdin (provide an extension hint so the server can detect the format)
+cat file.docx | markitdown-grpc-client -x .docx
+
+# Use the streaming RPC and save output to a file
+markitdown-grpc-client --stream path/to/file.pdf -o output.md
+
+# Connect to a non-default address
+markitdown-grpc-client --address 10.0.0.5:50051 path/to/file.pdf
+```
+
+**Python client:**
+
+```python
+from markitdown.grpc import MarkItDownClient
+
+# Unary convert
+with MarkItDownClient("127.0.0.1:50051") as client:
+    result = client.convert(local_path="path/to/file.pdf")
+    print(result.markdown)
+
+# Convert a remote URI
+with MarkItDownClient() as client:
+    result = client.convert(uri="https://example.com/page.html")
+    print(result.markdown)
+
+# Convert raw bytes
+with MarkItDownClient() as client:
+    with open("file.docx", "rb") as f:
+        data = f.read()
+    result = client.convert(content=data, extension=".docx")
+    print(result.markdown)
+
+# Streaming convert — reassemble markdown from chunks
+with MarkItDownClient() as client:
+    parts = []
+    for event in client.convert_stream(local_path="path/to/file.pdf"):
+        if event.HasField("markdown_chunk"):
+            parts.append(event.markdown_chunk.markdown)
+    markdown = "".join(parts)
+    print(markdown)
+
+# Structured document streaming — receive typed elements (headings,
+# paragraphs, tables, lists, code blocks, images, ...) so downstream
+# systems can process document structure without re-parsing Markdown
+with MarkItDownClient() as client:
+    for event in client.convert_document_stream(local_path="path/to/file.pdf"):
+        if not event.HasField("element"):
+            continue
+        element = event.element
+        kind = element.WhichOneof("kind")
+        if kind == "heading":
+            print(f"H{element.heading.level}: {element.heading.text}")
+        elif kind == "table":
+            print(f"table with {len(element.table.rows)} rows")
+        elif kind == "image":
+            print(f"image: {element.image.url} (alt: {element.image.alt_text})")
+```
+
+Both streaming RPCs deliver results as ordered events (`started`, then content, then `completed`). By default, the conversion completes server-side before streaming begins; streaming reduces time-to-first-byte on the wire and keeps individual messages small.
+
+**Experimental incremental conversion:** pass `incremental=True` (or set `streaming_options.experimental_incremental` in the proto) to stream results *while the document is still converting* — one fragment per PDF page or PPTX slide. On a 120-page PDF this cuts time-to-first-chunk from seconds to milliseconds. Unsupported formats fall back to whole-document conversion transparently.
+
+```python
+with MarkItDownClient() as client:
+    for event in client.convert_document_stream(
+        local_path="path/to/big.pdf", incremental=True
+    ):
+        if event.HasField("element"):
+            ...  # elements arrive as each page is processed
+```
+
+Incremental output is identical to whole-document conversion for PPTX and for PDFs containing tables/forms; pure-prose PDFs may differ slightly in whitespace (the standard converter re-extracts those in a single pass). Incremental conversion is skipped when Azure backends or plugins are configured.
+
 ## Contributing
 
 This project welcomes contributions and suggestions. Most contributions require you to agree to a

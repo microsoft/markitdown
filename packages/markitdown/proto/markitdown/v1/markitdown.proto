@@ -1,0 +1,355 @@
+syntax = "proto3";
+
+package markitdown.v1;
+
+// MarkItDownService converts documents (PDF, Office, HTML, images, audio,
+// and more) to Markdown suitable for LLM and text-analysis pipelines.
+//
+// Security note: the server performs I/O with the privileges of the server
+// process. `Source.local_path` and `Source.uri` are resolved server-side, so
+// requests must come from trusted callers only. See the project README's
+// "Security Considerations" section.
+service MarkItDownService {
+  // Convert performs a conversion and returns the complete Markdown
+  // result in a single response message.
+  rpc Convert(ConvertRequest) returns (ConvertResponse);
+
+  // ConvertStream performs a conversion and delivers the Markdown result
+  // as an ordered stream of chunks. The conversion itself completes before
+  // chunking begins; streaming reduces time-to-first-byte on the wire and
+  // keeps individual messages small, but does not stream partial conversion
+  // progress.
+  rpc ConvertStream(ConvertStreamRequest) returns (stream ConvertStreamResponse);
+
+  // ConvertDocumentStream performs a conversion and delivers the result as
+  // an ordered stream of structured document elements (headings, paragraphs,
+  // tables, lists, code blocks, images, ...). This lets downstream consumers
+  // process document structure incrementally without re-parsing Markdown.
+  //
+  // Segmentation is performed on the converted Markdown and is best-effort:
+  // constructs that do not match a known block type are delivered as
+  // paragraphs.
+  rpc ConvertDocumentStream(ConvertDocumentStreamRequest) returns (stream ConvertDocumentStreamResponse);
+}
+
+// Request for the unary Convert RPC.
+message ConvertRequest {
+  // The document to convert. Required.
+  Source source = 1;
+  // Options controlling Markdown generation.
+  ConversionOptions conversion_options = 2;
+  // Options controlling how the conversion backend is configured.
+  ServiceOptions service_options = 3;
+}
+
+// Request for the chunked ConvertStream RPC.
+message ConvertStreamRequest {
+  // The document to convert. Required.
+  Source source = 1;
+  // Options controlling Markdown generation.
+  ConversionOptions conversion_options = 2;
+  // Options controlling how the conversion backend is configured.
+  ServiceOptions service_options = 3;
+  // Options controlling chunked delivery.
+  StreamingOptions streaming_options = 4;
+}
+
+// Request for the structured ConvertDocumentStream RPC.
+message ConvertDocumentStreamRequest {
+  // The document to convert. Required.
+  Source source = 1;
+  // Options controlling Markdown generation.
+  ConversionOptions conversion_options = 2;
+  // Options controlling how the conversion backend is configured.
+  ServiceOptions service_options = 3;
+  // Options controlling streaming delivery. markdown_chunk_size_bytes is
+  // ignored by this RPC; see experimental_incremental.
+  StreamingOptions streaming_options = 4;
+}
+
+// Source identifies the document to convert. Exactly one input must be set.
+message Source {
+  oneof input {
+    // Path to a file on the server's filesystem. The server reads this path
+    // with its own privileges; only expose to trusted callers.
+    string local_path = 1;
+    // An http:, https:, file:, or data: URI fetched by the server.
+    string uri = 2;
+    // Raw document bytes supplied inline. Subject to the server's maximum
+    // receive message size (100 MiB by default; see
+    // --max-receive-message-bytes).
+    bytes content = 3;
+  }
+
+  // Optional hints that help the server detect the document format.
+  StreamInfo stream_info = 4;
+}
+
+// StreamInfo carries optional metadata hints about the document. Mirrors
+// markitdown.StreamInfo in the Python API.
+message StreamInfo {
+  // MIME type, e.g. "application/pdf".
+  optional string mimetype = 1;
+  // File extension including the leading dot, e.g. ".pdf".
+  optional string extension = 2;
+  // Character set, e.g. "utf-8". Meaningful for text formats only.
+  optional string charset = 3;
+  // Original filename, if known.
+  optional string filename = 4;
+  // Original local path, if known.
+  optional string local_path = 5;
+  // Original URL, if known.
+  optional string url = 6;
+}
+
+// ConversionOptions control Markdown generation.
+message ConversionOptions {
+  // Keep data: URIs (e.g. base64-encoded images) in the output instead of
+  // stripping them. Defaults to false.
+  optional bool keep_data_uris = 1;
+}
+
+// ServiceOptions control how the MarkItDown conversion backend is
+// configured for a request.
+message ServiceOptions {
+  // Enable the built-in converters. Defaults to true.
+  optional bool enable_builtins = 1;
+  // Enable 3rd-party plugin converters. Defaults to false.
+  optional bool enable_plugins = 2;
+  // If set, route supported formats through Azure Document Intelligence.
+  DocumentIntelligenceOptions document_intelligence = 3;
+  // If set, route supported formats through Azure Content Understanding.
+  ContentUnderstandingOptions content_understanding = 4;
+}
+
+// Configuration for Azure Document Intelligence.
+message DocumentIntelligenceOptions {
+  // Azure Document Intelligence endpoint URL. Required.
+  string endpoint = 1;
+}
+
+// Configuration for Azure Content Understanding.
+message ContentUnderstandingOptions {
+  // Azure Content Understanding endpoint URL. Required.
+  string endpoint = 1;
+  // Analyzer to use. Defaults to the service's prebuilt document analyzer.
+  optional string analyzer_id = 2;
+  // File types to route through Content Understanding. Empty means the
+  // server-side default set.
+  repeated ContentUnderstandingFileType file_types = 3;
+}
+
+// File types supported by the Azure Content Understanding converter.
+enum ContentUnderstandingFileType {
+  CONTENT_UNDERSTANDING_FILE_TYPE_UNSPECIFIED = 0;
+  CONTENT_UNDERSTANDING_FILE_TYPE_PDF = 1;
+  CONTENT_UNDERSTANDING_FILE_TYPE_DOCX = 2;
+  CONTENT_UNDERSTANDING_FILE_TYPE_PPTX = 3;
+  CONTENT_UNDERSTANDING_FILE_TYPE_XLSX = 4;
+  CONTENT_UNDERSTANDING_FILE_TYPE_HTML = 5;
+  CONTENT_UNDERSTANDING_FILE_TYPE_TXT = 6;
+  CONTENT_UNDERSTANDING_FILE_TYPE_MD = 7;
+  CONTENT_UNDERSTANDING_FILE_TYPE_RTF = 8;
+  CONTENT_UNDERSTANDING_FILE_TYPE_XML = 9;
+  CONTENT_UNDERSTANDING_FILE_TYPE_EML = 10;
+  CONTENT_UNDERSTANDING_FILE_TYPE_MSG = 11;
+  CONTENT_UNDERSTANDING_FILE_TYPE_JPEG = 12;
+  CONTENT_UNDERSTANDING_FILE_TYPE_PNG = 13;
+  CONTENT_UNDERSTANDING_FILE_TYPE_BMP = 14;
+  CONTENT_UNDERSTANDING_FILE_TYPE_TIFF = 15;
+  CONTENT_UNDERSTANDING_FILE_TYPE_HEIF = 16;
+  CONTENT_UNDERSTANDING_FILE_TYPE_MP4 = 17;
+  CONTENT_UNDERSTANDING_FILE_TYPE_M4V = 18;
+  CONTENT_UNDERSTANDING_FILE_TYPE_MOV = 19;
+  CONTENT_UNDERSTANDING_FILE_TYPE_AVI = 20;
+  CONTENT_UNDERSTANDING_FILE_TYPE_MKV = 21;
+  CONTENT_UNDERSTANDING_FILE_TYPE_WEBM = 22;
+  CONTENT_UNDERSTANDING_FILE_TYPE_FLV = 23;
+  CONTENT_UNDERSTANDING_FILE_TYPE_WMV = 24;
+  CONTENT_UNDERSTANDING_FILE_TYPE_WAV = 25;
+  CONTENT_UNDERSTANDING_FILE_TYPE_MP3 = 26;
+  CONTENT_UNDERSTANDING_FILE_TYPE_M4A = 27;
+  CONTENT_UNDERSTANDING_FILE_TYPE_FLAC = 28;
+  CONTENT_UNDERSTANDING_FILE_TYPE_OGG = 29;
+  CONTENT_UNDERSTANDING_FILE_TYPE_AAC = 30;
+  CONTENT_UNDERSTANDING_FILE_TYPE_WMA = 31;
+}
+
+// StreamingOptions control streaming delivery for ConvertStream and
+// ConvertDocumentStream.
+message StreamingOptions {
+  // Maximum size of each Markdown chunk in UTF-8 code units. Must be
+  // greater than zero when set. Defaults to 4096. Used by ConvertStream
+  // only.
+  optional uint32 markdown_chunk_size_bytes = 1;
+
+  // EXPERIMENTAL: when true, supported formats (currently PDF and PPTX)
+  // are converted incrementally — results stream as each page or slide is
+  // processed, instead of after the whole document converts. Unsupported
+  // formats fall back to whole-document conversion transparently.
+  //
+  // Incremental conversion is skipped when Azure Document Intelligence or
+  // Content Understanding is configured, or when plugins are enabled,
+  // since those paths may route the document elsewhere.
+  //
+  // Output caveat for PDFs without table/form content: the standard
+  // converter re-extracts such documents in a single pass for better
+  // spacing, so incremental output may differ slightly in whitespace.
+  optional bool experimental_incremental = 2;
+}
+
+// Response for the unary Convert RPC.
+message ConvertResponse {
+  // The conversion result.
+  ConversionResult result = 1;
+}
+
+// The complete result of a conversion.
+message ConversionResult {
+  // The converted document as Markdown.
+  string markdown = 1;
+  // Document title, when one could be extracted.
+  optional string title = 2;
+}
+
+// A single event in the ConvertStream response stream. Events arrive in
+// order: exactly one `started`, zero or more `markdown_chunk`, exactly one
+// `completed`.
+message ConvertStreamResponse {
+  oneof event {
+    ConversionStarted started = 1;
+    MarkdownChunk markdown_chunk = 2;
+    ConversionCompleted completed = 3;
+  }
+}
+
+// A single event in the ConvertDocumentStream response stream. Events
+// arrive in order: exactly one `started`, zero or more `element`, exactly
+// one `completed`.
+message ConvertDocumentStreamResponse {
+  oneof event {
+    ConversionStarted started = 1;
+    DocumentElement element = 2;
+    DocumentStreamCompleted completed = 3;
+  }
+}
+
+// Signals that the request was accepted and conversion is starting.
+message ConversionStarted {
+  // Which Source input was provided: "local_path", "uri", or "content".
+  string source_kind = 1;
+}
+
+// A contiguous piece of the converted Markdown.
+message MarkdownChunk {
+  // Zero-based position of this chunk in the stream.
+  uint32 chunk_index = 1;
+  // The Markdown text of this chunk.
+  string markdown = 2;
+  // True for the final chunk.
+  bool is_last = 3;
+}
+
+// Terminal event for ConvertStream.
+message ConversionCompleted {
+  // Total number of markdown_chunk events that were sent.
+  uint32 total_chunks = 1;
+  // Document title, when one could be extracted.
+  optional string title = 2;
+}
+
+// Terminal event for ConvertDocumentStream.
+message DocumentStreamCompleted {
+  // Total number of element events that were sent.
+  uint32 total_elements = 1;
+  // Document title, when one could be extracted.
+  optional string title = 2;
+}
+
+// A structured block of the converted document.
+message DocumentElement {
+  // Zero-based position of this element in the document.
+  uint32 element_index = 1;
+
+  oneof kind {
+    Heading heading = 2;
+    Paragraph paragraph = 3;
+    Table table = 4;
+    ListBlock list = 5;
+    CodeBlock code_block = 6;
+    Image image = 7;
+    BlockQuote block_quote = 8;
+    HorizontalRule horizontal_rule = 9;
+  }
+}
+
+// An ATX heading (`#` through `######`).
+message Heading {
+  // Heading level, 1 (highest) through 6.
+  uint32 level = 1;
+  // Heading text with the leading `#` markers removed.
+  string text = 2;
+}
+
+// A paragraph of text. Also the fallback for content that does not match
+// any other block type.
+message Paragraph {
+  // Paragraph text, possibly containing inline Markdown.
+  string text = 1;
+}
+
+// A pipe-delimited Markdown table.
+message Table {
+  // The original Markdown for the whole table, including the delimiter row.
+  string markdown = 1;
+  // Parsed cell text. The first row is the header row; the delimiter row is
+  // omitted.
+  repeated TableRow rows = 2;
+}
+
+// A single row of a Table.
+message TableRow {
+  // Cell text in column order, with surrounding whitespace trimmed.
+  repeated string cells = 1;
+}
+
+// A bulleted or numbered list.
+message ListBlock {
+  // The original Markdown for the whole list, including nested items.
+  string markdown = 1;
+  // True for ordered (numbered) lists.
+  bool ordered = 2;
+  // Top-level item text with list markers removed. Nested items and
+  // continuation lines remain part of their parent item's text, with their
+  // own markers preserved.
+  repeated string items = 3;
+}
+
+// A fenced code block.
+message CodeBlock {
+  // The info string following the opening fence, e.g. "python". Empty when
+  // no language was specified.
+  string language = 1;
+  // The code with the fences removed.
+  string code = 2;
+}
+
+// An image that appears as its own block (`![alt](url "title")`).
+message Image {
+  // Alternative text.
+  string alt_text = 1;
+  // Image URL. May be a data: URI when
+  // ConversionOptions.keep_data_uris is true.
+  string url = 2;
+  // Optional image title.
+  optional string title = 3;
+}
+
+// A block quote (`>` prefixed lines).
+message BlockQuote {
+  // The quoted text with the `>` markers removed.
+  string text = 1;
+}
+
+// A thematic break (`---`, `***`, or `___`).
+message HorizontalRule {}
