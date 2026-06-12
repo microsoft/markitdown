@@ -122,5 +122,37 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
             return "[x] " if el.has_attr("checked") else "[ ] "
         return ""
 
+    def convert_table(
+        self,
+        el: Any,
+        text: str,
+        convert_as_inline: Optional[bool] = False,
+        **kwargs,
+    ) -> str:
+        """Unwrap tables into readable Markdown text blocks to avoid layout breakage."""
+        rows = el.find_all('tr')
+        output = []
+        for row in rows:
+            cells = row.find_all(['td', 'th'])
+            # Convert cell contents to markdown
+            cell_contents = [self.convert_soup(cell).strip() for cell in cells]
+            
+            if len(cell_contents) == 2:
+                # Potential Key-Value pair (very common in Word forms)
+                key, val = cell_contents
+                if key and val:
+                    output.append(f"**{key}**: {val}")
+                elif key:
+                    output.append(f"**{key}**")
+                else:
+                    output.append(val)
+            else:
+                # Multiple cells: Join them with a separator
+                line = " | ".join([c for c in cell_contents if c])
+                if line:
+                    output.append(line)
+        
+        return "\n\n" + "\n\n".join(output) + "\n\n"
+
     def convert_soup(self, soup: Any) -> str:
         return super().convert_soup(soup)  # type: ignore
