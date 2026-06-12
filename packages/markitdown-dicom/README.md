@@ -8,9 +8,9 @@ The plugin is designed to be highly memory-efficient (using deferred loading for
 
 - **Efficient Stream Peeking**: Fast detection of `.dcm` files by peeking at the `DICM` file preamble/magic bytes at offset 128.
 - **Memory Safety**: Uses `pydicom` with deferred value loading (`defer_size="1 KB"`) to parse headers of large multi-frame DICOM files without loading gigabytes of pixel data.
-- **HIPAA-Compliant by Default**: Automatically redacts Patient Name, Patient ID, and Patient Birth Date.
+- **PII-Aware by Default**: Automatically redacts Patient Name, Patient ID, and Patient Birth Date.
 - **Formatted Metadata**: Standardizes dates to `YYYY-MM-DD` and times to `HH:MM:SS` for downstream RAG and vector database ingestion.
-- **Custom Tag Support**: Automatically extracts and formats additional standard and private vendor tags if they are simple numbers/text.
+- **Custom Tag Support**: Automatically extracts additional standard metadata fields. Private/vendor tags can optionally be included and are filtered to avoid binary, sequence, and other high-volume data types.
 
 ## Installation
 
