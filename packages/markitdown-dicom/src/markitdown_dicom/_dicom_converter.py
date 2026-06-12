@@ -23,9 +23,10 @@ class DicomConverter(DocumentConverter):
     Omits and redacts Patient PII (Name, ID, Birth Date) by default.
     """
 
-    def __init__(self, redact_pii: bool = True, **kwargs: Any):
+    def __init__(self, redact_pii: bool = True, include_private_tags: bool = False, **kwargs: Any):
         super().__init__()
         self._redact_pii = redact_pii
+        self._include_private_tags = include_private_tags
 
     def accepts(
         self,
@@ -67,8 +68,9 @@ class DicomConverter(DocumentConverter):
                 "To resolve, run: pip install pydicom"
             ) from _dependency_exc_info[1].with_traceback(_dependency_exc_info[2])  # type: ignore
 
-        # Resolve redact_pii setting (defaulting to True)
+        # Resolve settings
         redact_pii = kwargs.get("redact_pii", self._redact_pii)
+        include_private_tags = kwargs.get("include_private_tags", self._include_private_tags)
 
         # Parse DICOM from the stream.
         # Use defer_size="1 KB" so we don't load large pixel data arrays into memory.
@@ -246,6 +248,10 @@ class DicomConverter(DocumentConverter):
 
         custom_fields: Dict[str, str] = {}
         for elem in ds:
+            # Skip private tags unless explicitly requested
+            if elem.tag.is_private and not include_private_tags:
+                continue
+
             # Skip file meta or pixel group
             if elem.tag.group in (0x0002, 0x7FE0) or elem.tag.element == 0:
                 continue

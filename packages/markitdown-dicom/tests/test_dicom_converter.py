@@ -183,7 +183,7 @@ def test_dicom_converter_missing_fields() -> None:
 
 def test_dicom_converter_custom_and_private_tags() -> None:
     """Verifies that extra textual/numeric tags and private tags are formatted correctly."""
-    converter = DicomConverter()
+    converter = DicomConverter(include_private_tags=True)
 
     # Add custom standard tags (e.g. BodyPartExamined, InstitutionName) and a private tag
     # Private tags use odd group numbers, e.g., 0x0009
@@ -217,6 +217,33 @@ def test_dicom_converter_custom_and_private_tags() -> None:
 
     # Verify private tag rendering
     assert "Private Tag (0009,1001)**: Mock Private Value" in result.markdown
+
+
+def test_dicom_converter_exclude_private_tags_by_default() -> None:
+    """Verifies that private tags are excluded by default when include_private_tags is False."""
+    converter = DicomConverter()  # default is False
+
+    extra_fields = {
+        "InstitutionName": "Central Hospital",
+    }
+    stream = create_mock_dicom(extra_fields=extra_fields)
+
+    ds = pydicom.dcmread(stream, force=True)
+    ds.private_block(0x0009, "Mock Creator", create=True)
+    ds[0x0009, 0x1001] = pydicom.dataelem.DataElement(0x00091001, "LO", "Mock Private Value")
+
+    new_stream = io.BytesIO()
+    ds.save_as(new_stream)
+    new_stream.seek(0)
+
+    result = converter.convert(new_stream, StreamInfo())
+
+    # Standard custom fields should still be present
+    assert "Institution Name**: Central Hospital" in result.markdown
+
+    # Private tags should be excluded
+    assert "Mock Private Value" not in result.markdown
+    assert "Private Tag" not in result.markdown
 
 
 def test_markitdown_plugin_integration() -> None:
