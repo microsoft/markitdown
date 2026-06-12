@@ -3,7 +3,9 @@ import io
 import os
 import re
 import shutil
+import subprocess
 import pytest
+import sys
 from unittest.mock import MagicMock
 
 from markitdown._uri_utils import parse_data_uri, file_uri_to_path
@@ -105,6 +107,16 @@ def validate_strings(result, expected_strings, exclude_strings=None):
     if exclude_strings:
         for string in exclude_strings:
             assert string not in text_content
+
+
+def _has_pdf_dependencies() -> bool:
+    try:
+        import pdfminer  # noqa: F401
+        import pdfplumber  # noqa: F401
+
+        return True
+    except ModuleNotFoundError:
+        return False
 
 
 def test_stream_info_operations() -> None:
@@ -218,6 +230,71 @@ def test_data_uris() -> None:
     assert len(attributes) == 1
     assert attributes["charset"] == "utf-8"
     assert data == b"Hello, World!"
+
+
+@pytest.mark.skipif(
+    not _has_pdf_dependencies(),
+    reason="PDF optional dependencies not installed",
+)
+def test_pdf_extract_images_to_markdown(tmp_path) -> None:
+    pdf_path = os.path.join(TEST_FILES_DIR, "pdf_image_middle.pdf")
+    images_dir = tmp_path / "images"
+
+    result = MarkItDown().convert(
+        pdf_path,
+        extract_images=True,
+        images_dir=str(images_dir),
+        images_rel_dir="images",
+    )
+
+    markdown = result.markdown
+    assert "Here is some introductory text." in markdown
+    assert "![image_1](images/image_1." in markdown
+    assert "Section 2: Details" in markdown
+    assert (
+        markdown.index("Here is some introductory text.")
+        < markdown.index("![image_1](images/image_1.")
+        < markdown.index("Section 2: Details")
+    )
+
+    image_files = list(images_dir.glob("image_1.*"))
+    assert len(image_files) == 1
+    assert image_files[0].stat().st_size > 0
+
+
+@pytest.mark.skipif(
+    not _has_pdf_dependencies(),
+    reason="PDF optional dependencies not installed",
+)
+def test_cli_pdf_extract_images_uses_timestamped_dir(tmp_path) -> None:
+    pdf_path = os.path.join(TEST_FILES_DIR, "pdf_image_middle.pdf")
+    output_path = tmp_path / "out.md"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "markitdown",
+            pdf_path,
+            "-o",
+            str(output_path),
+            "--extract-images",
+            "--images-dir",
+            "assets",
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    markdown = output_path.read_text(encoding="utf-8")
+    image_dirs = list(tmp_path.glob("assets_*"))
+    assert len(image_dirs) == 1
+    assert image_dirs[0].is_dir()
+    assert f"![image_1]({image_dirs[0].name}/image_1." in markdown
+    image_files = list(image_dirs[0].glob("image_1.*"))
+    assert len(image_files) == 1
+    assert image_files[0].stat().st_size > 0
 
 
 def test_file_uris() -> None:
