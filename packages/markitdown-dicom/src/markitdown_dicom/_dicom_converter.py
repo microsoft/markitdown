@@ -18,9 +18,11 @@ except ImportError:
 
 class DicomConverter(DocumentConverter):
     """
-    Converts DICOM (.dcm) files to structured, token-efficient Markdown.
+    Converts DICOM (.dcm, .dicom) files to structured, token-efficient Markdown.
     Extracts key Study, Series, Acquisition, Equipment, and Image characteristics.
     Omits and redacts Patient PII (Name, ID, Birth Date) by default.
+    Supports both medical imaging and industrial radiography datasets conforming to the
+    DICONDE standard (ASTM E2339) used in Non-Destructive Testing (NDT).
     """
 
     def __init__(self, redact_pii: bool = True, include_private_tags: bool = False, **kwargs: Any):
@@ -41,7 +43,9 @@ class DicomConverter(DocumentConverter):
         if extension in (".dcm", ".dicom") or mimetype == "application/dicom":
             return True
 
-        # Peek at stream to check signature 'DICM' at offset 128
+        # Peek at stream to check signature 'DICM' at offset 128.
+        # This acts as a robust fallback for files lacking standard extensions (like
+        # industrial NDT or DICONDE images).
         cur_pos = file_stream.tell()
         try:
             file_stream.seek(128)
@@ -74,11 +78,22 @@ class DicomConverter(DocumentConverter):
 
         # Parse DICOM from the stream.
         # Use defer_size="1 KB" so we don't load large pixel data arrays into memory.
-        # force=True allows parsing datasets without file meta header.
+        # We attempt a strict read first (force=False) to ensure compliance and avoid false positives
+        # on non-DICOM streams. If that fails (e.g. for raw datasets lacking a file meta header),
+        # we reset and fall back to force=True.
+        cur_pos = file_stream.tell()
         try:
-            ds = pydicom.dcmread(file_stream, defer_size="1 KB", force=True)
+            ds = pydicom.dcmread(file_stream, defer_size="1 KB", force=False)
             if ds is None or len(ds) == 0:
                 raise ValueError("Parsed dataset has no elements.")
+        except (pydicom.errors.InvalidDicomError, TypeError):
+            file_stream.seek(cur_pos)
+            try:
+                ds = pydicom.dcmread(file_stream, defer_size="1 KB", force=True)
+                if ds is None or len(ds) == 0:
+                    raise ValueError("Parsed dataset has no elements.")
+            except Exception as e:
+                raise ValueError(f"Failed to parse DICOM file: {e}") from e
         except Exception as e:
             raise ValueError(f"Failed to parse DICOM file: {e}") from e
 
@@ -148,6 +163,7 @@ class DicomConverter(DocumentConverter):
         # 2. Study Information
         study_fields = {
             "Study Instance UID": _get_val("StudyInstanceUID"),
+            "Study ID": _get_val("StudyID"),
             "Study Date": _format_date(_get_val("StudyDate")),
             "Study Time": _format_time(_get_val("StudyTime")),
             "Study Description": _get_val("StudyDescription"),
@@ -159,6 +175,8 @@ class DicomConverter(DocumentConverter):
             "Series Instance UID": _get_val("SeriesInstanceUID"),
             "Series Number": _get_val("SeriesNumber"),
             "Series Description": _get_val("SeriesDescription"),
+            "Series Date": _format_date(_get_val("SeriesDate")),
+            "Series Time": _format_time(_get_val("SeriesTime")),
         }
 
         # 4. Acquisition Information
@@ -181,14 +199,11 @@ class DicomConverter(DocumentConverter):
         }
 
         # 6. Image Characteristics
-        rows = _get_val("Rows")
-        cols = _get_val("Columns")
-        resolution = f"{rows} × {cols}" if rows and cols else None
-
         pixel_data_present = "Yes" if (0x7FE0, 0x0010) in ds else "No"
 
         image_fields = {
-            "Resolution": resolution,
+            "Rows": _get_val("Rows"),
+            "Columns": _get_val("Columns"),
             "Samples Per Pixel": _get_val("SamplesPerPixel"),
             "Bits Allocated": _get_val("BitsAllocated"),
             "Bits Stored": _get_val("BitsStored"),
@@ -196,6 +211,9 @@ class DicomConverter(DocumentConverter):
             "Pixel Representation": _get_val("PixelRepresentation"),
             "Photometric Interpretation": _get_val("PhotometricInterpretation"),
             "Frame Count": _get_val("NumberOfFrames"),
+            "Instance Number": _get_val("InstanceNumber"),
+            "SOP Class UID": _get_val("SOPClassUID"),
+            "SOP Instance UID": _get_val("SOPInstanceUID"),
             "Pixel Data Present": pixel_data_present,
         }
 
@@ -230,15 +248,15 @@ class DicomConverter(DocumentConverter):
         # 8. Private / Custom textual tags when reasonable
         EXCLUDED_KEYWORDS = {
             # Study
-            "StudyInstanceUID", "StudyDate", "StudyTime", "StudyDescription", "AccessionNumber",
+            "StudyInstanceUID", "StudyDate", "StudyTime", "StudyDescription", "AccessionNumber", "StudyID",
             # Series
-            "SeriesInstanceUID", "SeriesNumber", "SeriesDescription",
+            "SeriesInstanceUID", "SeriesNumber", "SeriesDescription", "SeriesDate", "SeriesTime",
             # Acquisition
             "Modality", "ProtocolName", "Exposure", "ExposureTime", "KVP", "AcquisitionDate", "AcquisitionTime",
             # Equipment
             "Manufacturer", "ManufacturerModelName", "DeviceSerialNumber", "SoftwareVersions",
             # Image Characteristics
-            "Rows", "Columns", "SamplesPerPixel", "BitsAllocated", "BitsStored", "HighBit", "PixelRepresentation", "PhotometricInterpretation", "NumberOfFrames",
+            "Rows", "Columns", "SamplesPerPixel", "BitsAllocated", "BitsStored", "HighBit", "PixelRepresentation", "PhotometricInterpretation", "NumberOfFrames", "InstanceNumber", "SOPClassUID", "SOPInstanceUID",
             # Other Useful Text Fields
             "ImageComments", "InstitutionName", "StationName", "BodyPartExamined",
             # Patient info
@@ -276,10 +294,10 @@ class DicomConverter(DocumentConverter):
             if val is None or val == "":
                 continue
 
-            # Check for PII tags if redaction is enabled
-            lower_label = label.lower()
-            if redact_pii and ("patient" in lower_label or "name" in lower_label or "birth" in lower_label or "id" in lower_label):
-                if "sex" not in lower_label and "age" not in lower_label:
+            # Check for Patient PII tags if redaction is enabled (standard Patient group is 0x0010)
+            # Retain clinical demographics: PatientSex (0x0010, 0x0040) and PatientAge (0x0010, 0x1010)
+            if redact_pii:
+                if elem.tag.group == 0x0010 and elem.tag.element not in (0x0040, 0x1010):
                     continue
 
             # Format list value or other type

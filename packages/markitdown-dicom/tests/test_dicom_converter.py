@@ -48,6 +48,10 @@ def create_mock_dicom(
     ds.SeriesInstanceUID = generate_uid()
     ds.SOPInstanceUID = file_meta.MediaStorageSOPInstanceUID
     ds.SOPClassUID = file_meta.MediaStorageSOPClassUID
+    ds.StudyID = "STUDY-1"
+    ds.SeriesDate = "20260612"
+    ds.SeriesTime = "120500"
+    ds.InstanceNumber = 42
     ds.StudyDate = "20260612"
     ds.StudyTime = "120000.123"
     ds.StudyDescription = study_description
@@ -141,9 +145,16 @@ def test_dicom_converter_default_redaction() -> None:
 
     # Verifying other standard sections are rendered properly
     assert "Study Description**: Mock Study" in result.markdown
-    assert "Resolution**: 512 × 512" in result.markdown
+    assert "Study ID**: STUDY-1" in result.markdown
+    assert "Series Date**: 2026-06-12" in result.markdown
+    assert "Series Time**: 12:05:00" in result.markdown
+    assert "Rows**: 512" in result.markdown
+    assert "Columns**: 512" in result.markdown
+    assert "Instance Number**: 42" in result.markdown
     assert "Study Date**: 2026-06-12" in result.markdown
     assert "Study Time**: 12:00:00.123" in result.markdown
+    assert "SOP Class UID**" in result.markdown
+    assert "SOP Instance UID**" in result.markdown
 
 
 def test_dicom_converter_disabled_redaction() -> None:
@@ -175,7 +186,8 @@ def test_dicom_converter_missing_fields() -> None:
     result = converter.convert(stream, StreamInfo())
 
     # Ensure no empty field or error occurs
-    assert "Resolution" not in result.markdown
+    assert "Rows" not in result.markdown
+    assert "Columns" not in result.markdown
     assert "Study Description" not in result.markdown
     assert "Manufacturer**" in result.markdown  # Manufacturer remains since it wasn't set to None
     assert "DICOM File" in result.markdown
