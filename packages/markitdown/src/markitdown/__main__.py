@@ -6,6 +6,7 @@ import sys
 import os
 import codecs
 import zipfile
+from datetime import datetime
 from typing import Any, Dict
 from textwrap import dedent
 from importlib.metadata import entry_points
@@ -164,7 +165,7 @@ def main():
     parser.add_argument(
         "--extract-images",
         action="store_true",
-        help="Extract embedded images from DOCX to a local directory.",
+        help="Extract embedded images from DOCX/PDF to a local directory.",
     )
 
     parser.add_argument(
@@ -176,7 +177,7 @@ def main():
     parser.add_argument(
         "--images-dir",
         default="images",
-        help="Directory name for extracted images (default: images).",
+        help="Base directory name for extracted images (default: images). A timestamp suffix is added.",
     )
 
     parser.add_argument("filename", nargs="?")
@@ -302,7 +303,8 @@ def main():
     }
 
     if extract_images and args.output:
-        images_dir_name = args.images_dir or "images"
+        images_dir_name = _timestamped_images_dir_name(args.images_dir or "images")
+        args._actual_images_dir = images_dir_name
         abs_images_dir = os.path.join(
             os.path.dirname(os.path.abspath(args.output)),
             images_dir_name,
@@ -337,7 +339,7 @@ def _handle_output(args, result: DocumentConverterResult, extract_images: bool =
         with open(args.output, "w", encoding="utf-8") as f:
             f.write(result.markdown)
         if extract_images:
-            images_dir = args.images_dir or "images"
+            images_dir = getattr(args, "_actual_images_dir", args.images_dir or "images")
             print(f"[OK] Generated {args.output}")
             print(f"[OK] Images extracted to ./{images_dir}/")
     else:
@@ -352,6 +354,11 @@ def _handle_output(args, result: DocumentConverterResult, extract_images: bool =
 def _exit_with_error(message: str):
     print(message)
     sys.exit(1)
+
+
+def _timestamped_images_dir_name(base_name: str) -> str:
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return f"{base_name.rstrip(os.sep)}_{timestamp}"
 
 
 if __name__ == "__main__":
