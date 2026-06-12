@@ -70,6 +70,7 @@ result = md.convert("patient_scan.dcm")
 ## Study Information
 
 * **Study Instance UID**: 1.2.840.113619.2.134.1.20230612.98765432
+* **Study ID**: STUDY-1
 * **Study Date**: 2023-06-12
 * **Study Time**: 11:44:27
 * **Study Description**: Chest X-Ray
@@ -80,6 +81,8 @@ result = md.convert("patient_scan.dcm")
 * **Series Instance UID**: 1.2.840.113619.2.134.2.20230612.98765432
 * **Series Number**: 1
 * **Series Description**: PA View
+* **Series Date**: 2023-06-12
+* **Series Time**: 11:45:00
 
 ## Acquisition Parameters
 
@@ -100,7 +103,8 @@ result = md.convert("patient_scan.dcm")
 
 ## Image Properties
 
-* **Resolution**: 2048 × 1500
+* **Rows**: 2048
+* **Columns**: 1500
 * **Samples Per Pixel**: 1
 * **Bits Allocated**: 16
 * **Bits Stored**: 12
@@ -108,5 +112,8 @@ result = md.convert("patient_scan.dcm")
 * **Pixel Representation**: 0
 * **Photometric Interpretation**: MONOCHROME2
 * **Frame Count**: 1
+* **Instance Number**: 42
+* **SOP Class UID**: 1.2.840.10008.5.1.4.1.1.2
+* **SOP Instance UID**: 1.2.840.113619.2.134.2.20230612.98765432.1
 * **Pixel Data Present**: Yes
 ```
