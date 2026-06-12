@@ -16,6 +16,7 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
     """
 
     def __init__(self, **options: Any):
+        self._preserve_html_tables = bool(options.pop("_preserve_html_tables", False))
         options["heading_style"] = options.get("heading_style", markdownify.ATX)
         options["keep_data_uris"] = options.get("keep_data_uris", False)
         # Explicitly cast options to the expected type if necessary
@@ -121,6 +122,20 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         if el.get("type") == "checkbox":
             return "[x] " if el.has_attr("checked") else "[ ] "
         return ""
+
+    def convert_table(
+        self,
+        el: Any,
+        text: str,
+        parent_tags: Any,
+        **kwargs: Any,
+    ) -> str:
+        """Optionally preserve raw HTML tables for structures Markdown cannot represent."""
+
+        if self._preserve_html_tables:
+            return "\n\n" + str(el) + "\n\n"
+
+        return super().convert_table(el, text, parent_tags)  # type: ignore
 
     def convert_soup(self, soup: Any) -> str:
         return super().convert_soup(soup)  # type: ignore

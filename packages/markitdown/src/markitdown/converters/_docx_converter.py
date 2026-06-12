@@ -2,7 +2,7 @@ import sys
 import io
 from warnings import warn
 
-from typing import BinaryIO, Any
+from typing import BinaryIO, Any, Optional
 
 from ._html_converter import HtmlConverter
 from ..converter_utils.docx.pre_process import pre_process_docx
@@ -27,15 +27,34 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 
 ACCEPTED_FILE_EXTENSIONS = [".docx"]
 
+DOCX_TABLE_FORMAT_MARKDOWN = "markdown"
+DOCX_TABLE_FORMAT_HTML = "html"
+DOCX_TABLE_FORMATS = {DOCX_TABLE_FORMAT_MARKDOWN, DOCX_TABLE_FORMAT_HTML}
+
+
+def _validate_docx_table_format(docx_table_format: str) -> str:
+    if docx_table_format not in DOCX_TABLE_FORMATS:
+        raise ValueError(
+            "docx_table_format must be one of: " + ", ".join(sorted(DOCX_TABLE_FORMATS))
+        )
+    return docx_table_format
+
 
 class DocxConverter(HtmlConverter):
     """
     Converts DOCX files to Markdown. Style information (e.g.m headings) and tables are preserved where possible.
     """
 
-    def __init__(self):
+    def __init__(
+        self,
+        *,
+        docx_table_format: str = DOCX_TABLE_FORMAT_MARKDOWN,
+        docx_markdownify_options: Optional[dict[str, Any]] = None,
+    ):
         super().__init__()
         self._html_converter = HtmlConverter()
+        self._docx_table_format = _validate_docx_table_format(docx_table_format)
+        self._docx_markdownify_options = dict(docx_markdownify_options or {})
 
     def accepts(
         self,
@@ -75,9 +94,22 @@ class DocxConverter(HtmlConverter):
                 _dependency_exc_info[2]
             )
 
+        docx_table_format = _validate_docx_table_format(
+            kwargs.pop("docx_table_format", self._docx_table_format)
+        )
+        docx_markdownify_options = dict(self._docx_markdownify_options)
+        docx_markdownify_options.update(
+            kwargs.pop("docx_markdownify_options", {}) or {}
+        )
+        if docx_table_format == DOCX_TABLE_FORMAT_HTML:
+            docx_markdownify_options["_preserve_html_tables"] = True
+        else:
+            docx_markdownify_options.pop("_preserve_html_tables", None)
+
         style_map = kwargs.get("style_map", None)
+        html_converter_kwargs = {**kwargs, **docx_markdownify_options}
         pre_process_stream = pre_process_docx(file_stream)
         return self._html_converter.convert_string(
             mammoth.convert_to_html(pre_process_stream, style_map=style_map).value,
-            **kwargs,
+            **html_converter_kwargs,
         )
