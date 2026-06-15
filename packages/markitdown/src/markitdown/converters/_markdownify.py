@@ -104,7 +104,7 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
             return alt
 
         # Remove dataURIs
-        if src.startswith("data:") and not self.options["keep_data_uris"]:
+        if src.lower().startswith("data:") and not self.options["keep_data_uris"]:
             src = src.split(",")[0] + "..."
 
         return "![%s](%s%s)" % (alt, src, title_part)
