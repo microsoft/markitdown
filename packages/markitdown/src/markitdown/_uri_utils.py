@@ -29,7 +29,7 @@ def parse_data_uri(uri: str) -> Tuple[str | None, Dict[str, str], bytes]:
 
     is_base64 = False
     # Ends with base64?
-    if parts[-1] == "base64":
+    if parts[-1].lower() == "base64":
         parts.pop()
         is_base64 = True
 
@@ -43,9 +43,9 @@ def parse_data_uri(uri: str) -> Tuple[str | None, Dict[str, str], bytes]:
         # Handle key=value pairs in the middle
         if "=" in part:
             key, value = part.split("=", 1)
-            attributes[key] = value
+            attributes[key.lower()] = value
         elif len(part) > 0:
-            attributes[part] = ""
+            attributes[part.lower()] = ""
 
     content = base64.b64decode(data) if is_base64 else unquote_to_bytes(data)
 
