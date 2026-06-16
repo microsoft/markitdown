@@ -153,6 +153,20 @@ GENERAL_TEST_VECTORS = [
         must_not_include=[],
     ),
     FileTestVector(
+        filename="test_blank_first_line.csv",
+        mimetype="text/csv",
+        charset="utf-8",
+        url=None,
+        must_include=[
+            "| name | age |",
+            "| bob | 3 |",
+            "| alice | 7 |",
+        ],
+        must_not_include=[
+            "|  |",
+        ],
+    ),
+    FileTestVector(
         filename="test.json",
         mimetype="application/json",
         charset="ascii",

@@ -51,6 +51,13 @@ class CsvConverter(DocumentConverter):
         reader = csv.reader(io.StringIO(content))
         rows = list(reader)
 
+        # A leading blank line (or any empty rows before the header) parses as an
+        # empty list. If that becomes the header its column count is 0, and every
+        # data row then gets truncated to nothing -- silent total data loss.
+        # Skip leading empty rows so the first real row becomes the header.
+        while rows and len(rows[0]) == 0:
+            rows.pop(0)
+
         if not rows:
             return DocumentConverterResult(markdown="")
 
