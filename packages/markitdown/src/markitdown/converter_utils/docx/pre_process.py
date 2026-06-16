@@ -96,22 +96,30 @@ def _replace_equations(tag: Tag):
         raise ValueError(f"Not supported tag: {tag.name}")
 
 
-def _pre_process_math(content: bytes) -> bytes:
+def _pre_process_xml(content: bytes) -> bytes:
     """
-    Pre-processes the math content in a DOCX -> XML file by converting OMML (Office Math Markup Language) elements to LaTeX.
-    This preprocessed content can be directly replaced in the DOCX file -> XMLs.
+    Pre-processes the XML content of a DOCX file (e.g. document.xml, footnotes.xml, endnotes.xml).
+    Converts OMML (Office Math Markup Language) elements to LaTeX and unwraps internal-only hyperlinks.
 
     Args:
         content (bytes): The XML content of the DOCX file as bytes.
 
     Returns:
-        bytes: The processed content with OMML elements replaced by their LaTeX equivalents, encoded as bytes.
+        bytes: The processed content, encoded as bytes.
     """
     soup = BeautifulSoup(content.decode(), features="xml")
     for tag in soup.find_all("oMathPara"):
         _replace_equations(tag)
     for tag in soup.find_all("oMath"):
         _replace_equations(tag)
+
+    # Remove internal-only hyperlinks (e.g., TOC entries and cross-references)
+    for tag in soup.find_all(["w:hyperlink", "hyperlink"]):
+        has_anchor = any(k == "anchor" or k.endswith(":anchor") for k in tag.attrs)
+        has_id = any(k == "id" or k.endswith(":id") for k in tag.attrs)
+        if has_anchor and not has_id:
+            tag.unwrap()
+
     return str(soup).encode()
 
 
@@ -144,7 +152,7 @@ def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
                 if name in pre_process_enable_files:
                     try:
                         # Pre-process the content
-                        updated_content = _pre_process_math(content)
+                        updated_content = _pre_process_xml(content)
                         # In the future, if there are more pre-processing steps, they can be added here
                         zip_output.writestr(name, updated_content)
                     except Exception:
