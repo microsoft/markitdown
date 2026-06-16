@@ -532,6 +532,41 @@ def test_markitdown_llm() -> None:
     validate_strings(result, PPTX_TEST_STRINGS)
 
 
+def test_xlsx_clean_conversion() -> None:
+    """Test that empty rows/columns, NaN values, and Unnamed headers are cleaned up."""
+    import openpyxl
+    import tempfile
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws["A1"] = "PROGRESS"                                   # a title in A1
+    ws["A3"] = "Task"
+    ws["C3"] = "Owner"
+    ws["D3"] = "Status"   # real headers on row 3 (col B blank)
+    ws["A4"] = "Design"
+    ws["C4"] = "Ana"
+    ws["D4"] = "Done"
+
+    temp_dir = tempfile.gettempdir()
+    p = os.path.join(temp_dir, "repro_test.xlsx")
+    try:
+        wb.save(p)
+
+        markitdown = MarkItDown()
+        result = markitdown.convert(p)
+
+        expected_md = (
+            "## Sheet\n"
+            "| PROGRESS |  |  |\n"
+            "| --- | --- | --- |\n"
+            "| Task | Owner | Status |\n"
+            "| Design | Ana | Done |"
+        )
+        assert result.markdown.strip() == expected_md
+    finally:
+        if os.path.exists(p):
+            os.remove(p)
+
+
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     for test in [
@@ -547,8 +582,10 @@ if __name__ == "__main__":
         test_markitdown_exiftool,
         test_markitdown_llm_parameters,
         test_markitdown_llm,
+        test_xlsx_clean_conversion,
     ]:
         print(f"Running {test.__name__}...", end="")
         test()
         print("OK")
     print("All tests passed!")
+
