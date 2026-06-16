@@ -3,6 +3,7 @@ import io
 import os
 import re
 import shutil
+import zipfile
 import pytest
 from unittest.mock import MagicMock
 
@@ -530,6 +531,27 @@ def test_markitdown_llm() -> None:
         assert test_string in result.text_content
     # Standard alt text is included
     validate_strings(result, PPTX_TEST_STRINGS)
+
+
+def test_zip_stream_no_filename_header() -> None:
+    """Regression test: ZipConverter must not render the literal string 'None'
+    in the output header when the stream has no associated URL, local path, or
+    filename (e.g. when called via convert_stream() without stream_info)."""
+    markitdown = MarkItDown()
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("hello.txt", "Hello world")
+    buf.seek(0)
+
+    result = markitdown.convert_stream(
+        buf, stream_info=StreamInfo(mimetype="application/zip")
+    )
+    assert (
+        "None" not in result.markdown
+    ), f"Header must not contain literal 'None'; got: {result.markdown[:120]!r}"
+    assert "Content from the zip file" in result.markdown
+    assert "Hello world" in result.markdown
 
 
 if __name__ == "__main__":
