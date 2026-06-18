@@ -56,11 +56,42 @@ Once mounted, all files under data will be accessible under `/workdir` in the co
 
 ## Accessing from Claude Desktop
 
-It is recommended to use the Docker image when running the MCP server for Claude Desktop.
-
 Follow [these instructions](https://modelcontextprotocol.io/quickstart/user#for-claude-desktop-users) to access Claude's `claude_desktop_config.json` file.
 
-Edit it to include the following JSON entry:
+If you installed `markitdown-mcp` with `uvx`, edit it to include the following JSON entry:
+
+```json
+{
+  "mcpServers": {
+    "markitdown": {
+      "command": "uvx",
+      "args": [
+        "markitdown-mcp"
+      ]
+    }
+  }
+}
+```
+
+If you installed `markitdown-mcp` with `pip` in a virtual environment, use that environment's Python executable:
+
+```json
+{
+  "mcpServers": {
+    "markitdown": {
+      "command": "/path/to/.venv/bin/python",
+      "args": [
+        "-m",
+        "markitdown_mcp"
+      ]
+    }
+  }
+}
+```
+
+Replace `/path/to/.venv/bin/python` with the absolute path to your virtual environment's Python executable. Using the absolute path avoids issues where Claude Desktop cannot find commands installed in a shell-specific `PATH`.
+
+It is also possible to use the Docker image when running the MCP server for Claude Desktop. Edit `claude_desktop_config.json` to include the following JSON entry:
 
 ```json
 {
