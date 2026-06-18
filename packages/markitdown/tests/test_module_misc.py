@@ -220,6 +220,25 @@ def test_data_uris() -> None:
     assert data == b"Hello, World!"
 
 
+def test_xlsx_conversion_escapes_markdown_table_pipes() -> None:
+    import pandas as pd
+
+    stream = io.BytesIO()
+    pd.DataFrame({"A|B": ["x|y"], "C": ["z"]}).to_excel(stream, index=False)
+    stream.seek(0)
+
+    result = MarkItDown().convert_stream(
+        stream,
+        stream_info=StreamInfo(
+            extension=".xlsx",
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        ),
+    )
+
+    assert "A\\|B" in result.markdown
+    assert "x\\|y" in result.markdown
+
+
 def test_file_uris() -> None:
     # Test file URI with an empty host
     file_uri = "file:///path/to/file.txt"
