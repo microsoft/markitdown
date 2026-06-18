@@ -3,6 +3,7 @@ import io
 import os
 import re
 import shutil
+import zipfile
 import pytest
 from unittest.mock import MagicMock
 
@@ -218,6 +219,25 @@ def test_data_uris() -> None:
     assert len(attributes) == 1
     assert attributes["charset"] == "utf-8"
     assert data == b"Hello, World!"
+
+
+def test_zip_conversion_propagates_keep_data_uris() -> None:
+    archive = io.BytesIO()
+    html = (
+        "<html><body><img alt='example' "
+        "src='data:image/png;base64,SGVsbG8='></body></html>"
+    )
+    with zipfile.ZipFile(archive, "w") as zf:
+        zf.writestr("index.html", html)
+    archive.seek(0)
+
+    result = MarkItDown().convert_stream(
+        archive,
+        stream_info=StreamInfo(extension=".zip", mimetype="application/zip"),
+        keep_data_uris=True,
+    )
+
+    assert "data:image/png;base64,SGVsbG8=" in result.markdown
 
 
 def test_file_uris() -> None:
