@@ -33,6 +33,22 @@ ACCEPTED_XLS_MIME_TYPE_PREFIXES = [
 ACCEPTED_XLS_FILE_EXTENSIONS = [".xls"]
 
 
+def _escape_markdown_table_pipe(value: Any) -> Any:
+    if isinstance(value, str):
+        return value.replace("|", "\\|")
+    return value
+
+
+def _escape_dataframe_markdown_table_pipes(dataframe: "pd.DataFrame") -> "pd.DataFrame":
+    escaped = dataframe.copy()
+    escaped.columns = [
+        _escape_markdown_table_pipe(column) for column in escaped.columns
+    ]
+    if hasattr(escaped, "map"):
+        return escaped.map(_escape_markdown_table_pipe)
+    return escaped.applymap(_escape_markdown_table_pipe)
+
+
 class XlsxConverter(DocumentConverter):
     """
     Converts XLSX files to Markdown, with each sheet presented as a separate Markdown table.
@@ -84,7 +100,9 @@ class XlsxConverter(DocumentConverter):
         md_content = ""
         for s in sheets:
             md_content += f"## {s}\n"
-            html_content = sheets[s].to_html(index=False)
+            html_content = _escape_dataframe_markdown_table_pipes(sheets[s]).to_html(
+                index=False
+            )
             md_content += (
                 self._html_converter.convert_string(
                     html_content, **kwargs
@@ -146,7 +164,9 @@ class XlsConverter(DocumentConverter):
         md_content = ""
         for s in sheets:
             md_content += f"## {s}\n"
-            html_content = sheets[s].to_html(index=False)
+            html_content = _escape_dataframe_markdown_table_pipes(sheets[s]).to_html(
+                index=False
+            )
             md_content += (
                 self._html_converter.convert_string(
                     html_content, **kwargs
