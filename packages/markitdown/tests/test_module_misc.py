@@ -6,6 +6,7 @@ import shutil
 import pytest
 from unittest.mock import MagicMock
 
+from markitdown.converters._csv_converter import CsvConverter
 import markitdown.converters._pdf_converter as pdf_converter_module
 
 from markitdown._uri_utils import parse_data_uri, file_uri_to_path
@@ -548,6 +549,23 @@ def test_pdf_converter_prefers_pymupdf_when_primary_extraction_is_truncated(
 
     assert "BEFORE_IMAGE: this text should be extracted" in result.markdown
     assert "AFTER_IMAGE: this text should also be extracted" in result.markdown
+
+
+def test_csv_converter_skips_leading_blank_rows() -> None:
+    converter = CsvConverter()
+    result = converter.convert(
+        io.BytesIO(b"\nname,age\nbob,3\nalice,7\n"),
+        StreamInfo(mimetype="text/csv", extension=".csv", charset="utf-8"),
+    )
+
+    assert result.markdown == "\n".join(
+        [
+            "| name | age |",
+            "| --- | --- |",
+            "| bob | 3 |",
+            "| alice | 7 |",
+        ]
+    )
 
 
 @pytest.mark.skipif(

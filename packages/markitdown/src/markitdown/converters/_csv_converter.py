@@ -54,6 +54,12 @@ class CsvConverter(DocumentConverter):
         if not rows:
             return DocumentConverterResult(markdown="")
 
+        while rows and not any(cell.strip() for cell in rows[0]):
+            rows.pop(0)
+
+        if not rows:
+            return DocumentConverterResult(markdown="")
+
         # Create markdown table
         markdown_table = []
 
