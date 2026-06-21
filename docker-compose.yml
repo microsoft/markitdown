@@ -1,0 +1,23 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: markitdown-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - EXIFTOOL_PATH=/usr/bin/exiftool
+      - FFMPEG_PATH=/usr/bin/ffmpeg
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: markitdown-frontend
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend

@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MarkItDown - 文件转 Markdown</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.8.1/github-markdown.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/lib/highlight.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; background: #f6f8fa; min-height: 100vh; }
+        .header { background: #24292f; color: #fff; padding: 16px 32px; display: flex; align-items: center; gap: 12px; }
+        .header h1 { font-size: 20px; font-weight: 600; }
+        .header .badge { background: #0969da; font-size: 11px; padding: 2px 8px; border-radius: 10px; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 32px 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+        @media (max-width: 768px) { .container { grid-template-columns: 1fr; } }
+        .panel { background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.08); overflow: hidden; }
+        .panel-header { padding: 16px 24px; border-bottom: 1px solid #e8ecf0; font-weight: 600; font-size: 14px; color: #24292f; display: flex; align-items: center; justify-content: space-between; }
+        .panel-body { padding: 24px; }
+        .drop-zone { border: 2px dashed #d0d7de; border-radius: 10px; padding: 48px 24px; text-align: center; cursor: pointer; transition: all .2s; }
+        .drop-zone:hover, .drop-zone.drag-over { border-color: #0969da; background: #f0f6ff; }
+        .drop-zone-icon { font-size: 48px; margin-bottom: 12px; }
+        .drop-zone p { color: #656d76; font-size: 14px; margin: 4px 0; }
+        .drop-zone .browse { color: #0969da; font-weight: 600; }
+        .divider { display: flex; align-items: center; margin: 20px 0; color: #8c959f; font-size: 13px; }
+        .divider::before, .divider::after { content: ''; flex: 1; border-bottom: 1px solid #d0d7de; }
+        .divider span { padding: 0 16px; }
+        .url-input-group { display: flex; gap: 8px; }
+        .url-input-group input { flex: 1; padding: 10px 14px; border: 1px solid #d0d7de; border-radius: 8px; font-size: 14px; outline: none; transition: border-color .2s; }
+        .url-input-group input:focus { border-color: #0969da; box-shadow: 0 0 0 3px rgba(9,105,218,.1); }
+        .btn { padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all .2s; }
+        .btn-primary { background: #0969da; color: #fff; }
+        .btn-primary:hover { background: #0550b3; }
+        .btn-primary:disabled { background: #d0d7de; color: #8c959f; cursor: not-allowed; }
+        .btn-outline { background: #fff; color: #0969da; border: 1px solid #0969da; }
+        .btn-outline:hover { background: #f0f6ff; }
+        .btn-group { display: flex; gap: 8px; }
+        .file-info { display: none; padding: 12px 16px; background: #f0f6ff; border-radius: 8px; margin-top: 12px; font-size: 13px; color: #0969da; align-items: center; gap: 8px; }
+        .file-info.show { display: flex; }
+        .file-info .remove { margin-left: auto; cursor: pointer; color: #cf222e; font-weight: 600; }
+        .loading { display: none; text-align: center; padding: 20px; }
+        .loading.show { display: block; }
+        .spinner { width: 36px; height: 36px; border: 3px solid #e8ecf0; border-top-color: #0969da; border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 12px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .error { display: none; padding: 12px 16px; background: #fff1f0; border: 1px solid #ffccc7; border-radius: 8px; color: #cf222e; font-size: 13px; margin-top: 12px; }
+        .error.show { display: block; }
+        .preview-empty { text-align: center; color: #8c959f; padding: 64px 24px; }
+        .preview-empty .icon { font-size: 48px; margin-bottom: 12px; }
+        .markdown-body { padding: 24px; max-height: 70vh; overflow-y: auto; }
+        .markdown-body pre code.hljs { padding: 16px; border-radius: 8px; font-size: 13px; }
+        .toast { position: fixed; top: 20px; right: 20px; background: #24292f; color: #fff; padding: 12px 20px; border-radius: 8px; font-size: 14px; z-index: 999; opacity: 0; transform: translateY(-10px); transition: all .3s; pointer-events: none; }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        #filename { display: none; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        <h1>MarkItDown</h1>
+        <span class="badge">文件转 Markdown</span>
+    </div>
+
+    <div class="container">
+        <!-- Left: Input -->
+        <div class="panel">
+            <div class="panel-header">上传文件或输入 URL</div>
+            <div class="panel-body">
+                <div class="drop-zone" id="dropZone">
+                    <div class="drop-zone-icon">&#128196;</div>
+                    <p>拖拽文件到此处，或 <span class="browse">点击浏览</span></p>
+                    <p style="font-size:12px; color:#8c959f; margin-top:8px;">支持 PDF、Word、Excel、PPT、图片、音频、EPUB、HTML 等格式</p>
+                    <input type="file" id="fileInput" style="display:none">
+                </div>
+                <div class="file-info" id="fileInfo">
+                    <span id="fileName"></span>
+                    <span class="remove" id="removeFile">移除</span>
+                </div>
+
+                <div class="divider"><span>或</span></div>
+
+                <div class="url-input-group">
+                    <input type="text" id="urlInput" placeholder="输入网页 URL，如 https://example.com">
+                    <button class="btn btn-outline" id="convertUrlBtn" style="white-space:nowrap;">转换 URL</button>
+                </div>
+
+                <button class="btn btn-primary" id="convertBtn" style="width:100%; margin-top:16px;" disabled>开始转换</button>
+
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p style="color:#656d76; font-size:13px;">正在转换中...</p>
+                </div>
+                <div class="error" id="error"></div>
+            </div>
+        </div>
+
+        <!-- Right: Preview -->
+        <div class="panel">
+            <div class="panel-header">
+                <span>预览</span>
+                <div class="btn-group" id="actionBtns" style="display:none;">
+                    <button class="btn btn-outline" id="copyBtn" style="font-size:12px; padding:6px 12px;">复制</button>
+                    <button class="btn btn-outline" id="downloadBtn" style="font-size:12px; padding:6px 12px;">下载 .md</button>
+                </div>
+            </div>
+            <div id="previewArea">
+                <div class="preview-empty" id="previewEmpty">
+                    <div class="icon">&#128270;</div>
+                    <p>转换结果将在这里显示</p>
+                </div>
+                <div class="markdown-body" id="markdownBody" style="display:none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        const API_BASE = '/api';
+
+        marked.setOptions({
+            highlight: function(code, lang) {
+                if (lang && hljs.getLanguage(lang)) {
+                    return hljs.highlight(code, { language: lang }).value;
+                }
+                return hljs.highlightAuto(code).value;
+            },
+            breaks: true,
+            gfm: true,
+        });
+
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const removeFile = document.getElementById('removeFile');
+        const convertBtn = document.getElementById('convertBtn');
+        const convertUrlBtn = document.getElementById('convertUrlBtn');
+        const urlInput = document.getElementById('urlInput');
+        const loading = document.getElementById('loading');
+        const error = document.getElementById('error');
+        const previewEmpty = document.getElementById('previewEmpty');
+        const markdownBody = document.getElementById('markdownBody');
+        const actionBtns = document.getElementById('actionBtns');
+        const copyBtn = document.getElementById('copyBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const toast = document.getElementById('toast');
+
+        let selectedFile = null;
+        let lastMarkdown = '';
+        let lastFilename = '';
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            if (e.dataTransfer.files.length > 0) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length > 0) handleFile(fileInput.files[0]);
+        });
+        removeFile.addEventListener('click', () => {
+            selectedFile = null;
+            fileInfo.classList.remove('show');
+            fileInput.value = '';
+            updateConvertBtn();
+        });
+
+        function handleFile(file) {
+            selectedFile = file;
+            fileName.textContent = file.name;
+            fileInfo.classList.add('show');
+            updateConvertBtn();
+        }
+
+        function updateConvertBtn() {
+            convertBtn.disabled = !selectedFile && !urlInput.value.trim();
+        }
+
+        urlInput.addEventListener('input', updateConvertBtn);
+
+        convertBtn.addEventListener('click', async () => {
+            if (selectedFile) {
+                await convertFile();
+            } else if (urlInput.value.trim()) {
+                await convertUrl();
+            }
+        });
+
+        convertUrlBtn.addEventListener('click', async () => {
+            if (urlInput.value.trim()) await convertUrl();
+        });
+
+        async function convertFile() {
+            showLoading();
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            try {
+                const res = await fetch(`${API_BASE}/convert/file`, { method: 'POST', body: formData });
+                const data = await res.json();
+                handleResult(data);
+            } catch (e) {
+                showError('网络错误: ' + e.message);
+            }
+            hideLoading();
+        }
+
+        async function convertUrl() {
+            const url = urlInput.value.trim();
+            if (!url) return;
+            showLoading();
+            try {
+                const res = await fetch(`${API_BASE}/convert/url`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url }),
+                });
+                const data = await res.json();
+                handleResult(data);
+            } catch (e) {
+                showError('网络错误: ' + e.message);
+            }
+            hideLoading();
+        }
+
+        function handleResult(data) {
+            if (data.success) {
+                lastMarkdown = data.markdown;
+                lastFilename = data.filename || 'output';
+                showMarkdown(data.markdown);
+                error.classList.remove('show');
+            } else {
+                showError(data.error || '转换失败');
+                previewEmpty.style.display = 'block';
+                markdownBody.style.display = 'none';
+                actionBtns.style.display = 'none';
+            }
+        }
+
+        function showMarkdown(md) {
+            previewEmpty.style.display = 'none';
+            markdownBody.style.display = 'block';
+            markdownBody.innerHTML = marked.parse(md);
+            actionBtns.style.display = 'flex';
+        }
+
+        function showLoading() {
+            loading.classList.add('show');
+            error.classList.remove('show');
+            convertBtn.disabled = true;
+            convertUrlBtn.disabled = true;
+        }
+
+        function hideLoading() {
+            loading.classList.remove('show');
+            convertBtn.disabled = false;
+            convertUrlBtn.disabled = false;
+        }
+
+        function showError(msg) {
+            error.textContent = msg;
+            error.classList.add('show');
+        }
+
+        copyBtn.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(lastMarkdown);
+                showToast('已复制到剪贴板');
+            } catch {
+                showToast('复制失败');
+            }
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            const blob = new Blob([lastMarkdown], { type: 'text/markdown;charset=utf-8' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            const baseName = lastFilename.replace(/\.[^.]+$/, '') || 'output';
+            a.download = baseName + '.md';
+            a.click();
+            URL.revokeObjectURL(a.href);
+        });
+
+        function showToast(msg) {
+            toast.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2000);
+        }
+    </script>
+</body>
+</html>
