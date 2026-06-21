@@ -46,12 +46,43 @@ def test_font_tables_resolve_cmsy_cmmi():
     """CMSY/CMMI tables map their glyphs, including point-size variants."""
     assert lookup("ABCDEF+CMMI10", 64) == "∂"  # partialdiff
     assert lookup("ABCDEF+CMMI10", 11) == "α"  # alpha
+    assert lookup("ABCDEF+CMMI10", 15) == "ε"  # epsilon1 (varepsilon)
+    assert lookup("ABCDEF+CMMI10", 34) == "ϵ"  # epsilon (lunate)
     assert lookup("ABCDEF+CMSY10", 114) == "∇"  # nabla
     assert lookup("ABCDEF+CMSY10", 11) == "⊘"  # circledivide
     assert lookup("ABCDEF+CMSY10", 10) == "⊗"  # circlemultiply
     # Design-size and Latin Modern variants share the family table.
     assert lookup("ABCDEF+CMSY8", 48) == "′"  # prime
     assert lookup("ABCDEF+LMMI10", 11) == "α"
+
+
+def test_bold_and_ams_fonts():
+    """Bold-math (CMBSY/CMMIB) and AMS symbol fonts (MSAM/MSBM/LASY) resolve."""
+    # Bold math fonts share the plain CM encodings.
+    assert lookup("ABCDEF+CMBSY10", 0) == "−"  # bold cmsy minus
+    assert lookup("ABCDEF+CMMIB10", 11) == "α"  # bold math italic alpha
+    # AMS symbols.
+    assert lookup("ABCDEF+MSAM10", 3) == "□"  # square
+    assert lookup("ABCDEF+MSBM10", 82) == "ℝ"  # blackboard R (Letterlike U+211D)
+    assert lookup("ABCDEF+MSBM10", 65) == "𝔸"  # blackboard A (1D5 block)
+    # Letterlike exception overrides the double-struck range: Z is U+2124, not 1D56B.
+    assert lookup("ABCDEF+MSBM10", 90) == "ℤ"
+    assert lookup("ABCDEF+LASY10", 0) == "⊲"  # \lhd
+    # Fallback path stays active for codes outside an authored table.
+    assert lookup("ABCDEF+MSAM10", 200) is None
+
+
+def test_cmex_full_coverage_and_operators():
+    """Every cmex10 code 0-127 resolves, including the rarer big operators."""
+    # Big operators / contour integrals added from the full AFM encoding.
+    assert lookup("ABCDEF+CMEX10", 72) == "∮"  # contintegraltext
+    assert lookup("ABCDEF+CMEX10", 76) == "⊕"  # circleplustext
+    assert lookup("ABCDEF+CMEX10", 96) == "∐"  # coproducttext
+    assert lookup("ABCDEF+CMEX10", 106) == "⌊"  # floorleftBig
+    # Extensible delimiter extenders collapse to nothing (single delimiter out).
+    assert lookup("ABCDEF+CMEX10", 66) == ""  # parenleftex
+    # No cmex code in 0-127 is left unresolved.
+    assert all(lookup("ABCDEF+CMEX10", c) is not None for c in range(128))
 
 
 def test_prose_pdf_unaffected_by_decode(markitdown):
