@@ -60,7 +60,9 @@ def build_cid_map(pdf_bytes: BinaryIO) -> dict[int, str]:
         walk(page)
 
     # Keep only unambiguous resolutions.
-    return {cid: next(iter(chars)) for cid, chars in candidates.items() if len(chars) == 1}
+    return {
+        cid: next(iter(chars)) for cid, chars in candidates.items() if len(chars) == 1
+    }
 
 
 def _same_cluster(gap: str) -> bool:
@@ -107,9 +109,7 @@ def decode_cids(
 
         if confidence >= confidence_threshold:
             out.append(
-                _CID_TOKEN.sub(
-                    lambda m: cid_map.get(int(m.group(1)), m.group(0)), span
-                )
+                _CID_TOKEN.sub(lambda m: cid_map.get(int(m.group(1)), m.group(0)), span)
             )
         else:
             out.append(f"<!-- FORMULA: {span} -->")

@@ -331,14 +331,24 @@ def _build(codes: dict[int, str]) -> dict[int, str]:
             # "summationdisplay"): fall back to the base name by stripping the
             # suffix.
             for suffix in (
-                "bigg", "Bigg", "big", "Big", "display", "text",
-                "tp", "bt", "ex", "mid",  # extensible delimiter pieces
+                "bigg",
+                "Bigg",
+                "big",
+                "Big",
+                "display",
+                "text",
+                "tp",
+                "bt",
+                "ex",
+                "mid",  # extensible delimiter pieces
             ):
                 if glyph.endswith(suffix):
                     unicode_char = _GLYPH_TO_UNICODE.get(glyph[: -len(suffix)])
                     break
         if unicode_char is None and glyph.startswith("vextend"):
-            unicode_char = _GLYPH_TO_UNICODE["bar" if glyph == "vextendsingle" else "doublebar"]
+            unicode_char = _GLYPH_TO_UNICODE[
+                "bar" if glyph == "vextendsingle" else "doublebar"
+            ]
         if unicode_char is not None:
             table[code] = unicode_char
     return table

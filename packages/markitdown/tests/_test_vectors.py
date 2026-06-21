@@ -102,9 +102,7 @@ GENERAL_TEST_VECTORS = [
         mimetype="application/pdf",
         charset=None,
         url=None,
-        must_include=[
-            "surveys spectral theory and variational calculus on Hilbert"
-        ],
+        must_include=["surveys spectral theory and variational calculus on Hilbert"],
         must_not_include=["(cid:"],
     ),
     FileTestVector(
