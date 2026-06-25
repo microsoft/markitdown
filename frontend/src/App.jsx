@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { UploadCloud, FileType, X, Download, Copy, Settings, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
+import { UploadCloud, FileText, X, Download, Copy, Settings, CheckCircle, AlertCircle, Loader2, Github } from 'lucide-react'
 
 function App() {
   const [file, setFile] = useState(null)
@@ -7,11 +7,11 @@ function App() {
   const [isConverting, setIsConverting] = useState(false)
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
-  const [backendUrl, setBackendUrl] = useState('https://markitdown-agent-ui.onrender.com') // Default to live backend
+  const [backendUrl, setBackendUrl] = useState('https://markitdown-agent-ui.onrender.com')
   const [copied, setCopied] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
   const fileInputRef = useRef(null)
 
-  // Extract from query params if available (for production)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const urlParam = params.get('backend')
@@ -88,8 +88,19 @@ function App() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    // remove extension and add .md
-    const filename = file ? file.name.split('.').slice(0, -1).join('.') + '.md' : 'document.md'
+    
+    // Robust filename extraction to handle files with or without extensions
+    let filename = 'document.md';
+    if (file && file.name) {
+      const parts = file.name.split('.');
+      if (parts.length > 1) {
+        parts.pop(); // Remove the old extension
+        filename = parts.join('.') + '.md';
+      } else {
+        filename = file.name + '.md';
+      }
+    }
+    
     a.download = filename
     document.body.appendChild(a)
     a.click()
@@ -97,144 +108,151 @@ function App() {
     URL.revokeObjectURL(url)
   }
 
+  const clearFile = () => {
+    setFile(null)
+    setResult(null)
+    setError(null)
+    if (fileInputRef.current) fileInputRef.current.value = ""
+  }
+
   return (
-    <div className="container">
-      <header>
-        <h1>MarkItDown</h1>
-        <p className="subtitle">Convert almost any document to Markdown instantly.</p>
-      </header>
+    <div className="app-wrapper">
+      <nav className="navbar">
+        <div className="logo">
+          <div className="logo-icon">M</div>
+          <span>MarkItDown Web</span>
+        </div>
+        <button className="settings-btn" onClick={() => setShowSettings(!showSettings)} title="Settings">
+          <Settings size={20} />
+        </button>
+      </nav>
 
-      <main className="main-content">
-        {/* Left Panel: Upload */}
-        <section className="panel">
-          <div className="panel-header">
-            <h2 className="panel-title">
-              <UploadCloud size={24} className="text-accent" style={{ color: 'var(--accent-color)' }} />
-              Upload Document
-            </h2>
-          </div>
+      <main className="main-container">
+        <div className="hero-section">
+          <h1>Universal File Conversion</h1>
+          <p>Transform PDFs, Word docs, Excel, Images, and more into clean Markdown instantly.</p>
+        </div>
 
-          <div 
-            className={`upload-area ${isDragging ? 'drag-active' : ''}`}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
-          >
+        {showSettings && (
+          <div className="settings-dropdown slide-down">
+            <label>API Backend Endpoint</label>
             <input 
-              type="file" 
-              className="file-input" 
-              ref={fileInputRef}
-              onChange={handleFileChange}
+              type="url" 
+              value={backendUrl}
+              onChange={(e) => setBackendUrl(e.target.value)}
+              placeholder="https://your-api-url.com"
             />
-            <UploadCloud size={48} className="upload-icon" />
-            <p className="upload-text">Click or drag & drop a file</p>
-            <p className="upload-hint">Supports PDF, PPTX, DOCX, XLSX, Images, HTML, CSV, and more.</p>
+            <p className="settings-hint">Must be a valid FastAPI backend running the MarkItDown wrapper.</p>
+          </div>
+        )}
+
+        <div className={`workspace ${result ? 'split-view' : 'single-view'}`}>
+          {/* Left / Top Panel - Upload & Controls */}
+          <div className="card upload-card">
+            <div className="card-header">
+              <h2>Input Document</h2>
+            </div>
+            
+            <div className="card-body">
+              {!file ? (
+                <div 
+                  className={`drop-zone ${isDragging ? 'dragging' : ''}`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <input 
+                    type="file" 
+                    className="hidden-input" 
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                  />
+                  <div className="drop-icon-wrapper">
+                    <UploadCloud size={40} className="drop-icon" />
+                  </div>
+                  <h3>Upload a file</h3>
+                  <p>Drag and drop or click to browse</p>
+                </div>
+              ) : (
+                <div className="file-active-state">
+                  <div className="file-card">
+                    <div className="file-icon">
+                      <FileText size={24} />
+                    </div>
+                    <div className="file-details">
+                      <span className="filename" title={file.name}>{file.name}</span>
+                      <span className="filesize">{(file.size / 1024).toFixed(1)} KB</span>
+                    </div>
+                    <button className="remove-file" onClick={clearFile} title="Remove file">
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  <button 
+                    className={`primary-btn convert-btn ${isConverting ? 'converting' : ''}`} 
+                    onClick={handleConvert}
+                    disabled={isConverting}
+                  >
+                    {isConverting ? (
+                      <><Loader2 size={20} className="spin" /> Processing...</>
+                    ) : (
+                      'Convert to Markdown'
+                    )}
+                  </button>
+
+                  {error && (
+                    <div className="alert alert-error fade-in">
+                      <AlertCircle size={18} />
+                      <p>{error}</p>
+                    </div>
+                  )}
+                  {result && (
+                    <div className="alert alert-success fade-in">
+                      <CheckCircle size={18} />
+                      <p>Conversion successful!</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
-          {file && (
-            <div className="file-info">
-              <div className="file-name">
-                <FileType size={20} style={{ color: 'var(--accent-color)' }} />
-                <span>{file.name}</span>
-                <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-                  ({(file.size / 1024).toFixed(1)} KB)
-                </span>
-              </div>
-              <button className="remove-btn" onClick={() => setFile(null)}>
-                <X size={18} />
-              </button>
-            </div>
-          )}
-
-          <div className="settings-panel">
-            <h3 className="settings-title">
-              <Settings size={16} style={{ display: 'inline', marginRight: '4px', verticalAlign: '-3px' }} /> 
-              Configuration
-            </h3>
-            <div className="setting-row">
-              <label className="input-label">Backend API URL</label>
-              <input 
-                type="text" 
-                className="text-input" 
-                value={backendUrl}
-                onChange={(e) => setBackendUrl(e.target.value)}
-                placeholder="https://your-render-url.onrender.com"
-              />
-            </div>
-          </div>
-
-          <button 
-            className="convert-btn" 
-            onClick={handleConvert}
-            disabled={!file || isConverting}
-          >
-            {isConverting ? (
-              <>
-                <Loader2 size={20} className="spinner" />
-                Converting...
-              </>
-            ) : (
-              <>
-                Convert to Markdown
-              </>
-            )}
-          </button>
-
-          {error && (
-            <div className="status-message status-error">
-              <AlertCircle size={18} />
-              <span>{error}</span>
-            </div>
-          )}
+          {/* Right / Bottom Panel - Result */}
           {result && (
-            <div className="status-message status-success">
-              <CheckCircle size={18} />
-              <span>Conversion successful!</span>
+            <div className="card result-card fade-in-up">
+              <div className="card-header">
+                <h2>Markdown Output</h2>
+                <div className="action-group">
+                  <button className="icon-btn" onClick={handleCopy} title="Copy code">
+                    {copied ? <CheckCircle size={18} className="text-success" /> : <Copy size={18} />}
+                  </button>
+                  <button className="icon-btn" onClick={handleDownload} title="Download .md">
+                    <Download size={18} />
+                  </button>
+                </div>
+              </div>
+              <div className="card-body no-padding">
+                <pre className="code-block">
+                  <code>{result}</code>
+                </pre>
+              </div>
             </div>
           )}
-        </section>
-
-        {/* Right Panel: Preview */}
-        <section className="panel">
-          <div className="panel-header">
-            <h2 className="panel-title">
-              Markdown Output
-            </h2>
-            <div className="action-btns">
-              <button 
-                className="icon-btn" 
-                onClick={handleCopy} 
-                disabled={!result}
-                title="Copy to clipboard"
-                style={{ opacity: !result ? 0.5 : 1, cursor: !result ? 'not-allowed' : 'pointer' }}
-              >
-                {copied ? <CheckCircle size={18} color="var(--success-color)" /> : <Copy size={18} />}
-              </button>
-              <button 
-                className="icon-btn" 
-                onClick={handleDownload} 
-                disabled={!result}
-                title="Download .md file"
-                style={{ opacity: !result ? 0.5 : 1, cursor: !result ? 'not-allowed' : 'pointer' }}
-              >
-                <Download size={18} />
-              </button>
-            </div>
-          </div>
-
-          <div className="preview-area">
-            {result ? (
-              result
-            ) : (
-              <div className="preview-placeholder">
-                <FileType size={48} style={{ opacity: 0.2, marginBottom: '1rem' }} />
-                <p>Your generated markdown will appear here.</p>
-              </div>
-            )}
-          </div>
-        </section>
+        </div>
       </main>
+
+      <footer className="footer">
+        <div className="footer-content">
+          <p>
+            Powered by <a href="https://github.com/microsoft/markitdown" target="_blank" rel="noreferrer">Microsoft MarkItDown</a>
+          </p>
+          <p className="divider">•</p>
+          <p>
+            UI crafted by <a href="https://github.com/gurukannan22" target="_blank" rel="noreferrer" className="author-link"><Github size={14} /> gurukannan22</a>
+          </p>
+        </div>
+      </footer>
     </div>
   )
 }
