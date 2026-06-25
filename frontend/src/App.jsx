@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { UploadCloud, FileText, X, Download, Copy, Settings, CheckCircle, AlertCircle, Loader2, Github } from 'lucide-react'
+import { UploadCloud, FileText, X, Download, Copy, Settings, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
 
 function App() {
   const [file, setFile] = useState(null)
@@ -249,7 +249,7 @@ function App() {
           </p>
           <p className="divider">•</p>
           <p>
-            UI crafted by <a href="https://github.com/gurukannan22" target="_blank" rel="noreferrer" className="author-link"><Github size={14} /> gurukannan22</a>
+            UI crafted by <a href="https://github.com/gurukannan22" target="_blank" rel="noreferrer" className="author-link">gurukannan22</a>
           </p>
         </div>
       </footer>
