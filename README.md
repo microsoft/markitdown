@@ -110,6 +110,7 @@ At the moment, the following optional dependencies are available:
 * `[az-content-understanding]` Installs dependencies for Azure Content Understanding
 * `[audio-transcription]` Installs dependencies for audio transcription of wav and mp3 files
 * `[youtube-transcription]` Installs dependencies for fetching YouTube video transcription
+* `[twelvelabs]` Installs dependencies for video understanding with TwelveLabs Pegasus
 
 ### Plugins
 
@@ -279,6 +280,39 @@ md = MarkItDown(llm_client=client, llm_model="gpt-4o", llm_prompt="optional cust
 result = md.convert("example.jpg")
 print(result.text_content)
 ```
+
+### TwelveLabs (Video Understanding)
+
+The built-in audio/video converter only transcribes speech. [TwelveLabs](https://twelvelabs.io)
+Pegasus is a video-understanding model that reads the actual frames and audio, so the
+resulting Markdown can also describe visual scenes, on-screen action, and structure — not
+just the spoken words. It is opt-in and only activates for video files (`.mp4`, `.mov`,
+`.webm`, `.mkv`, `.avi`, `.m4v`) when an API key is supplied. All other formats continue to
+use the existing converters unchanged.
+
+Install: `pip install 'markitdown[twelvelabs]'`
+
+From the command line (reads the `TWELVELABS_API_KEY` environment variable):
+
+```bash
+export TWELVELABS_API_KEY="<your_api_key>"
+markitdown talk.mp4 --use-twelvelabs -o talk.md
+```
+
+In Python (pass the key explicitly or via `TWELVELABS_API_KEY`):
+
+```python
+from markitdown import MarkItDown
+
+md = MarkItDown(
+    twelvelabs_api_key="<your_api_key>",
+    twelvelabs_prompt="Summarize this video as Markdown.",  # optional
+)
+result = md.convert("talk.mp4")
+print(result.text_content)
+```
+
+You can grab a free API key at [twelvelabs.io](https://twelvelabs.io) — there's a generous free tier.
 
 ### Docker
 

@@ -49,6 +49,7 @@ all = [
   "azure-ai-documentintelligence",
   "azure-ai-contentunderstanding>=1.2.0b1",
   "azure-identity",
+  "twelvelabs>=1.2.8",
 ]
 pptx = ["python-pptx"]
 docx = ["mammoth~=1.11.0", "lxml"]
@@ -61,6 +62,7 @@ youtube-transcription = ["youtube-transcript-api"]
 az-doc-intel = ["azure-ai-documentintelligence", "azure-identity"]
 # >=1.2.0b1 required for to_llm_input() helper used by ContentUnderstandingConverter
 az-content-understanding = ["azure-ai-contentunderstanding>=1.2.0b1", "azure-identity"]
+twelvelabs = ["twelvelabs>=1.2.8"]
 
 [project.urls]
 Documentation = "https://github.com/microsoft/markitdown#readme"

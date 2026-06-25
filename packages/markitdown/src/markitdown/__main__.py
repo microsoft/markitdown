@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: MIT
 import argparse
+import os
 import sys
 import codecs
 from typing import Any, Dict
@@ -94,6 +95,13 @@ def main():
         help="Use Azure Content Understanding to extract text. Requires --cu-endpoint.",
     )
 
+    cloud_group.add_argument(
+        "--use-twelvelabs",
+        action="store_true",
+        dest="use_twelvelabs",
+        help="Use TwelveLabs Pegasus to convert video to Markdown. Requires the TWELVELABS_API_KEY environment variable.",
+    )
+
     parser.add_argument(
         "-e",
         "--endpoint",
@@ -117,6 +125,18 @@ def main():
         "--cu-file-types",
         type=str,
         help="Comma-separated list of file types to route to Content Understanding (e.g., pdf,jpeg,mp4). If omitted, all supported types are routed.",
+    )
+
+    parser.add_argument(
+        "--twelvelabs-model",
+        type=str,
+        help="TwelveLabs Pegasus model name to use with --use-twelvelabs (e.g., pegasus1.5).",
+    )
+
+    parser.add_argument(
+        "--twelvelabs-prompt",
+        type=str,
+        help="Instruction sent to Pegasus describing how to summarize the video when using --use-twelvelabs.",
     )
 
     parser.add_argument(
@@ -241,6 +261,22 @@ def main():
             cu_kwargs["cu_file_types"] = cu_types
 
         markitdown = MarkItDown(enable_plugins=args.use_plugins, **cu_kwargs)
+    elif args.use_twelvelabs:
+        twelvelabs_api_key = os.environ.get("TWELVELABS_API_KEY")
+        if twelvelabs_api_key is None:
+            _exit_with_error(
+                "The TWELVELABS_API_KEY environment variable is required when using --use-twelvelabs."
+            )
+        elif args.filename is None:
+            _exit_with_error("Filename is required when using TwelveLabs.")
+
+        tl_kwargs: Dict[str, Any] = {"twelvelabs_api_key": twelvelabs_api_key}
+        if args.twelvelabs_model is not None:
+            tl_kwargs["twelvelabs_model"] = args.twelvelabs_model
+        if args.twelvelabs_prompt is not None:
+            tl_kwargs["twelvelabs_prompt"] = args.twelvelabs_prompt
+
+        markitdown = MarkItDown(enable_plugins=args.use_plugins, **tl_kwargs)
     else:
         markitdown = MarkItDown(enable_plugins=args.use_plugins)
 
