@@ -1,0 +1,4 @@
+fastapi==0.110.1
+uvicorn==0.29.0
+python-multipart==0.0.9
+markitdown==0.0.1a2
