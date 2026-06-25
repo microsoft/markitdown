@@ -7,7 +7,7 @@ function App() {
   const [isConverting, setIsConverting] = useState(false)
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
-  const [backendUrl, setBackendUrl] = useState('http://localhost:8000') // Default for local
+  const [backendUrl, setBackendUrl] = useState('https://markitdown-agent-ui.onrender.com') // Default to live backend
   const [copied, setCopied] = useState(false)
   const fileInputRef = useRef(null)
 
