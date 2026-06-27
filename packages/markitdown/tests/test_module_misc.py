@@ -3,7 +3,9 @@ import io
 import os
 import re
 import shutil
+import zipfile
 import pytest
+from xml.etree import ElementTree as ET
 from unittest.mock import MagicMock
 
 from markitdown._uri_utils import parse_data_uri, file_uri_to_path
@@ -272,6 +274,38 @@ def test_docx_equations() -> None:
     # Find block equations wrapped with double $$ and check if they are present
     block_equations = re.findall(r"\$\$(.+?)\$\$", result.text_content)
     assert block_equations, "No block equations found in the document."
+
+
+def test_docx_missing_style_type_does_not_crash(tmp_path) -> None:
+    docx_file = os.path.join(TEST_FILES_DIR, "test.docx")
+    malformed_docx = tmp_path / "missing-style-type.docx"
+
+    namespace = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    style_type_attr = f"{{{namespace}}}type"
+
+    with zipfile.ZipFile(docx_file, mode="r") as zip_input:
+        with zipfile.ZipFile(malformed_docx, mode="w") as zip_output:
+            zip_output.comment = zip_input.comment
+            removed_style_type = False
+
+            for item in zip_input.infolist():
+                content = zip_input.read(item.filename)
+                if item.filename == "word/styles.xml":
+                    root = ET.fromstring(content)
+                    for style in root.findall(f".//{{{namespace}}}style"):
+                        if style_type_attr in style.attrib:
+                            del style.attrib[style_type_attr]
+                            removed_style_type = True
+                            break
+                    content = ET.tostring(root, encoding="utf-8", xml_declaration=True)
+
+                zip_output.writestr(item, content)
+
+    assert removed_style_type
+
+    result = MarkItDown().convert(str(malformed_docx))
+
+    assert "AutoGen: Enabling Next-Gen LLM Applications" in result.text_content
 
 
 def test_input_as_strings() -> None:

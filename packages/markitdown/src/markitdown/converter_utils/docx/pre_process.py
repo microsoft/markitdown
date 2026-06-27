@@ -7,6 +7,9 @@ from bs4 import BeautifulSoup, Tag
 
 from .math.omml import OMML_NS, oMath2Latex
 
+WORD_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+WORD_STYLE_TYPE_ATTR = WORD_NS + "type"
+
 MATH_ROOT_TEMPLATE = "".join(
     (
         "<w:document ",
@@ -115,6 +118,14 @@ def _pre_process_math(content: bytes) -> bytes:
     return str(soup).encode()
 
 
+def _pre_process_styles(content: bytes) -> bytes:
+    root = ET.fromstring(content)
+    for style in list(root.findall(f".//{WORD_NS}style")):
+        if WORD_STYLE_TYPE_ATTR not in style.attrib:
+            root.remove(style)
+    return ET.tostring(root, encoding="utf-8", xml_declaration=True)
+
+
 def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
     """
     Pre-processes a DOCX file with provided steps.
@@ -136,6 +147,9 @@ def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
         "word/footnotes.xml",
         "word/endnotes.xml",
     ]
+    pre_process_style_files = [
+        "word/styles.xml",
+    ]
     with zipfile.ZipFile(input_docx, mode="r") as zip_input:
         files = {name: zip_input.read(name) for name in zip_input.namelist()}
         with zipfile.ZipFile(output_docx, mode="w") as zip_output:
@@ -149,6 +163,12 @@ def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
                         zip_output.writestr(name, updated_content)
                     except Exception:
                         # If there is an error in processing the content, write the original content
+                        zip_output.writestr(name, content)
+                elif name in pre_process_style_files:
+                    try:
+                        updated_content = _pre_process_styles(content)
+                        zip_output.writestr(name, updated_content)
+                    except Exception:
                         zip_output.writestr(name, content)
                 else:
                     zip_output.writestr(name, content)
