@@ -319,7 +319,7 @@ class MarkItDown:
             return self.convert_stream(source, stream_info=stream_info, **kwargs)
         else:
             raise TypeError(
-                f"Invalid source type: {type(source)}. Expected str, requests.Response, BinaryIO."
+                f"Invalid source type: {type(source)}. Expected str, pathlib.Path, requests.Response, or BinaryIO."
             )
 
     def convert_local(
