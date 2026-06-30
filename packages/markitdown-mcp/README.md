@@ -35,6 +35,66 @@ To run the MCP server, using Streamable HTTP and SSE, use the following command:
 markitdown-mcp --http --host 127.0.0.1 --port 3001
 ```
 
+## LLM / OCR Support (Optional)
+
+The MCP server can be configured to use a local or remote LLM for image
+descriptions and OCR (via the `markitdown-ocr` plugin).  Set the following
+environment variables:
+
+| Variable | Description |
+|---|---|
+| `MARKITDOWN_LLM_BASE_URL` | OpenAI-compatible API base URL (e.g. `http://localhost:11434/v1` for Ollama, `http://localhost:1234/v1` for LM Studio) |
+| `MARKITDOWN_LLM_MODEL` | Model name (e.g. `llama3.2-vision`, `gpt-4o`) |
+| `MARKITDOWN_LLM_API_KEY` | API key (optional; defaults to `ollama` for local servers) |
+| `MARKITDOWN_ENABLE_PLUGINS` | Set to `true` to enable the OCR plugin |
+
+### Ollama
+
+Ollama is auto-detected (port 11434 or hostname containing "ollama") and
+uses a lightweight native API adapter — **no `openai` package required**.
+
+```bash
+MARKITDOWN_ENABLE_PLUGINS=true \
+MARKITDOWN_LLM_BASE_URL=http://localhost:11434/v1 \
+MARKITDOWN_LLM_MODEL=llama3.2-vision \
+markitdown-mcp
+```
+
+### LM Studio / vLLM / Other OpenAI-Compatible Servers
+
+These servers expose a standard `/v1/chat/completions` endpoint and work
+with the `openai` Python package.
+
+```bash
+pip install openai
+
+MARKITDOWN_ENABLE_PLUGINS=true \
+MARKITDOWN_LLM_BASE_URL=http://localhost:1234/v1 \
+MARKITDOWN_LLM_MODEL=local-model \
+markitdown-mcp
+```
+
+### MCP Client Configuration
+
+When configuring an MCP client (VS Code, Claude Desktop, etc.), pass the
+environment variables in the server configuration:
+
+```json
+{
+  "servers": {
+    "markitdown": {
+      "command": "markitdown-mcp",
+      "args": [],
+      "env": {
+        "MARKITDOWN_ENABLE_PLUGINS": "true",
+        "MARKITDOWN_LLM_BASE_URL": "http://localhost:11434/v1",
+        "MARKITDOWN_LLM_MODEL": "llama3.2-vision"
+      }
+    }
+  }
+}
+```
+
 ## Running in Docker
 
 To run `markitdown-mcp` in Docker, build the Docker image using the provided Dockerfile:

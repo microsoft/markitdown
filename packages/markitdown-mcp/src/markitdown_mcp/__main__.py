@@ -17,10 +17,60 @@ import uvicorn
 mcp = FastMCP("markitdown")
 
 
+def _build_markitdown_kwargs() -> dict:
+    """Build MarkItDown constructor kwargs from environment variables.
+
+    Reads ``MARKITDOWN_LLM_BASE_URL``, ``MARKITDOWN_LLM_MODEL``, and
+    ``MARKITDOWN_LLM_API_KEY`` to configure an OpenAI-compatible LLM
+    client for image descriptions and OCR plugins.
+
+    Supported backends:
+
+    * **Ollama** — detected automatically when the base URL contains
+      ``:11434`` or the hostname ``ollama``.  Uses a lightweight native
+      API adapter (``_ollama_adapter.py``) that does not require the
+      ``openai`` package.
+    * **LM Studio / vLLM / any OpenAI-compatible server** — uses the
+      standard ``openai.OpenAI`` client.  Requires ``pip install openai``.
+    """
+    kwargs: dict = {"enable_plugins": check_plugins_enabled()}
+
+    llm_base_url = os.getenv("MARKITDOWN_LLM_BASE_URL")
+    llm_model = os.getenv("MARKITDOWN_LLM_MODEL")
+
+    if llm_base_url and llm_model:
+        # Auto-detect Ollama so we can use the native adapter
+        if ":11434" in llm_base_url or "ollama" in llm_base_url.lower():
+            from ._ollama_adapter import OllamaClient
+
+            kwargs["llm_client"] = OllamaClient(
+                base_url=llm_base_url.replace("/v1", ""),
+                model=llm_model,
+            )
+            kwargs["llm_model"] = llm_model
+        else:
+            try:
+                from openai import OpenAI
+
+                kwargs["llm_client"] = OpenAI(
+                    base_url=llm_base_url,
+                    api_key=os.getenv("MARKITDOWN_LLM_API_KEY", "ollama"),
+                )
+                kwargs["llm_model"] = llm_model
+            except ImportError:
+                print(
+                    "MARKITDOWN_LLM_BASE_URL/MODEL set but 'openai' package "
+                    "not installed. Install it with: pip install openai",
+                    file=sys.stderr,
+                )
+
+    return kwargs
+
+
 @mcp.tool()
 async def convert_to_markdown(uri: str) -> str:
     """Convert a resource described by an http:, https:, file: or data: URI to markdown"""
-    return MarkItDown(enable_plugins=check_plugins_enabled()).convert_uri(uri).markdown
+    return MarkItDown(**_build_markitdown_kwargs()).convert_uri(uri).markdown
 
 
 def check_plugins_enabled() -> bool:
