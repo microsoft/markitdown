@@ -151,40 +151,44 @@ class YouTubeConverter(DocumentConverter):
             params = parse_qs(parsed_url.query)  # type: ignore
             if "v" in params and params["v"][0]:
                 video_id = str(params["v"][0])
-                transcript_list = ytt_api.list(video_id)
-                languages = ["en"]
-                for transcript in transcript_list:
-                    languages.append(transcript.language_code)
-                    break
                 try:
-                    youtube_transcript_languages = kwargs.get(
-                        "youtube_transcript_languages", languages
-                    )
-                    # Retry the transcript fetching operation
-                    transcript = self._retry_operation(
-                        lambda: ytt_api.fetch(
-                            video_id, languages=youtube_transcript_languages
-                        ),
-                        retries=3,  # Retry 3 times
-                        delay=2,  # 2 seconds delay between retries
-                    )
-
-                    if transcript:
-                        transcript_text = " ".join(
-                            [part.text for part in transcript]
-                        )  # type: ignore
-                except Exception as e:
-                    # No transcript available
-                    if len(languages) == 1:
-                        print(f"Error fetching transcript: {e}")
-                    else:
-                        # Translate transcript into first kwarg
-                        transcript = (
-                            transcript_list.find_transcript(languages)
-                            .translate(youtube_transcript_languages[0])
-                            .fetch()
+                    transcript_list = ytt_api.list(video_id)
+                    languages = ["en"]
+                    for transcript in transcript_list:
+                        languages.append(transcript.language_code)
+                        break
+                    try:
+                        youtube_transcript_languages = kwargs.get(
+                            "youtube_transcript_languages", languages
                         )
-                        transcript_text = " ".join([part.text for part in transcript])
+                        # Retry the transcript fetching operation
+                        transcript = self._retry_operation(
+                            lambda: ytt_api.fetch(
+                                video_id, languages=youtube_transcript_languages
+                            ),
+                            retries=3,  # Retry 3 times
+                            delay=2,  # 2 seconds delay between retries
+                        )
+
+                        if transcript:
+                            transcript_text = " ".join(
+                                [part.text for part in transcript]
+                            )  # type: ignore
+                    except Exception as e:
+                        # No transcript available
+                        if len(languages) == 1:
+                            print(f"Error fetching transcript: {e}")
+                        else:
+                            # Translate transcript into first kwarg
+                            transcript = (
+                                transcript_list.find_transcript(languages)
+                                .translate(youtube_transcript_languages[0])
+                                .fetch()
+                            )
+                            transcript_text = " ".join([part.text for part in transcript])
+                except Exception as e:
+                    print(f"YouTube transcript extraction failed: {e}")
+                    transcript_text = "*(Transcript unavailable)*"
             if transcript_text:
                 webpage_text += f"\n### Transcript\n{transcript_text}\n"
 
