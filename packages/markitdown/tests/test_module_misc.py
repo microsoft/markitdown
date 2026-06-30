@@ -532,6 +532,21 @@ def test_markitdown_llm() -> None:
     validate_strings(result, PPTX_TEST_STRINGS)
 
 
+def test_csv_with_blank_first_line() -> None:
+    markitdown = MarkItDown()
+    csv_content = "\n\nname,age\nbob,3\nalice,7\n"
+    result = markitdown.convert_stream(
+        io.BytesIO(csv_content.encode("utf-8")),
+        file_extension=".csv",
+    )
+    assert "name" in result.text_content
+    assert "age" in result.text_content
+    assert "bob" in result.text_content
+    assert "3" in result.text_content
+    assert "alice" in result.text_content
+    assert "7" in result.text_content
+
+
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     for test in [
@@ -547,6 +562,7 @@ if __name__ == "__main__":
         test_markitdown_exiftool,
         test_markitdown_llm_parameters,
         test_markitdown_llm,
+        test_csv_with_blank_first_line,
     ]:
         print(f"Running {test.__name__}...", end="")
         test()

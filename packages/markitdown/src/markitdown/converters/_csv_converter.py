@@ -51,6 +51,14 @@ class CsvConverter(DocumentConverter):
         reader = csv.reader(io.StringIO(content))
         rows = list(reader)
 
+        # Skip leading empty rows
+        start_idx = 0
+        while start_idx < len(rows) and (
+            not rows[start_idx] or all(cell.strip() == "" for cell in rows[start_idx])
+        ):
+            start_idx += 1
+        rows = rows[start_idx:]
+
         if not rows:
             return DocumentConverterResult(markdown="")
 
