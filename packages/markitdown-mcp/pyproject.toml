@@ -24,7 +24,7 @@ classifiers = [
   "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dependencies = [
-  "mcp~=1.8.0",
+  "mcp>=1.9.4,<2",
   "markitdown[all]>=0.1.1,<0.2.0",
 ]
 
@@ -42,6 +42,7 @@ markitdown-mcp = "markitdown_mcp.__main__:main"
 [tool.hatch.envs.types]
 extra-dependencies = [
   "mypy>=1.0.0",
+  "pytest",
 ]
 [tool.hatch.envs.types.scripts]
 check = "mypy --install-types --non-interactive {args:src/markitdown_mcp tests}"
