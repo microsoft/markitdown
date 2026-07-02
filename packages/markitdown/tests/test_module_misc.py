@@ -532,6 +532,19 @@ def test_markitdown_llm() -> None:
     validate_strings(result, PPTX_TEST_STRINGS)
 
 
+def test_ipynb_converter_accepts_handling_decode_error() -> None:
+    from markitdown.converters._ipynb_converter import IpynbConverter
+    from io import BytesIO
+    converter = IpynbConverter()
+    # A stream of non-decodable bytes (binary data like French PDF bytes)
+    stream = BytesIO(b"\xc3\x28\x91\xff\x00")
+    # StreamInfo guessing MIME type application/json (to trigger decoding in accepts())
+    stream_info = StreamInfo(mimetype="application/json")
+
+    # This should return False gracefully and NOT raise UnicodeDecodeError/ValueError
+    assert not converter.accepts(stream, stream_info)
+
+
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     for test in [
@@ -547,6 +560,7 @@ if __name__ == "__main__":
         test_markitdown_exiftool,
         test_markitdown_llm_parameters,
         test_markitdown_llm,
+        test_ipynb_converter_accepts_handling_decode_error,
     ]:
         print(f"Running {test.__name__}...", end="")
         test()
