@@ -115,6 +115,24 @@ def _pre_process_math(content: bytes) -> bytes:
     return str(soup).encode()
 
 
+def _pre_process_styles(content: bytes) -> bytes:
+    """
+    Removes malformed DOCX style definitions that are missing required attributes.
+
+    Mammoth expects every ``w:style`` element to include ``w:type`` and
+    ``w:styleId``. Some DOCX producers emit malformed style entries without
+    those attributes, which otherwise causes conversion to fail with a
+    ``KeyError`` before any document text can be extracted. Dropping only the
+    malformed style definition allows Mammoth to continue and preserves the
+    document body content.
+    """
+    soup = BeautifulSoup(content.decode(), features="xml")
+    for tag in soup.find_all("w:style"):
+        if not tag.has_attr("w:type") or not tag.has_attr("w:styleId"):
+            tag.decompose()
+    return str(soup).encode()
+
+
 def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
     """
     Pre-processes a DOCX file with provided steps.
@@ -131,11 +149,12 @@ def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
     """
     output_docx = BytesIO()
     # The files that need to be pre-processed from .docx
-    pre_process_enable_files = [
-        "word/document.xml",
-        "word/footnotes.xml",
-        "word/endnotes.xml",
-    ]
+    pre_process_enable_files = {
+        "word/document.xml": _pre_process_math,
+        "word/footnotes.xml": _pre_process_math,
+        "word/endnotes.xml": _pre_process_math,
+        "word/styles.xml": _pre_process_styles,
+    }
     with zipfile.ZipFile(input_docx, mode="r") as zip_input:
         files = {name: zip_input.read(name) for name in zip_input.namelist()}
         with zipfile.ZipFile(output_docx, mode="w") as zip_output:
@@ -144,7 +163,7 @@ def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
                 if name in pre_process_enable_files:
                     try:
                         # Pre-process the content
-                        updated_content = _pre_process_math(content)
+                        updated_content = pre_process_enable_files[name](content)
                         # In the future, if there are more pre-processing steps, they can be added here
                         zip_output.writestr(name, updated_content)
                     except Exception:
