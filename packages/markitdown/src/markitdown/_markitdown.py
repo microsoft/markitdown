@@ -5,7 +5,7 @@ import sys
 import shutil
 import traceback
 import io
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from importlib.metadata import entry_points
 from typing import Any, List, Dict, Optional, Union, BinaryIO
 from pathlib import Path
@@ -89,6 +89,26 @@ class ConverterRegistration:
 
     converter: DocumentConverter
     priority: float
+
+
+@dataclass(kw_only=True, frozen=True)
+class DocumentInfo:
+    """Lightweight metadata about a local document, without conversion."""
+
+    path: Optional[str]
+    size_bytes: Optional[int]
+    mime_type: Optional[str]
+    extension: Optional[str]
+    charset: Optional[str]
+    detected_converter: Optional[str]
+    page_count: Optional[int] = None
+    image_count: Optional[int] = None
+    table_count: Optional[int] = None
+    estimated_tokens: Optional[int] = None
+    warning: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
 
 
 class MarkItDown:
@@ -359,6 +379,54 @@ class MarkItDown:
             )
             return self._convert(file_stream=fh, stream_info_guesses=guesses, **kwargs)
 
+    def get_local_document_info(
+        self,
+        path: Union[str, Path],
+        *,
+        stream_info: Optional[StreamInfo] = None,
+        **kwargs: Any,
+    ) -> DocumentInfo:
+        """Inspect a local document without running the conversion pipeline."""
+        if isinstance(path, Path):
+            path = str(path)
+
+        base_guess = StreamInfo(
+            local_path=path,
+            extension=os.path.splitext(path)[1],
+            filename=os.path.basename(path),
+        )
+
+        if stream_info is not None:
+            base_guess = base_guess.copy_and_update(stream_info)
+
+        with open(path, "rb") as fh:
+            guesses = self._get_stream_info_guesses(
+                file_stream=fh, base_guess=base_guess
+            )
+            detected_stream_info, detected_converter = self._detect_converter(
+                file_stream=fh, stream_info_guesses=guesses, **kwargs
+            )
+
+        info_stream = detected_stream_info
+        if info_stream is None and len(guesses) > 0:
+            info_stream = guesses[0]
+        if info_stream is None:
+            info_stream = base_guess
+
+        warning = None
+        if detected_converter is None:
+            warning = "No converter detected for this file."
+
+        return DocumentInfo(
+            path=path,
+            size_bytes=os.path.getsize(path),
+            mime_type=info_stream.mimetype,
+            extension=info_stream.extension,
+            charset=info_stream.charset,
+            detected_converter=detected_converter,
+            warning=warning,
+        )
+
     def convert_stream(
         self,
         stream: BinaryIO,
@@ -582,34 +650,7 @@ class MarkItDown:
                     cur_pos == file_stream.tell()
                 ), "File stream position should NOT change between guess iterations"
 
-                _kwargs = {k: v for k, v in kwargs.items()}
-
-                # Copy any additional global options
-                if "llm_client" not in _kwargs and self._llm_client is not None:
-                    _kwargs["llm_client"] = self._llm_client
-
-                if "llm_model" not in _kwargs and self._llm_model is not None:
-                    _kwargs["llm_model"] = self._llm_model
-
-                if "llm_prompt" not in _kwargs and self._llm_prompt is not None:
-                    _kwargs["llm_prompt"] = self._llm_prompt
-
-                if "style_map" not in _kwargs and self._style_map is not None:
-                    _kwargs["style_map"] = self._style_map
-
-                if "exiftool_path" not in _kwargs and self._exiftool_path is not None:
-                    _kwargs["exiftool_path"] = self._exiftool_path
-
-                # Add the list of converters for nested processing
-                _kwargs["_parent_converters"] = self._converters
-
-                # Add legaxy kwargs
-                if stream_info is not None:
-                    if stream_info.extension is not None:
-                        _kwargs["file_extension"] = stream_info.extension
-
-                    if stream_info.url is not None:
-                        _kwargs["url"] = stream_info.url
+                _kwargs = self._get_converter_kwargs(stream_info, kwargs)
 
                 # Check if the converter will accept the file, and if so, try to convert it
                 _accepts = False
@@ -652,6 +693,69 @@ class MarkItDown:
         raise UnsupportedFormatException(
             "Could not convert stream to Markdown. No converter attempted a conversion, suggesting that the filetype is simply not supported."
         )
+
+    def _detect_converter(
+        self, *, file_stream: BinaryIO, stream_info_guesses: List[StreamInfo], **kwargs
+    ) -> tuple[Optional[StreamInfo], Optional[str]]:
+        sorted_registrations = sorted(self._converters, key=lambda x: x.priority)
+        cur_pos = file_stream.tell()
+
+        for stream_info in stream_info_guesses + [StreamInfo()]:
+            for converter_registration in sorted_registrations:
+                converter = converter_registration.converter
+                assert (
+                    cur_pos == file_stream.tell()
+                ), "File stream position should NOT change between guess iterations"
+
+                _kwargs = self._get_converter_kwargs(stream_info, kwargs)
+
+                _accepts = False
+                try:
+                    _accepts = converter.accepts(file_stream, stream_info, **_kwargs)
+                except NotImplementedError:
+                    pass
+
+                assert (
+                    cur_pos == file_stream.tell()
+                ), f"{type(converter).__name__}.accept() should NOT change the file_stream position"
+
+                if _accepts:
+                    return stream_info, type(converter).__name__
+
+        return None, None
+
+    def _get_converter_kwargs(
+        self, stream_info: StreamInfo, kwargs: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        _kwargs = {k: v for k, v in kwargs.items()}
+
+        # Copy any additional global options
+        if "llm_client" not in _kwargs and self._llm_client is not None:
+            _kwargs["llm_client"] = self._llm_client
+
+        if "llm_model" not in _kwargs and self._llm_model is not None:
+            _kwargs["llm_model"] = self._llm_model
+
+        if "llm_prompt" not in _kwargs and self._llm_prompt is not None:
+            _kwargs["llm_prompt"] = self._llm_prompt
+
+        if "style_map" not in _kwargs and self._style_map is not None:
+            _kwargs["style_map"] = self._style_map
+
+        if "exiftool_path" not in _kwargs and self._exiftool_path is not None:
+            _kwargs["exiftool_path"] = self._exiftool_path
+
+        # Add the list of converters for nested processing
+        _kwargs["_parent_converters"] = self._converters
+
+        # Add legacy kwargs
+        if stream_info.extension is not None:
+            _kwargs["file_extension"] = stream_info.extension
+
+        if stream_info.url is not None:
+            _kwargs["url"] = stream_info.url
+
+        return _kwargs
 
     def register_page_converter(self, converter: DocumentConverter) -> None:
         """DEPRECATED: User register_converter instead."""

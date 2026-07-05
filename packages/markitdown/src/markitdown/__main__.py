@@ -4,6 +4,7 @@
 import argparse
 import sys
 import codecs
+import json
 from typing import Any, Dict
 from textwrap import dedent
 from importlib.metadata import entry_points
@@ -138,6 +139,12 @@ def main():
         help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
     )
 
+    parser.add_argument(
+        "--info",
+        action="store_true",
+        help="Emit lightweight document metadata as JSON without converting the file.",
+    )
+
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
 
@@ -244,6 +251,20 @@ def main():
     else:
         markitdown = MarkItDown(enable_plugins=args.use_plugins)
 
+    if args.info:
+        if args.filename is None:
+            _exit_with_error("Filename is required when using --info.")
+        if _is_uri(args.filename):
+            _exit_with_error("--info currently supports local files only.")
+
+        info = markitdown.get_local_document_info(
+            args.filename,
+            stream_info=stream_info,
+            keep_data_uris=args.keep_data_uris,
+        )
+        print(json.dumps(info.to_dict(), indent=2))
+        sys.exit(0)
+
     if args.filename is None:
         result = markitdown.convert_stream(
             sys.stdin.buffer,
@@ -275,6 +296,10 @@ def _handle_output(args, result: DocumentConverterResult):
 def _exit_with_error(message: str):
     print(message)
     sys.exit(1)
+
+
+def _is_uri(source: str) -> bool:
+    return source.startswith(("http:", "https:", "file:", "data:"))
 
 
 if __name__ == "__main__":
