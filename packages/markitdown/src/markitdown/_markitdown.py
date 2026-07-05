@@ -662,7 +662,7 @@ class MarkItDown:
                 # accept() should not have changed the file stream position
                 assert (
                     cur_pos == file_stream.tell()
-                ), f"{type(converter).__name__}.accept() should NOT change the file_stream position"
+                ), f"{type(converter).__name__}.accepts() should NOT change the file_stream position"
 
                 # Attempt the conversion
                 if _accepts:
@@ -717,7 +717,7 @@ class MarkItDown:
 
                 assert (
                     cur_pos == file_stream.tell()
-                ), f"{type(converter).__name__}.accept() should NOT change the file_stream position"
+                ), f"{type(converter).__name__}.accepts() should NOT change the file_stream position"
 
                 if _accepts:
                     return stream_info, type(converter).__name__

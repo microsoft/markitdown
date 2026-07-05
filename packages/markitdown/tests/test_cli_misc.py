@@ -89,10 +89,27 @@ def test_info_outputs_warning_for_unsupported_file() -> None:
     assert info["warning"] == "No converter detected for this file."
 
 
+def test_info_missing_local_file_outputs_clean_error() -> None:
+    missing_file = os.path.join(TEST_FILES_DIR, "missing-local-file.xlsx")
+
+    result = subprocess.run(
+        ["python", "-m", "markitdown", "--info", missing_file],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "Could not read file:" in result.stdout
+    assert missing_file in result.stdout
+    assert "Traceback" not in result.stderr
+    assert "Traceback" not in result.stdout
+
+
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     test_version()
     test_invalid_flag()
     test_info_outputs_xlsx_metadata_without_conversion()
     test_info_outputs_warning_for_unsupported_file()
+    test_info_missing_local_file_outputs_clean_error()
     print("All tests passed!")

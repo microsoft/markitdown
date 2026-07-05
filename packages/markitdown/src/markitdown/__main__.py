@@ -255,13 +255,19 @@ def main():
         if args.filename is None:
             _exit_with_error("Filename is required when using --info.")
         if _is_uri(args.filename):
-            _exit_with_error("--info currently supports local files only.")
+            _exit_with_error(
+                "--info currently supports local filesystem paths only (no URIs)."
+            )
 
-        info = markitdown.get_local_document_info(
-            args.filename,
-            stream_info=stream_info,
-            keep_data_uris=args.keep_data_uris,
-        )
+        try:
+            info = markitdown.get_local_document_info(
+                args.filename,
+                stream_info=stream_info,
+                keep_data_uris=args.keep_data_uris,
+            )
+        except (FileNotFoundError, OSError) as exc:
+            _exit_with_error(f"Could not read file: {exc}")
+
         print(json.dumps(info.to_dict(), indent=2))
         sys.exit(0)
 
