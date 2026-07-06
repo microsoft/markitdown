@@ -532,6 +532,31 @@ def test_markitdown_llm() -> None:
     validate_strings(result, PPTX_TEST_STRINGS)
 
 
+def test_pptx_chart_no_title_text_frame() -> None:
+    from markitdown.converters._pptx_converter import PptxConverter
+
+    mock_chart = MagicMock()
+    mock_chart.has_title = True
+    mock_chart.chart_title.text_frame = None
+
+    mock_category = MagicMock()
+    mock_category.label = "Cat 1"
+    mock_chart.plots = [MagicMock(categories=[mock_category])]
+
+    mock_series = MagicMock()
+    mock_series.name = "Series 1"
+    mock_series.values = [10.0]
+    mock_chart.series = [mock_series]
+
+    converter = PptxConverter()
+    result = converter._convert_chart_to_markdown(mock_chart)
+
+    assert "### Chart" in result
+    assert "Cat 1" in result
+    assert "Series 1" in result
+    assert ":" not in result
+
+
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     for test in [
@@ -547,6 +572,7 @@ if __name__ == "__main__":
         test_markitdown_exiftool,
         test_markitdown_llm_parameters,
         test_markitdown_llm,
+        test_pptx_chart_no_title_text_frame,
     ]:
         print(f"Running {test.__name__}...", end="")
         test()
