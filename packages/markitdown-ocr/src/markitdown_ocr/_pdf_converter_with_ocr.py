@@ -333,43 +333,61 @@ class PdfConverterWithOCR(DocumentConverter):
             ).strip()
             if not _real_content:
                 pdf_bytes.seek(0)
-                markdown = self._ocr_full_pages(pdf_bytes, ocr_service)
+                ocr_dpi = kwargs.get("ocr_dpi", 150)
+                markdown = self._ocr_full_pages(pdf_bytes, ocr_service, ocr_dpi=ocr_dpi)
 
         return DocumentConverterResult(markdown=markdown)
 
     def _ocr_full_pages(
-        self, pdf_bytes: io.BytesIO, ocr_service: LLMVisionOCRService
+        self, pdf_bytes: io.BytesIO, ocr_service: LLMVisionOCRService,
+        ocr_dpi: int = 150,
     ) -> str:
         """
         Fallback for scanned PDFs: Convert entire pages to images and OCR them.
-        Used when text extraction returns empty/whitespace results.
 
-        Images are collected from all pages first, then OCR'd in parallel
-        via extract_text_batch for maximum throughput.
+        Pages are rendered in parallel via ThreadPoolExecutor, then OCR'd
+        in parallel via extract_text_batch for maximum throughput.
 
-        Args:
-            pdf_bytes: PDF file as BytesIO
-            ocr_service: OCR service to use
-
-        Returns:
-            Markdown text extracted from OCR of full pages
+        Resolution defaults to 150 DPI — sufficient for OCR and 4x faster
+        than 300 DPI (smaller images = faster rendering + smaller payloads).
         """
-        markdown_parts: list[str] = []
-        page_images: list[tuple[BinaryIO, int]] = []  # (stream, page_num)
+        import os as _os
+        from concurrent.futures import ThreadPoolExecutor as _TPE, as_completed as _ac
 
-        # ── Phase 1: Collect page images ──
+        markdown_parts: list[str] = []
+        page_images: list[tuple[BinaryIO, int]] = []
+
+        # ── Phase 1: Parallel page rendering ──
         try:
             pdf_bytes.seek(0)
             with pdfplumber.open(pdf_bytes) as pdf:
-                for page_num, page in enumerate(pdf.pages, 1):
+                n_pages = len(pdf.pages)
+                # Cap render workers: CPU-bound, so use min(4, n_pages)
+                render_workers = min(4, n_pages) if n_pages > 0 else 1
+
+                def _render_page(pg_num: int) -> tuple[int, BinaryIO | None]:
                     try:
-                        page_img = page.to_image(resolution=300)
-                        img_stream = io.BytesIO()
-                        page_img.original.save(img_stream, format="PNG")
-                        img_stream.seek(0)
-                        page_images.append((img_stream, page_num))
+                        pg = pdf.pages[pg_num - 1]  # 0-indexed
+                        pg_img = pg.to_image(resolution=ocr_dpi)
+                        buf = io.BytesIO()
+                        pg_img.original.save(buf, format="PNG")
+                        buf.seek(0)
+                        return pg_num, buf
                     except Exception:
-                        continue
+                        return pg_num, None
+
+                # Submit all renders in parallel
+                render_results: dict[int, BinaryIO] = {}
+                with _TPE(max_workers=render_workers) as executor:
+                    futures = {executor.submit(_render_page, i): i for i in range(1, n_pages + 1)}
+                    for future in _ac(futures):
+                        pg_num, buf = future.result()
+                        if buf is not None:
+                            render_results[pg_num] = buf
+
+                # Preserve page order
+                for pg_num in sorted(render_results):
+                    page_images.append((render_results[pg_num], pg_num))
 
             # ── Phase 2: Batch OCR all pages in parallel ──
             if page_images:
@@ -389,29 +407,41 @@ class PdfConverterWithOCR(DocumentConverter):
                         )
 
         except Exception:
-            # pdfplumber failed (e.g. malformed EOF) — try PyMuPDF for rendering
+            # pdfplumber failed — try PyMuPDF with parallel rendering
             markdown_parts = []
             try:
                 import fitz  # PyMuPDF
+                from concurrent.futures import ThreadPoolExecutor as _TPE2, as_completed as _ac2
 
                 pdf_bytes.seek(0)
                 doc = fitz.open(stream=pdf_bytes.read(), filetype="pdf")
+                n_pages = doc.page_count
+                render_workers = min(4, n_pages) if n_pages > 0 else 1
 
-                # Phase 1: Render all pages
-                page_images = []
-                for page_num in range(1, doc.page_count + 1):
+                def _render_mupdf(pg_num: int) -> tuple[int, BinaryIO | None]:
                     try:
-                        page = doc[page_num - 1]
-                        mat = fitz.Matrix(300 / 72, 300 / 72)  # 300 DPI
-                        pix = page.get_pixmap(matrix=mat)
-                        img_stream = io.BytesIO(pix.tobytes("png"))
-                        img_stream.seek(0)
-                        page_images.append((img_stream, page_num))
+                        pg = doc[pg_num - 1]
+                        mat = fitz.Matrix(ocr_dpi / 72, ocr_dpi / 72)
+                        pix = pg.get_pixmap(matrix=mat)
+                        buf = io.BytesIO(pix.tobytes("png"))
+                        buf.seek(0)
+                        return pg_num, buf
                     except Exception:
-                        continue
+                        return pg_num, None
+
+                render_results: dict[int, BinaryIO] = {}
+                with _TPE2(max_workers=render_workers) as executor:
+                    futures = {executor.submit(_render_mupdf, i): i for i in range(1, n_pages + 1)}
+                    for future in _ac2(futures):
+                        pg_num, buf = future.result()
+                        if buf is not None:
+                            render_results[pg_num] = buf
                 doc.close()
 
-                # Phase 2: Batch OCR
+                page_images = []
+                for pg_num in sorted(render_results):
+                    page_images.append((render_results[pg_num], pg_num))
+
                 if page_images:
                     ocr_results = ocr_service.extract_text_batch(
                         [(stream, None) for stream, _ in page_images]
