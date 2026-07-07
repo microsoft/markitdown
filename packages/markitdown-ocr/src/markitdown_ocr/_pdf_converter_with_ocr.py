@@ -343,120 +343,173 @@ class PdfConverterWithOCR(DocumentConverter):
         ocr_dpi: int = 300,
     ) -> str:
         """
-        Fallback for scanned PDFs: Convert entire pages to images and OCR them.
+        Fallback for scanned PDFs: render pages to images and OCR them.
 
-        Pages are rendered in parallel via ThreadPoolExecutor, then OCR'd
-        in parallel via extract_text_batch for maximum throughput.
-
-        Resolution defaults to 150 DPI — sufficient for OCR and 4x faster
-        than 300 DPI (smaller images = faster rendering + smaller payloads).
+        Uses a streaming pipeline: each page is submitted for OCR the moment
+        its render finishes. Rendering and OCR run concurrently, so total
+        time ≈ max(render_all, ocr_all) instead of render_all + ocr_all.
         """
-        import os as _os
         from concurrent.futures import ThreadPoolExecutor as _TPE, as_completed as _ac
+        from ._ocr_service import OCRResult
 
         markdown_parts: list[str] = []
-        page_images: list[tuple[BinaryIO, int]] = []
+        ocr_results: dict[int, str] = {}  # page_num -> text
 
-        # ── Phase 1: Parallel page rendering ──
         try:
             pdf_bytes.seek(0)
             with pdfplumber.open(pdf_bytes) as pdf:
                 n_pages = len(pdf.pages)
-                # Cap render workers: CPU-bound, so use min(4, n_pages)
-                render_workers = min(4, n_pages) if n_pages > 0 else 1
+                if n_pages == 0:
+                    return ""
 
-                def _render_page(pg_num: int) -> tuple[int, BinaryIO | None]:
+                # ── Single-page fast path (no thread overhead) ──
+                if n_pages == 1:
                     try:
-                        pg = pdf.pages[pg_num - 1]  # 0-indexed
+                        pg = pdf.pages[0]
                         pg_img = pg.to_image(resolution=ocr_dpi)
                         buf = io.BytesIO()
                         pg_img.original.save(buf, format="PNG")
                         buf.seek(0)
-                        return pg_num, buf
+                        result = ocr_service.extract_text(buf)
+                        if result.text.strip():
+                            ocr_results[1] = result.text.strip()
                     except Exception:
-                        return pg_num, None
+                        pass
+                else:
+                    # ── Multi-page streaming pipeline ──
+                    render_workers = min(4, n_pages)
+                    ocr_workers = ocr_service.max_workers
 
-                # Submit all renders in parallel
-                render_results: dict[int, BinaryIO] = {}
-                with _TPE(max_workers=render_workers) as executor:
-                    futures = {executor.submit(_render_page, i): i for i in range(1, n_pages + 1)}
-                    for future in _ac(futures):
-                        pg_num, buf = future.result()
-                        if buf is not None:
-                            render_results[pg_num] = buf
+                    def _render_page(pg_num: int) -> tuple[int, BinaryIO | None]:
+                        try:
+                            pg = pdf.pages[pg_num - 1]
+                            pg_img = pg.to_image(resolution=ocr_dpi)
+                            buf = io.BytesIO()
+                            pg_img.original.save(buf, format="PNG")
+                            buf.seek(0)
+                            return pg_num, buf
+                        except Exception:
+                            return pg_num, None
 
-                # Preserve page order
-                for pg_num in sorted(render_results):
-                    page_images.append((render_results[pg_num], pg_num))
+                    def _ocr_one(img_stream: BinaryIO) -> OCRResult:
+                        try:
+                            return ocr_service.extract_text(img_stream)
+                        except Exception as e:
+                            return OCRResult(text="", error=str(e))
 
-            # ── Phase 2: Batch OCR all pages in parallel ──
-            if page_images:
-                ocr_results = ocr_service.extract_text_batch(
-                    [(stream, None) for stream, _ in page_images]
+                    with _TPE(max_workers=render_workers) as render_pool:
+                        ocr_futures: dict = {}
+                        render_futures = {
+                            render_pool.submit(_render_page, i): i
+                            for i in range(1, n_pages + 1)
+                        }
+                        with _TPE(max_workers=ocr_workers) as ocr_pool:
+                            for render_future in _ac(render_futures):
+                                pg_num, buf = render_future.result()
+                                if buf is not None:
+                                    ocr_futures[
+                                        ocr_pool.submit(_ocr_one, buf)
+                                    ] = pg_num
+                            for ocr_future in _ac(ocr_futures):
+                                pg_num = ocr_futures[ocr_future]
+                                result = ocr_future.result()
+                                if result.text.strip():
+                                    ocr_results[pg_num] = result.text.strip()
+
+            # ── Assemble output in page order ──
+            for pg_num in sorted(ocr_results):
+                markdown_parts.append(f"\n## Page {pg_num}\n")
+                markdown_parts.append(
+                    f"*[Image OCR]\n{ocr_results[pg_num]}\n[End OCR]*"
                 )
-                for i, (_, page_num) in enumerate(page_images):
-                    markdown_parts.append(f"\n## Page {page_num}\n")
-                    text = ocr_results[i].text.strip()
-                    if text:
-                        markdown_parts.append(
-                            f"*[Image OCR]\n{text}\n[End OCR]*"
-                        )
-                    else:
-                        markdown_parts.append(
-                            "*[No text could be extracted from this page]*"
-                        )
+            # Pages that failed to produce text
+            for pg_num in range(1, n_pages + 1):
+                if pg_num not in ocr_results:
+                    markdown_parts.append(f"\n## Page {pg_num}\n")
+                    markdown_parts.append(
+                        "*[No text could be extracted from this page]*"
+                    )
 
         except Exception:
-            # pdfplumber failed — try PyMuPDF with parallel rendering
+            # pdfplumber failed — try PyMuPDF with same streaming pipeline
             markdown_parts = []
+            ocr_results = {}
             try:
                 import fitz  # PyMuPDF
-                from concurrent.futures import ThreadPoolExecutor as _TPE2, as_completed as _ac2
 
                 pdf_bytes.seek(0)
                 doc = fitz.open(stream=pdf_bytes.read(), filetype="pdf")
                 n_pages = doc.page_count
-                render_workers = min(4, n_pages) if n_pages > 0 else 1
+                if n_pages == 0:
+                    doc.close()
+                    return ""
 
-                def _render_mupdf(pg_num: int) -> tuple[int, BinaryIO | None]:
+                # ── Single-page fast path ──
+                if n_pages == 1:
                     try:
-                        pg = doc[pg_num - 1]
+                        pg = doc[0]
                         mat = fitz.Matrix(ocr_dpi / 72, ocr_dpi / 72)
                         pix = pg.get_pixmap(matrix=mat)
                         buf = io.BytesIO(pix.tobytes("png"))
                         buf.seek(0)
-                        return pg_num, buf
+                        result = ocr_service.extract_text(buf)
+                        if result.text.strip():
+                            ocr_results[1] = result.text.strip()
                     except Exception:
-                        return pg_num, None
+                        pass
+                else:
+                    # ── Multi-page streaming pipeline ──
+                    render_workers = min(4, n_pages)
+                    ocr_workers = ocr_service.max_workers
 
-                render_results: dict[int, BinaryIO] = {}
-                with _TPE2(max_workers=render_workers) as executor:
-                    futures = {executor.submit(_render_mupdf, i): i for i in range(1, n_pages + 1)}
-                    for future in _ac2(futures):
-                        pg_num, buf = future.result()
-                        if buf is not None:
-                            render_results[pg_num] = buf
+                    def _render_mupdf(pg_num: int) -> tuple[int, BinaryIO | None]:
+                        try:
+                            pg = doc[pg_num - 1]
+                            mat = fitz.Matrix(ocr_dpi / 72, ocr_dpi / 72)
+                            pix = pg.get_pixmap(matrix=mat)
+                            buf = io.BytesIO(pix.tobytes("png"))
+                            buf.seek(0)
+                            return pg_num, buf
+                        except Exception:
+                            return pg_num, None
+
+                    def _ocr_one_mupdf(img_stream: BinaryIO) -> OCRResult:
+                        try:
+                            return ocr_service.extract_text(img_stream)
+                        except Exception as e:
+                            return OCRResult(text="", error=str(e))
+
+                    with _TPE(max_workers=render_workers) as render_pool:
+                        ocr_futures = {}
+                        render_futures = {
+                            render_pool.submit(_render_mupdf, i): i
+                            for i in range(1, n_pages + 1)
+                        }
+                        with _TPE(max_workers=ocr_workers) as ocr_pool:
+                            for render_future in _ac(render_futures):
+                                pg_num, buf = render_future.result()
+                                if buf is not None:
+                                    ocr_futures[
+                                        ocr_pool.submit(_ocr_one_mupdf, buf)
+                                    ] = pg_num
+                            for ocr_future in _ac(ocr_futures):
+                                pg_num = ocr_futures[ocr_future]
+                                result = ocr_future.result()
+                                if result.text.strip():
+                                    ocr_results[pg_num] = result.text.strip()
                 doc.close()
 
-                page_images = []
-                for pg_num in sorted(render_results):
-                    page_images.append((render_results[pg_num], pg_num))
-
-                if page_images:
-                    ocr_results = ocr_service.extract_text_batch(
-                        [(stream, None) for stream, _ in page_images]
+                for pg_num in sorted(ocr_results):
+                    markdown_parts.append(f"\n## Page {pg_num}\n")
+                    markdown_parts.append(
+                        f"*[Image OCR]\n{ocr_results[pg_num]}\n[End OCR]*"
                     )
-                    for i, (_, page_num) in enumerate(page_images):
-                        markdown_parts.append(f"\n## Page {page_num}\n")
-                        text = ocr_results[i].text.strip()
-                        if text:
-                            markdown_parts.append(
-                                f"*[Image OCR]\n{text}\n[End OCR]*"
-                            )
-                        else:
-                            markdown_parts.append(
-                                "*[No text could be extracted from this page]*"
-                            )
+                for pg_num in range(1, n_pages + 1):
+                    if pg_num not in ocr_results:
+                        markdown_parts.append(f"\n## Page {pg_num}\n")
+                        markdown_parts.append(
+                            "*[No text could be extracted from this page]*"
+                        )
 
             except Exception:
                 return "*[Error: Could not process scanned PDF]*"
