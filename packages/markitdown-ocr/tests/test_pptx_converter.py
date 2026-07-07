@@ -41,6 +41,13 @@ class MockOCRService:
     ) -> OCRResult:
         return OCRResult(text=_MOCK_TEXT, backend_used="mock")
 
+    def extract_text_batch(
+        self,
+        images: list[tuple[Any, Any]],
+        **kwargs: Any,
+    ) -> list[OCRResult]:
+        return [self.extract_text(stream) for stream, _ in images]
+
 
 @pytest.fixture(scope="module")
 def svc() -> MockOCRService:

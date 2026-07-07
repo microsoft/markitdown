@@ -108,14 +108,36 @@ class XlsxConverterWithOCR(DocumentConverter):
     def _convert_with_ocr(
         self, file_stream: BinaryIO, ocr_service: LLMVisionOCRService, **kwargs: Any
     ) -> DocumentConverterResult:
-        """Convert XLSX with image OCR."""
+        """Convert XLSX with image OCR (batch-parallel)."""
         file_stream.seek(0)
         wb = load_workbook(file_stream)
 
-        md_content = ""
+        # ── Phase 1: Collect all images from all sheets ──
+        # all_images: (image_stream, sheet_name, cell_ref)
+        all_images: list[tuple[BinaryIO, str, str]] = []
 
         for sheet_name in wb.sheetnames:
             sheet = wb[sheet_name]
+            for img_stream, cell_ref in self._extract_sheet_images(sheet):
+                all_images.append((img_stream, sheet_name, cell_ref))
+
+        # ── Phase 2: Batch OCR all images in parallel ──
+        ocr_by_sheet: dict[str, list[dict]] = {}
+        if all_images:
+            ocr_results = ocr_service.extract_text_batch(
+                [(stream, None) for stream, _, _ in all_images]
+            )
+            for i, (_, sheet_name, cell_ref) in enumerate(all_images):
+                text = ocr_results[i].text.strip()
+                if text:
+                    ocr_by_sheet.setdefault(sheet_name, []).append(
+                        {"cell_ref": cell_ref, "ocr_text": text}
+                    )
+
+        # ── Phase 3: Render sheets ──
+        md_content = ""
+
+        for sheet_name in wb.sheetnames:
             md_content += f"## {sheet_name}\n\n"
 
             # Convert sheet data to markdown table
@@ -132,37 +154,34 @@ class XlsxConverterWithOCR(DocumentConverter):
                     + "\n\n"
                 )
             except Exception:
-                # If pandas fails, just skip the table
                 pass
 
-            # Extract and OCR images in this sheet
-            images_with_ocr = self._extract_and_ocr_sheet_images(sheet, ocr_service)
-
+            # Append pre-computed OCR results for this sheet
+            images_with_ocr = ocr_by_sheet.get(sheet_name, [])
             if images_with_ocr:
                 md_content += "### Images in this sheet:\n\n"
                 for img_info in images_with_ocr:
-                    ocr_text = img_info["ocr_text"]
-                    md_content += f"*[Image OCR]\n{ocr_text}\n[End OCR]*\n\n"
+                    md_content += (
+                        f"*[Image OCR]\n{img_info['ocr_text']}\n[End OCR]*\n\n"
+                    )
 
         return DocumentConverterResult(markdown=md_content.strip())
 
-    def _extract_and_ocr_sheet_images(
-        self, sheet: Any, ocr_service: LLMVisionOCRService
-    ) -> list[dict]:
+    def _extract_sheet_images(
+        self, sheet: Any
+    ) -> list[tuple[BinaryIO, str]]:
         """
-        Extract and OCR images from an Excel sheet.
+        Extract images from an Excel sheet (no OCR — just collection).
 
         Args:
             sheet: openpyxl worksheet
-            ocr_service: OCR service
 
-        Returns:
-            List of dicts with 'cell_ref' and 'ocr_text'
+        Yields:
+            (image_stream, cell_ref) tuples, one per image in the sheet
         """
-        results = []
+        results: list[tuple[BinaryIO, str]] = []
 
         try:
-            # Check if sheet has images
             if hasattr(sheet, "_images"):
                 for img in sheet._images:
                     try:
@@ -170,12 +189,10 @@ class XlsxConverterWithOCR(DocumentConverter):
                         if hasattr(img, "_data"):
                             image_data = img._data()
                         elif hasattr(img, "image"):
-                            # Some versions store it differently
                             image_data = img.image
                         else:
                             continue
 
-                        # Create image stream
                         image_stream = io.BytesIO(image_data)
 
                         # Get cell reference
@@ -187,27 +204,15 @@ class XlsxConverterWithOCR(DocumentConverter):
                                 if hasattr(from_cell, "col") and hasattr(
                                     from_cell, "row"
                                 ):
-                                    # Convert column number to letter
                                     col_letter = self._column_number_to_letter(
                                         from_cell.col
                                     )
                                     cell_ref = f"{col_letter}{from_cell.row + 1}"
 
-                        # Perform OCR
-                        ocr_result = ocr_service.extract_text(image_stream)
-
-                        if ocr_result.text.strip():
-                            results.append(
-                                {
-                                    "cell_ref": cell_ref,
-                                    "ocr_text": ocr_result.text.strip(),
-                                    "backend": ocr_result.backend_used,
-                                }
-                            )
+                        results.append((image_stream, cell_ref))
 
                     except Exception:
                         continue
-
         except Exception:
             pass
 
