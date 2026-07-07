@@ -98,7 +98,7 @@ class PptxConverterWithOCR(DocumentConverter):
         if image_entries:
             # Round 1: Parallel LLM caption for all images
             if llm_client and llm_model:
-                from ._llm_caption import llm_caption
+                from markitdown.converters._llm_caption import llm_caption
                 import os
 
                 def _caption_one(
