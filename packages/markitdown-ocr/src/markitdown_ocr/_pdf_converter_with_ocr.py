@@ -333,14 +333,14 @@ class PdfConverterWithOCR(DocumentConverter):
             ).strip()
             if not _real_content:
                 pdf_bytes.seek(0)
-                ocr_dpi = kwargs.get("ocr_dpi", 150)
+                ocr_dpi = kwargs.get("ocr_dpi", 300)
                 markdown = self._ocr_full_pages(pdf_bytes, ocr_service, ocr_dpi=ocr_dpi)
 
         return DocumentConverterResult(markdown=markdown)
 
     def _ocr_full_pages(
         self, pdf_bytes: io.BytesIO, ocr_service: LLMVisionOCRService,
-        ocr_dpi: int = 150,
+        ocr_dpi: int = 300,
     ) -> str:
         """
         Fallback for scanned PDFs: Convert entire pages to images and OCR them.
