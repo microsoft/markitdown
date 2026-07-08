@@ -288,6 +288,30 @@ def test_input_as_strings() -> None:
     assert "# Test" in result.text_content
 
 
+def test_html_preserves_percent_encoded_href_octets() -> None:
+    markitdown = MarkItDown()
+    href = "https://abc.com/hist/%a5%c8%a5%c3%a5%d7%a5%da%a1%bc%a5%b8"
+    input_data = f'<html><body><a href="{href}">example</a></body></html>'
+
+    result = markitdown.convert_stream(
+        io.BytesIO(input_data.encode("utf-8")),
+        file_extension=".html",
+    )
+
+    assert f"[example]({href})" in result.text_content
+    assert "%EF%BF%BD" not in result.text_content
+
+    raw_percent_href = "https://abc.com/hist/100% ready.html"
+    input_data = f'<html><body><a href="{raw_percent_href}">raw</a></body></html>'
+
+    result = markitdown.convert_stream(
+        io.BytesIO(input_data.encode("utf-8")),
+        file_extension=".html",
+    )
+
+    assert "[raw](https://abc.com/hist/100%25%20ready.html)" in result.text_content
+
+
 def test_deeply_nested_html_fallback() -> None:
     """Large, deeply nested HTML should fall back to plain-text extraction
     instead of silently returning unconverted HTML (issue #1636).

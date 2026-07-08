@@ -2,7 +2,18 @@ import re
 import markdownify
 
 from typing import Any, Optional
-from urllib.parse import quote, unquote, urlparse, urlunparse
+from urllib.parse import quote, urlparse, urlunparse
+
+
+def _quote_path_preserving_percent_encoded_octets(path: str) -> str:
+    parts = []
+    start = 0
+    for match in re.finditer(r"%[0-9A-Fa-f]{2}", path):
+        parts.append(quote(path[start : match.start()], safe="/"))
+        parts.append(match.group(0))
+        start = match.end()
+    parts.append(quote(path[start:], safe="/"))
+    return "".join(parts)
 
 
 class _CustomMarkdownify(markdownify.MarkdownConverter):
@@ -60,7 +71,13 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
                 parsed_url = urlparse(href)  # type: ignore
                 if parsed_url.scheme and parsed_url.scheme.lower() not in ["http", "https", "file"]:  # type: ignore
                     return "%s%s%s" % (prefix, text, suffix)
-                href = urlunparse(parsed_url._replace(path=quote(unquote(parsed_url.path))))  # type: ignore
+                href = urlunparse(
+                    parsed_url._replace(
+                        path=_quote_path_preserving_percent_encoded_octets(
+                            parsed_url.path
+                        )
+                    )
+                )  # type: ignore
             except ValueError:  # It's not clear if this ever gets thrown
                 return "%s%s%s" % (prefix, text, suffix)
 
