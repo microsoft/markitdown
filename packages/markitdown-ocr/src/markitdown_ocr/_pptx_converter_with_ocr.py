@@ -163,7 +163,7 @@ class PptxConverterWithOCR(DocumentConverter):
 
         for slide in presentation.slides:
             slide_num += 1
-            md_content += f"\\n\\n<!-- Slide number: {slide_num} -->\\n"
+            md_content += f"\n\n<!-- Slide number: {slide_num} -->\n"
 
             title = slide.shapes.title
 
@@ -197,9 +197,9 @@ class PptxConverterWithOCR(DocumentConverter):
                 # Text areas
                 elif shape.has_text_frame:
                     if shape == title:
-                        md_content += "# " + shape.text.lstrip() + "\\n"
+                        md_content += "# " + shape.text.lstrip() + "\n"
                     else:
-                        md_content += shape.text + "\\n"
+                        md_content += shape.text + "\n"
 
                 # Group Shapes
                 if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.GROUP:
@@ -226,7 +226,7 @@ class PptxConverterWithOCR(DocumentConverter):
             md_content = md_content.strip()
 
             if slide.has_notes_slide:
-                md_content += "\\n\\n### Notes:\\n"
+                md_content += "\n\n### Notes:\n"
                 notes_frame = slide.notes_slide.notes_text_frame
                 if notes_frame is not None:
                     md_content += notes_frame.text
@@ -294,15 +294,15 @@ class PptxConverterWithOCR(DocumentConverter):
 
         return (
             self._html_converter.convert_string(html_table, **kwargs).markdown.strip()
-            + "\\n"
+            + "\n"
         )
 
     def _convert_chart_to_markdown(self, chart):
         try:
-            md = "\\n\\n### Chart"
+            md = "\n\n### Chart"
             if chart.has_title:
                 md += f": {chart.chart_title.text_frame.text}"
-            md += "\\n\\n"
+            md += "\n\n"
             data = []
             category_names = [c.label for c in chart.plots[0].categories]
             series_names = [s.name for s in chart.series]
@@ -319,9 +319,9 @@ class PptxConverterWithOCR(DocumentConverter):
                 markdown_table.append("| " + " | ".join(map(str, row)) + " |")
             header = markdown_table[0]
             separator = "|" + "|".join(["---"] * len(data[0])) + "|"
-            return md + "\\n".join([header, separator] + markdown_table[1:])
+            return md + "\n".join([header, separator] + markdown_table[1:])
         except ValueError as e:
             if "unsupported plot type" in str(e):
-                return "\\n\\n[unsupported chart]\\n\\n"
+                return "\n\n[unsupported chart]\n\n"
         except Exception:
-            return "\\n\\n[unsupported chart]\\n\\n"
+            return "\n\n[unsupported chart]\n\n"

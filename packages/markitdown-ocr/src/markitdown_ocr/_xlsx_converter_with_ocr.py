@@ -135,26 +135,34 @@ class XlsxConverterWithOCR(DocumentConverter):
                     )
 
         # ── Phase 3: Render sheets ──
+        # Read every sheet in a single pass (sheet_name=None) instead of
+        # re-parsing the whole file once per sheet.
+        file_stream.seek(0)
+        try:
+            all_dfs = pd.read_excel(
+                file_stream, sheet_name=None, engine="openpyxl"
+            )
+        except Exception:
+            all_dfs = {}
+
         md_content = ""
 
         for sheet_name in wb.sheetnames:
             md_content += f"## {sheet_name}\n\n"
 
             # Convert sheet data to markdown table
-            file_stream.seek(0)
-            try:
-                df = pd.read_excel(
-                    file_stream, sheet_name=sheet_name, engine="openpyxl"
-                )
-                html_content = df.to_html(index=False)
-                md_content += (
-                    self._html_converter.convert_string(
-                        html_content, **kwargs
-                    ).markdown.strip()
-                    + "\n\n"
-                )
-            except Exception:
-                pass
+            df = all_dfs.get(sheet_name)
+            if df is not None:
+                try:
+                    html_content = df.to_html(index=False)
+                    md_content += (
+                        self._html_converter.convert_string(
+                            html_content, **kwargs
+                        ).markdown.strip()
+                        + "\n\n"
+                    )
+                except Exception:
+                    pass
 
             # Append pre-computed OCR results for this sheet
             images_with_ocr = ocr_by_sheet.get(sheet_name, [])
