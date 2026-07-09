@@ -1,7 +1,8 @@
 import contextlib
-import sys
 import os
+import sys
 from collections.abc import AsyncIterator
+from pathlib import Path
 from mcp.server.fastmcp import FastMCP
 from starlette.applications import Starlette
 from mcp.server.sse import SseServerTransport
@@ -18,9 +19,38 @@ mcp = FastMCP("markitdown")
 
 
 @mcp.tool()
-async def convert_to_markdown(uri: str) -> str:
-    """Convert a resource described by an http:, https:, file: or data: URI to markdown"""
-    return MarkItDown(enable_plugins=check_plugins_enabled()).convert_uri(uri).markdown
+async def convert_to_markdown(uri: str, output_file: str | None = None) -> str:
+    """Convert a resource described by an http:, https:, file: or data: URI.
+
+    Set output_file to write the markdown to a new local file and return its
+    absolute path. Existing files are never overwritten.
+    """
+    markdown = (
+        MarkItDown(enable_plugins=check_plugins_enabled()).convert_uri(uri).markdown
+    )
+    if output_file is None:
+        return markdown
+
+    return write_markdown_file(output_file, markdown)
+
+
+def write_markdown_file(output_file: str, markdown: str) -> str:
+    output_path = Path(output_file).expanduser()
+    fd = os.open(
+        output_path,
+        os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+        0o600,
+    )
+    try:
+        with os.fdopen(fd, "wb") as output:
+            fd = -1
+            output.write(markdown.encode("utf-8"))
+    except BaseException:
+        if fd >= 0:
+            os.close(fd)
+        output_path.unlink(missing_ok=True)
+        raise
+    return str(output_path.resolve())
 
 
 def check_plugins_enabled() -> bool:
