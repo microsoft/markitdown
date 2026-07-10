@@ -138,6 +138,12 @@ def main():
         help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
     )
 
+    parser.add_argument(
+        "--info",
+        action="store_true",
+        help="Print a structured JSON summary of a file's metadata and exit.",
+    )
+
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
 
@@ -243,6 +249,18 @@ def main():
         markitdown = MarkItDown(enable_plugins=args.use_plugins, **cu_kwargs)
     else:
         markitdown = MarkItDown(enable_plugins=args.use_plugins)
+
+    if args.info:
+        import json
+        try:
+            if args.filename is None:
+                metadata = markitdown.get_metadata(sys.stdin.buffer, stream_info=stream_info)
+            else:
+                metadata = markitdown.get_metadata(args.filename, stream_info=stream_info)
+            print(json.dumps(metadata, indent=2))
+            sys.exit(0)
+        except Exception as e:
+            _exit_with_error(f"Error extracting metadata: {e}")
 
     if args.filename is None:
         result = markitdown.convert_stream(
