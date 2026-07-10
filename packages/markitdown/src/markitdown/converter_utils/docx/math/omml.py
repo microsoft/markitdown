@@ -373,9 +373,11 @@ class oMath2Latex(Tag2Method):
         @todo \text (latex pure text support)
         """
         _str = []
-        for s in elm.findtext("./{0}t".format(OMML_NS)):
-            # s = s if isinstance(s,unicode) else unicode(s,'utf-8')
-            _str.append(self._t_dict.get(s, s))
+        text = elm.findtext("./{0}t".format(OMML_NS))
+        if text is not None:
+            for s in text:
+                # s = s if isinstance(s,unicode) else unicode(s,'utf-8')
+                _str.append(self._t_dict.get(s, s))
         return escape_latex(BLANK.join(_str))
 
     tag2meth = {

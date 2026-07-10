@@ -532,6 +532,28 @@ def test_markitdown_llm() -> None:
     validate_strings(result, PPTX_TEST_STRINGS)
 
 
+def test_docx_empty_math_run() -> None:
+    from xml.etree import ElementTree as ET
+    from markitdown.converter_utils.docx.math.omml import oMath2Latex
+    
+    # Create OMML XML string containing an empty run with no text child
+    omml_str = """
+    <m:oMath xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">
+        <m:r>
+            <m:rPr/>
+        </m:r>
+        <m:r>
+            <m:t>x</m:t>
+        </m:r>
+    </m:oMath>
+    """
+    
+    math_element = ET.fromstring(omml_str)
+    # This should not raise a TypeError: 'NoneType' object is not iterable
+    latex_converter = oMath2Latex(math_element)
+    assert latex_converter.latex == "x"
+
+
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     for test in [
@@ -547,6 +569,7 @@ if __name__ == "__main__":
         test_markitdown_exiftool,
         test_markitdown_llm_parameters,
         test_markitdown_llm,
+        test_docx_empty_math_run,
     ]:
         print(f"Running {test.__name__}...", end="")
         test()
