@@ -532,6 +532,42 @@ def test_markitdown_llm() -> None:
     validate_strings(result, PPTX_TEST_STRINGS)
 
 
+def test_eml_converter() -> None:
+    from email.message import EmailMessage
+    
+    # Create a dummy email message
+    msg = EmailMessage()
+    msg["Subject"] = "Test Subject"
+    msg["From"] = "sender@example.com"
+    msg["To"] = "receiver@example.com"
+    msg["Date"] = "Fri, 10 Jul 2026 12:00:00 +0000"
+    msg.set_content("This is the main email content.")
+    
+    # Add an attachment
+    attachment_content = "This is the attachment text."
+    msg.add_attachment(
+        attachment_content.encode("utf-8"),
+        maintype="text",
+        subtype="plain",
+        filename="hello.txt"
+    )
+    
+    # Convert EML stream using MarkItDown
+    eml_bytes = msg.as_bytes()
+    markitdown = MarkItDown()
+    
+    stream = io.BytesIO(eml_bytes)
+    stream_info = StreamInfo(mimetype="message/rfc822", extension=".eml")
+    
+    result = markitdown.convert_stream(stream, stream_info=stream_info)
+    
+    # Assert on output
+    assert "Test Subject" in result.title
+    assert "**From:** sender@example.com" in result.markdown
+    assert "**To:** receiver@example.com" in result.markdown
+    assert "This is the main email content." in result.markdown
+    assert "## Attachment: hello.txt" in result.markdown
+    assert "This is the attachment text." in result.markdown
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     for test in [
@@ -547,6 +583,7 @@ if __name__ == "__main__":
         test_markitdown_exiftool,
         test_markitdown_llm_parameters,
         test_markitdown_llm,
+        test_eml_converter,
     ]:
         print(f"Running {test.__name__}...", end="")
         test()
