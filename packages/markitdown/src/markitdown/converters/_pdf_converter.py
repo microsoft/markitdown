@@ -10,6 +10,17 @@ from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 # Pattern for MasterFormat-style partial numbering (e.g., ".1", ".2", ".10")
 PARTIAL_NUMBERING_PATTERN = re.compile(r"^\.\d+$")
 
+# Thresholds for the PyMuPDF inline-image-truncation recovery pass below.
+# Only attempt the (relatively expensive) PyMuPDF re-extraction when the
+# primary parsers' output is short enough to plausibly be truncated.
+PYMUPDF_FALLBACK_MAX_PRIMARY_LENGTH = 2048
+# Prefer the PyMuPDF result when it recovers meaningfully more text than the
+# primary parsers, either proportionally (50% more) or in absolute terms
+# (200+ extra characters), to avoid swapping in a result that isn't a real
+# improvement.
+PYMUPDF_FALLBACK_MIN_LENGTH_RATIO = 1.5
+PYMUPDF_FALLBACK_MIN_LENGTH_DELTA = 200
+
 
 def _merge_partial_numbering_lines(text: str) -> str:
     """
@@ -63,12 +74,18 @@ def _extract_with_pymupdf(pdf_bytes: io.BytesIO) -> str | None:
         return None
 
     pdf_bytes.seek(0)
-    chunks: list[str] = []
-    with fitz.open(stream=pdf_bytes.read(), filetype="pdf") as doc:
-        for page in doc:
-            text = page.get_text("text")
-            if text and text.strip():
-                chunks.append(text.strip())
+    # Use a zero-copy view into the already-buffered bytes instead of
+    # `pdf_bytes.read()`, which would duplicate the whole PDF in memory.
+    view = pdf_bytes.getbuffer()
+    try:
+        chunks: list[str] = []
+        with fitz.open(stream=view, filetype="pdf") as doc:
+            for page in doc:
+                text = page.get_text("text")
+                if text and text.strip():
+                    chunks.append(text.strip())
+    finally:
+        view.release()
 
     markdown = "\n\n".join(chunks).strip()
     return markdown or None
@@ -612,7 +629,12 @@ class PdfConverter(DocumentConverter):
 
         # Recover from inline-image truncation cases where the primary parsers
         # return a much shorter body than an optional PyMuPDF pass.
-        if fitz is not None and has_images and markdown and len(markdown) < 2048:
+        if (
+            fitz is not None
+            and has_images
+            and markdown
+            and len(markdown) < PYMUPDF_FALLBACK_MAX_PRIMARY_LENGTH
+        ):
             try:
                 pymupdf_markdown = _extract_with_pymupdf(pdf_bytes)
             except Exception:
@@ -623,8 +645,10 @@ class PdfConverter(DocumentConverter):
                     pymupdf_length = len(pymupdf_markdown.strip())
                     if pymupdf_length > primary_length and (
                         primary_length == 0
-                        or pymupdf_length >= primary_length * 1.5
-                        or pymupdf_length - primary_length >= 200
+                        or pymupdf_length
+                        >= primary_length * PYMUPDF_FALLBACK_MIN_LENGTH_RATIO
+                        or pymupdf_length - primary_length
+                        >= PYMUPDF_FALLBACK_MIN_LENGTH_DELTA
                     ):
                         markdown = pymupdf_markdown
 

@@ -529,17 +529,20 @@ def test_pdf_converter_prefers_pymupdf_when_primary_extraction_is_truncated(
         def __iter__(self):
             return iter([_FakePyMuPdfPage()])
 
+    class _FakeFitz:
+        @staticmethod
+        def open(*args, **kwargs):
+            return _FakePyMuPdfDoc()
+
     monkeypatch.setattr(pdf_converter_module.pdfplumber, "open", lambda _: _FakePdf())
     monkeypatch.setattr(
         pdf_converter_module.pdfminer.high_level,
         "extract_text",
         lambda _: "BEFORE_IMAGE: this text should be extracted",
     )
-    monkeypatch.setattr(
-        pdf_converter_module.fitz,
-        "open",
-        lambda *args, **kwargs: _FakePyMuPdfDoc(),
-    )
+    # Patch the module-level `fitz` name itself (not an attribute on it), since
+    # `fitz` is `None` when PyMuPDF isn't installed and `setattr(None, ...)` fails.
+    monkeypatch.setattr(pdf_converter_module, "fitz", _FakeFitz)
 
     converter = pdf_converter_module.PdfConverter()
     result = converter.convert(
