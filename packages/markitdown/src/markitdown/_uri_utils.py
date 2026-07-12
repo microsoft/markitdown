@@ -1,5 +1,6 @@
 import base64
 import os
+import re
 from typing import Tuple, Dict
 from urllib.request import url2pathname
 from urllib.parse import urlparse, unquote_to_bytes
@@ -12,7 +13,14 @@ def file_uri_to_path(file_uri: str) -> Tuple[str | None, str]:
         raise ValueError(f"Not a file URL: {file_uri}")
 
     netloc = parsed.netloc if parsed.netloc else None
-    path = os.path.abspath(url2pathname(parsed.path))
+    uri_path = parsed.path
+    if os.name == "nt":
+        # ``url2pathname`` decodes escapes after detecting a drive prefix. A
+        # percent-encoded colon therefore looks root-relative during detection
+        # and becomes ``\C:\...`` only afterward, causing ``abspath`` to prepend
+        # the current drive. Decode just the drive separator before detection.
+        uri_path = re.sub(r"^/([A-Za-z])%3[aA](?=/|$)", r"/\1:", uri_path)
+    path = os.path.abspath(url2pathname(uri_path))
     return netloc, path
 
 

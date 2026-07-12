@@ -226,7 +226,6 @@ def test_file_uris() -> None:
     netloc, path = file_uri_to_path(file_uri)
     assert netloc is None
     assert path == "/path/to/file.txt"
-
     # Test file URI with no host
     file_uri = "file:/path/to/file.txt"
     netloc, path = file_uri_to_path(file_uri)
@@ -250,6 +249,14 @@ def test_file_uris() -> None:
     netloc, path = file_uri_to_path(file_uri)
     assert netloc is None
     assert path == "/path/to/file.txt"
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows drive-letter URI behavior")
+def test_file_uri_with_percent_encoded_drive_colon() -> None:
+    _, unescaped_path = file_uri_to_path("file:///C:/Temp/example.md")
+    _, escaped_path = file_uri_to_path("file:///C%3A/Temp/example.md")
+
+    assert escaped_path == unescaped_path
 
 
 def test_docx_comments() -> None:
