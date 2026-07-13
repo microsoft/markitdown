@@ -1,0 +1,13 @@
+PySide6>=6.7
+watchdog>=4.0
+pillow>=10.0
+PyMuPDF>=1.24
+markitdown>=0.1.0
+beautifulsoup4
+requests
+markdownify
+magika~=0.6.1
+charset-normalizer
+defusedxml
+pdfminer.six>=20251230
+pdfplumber>=0.11.9

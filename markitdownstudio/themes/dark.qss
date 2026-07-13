@@ -1,0 +1,64 @@
+QMainWindow {
+    background: #1e1e1e;
+    color: #f5f5f5;
+}
+
+#nav-pane {
+    background: #252526;
+    border: none;
+}
+
+#app-title {
+    font-size: 20px;
+    font-weight: 600;
+}
+
+#nav-button {
+    text-align: left;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: transparent;
+    color: #f5f5f5;
+}
+
+#nav-button:checked {
+    background: #3b3b3b;
+}
+
+#drop-zone {
+    border: 2px dashed #4f5d75;
+    border-radius: 14px;
+    background: #2a2d3a;
+}
+
+#drop-zone-icon {
+    font-size: 40px;
+}
+
+QGroupBox {
+    border: 1px solid #3c3c3c;
+    border-radius: 10px;
+    margin-top: 8px;
+    padding-top: 8px;
+}
+
+QPushButton {
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: #0078d4;
+    color: white;
+}
+
+QLineEdit, QTextBrowser, QPlainTextEdit, QTableWidget, QListWidget {
+    background: #2d2d2d;
+    color: #f5f5f5;
+    border: 1px solid #3c3c3c;
+    border-radius: 8px;
+    padding: 6px;
+}
+
+#stat-card {
+    background: #2d2d2d;
+    border-radius: 12px;
+    padding: 12px;
+}
