@@ -3,6 +3,7 @@ import io
 import os
 import re
 import shutil
+
 import pytest
 from unittest.mock import MagicMock
 
@@ -221,35 +222,52 @@ def test_data_uris() -> None:
 
 
 def test_file_uris() -> None:
+    expected_path = os.path.abspath(os.path.join(os.path.sep, "path", "to", "file.txt"))
+    expected_path_with_space = os.path.abspath(
+        os.path.join(os.path.sep, "path with space", "file.txt")
+    )
+
     # Test file URI with an empty host
     file_uri = "file:///path/to/file.txt"
     netloc, path = file_uri_to_path(file_uri)
     assert netloc is None
-    assert path == "/path/to/file.txt"
+    assert path == expected_path
 
     # Test file URI with no host
     file_uri = "file:/path/to/file.txt"
     netloc, path = file_uri_to_path(file_uri)
     assert netloc is None
-    assert path == "/path/to/file.txt"
+    assert path == expected_path
 
     # Test file URI with localhost
     file_uri = "file://localhost/path/to/file.txt"
     netloc, path = file_uri_to_path(file_uri)
     assert netloc == "localhost"
-    assert path == "/path/to/file.txt"
+    assert path == expected_path
 
     # Test file URI with query parameters
     file_uri = "file:///path/to/file.txt?param=value"
     netloc, path = file_uri_to_path(file_uri)
     assert netloc is None
-    assert path == "/path/to/file.txt"
+    assert path == expected_path
 
     # Test file URI with fragment
     file_uri = "file:///path/to/file.txt#fragment"
     netloc, path = file_uri_to_path(file_uri)
     assert netloc is None
-    assert path == "/path/to/file.txt"
+    assert path == expected_path
+
+    # Test file URI with quoted spaces
+    file_uri = "file:///path%20with%20space/file.txt"
+    netloc, path = file_uri_to_path(file_uri)
+    assert netloc is None
+    assert path == expected_path_with_space
+
+    if os.name == "nt":
+        file_uri = "file:///C%3A/Temp/example.txt"
+        netloc, path = file_uri_to_path(file_uri)
+        assert netloc is None
+        assert path == r"C:\Temp\example.txt"
 
 
 def test_docx_comments() -> None:
