@@ -96,7 +96,7 @@ def test_output_to_file(shared_tmp_dir, test_vector) -> None:
 
 @pytest.mark.parametrize("test_vector", CLI_TEST_VECTORS)
 def test_input_from_stdin_without_hints(shared_tmp_dir, test_vector) -> None:
-    """Test that the CLI readds from stdin correctly."""
+    """Test that the CLI reads from stdin correctly."""
 
     test_input = b""
     with open(os.path.join(TEST_FILES_DIR, test_vector.filename), "rb") as stream:
