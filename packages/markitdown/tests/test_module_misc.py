@@ -506,6 +506,26 @@ def test_markitdown_llm_parameters() -> None:
     assert messages[0]["content"][0]["text"] == test_prompt
 
 
+def test_markitdown_gif_image() -> None:
+    """Test that GIF images are accepted by the ImageConverter (issue #1103)."""
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock(message=MagicMock(content="A red pixel."))]
+    mock_client.chat.completions.create.return_value = mock_response
+
+    markitdown = MarkItDown(llm_client=mock_client, llm_model="gpt-4o")
+
+    # Must not raise UnsupportedFormatException
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.gif"))
+    assert "A red pixel." in result.text_content
+
+    # The image must be sent to the LLM with the correct content type
+    call_args = mock_client.chat.completions.create.call_args
+    messages = call_args[1]["messages"]
+    image_url = messages[0]["content"][1]["image_url"]["url"]
+    assert image_url.startswith("data:image/gif;base64,")
+
+
 @pytest.mark.skipif(
     skip_llm,
     reason="do not run llm tests without a key",
