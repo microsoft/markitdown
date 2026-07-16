@@ -49,9 +49,70 @@ uv venv --python=3.12 .venv
 # NOTE: Be sure to use 'uv pip install' rather than just 'pip install' to install packages in this virtual environment
 ```
 
-And you can activate the virtual environment with a platform-specific command[^venv] (macOS/Linux: `source .venv/bin/activate`; Windows PowerShell: `.venv\\Scripts\\Activate.ps1`; Windows cmd.exe: `.venv\\Scripts\\activate.bat`).
+And you can activate the virtual environment with a platform-specific command[^venv]:
 
 [^venv]: https://docs.python.org/3/library/venv.html#how-venvs-work
+
+<details open>
+
+<summary>bash/zsh</summary>
+
+```bash
+source .venv/bin/activate
+```
+
+</details>
+
+<details>
+
+<summary>fish</summary>
+
+```fish
+.venv/bin/activate.fish
+```
+
+</details>
+
+<details>
+
+<summary>csh/tcsh</summary>
+
+```csh/tcsh
+.venv/bin/activate.csh
+```
+
+</details>
+
+<details open>
+
+<summary>pwsh</summary>
+
+```powershell
+.venv/bin/Activate.ps1
+```
+
+</details>
+
+<details>
+
+<summary>cmd.exe</summary>
+
+```cmd
+.venv\Scripts\activate.bat
+```
+
+</details>
+
+<details open>
+
+<summary>Windows PowerShell</summary>
+
+```powershell
+Set-ExecutionPolicy RemoteSigned -Scope Process
+.venv\Scripts\Activate.ps1
+```
+
+</details>
 
 If you are using Anaconda, you can create a virtual environment with:
 
