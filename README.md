@@ -34,7 +34,10 @@ Markdown-formatted text, and understand it well. As a side benefit, Markdown con
 are also highly token-efficient.
 
 ## Prerequisites
+
 MarkItDown requires Python 3.10 or higher. It is recommended to use a virtual environment to avoid dependency conflicts.
+
+### Virtual environment creation
 
 With the standard Python installation, you can create a virtual environment using the following commands:
 
@@ -49,7 +52,9 @@ uv venv --python=3.12 .venv
 # NOTE: Be sure to use 'uv pip install' rather than just 'pip install' to install packages in this virtual environment
 ```
 
-And you can activate the virtual environment with a platform-specific command[^venv]:
+### Virtual environment activation
+
+You can activate the virtual environment with a platform-specific command[^venv]:
 
 [^venv]: https://docs.python.org/3/library/venv.html#how-venvs-work
 
