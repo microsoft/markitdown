@@ -49,9 +49,9 @@ uv venv --python=3.12 .venv
 # NOTE: Be sure to use 'uv pip install' rather than just 'pip install' to install packages in this virtual environment
 ```
 
-And you can activate the virtual environment with a platform-specific command[^venv].
+And you can activate the virtual environment with a platform-specific command[^venv] (macOS/Linux: `source .venv/bin/activate`; Windows PowerShell: `.venv\\Scripts\\Activate.ps1`; Windows cmd.exe: `.venv\\Scripts\\activate.bat`).
 
-[^venv]: https://docs.python.org/3/library/venv.html#how-venvs-work.
+[^venv]: https://docs.python.org/3/library/venv.html#how-venvs-work
 
 If you are using Anaconda, you can create a virtual environment with:
 
