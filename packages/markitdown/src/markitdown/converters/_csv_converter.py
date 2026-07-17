@@ -45,7 +45,15 @@ class CsvConverter(DocumentConverter):
         if stream_info.charset:
             content = file_stream.read().decode(stream_info.charset)
         else:
-            content = str(from_bytes(file_stream.read()).best())
+            data = file_stream.read()
+            best_guess = from_bytes(data).best()
+            if best_guess is not None:
+                content = str(best_guess)
+            else:
+                # charset_normalizer could not classify the bytes; decode as
+                # UTF-8 with replacement rather than stringifying None, which
+                # would silently turn the document into the literal "None".
+                content = data.decode("utf-8", errors="replace")
 
         # Parse CSV content
         reader = csv.reader(io.StringIO(content))
