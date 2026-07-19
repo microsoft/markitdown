@@ -86,11 +86,16 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         self,
         el: Any,
         text: str,
-        convert_as_inline: Optional[bool] = False,
+        parent_tags: Optional[Any] = None,
         **kwargs,
     ) -> str:
         """Same as usual converter, but removes data URIs"""
 
+        # markdownify >= 1.0 passes `parent_tags` (containing the pseudo-tag
+        # "_inline" for headings/table cells) instead of the old
+        # `convert_as_inline` boolean; check that so inline images still reduce
+        # to their alt text.
+        parent_tags = parent_tags or set()
         alt = el.attrs.get("alt", None) or ""
         src = el.attrs.get("src", None) or el.attrs.get("data-src", None) or ""
         title = el.attrs.get("title", None) or ""
@@ -98,7 +103,7 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         # Remove all line breaks from alt
         alt = alt.replace("\n", " ")
         if (
-            convert_as_inline
+            "_inline" in parent_tags
             and el.parent.name not in self.options["keep_inline_images_in"]
         ):
             return alt

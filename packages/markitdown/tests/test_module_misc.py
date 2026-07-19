@@ -552,3 +552,29 @@ if __name__ == "__main__":
         test()
         print("OK")
     print("All tests passed!")
+
+
+def test_inline_image_in_heading_reduced_to_alt() -> None:
+    from markitdown.converters._html_converter import HtmlConverter
+
+    md = HtmlConverter().convert_string('<h1>Hello <img src="a.png" alt="World"></h1>').markdown
+    assert md.strip() == "# Hello World", repr(md)
+
+
+def test_inline_image_in_table_cell_reduced_to_alt() -> None:
+    from markitdown.converters._html_converter import HtmlConverter
+
+    html = (
+        "<table><tr><th>Pic</th><th>Name</th></tr>"
+        '<tr><td><img src="a.png" alt="AA"></td><td>bob</td></tr></table>'
+    )
+    md = HtmlConverter().convert_string(html).markdown
+    assert "| AA | bob |" in md, repr(md)
+    assert "![AA]" not in md, repr(md)
+
+
+def test_block_image_still_rendered() -> None:
+    from markitdown.converters._html_converter import HtmlConverter
+
+    md = HtmlConverter().convert_string('<p><img src="a.png" alt="x"></p>').markdown
+    assert "![x](a.png)" in md, repr(md)
