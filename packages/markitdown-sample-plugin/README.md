@@ -11,12 +11,12 @@ First, implement your custom DocumentConverter:
 
 ```python
 from typing import BinaryIO, Any
-from markitdown import MarkItDown, DocumentConverter, DocumentConverterResult, StreamInfo
+from markitdown import MarkItDown, DocumentConverter, DocumentConverterResult, StreamInfo, PRIORITY_SPECIFIC_FILE_FORMAT
 
 class RtfConverter(DocumentConverter):
 
     def __init__(
-        self, priority: float = DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT
+        self, priority: float = PRIORITY_SPECIFIC_FILE_FORMAT
     ):
         super().__init__(priority=priority)
 

@@ -671,7 +671,7 @@ class MarkItDown:
         Register a DocumentConverter with a given priority.
 
         Priorities work as follows: By default, most converters get priority
-        DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT (== 0). The exception
+        PRIORITY_SPECIFIC_FILE_FORMAT (== 0). The exception
         is the PlainTextConverter, HtmlConverter, and ZipConverter, which get
         priority PRIORITY_GENERIC_FILE_FORMAT (== 10), with lower values
         being tried first (i.e., higher priority).
