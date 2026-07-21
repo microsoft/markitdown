@@ -240,13 +240,19 @@ class PptxConverter(DocumentConverter):
             md += "\n\n"
             data = []
             category_names = [c.label for c in chart.plots[0].categories]
-            series_names = [s.name for s in chart.series]
+            series_list = list(chart.series)
+            series_names = [s.name for s in series_list]
             data.append(["Category"] + series_names)
+
+            # Materialize each series' values once. Accessing series.values[idx]
+            # inside the nested loop is O(n^2) in python-pptx (each lookup does an
+            # XPath scan of all points), which is extremely slow on large charts.
+            series_values = [list(s.values) for s in series_list]
 
             for idx, category in enumerate(category_names):
                 row = [category]
-                for series in chart.series:
-                    row.append(series.values[idx])
+                for sv in series_values:
+                    row.append(sv[idx] if idx < len(sv) else None)
                 data.append(row)
 
             markdown_table = []

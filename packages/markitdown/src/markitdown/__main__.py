@@ -75,7 +75,7 @@ def main():
     parser.add_argument(
         "-c",
         "--charset",
-        help="Provide a hint about the file's charset (e.g, UTF-8).",
+        help="Provide a hint about the file's charset (e.g., UTF-8).",
     )
 
     cloud_group = parser.add_mutually_exclusive_group()
