@@ -75,4 +75,3 @@ class CsvConverter(DocumentConverter):
         result = "\n".join(markdown_table)
 
         return DocumentConverterResult(markdown=result)
-

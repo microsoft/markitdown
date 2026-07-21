@@ -79,14 +79,11 @@ CHR_BO = {
 }
 
 T = {
-    "\u2192": "\\rightarrow ",
-    "\u2192": "\\rightarrow ",
-    "\u2192": "\\rightarrow ",
     # Greek letters
     "\U0001d6fc": "\\alpha ",
     "\U0001d6fd": "\\beta ",
     "\U0001d6fe": "\\gamma ",
-    "\U0001d6ff": "\\theta ",
+    "\U0001d6ff": "\\delta ",
     "\U0001d700": "\\epsilon ",
     "\U0001d701": "\\zeta ",
     "\U0001d702": "\\eta ",
@@ -118,6 +115,7 @@ T = {
     # Relation symbols
     "\u2190": "\\leftarrow ",
     "\u2191": "\\uparrow ",
+    "\u2192": "\\rightarrow ",
     "\u2193": "\\downarrow ",
     "\u2194": "\\leftrightarrow ",
     "\u2195": "\\updownarrow ",
@@ -272,5 +270,3 @@ LIM_TO = ("\\rightarrow", "\\to")
 LIM_UPP = "\\overset{{{lim}}}{{{text}}}"
 
 M = "\\begin{{matrix}}{text}\\end{{matrix}}"
-
-
