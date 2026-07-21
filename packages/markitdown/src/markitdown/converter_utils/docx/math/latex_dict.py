@@ -80,6 +80,8 @@ CHR_BO = {
 
 T = {
     "\u2192": "\\rightarrow ",
+    "\u2192": "\\rightarrow ",
+    "\u2192": "\\rightarrow ",
     # Greek letters
     "\U0001d6fc": "\\alpha ",
     "\U0001d6fd": "\\beta ",
@@ -92,15 +94,15 @@ T = {
     "\U0001d704": "\\iota ",
     "\U0001d705": "\\kappa ",
     "\U0001d706": "\\lambda ",
-    "\U0001d707": "\\m ",
-    "\U0001d708": "\\n ",
+    "\U0001d707": "\\mu ",
+    "\U0001d708": "\\nu ",
     "\U0001d709": "\\xi ",
     "\U0001d70a": "\\omicron ",
     "\U0001d70b": "\\pi ",
     "\U0001d70c": "\\rho ",
     "\U0001d70d": "\\varsigma ",
     "\U0001d70e": "\\sigma ",
-    "\U0001d70f": "\\ta ",
+    "\U0001d70f": "\\tau ",
     "\U0001d710": "\\upsilon ",
     "\U0001d711": "\\phi ",
     "\U0001d712": "\\chi ",
@@ -116,8 +118,7 @@ T = {
     # Relation symbols
     "\u2190": "\\leftarrow ",
     "\u2191": "\\uparrow ",
-    "\u2192": "\\rightarrow ",
-    "\u2193": "\\downright ",
+    "\u2193": "\\downarrow ",
     "\u2194": "\\leftrightarrow ",
     "\u2195": "\\updownarrow ",
     "\u2196": "\\nwarrow ",
@@ -271,3 +272,5 @@ LIM_TO = ("\\rightarrow", "\\to")
 LIM_UPP = "\\overset{{{lim}}}{{{text}}}"
 
 M = "\\begin{{matrix}}{text}\\end{{matrix}}"
+
+
