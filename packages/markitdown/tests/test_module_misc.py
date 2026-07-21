@@ -288,6 +288,61 @@ def test_input_as_strings() -> None:
     assert "# Test" in result.text_content
 
 
+def test_pptx_chart_multi_series_conversion() -> None:
+    """Charts with multiple series and many categories must convert correctly.
+
+    Regression test for the slow path in PptxConverter._convert_chart_to_markdown,
+    where ``series.values[idx]`` was evaluated inside the (category x series) loop.
+    In python-pptx each ``series.values`` access rescans the cached points via
+    XPath (O(n) per lookup), so the old code was O(n^2) per series (and rebuilt
+    the whole tuple for every category), making large charts extremely slow.
+
+    The values are now materialized once per series. This test builds a chart
+    with enough categories that the regressed code path would be pathologically
+    slow, and verifies the resulting Markdown table is correct across series.
+    """
+    pptx = pytest.importorskip("pptx")
+    from pptx.util import Inches
+    from pptx.chart.data import CategoryChartData
+    from pptx.enum.chart import XL_CHART_TYPE
+
+    n_categories = 200
+    categories = [f"C{i}" for i in range(n_categories)]
+    series_a = [float(i) for i in range(n_categories)]
+    series_b = [float(i * 2) for i in range(n_categories)]
+
+    presentation = pptx.Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[5])
+    chart_data = CategoryChartData()
+    chart_data.categories = categories
+    chart_data.add_series("Series A", series_a)
+    chart_data.add_series("Series B", series_b)
+    slide.shapes.add_chart(
+        XL_CHART_TYPE.COLUMN_CLUSTERED,
+        Inches(1),
+        Inches(1),
+        Inches(8),
+        Inches(5),
+        chart_data,
+    )
+
+    buffer = io.BytesIO()
+    presentation.save(buffer)
+    buffer.seek(0)
+
+    result = MarkItDown().convert_stream(buffer, file_extension=".pptx")
+    md = result.markdown
+
+    # Both series headers are present
+    assert "Series A" in md
+    assert "Series B" in md
+    # First and last categories are present (nothing truncated)
+    assert "| C0 |" in md
+    assert f"| C{n_categories - 1} |" in md
+    # A representative row carries the correct value for each series
+    assert "| C10 | 10.0 | 20.0 |" in md
+
+
 def test_deeply_nested_html_fallback() -> None:
     """Large, deeply nested HTML should fall back to plain-text extraction
     instead of silently returning unconverted HTML (issue #1636).
