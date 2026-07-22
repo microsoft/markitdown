@@ -100,9 +100,11 @@ class PptxConverter(DocumentConverter):
 
                     # Resolve the image blob, handling SVG images that lack a
                     # rasterized fallback (shape.image raises in that case).
-                    image_blob, image_content_type, image_filename = (
-                        self._get_image_info(shape)
-                    )
+                    (
+                        image_blob,
+                        image_content_type,
+                        image_filename,
+                    ) = self._get_image_info(shape)
 
                     # Potentially generate a description using an LLM
                     llm_client = kwargs.get("llm_client")
