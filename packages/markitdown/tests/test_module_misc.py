@@ -303,8 +303,8 @@ def test_undetectable_charset_does_not_become_none() -> None:
 
     result = markitdown.convert_stream(io.BytesIO(undetectable), file_extension=".csv")
     assert "None" not in result.markdown
-    
-    
+
+
 def test_pptx_chart_multi_series_conversion() -> None:
     """Charts with multiple series and many categories must convert correctly.
 
