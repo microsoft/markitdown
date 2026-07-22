@@ -138,6 +138,16 @@ def main():
         help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
     )
 
+    parser.add_argument(
+        "--extract-images-to",
+        metavar="DIR",
+        default=None,
+        help=(
+            "Extract embedded images (currently supported for PPTX) to the given directory and "
+            "reference them by relative filename in the output. Ignored when --keep-data-uris is set."
+        ),
+    )
+
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
 
@@ -249,10 +259,14 @@ def main():
             sys.stdin.buffer,
             stream_info=stream_info,
             keep_data_uris=args.keep_data_uris,
+            extract_images_to=args.extract_images_to,
         )
     else:
         result = markitdown.convert(
-            args.filename, stream_info=stream_info, keep_data_uris=args.keep_data_uris
+            args.filename,
+            stream_info=stream_info,
+            keep_data_uris=args.keep_data_uris,
+            extract_images_to=args.extract_images_to,
         )
 
     _handle_output(args, result)
