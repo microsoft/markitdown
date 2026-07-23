@@ -16,8 +16,7 @@ def main():
         description="Convert various file formats to markdown.",
         prog="markitdown",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        usage=dedent(
-            """
+        usage=dedent("""
             SYNTAX:
 
                 markitdown <OPTIONAL: FILENAME>
@@ -42,8 +41,7 @@ def main():
                 OR
 
                 markitdown example.pdf > example.md
-            """
-        ).strip(),
+            """).strip(),
     )
 
     parser.add_argument(
@@ -136,6 +134,13 @@ def main():
         "--keep-data-uris",
         action="store_true",
         help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
+    )
+
+    parser.add_argument(
+        "-r",
+        "--reader-mode",
+        action="store_true",
+        help="Extract main article content from web pages, stripping navigation, sidebars, and footers. Requires the [readability] extra.",
     )
 
     parser.add_argument("filename", nargs="?")
@@ -249,10 +254,14 @@ def main():
             sys.stdin.buffer,
             stream_info=stream_info,
             keep_data_uris=args.keep_data_uris,
+            reader_mode=args.reader_mode,
         )
     else:
         result = markitdown.convert(
-            args.filename, stream_info=stream_info, keep_data_uris=args.keep_data_uris
+            args.filename,
+            stream_info=stream_info,
+            keep_data_uris=args.keep_data_uris,
+            reader_mode=args.reader_mode,
         )
 
     _handle_output(args, result)
