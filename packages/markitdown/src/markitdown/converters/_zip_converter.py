@@ -91,10 +91,15 @@ class ZipConverter(DocumentConverter):
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
         file_path = stream_info.url or stream_info.local_path or stream_info.filename
-        md_content = f"Content from the zip file `{file_path}`:\n\n"
+        md_content = f"Content from the zip file `{file_path}`:
+
+"
 
         with zipfile.ZipFile(file_stream, "r") as zipObj:
             for name in zipObj.namelist():
+                # Skip directory entries - they have no file content to convert
+                if zipObj.getinfo(name).is_dir():
+                    continue
                 try:
                     z_file_stream = io.BytesIO(zipObj.read(name))
                     z_file_stream_info = StreamInfo(
@@ -106,8 +111,12 @@ class ZipConverter(DocumentConverter):
                         stream_info=z_file_stream_info,
                     )
                     if result is not None:
-                        md_content += f"## File: {name}\n\n"
-                        md_content += result.markdown + "\n\n"
+                        md_content += f"## File: {name}
+
+"
+                        md_content += result.markdown + "
+
+"
                 except UnsupportedFormatException:
                     pass
                 except FileConversionException:
