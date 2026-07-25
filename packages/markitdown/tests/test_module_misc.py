@@ -587,6 +587,37 @@ def test_markitdown_llm() -> None:
     validate_strings(result, PPTX_TEST_STRINGS)
 
 
+def test_youtube_converter_missing_title_metadata() -> None:
+    """Test that YouTubeConverter converts streams with and without title metadata without raising AssertionError."""
+    from unittest.mock import patch
+    from markitdown.converters._youtube_converter import YouTubeConverter
+
+    converter = YouTubeConverter()
+    stream_info = StreamInfo(
+        mimetype="text/html",
+        extension=".html",
+        url="https://www.youtube.com/watch?v=12345",
+    )
+
+    with patch(
+        "markitdown.converters._youtube_converter.IS_YOUTUBE_TRANSCRIPT_CAPABLE",
+        False,
+    ):
+        # Case 1: Stream with no title metadata or title tag
+        html_content_no_title = b"<html><head></head><body>Video Content</body></html>"
+        stream_no_title = io.BytesIO(html_content_no_title)
+        result_no_title = converter.convert(stream_no_title, stream_info)
+        assert result_no_title.title == ""
+        assert "# YouTube" in result_no_title.text_content
+
+        # Case 2: Stream with fallback <title> tag
+        html_content_fallback = b"<html><head><title>Fallback Title</title></head><body>Video Content</body></html>"
+        stream_fallback = io.BytesIO(html_content_fallback)
+        result_fallback = converter.convert(stream_fallback, stream_info)
+        assert result_fallback.title == "Fallback Title"
+        assert "# YouTube" in result_fallback.text_content
+
+
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     for test in [

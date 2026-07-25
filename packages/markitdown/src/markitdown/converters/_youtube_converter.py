@@ -118,8 +118,7 @@ class YouTubeConverter(DocumentConverter):
         # Start preparing the page
         webpage_text = "# YouTube\n"
 
-        title = self._get(metadata, ["title", "og:title", "name"])  # type: ignore
-        assert isinstance(title, str)
+        title = self._get(metadata, ["title", "og:title", "name"])
 
         if title:
             webpage_text += f"\n## {title}\n"
