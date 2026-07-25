@@ -587,6 +587,47 @@ def test_markitdown_llm() -> None:
     validate_strings(result, PPTX_TEST_STRINGS)
 
 
+def test_ipynb_converter_string_and_none_source() -> None:
+    """Test IpynbConverter when cell source is represented as string, list, or None."""
+    import json
+
+    markitdown = MarkItDown()
+    nb_content = json.dumps(
+        {
+            "nbformat": 4,
+            "nbformat_minor": 2,
+            "cells": [
+                {
+                    "cell_type": "markdown",
+                    "source": "# String Title Heading\nThis cell source is a single string.",
+                },
+                {
+                    "cell_type": "code",
+                    "source": "x = 42\nprint(x)",
+                },
+                {
+                    "cell_type": "markdown",
+                    "source": None,
+                },
+                {
+                    "cell_type": "raw",
+                    "source": ["raw line 1\n", "raw line 2"],
+                },
+            ],
+            "metadata": None,
+        }
+    ).encode("utf-8")
+
+    result = markitdown.convert_stream(
+        io.BytesIO(nb_content), stream_info=StreamInfo(extension=".ipynb")
+    )
+    assert result.title == "String Title Heading"
+    assert "# String Title Heading" in result.markdown
+    assert "This cell source is a single string." in result.markdown
+    assert "```python\nx = 42\nprint(x)\n```" in result.markdown
+    assert "```\nraw line 1\nraw line 2\n```" in result.markdown
+
+
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     for test in [
@@ -602,6 +643,7 @@ if __name__ == "__main__":
         test_markitdown_exiftool,
         test_markitdown_llm_parameters,
         test_markitdown_llm,
+        test_ipynb_converter_string_and_none_source,
     ]:
         print(f"Running {test.__name__}...", end="")
         test()
