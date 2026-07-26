@@ -234,6 +234,17 @@ GENERAL_TEST_VECTORS = [
         ],
         must_not_include=[],
     ),
+    FileTestVector(
+        filename="test.doc",
+        mimetype="application/msword",
+        charset=None,
+        url=None,
+        must_include=[
+            "This is a test document for MarkItDown",
+            "07f1c8ad-3e09-4bcd-b9f7-a4e0d6c812b3",
+        ],
+        must_not_include=[],
+    ),
 ]
 
 
