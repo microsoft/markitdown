@@ -167,6 +167,20 @@ def test_html_body_absent_returns_none() -> None:
     assert OutlookMsgConverter()._get_html_body(_FakeMsg({})) is None
 
 
+def test_html_body_skips_an_empty_binary_property() -> None:
+    # An empty binary stream must not mask a populated string variant.
+    msg = _FakeMsg(
+        {
+            "__substg1.0_10130102": b"",
+            "__substg1.0_1013001F": _unicode_stream(
+                "<html><body><p>Fallback body</p></body></html>"
+            ),
+        }
+    )
+
+    assert "Fallback body" in (OutlookMsgConverter()._get_html_body(msg) or "")
+
+
 def test_plain_text_body_wins_over_html(monkeypatch) -> None:
     streams = {
         "__substg1.0_0037001F": _unicode_stream("Q3 planning"),

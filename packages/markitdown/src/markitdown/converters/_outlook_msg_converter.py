@@ -31,7 +31,8 @@ class OutlookMsgConverter(DocumentConverter):
 
     Uses the olefile package to parse the .msg file structure and extract:
     - Email headers (From, To, Subject)
-    - Email body content
+    - Email body content, falling back to the HTML body for messages that
+      carry no plain-text part
     """
 
     def __init__(self):
@@ -175,7 +176,7 @@ class OutlookMsgConverter(DocumentConverter):
 
         # PR_HTML is normally a binary stream; some clients write the string variant.
         html_bytes = self._read_stream(msg, "__substg1.0_10130102")
-        if html_bytes is None:
+        if not html_bytes:
             html = self._get_stream_data(msg, "__substg1.0_1013001F")
             if not html:
                 return None
