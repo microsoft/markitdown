@@ -398,5 +398,186 @@ def test_real_unicode_fixture_still_converts() -> None:
     assert "This is the body of the test email message" in result.markdown
 
 
+# Exchange senders and HTML-only bodies
+#
+# PR_SENDER_EMAIL_ADDRESS (0x0C1F) holds an Exchange Distinguished Name rather
+# than an address whenever PR_SENDER_ADDRTYPE (0x0C1E) is "EX"; the address
+# lives in PR_SENDER_SMTP_ADDRESS (0x5D01). HTML-only messages leave PR_BODY
+# empty and store their content in PR_HTML (0x1013).
+
+EXCHANGE_DN = (
+    "/O=EXCHANGELABS/OU=EXCHANGE ADMINISTRATIVE GROUP"
+    " (FYDIBOHF23SPDLT)/CN=RECIPIENTS/CN=ab12cd34"
+)
+
+
+def _fake_msg(streams: dict):
+    """An opened stand-in message, for exercising the converter's helpers."""
+    return _fake_olefile(streams)(None)
+
+
+def _sender(streams: dict):
+    return OutlookMsgConverter()._get_sender(_fake_msg(streams))
+
+
+def _html_body(streams: dict, encoding=None):
+    return OutlookMsgConverter()._get_html_body(_fake_msg(streams), encoding)
+
+
+def test_sender_prefers_smtp_address_over_exchange_dn() -> None:
+    streams = {
+        "__substg1.0_0C1E001F": "EX".encode("utf-16-le"),
+        "__substg1.0_0C1F001F": EXCHANGE_DN.encode("utf-16-le"),
+        "__substg1.0_5D01001F": "sender@example.com".encode("utf-16-le"),
+    }
+
+    assert _sender(streams) == "sender@example.com"
+
+
+def test_sender_prefers_sent_representing_smtp_address() -> None:
+    streams = {
+        "__substg1.0_0C1E001F": "EX".encode("utf-16-le"),
+        "__substg1.0_0C1F001F": EXCHANGE_DN.encode("utf-16-le"),
+        "__substg1.0_5D02001F": "delegate@example.com".encode("utf-16-le"),
+    }
+
+    assert _sender(streams) == "delegate@example.com"
+
+
+def test_sender_skips_exchange_dn_for_sent_representing_address() -> None:
+    streams = {
+        "__substg1.0_0C1E001F": "EX".encode("utf-16-le"),
+        "__substg1.0_0C1F001F": EXCHANGE_DN.encode("utf-16-le"),
+        "__substg1.0_0064001F": "SMTP".encode("utf-16-le"),
+        "__substg1.0_0065001F": "onbehalf@example.com".encode("utf-16-le"),
+    }
+
+    assert _sender(streams) == "onbehalf@example.com"
+
+
+def test_sender_keeps_smtp_addrtype_address() -> None:
+    """The common non-Exchange case must keep behaving exactly as before."""
+    streams = {
+        "__substg1.0_0C1E001F": "SMTP".encode("utf-16-le"),
+        "__substg1.0_0C1F001F": "plain@example.com".encode("utf-16-le"),
+    }
+
+    assert _sender(streams) == "plain@example.com"
+
+
+def test_sender_falls_back_to_dn_when_no_smtp_address_exists() -> None:
+    """Nothing better on file: keep the DN rather than dropping the header."""
+    streams = {
+        "__substg1.0_0C1E001F": "EX".encode("utf-16-le"),
+        "__substg1.0_0C1F001F": EXCHANGE_DN.encode("utf-16-le"),
+    }
+
+    assert _sender(streams) == EXCHANGE_DN
+
+
+def test_ansi_exchange_sender_resolves_smtp_address() -> None:
+    """The sender properties are read in the non-Unicode format as well."""
+    streams = {
+        "__substg1.0_0C1E001E": b"EX",
+        "__substg1.0_0C1F001E": EXCHANGE_DN.encode("cp1252"),
+        "__substg1.0_5D01001E": SENDER.encode("cp1252"),
+        "__properties_version1.0": _properties_stream({PR_MESSAGE_CODEPAGE: 1252}),
+    }
+    markdown = _convert(streams)
+
+    assert f"**From:** {SENDER}" in markdown
+    assert "EXCHANGELABS" not in markdown
+
+
+def test_html_only_body_is_converted_to_markdown() -> None:
+    streams = {
+        "__substg1.0_10130102": (
+            b"<html><body><h1>Status</h1><p>Hello <b>world</b></p></body></html>"
+        ),
+    }
+    body = _html_body(streams)
+
+    assert body is not None
+    assert "# Status" in body
+    assert "Hello **world**" in body
+    # The HTML must be converted, not passed through verbatim.
+    assert "<p>" not in body
+
+
+def test_html_body_reads_the_string_property_variant() -> None:
+    streams = {
+        "__substg1.0_1013001F": (
+            "<html><body><p>String variant</p></body></html>".encode("utf-16-le")
+        ),
+    }
+
+    assert "String variant" in (_html_body(streams) or "")
+
+
+def test_html_body_decodes_non_utf8_bytes() -> None:
+    """PR_HTML records no encoding of its own; assuming UTF-8 mangles this."""
+    streams = {
+        "__substg1.0_10130102": (
+            "<html><body><p>Grüße aus München</p></body></html>".encode("cp1252")
+        ),
+    }
+
+    assert "Grüße aus München" in (_html_body(streams) or "")
+
+
+def test_html_body_honors_the_internet_codepage() -> None:
+    """A declared body code page wins over detecting a short, ambiguous sample."""
+    streams = {
+        "__substg1.0_10130102": (f"<p>{AMBIGUOUS_CYRILLIC}</p>".encode("cp1251")),
+        "__properties_version1.0": _properties_stream({PR_INTERNET_CPID: 1251}),
+    }
+
+    assert AMBIGUOUS_CYRILLIC in _convert(streams)
+
+
+def test_html_body_absent_returns_none() -> None:
+    assert _html_body({}) is None
+
+
+def test_html_body_skips_an_empty_binary_property() -> None:
+    """An empty binary stream must not mask a populated string variant."""
+    streams = {
+        "__substg1.0_10130102": b"",
+        "__substg1.0_1013001F": (
+            "<html><body><p>Fallback body</p></body></html>".encode("utf-16-le")
+        ),
+    }
+
+    assert "Fallback body" in (_html_body(streams) or "")
+
+
+def test_plain_text_body_wins_over_html() -> None:
+    streams = _unicode_streams()
+    streams["__substg1.0_10130102"] = b"<html><body><p>The HTML body.</p></body></html>"
+    markdown = _convert(streams)
+
+    assert "Te confirmo la reunión del martes" in markdown
+    assert "The HTML body." not in markdown
+
+
+def test_convert_renders_exchange_message() -> None:
+    """End-to-end shape of the message reported in #1188: Exchange sender, no
+    plain-text body."""
+    streams = {
+        "__substg1.0_0037001F": "Q3 planning".encode("utf-16-le"),
+        "__substg1.0_0E04001F": RECIPIENT.encode("utf-16-le"),
+        "__substg1.0_0C1E001F": "EX".encode("utf-16-le"),
+        "__substg1.0_0C1F001F": EXCHANGE_DN.encode("utf-16-le"),
+        "__substg1.0_5D01001F": SENDER.encode("utf-16-le"),
+        "__substg1.0_10130102": b"<html><body><p>Hello <b>world</b></p></body></html>",
+    }
+    result = _convert_result(streams)
+
+    assert f"**From:** {SENDER}" in result.markdown
+    assert "EXCHANGELABS" not in result.markdown
+    assert "Hello **world**" in result.markdown
+    assert result.title == "Q3 planning"
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
