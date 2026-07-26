@@ -29,6 +29,7 @@ from .latex_dict import (
     LIM_FUNC,
     LIM_TO,
     LIM_UPP,
+    LIM_LOW,
     M,
     BRK,
     BLANK,
@@ -285,7 +286,7 @@ class oMath2Latex(Tag2Method):
         c_dict = self.process_children_dict(elm)
         pr = c_dict["groupChrPr"]
         latex_s = get_val(pr.chr)
-        return pr.text + latex_s.format(c_dict["e"])
+        return pr.text + (latex_s.format(c_dict["e"]) if latex_s else "")
 
     def do_rad(self, elm):
         """
@@ -316,7 +317,7 @@ class oMath2Latex(Tag2Method):
         t_dict = self.process_children_dict(elm, include=("e", "lim"))
         latex_s = LIM_FUNC.get(t_dict["e"])
         if not latex_s:
-            raise NotImplementedError("Not support lim %s" % t_dict["e"])
+            return LIM_LOW.format(lim=t_dict.get("lim"), text=t_dict.get("e"))
         else:
             return latex_s.format(lim=t_dict.get("lim"))
 
@@ -373,7 +374,8 @@ class oMath2Latex(Tag2Method):
         @todo \text (latex pure text support)
         """
         _str = []
-        for s in elm.findtext("./{0}t".format(OMML_NS)):
+        text = elm.findtext("./{0}t".format(OMML_NS)) or ""
+        for s in text:
             # s = s if isinstance(s,unicode) else unicode(s,'utf-8')
             _str.append(self._t_dict.get(s, s))
         return escape_latex(BLANK.join(_str))

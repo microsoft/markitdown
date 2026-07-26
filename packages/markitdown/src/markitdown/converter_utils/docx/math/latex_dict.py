@@ -214,6 +214,22 @@ FUNC = {
     "coth": "\\coth({fe})",
     "sec": "\\sec({fe})",
     "csc": "\\csc({fe})",
+    "max": "\\max({fe})",
+    "min": "\\min({fe})",
+    "log": "\\log({fe})",
+    "ln": "\\ln({fe})",
+    "exp": "\\exp({fe})",
+    "lim": "\\lim({fe})",
+    "sup": "\\sup({fe})",
+    "inf": "\\inf({fe})",
+    "det": "\\det({fe})",
+    "dim": "\\dim({fe})",
+    "gcd": "\\gcd({fe})",
+    "lcm": "\\mathrm{{lcm}}({fe})",
+    "arg": "\\arg({fe})",
+    "ker": "\\ker({fe})",
+    "deg": "\\deg({fe})",
+    "hom": "\\hom({fe})",
 }
 
 FUNC_PLACE = "{fe}"
@@ -268,5 +284,6 @@ LIM_FUNC = {
 LIM_TO = ("\\rightarrow", "\\to")
 
 LIM_UPP = "\\overset{{{lim}}}{{{text}}}"
+LIM_LOW = "\\underset{{{lim}}}{{{text}}}"
 
 M = "\\begin{{matrix}}{text}\\end{{matrix}}"
