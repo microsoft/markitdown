@@ -373,7 +373,7 @@ class oMath2Latex(Tag2Method):
         @todo \text (latex pure text support)
         """
         _str = []
-        for s in elm.findtext("./{0}t".format(OMML_NS)):
+        for s in (elm.findtext("./{0}t".format(OMML_NS)) or ""):
             # s = s if isinstance(s,unicode) else unicode(s,'utf-8')
             _str.append(self._t_dict.get(s, s))
         return escape_latex(BLANK.join(_str))
