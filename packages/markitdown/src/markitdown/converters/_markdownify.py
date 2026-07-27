@@ -60,7 +60,11 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
                 parsed_url = urlparse(href)  # type: ignore
                 if parsed_url.scheme and parsed_url.scheme.lower() not in ["http", "https", "file"]:  # type: ignore
                     return "%s%s%s" % (prefix, text, suffix)
-                href = urlunparse(parsed_url._replace(path=quote(unquote(parsed_url.path))))  # type: ignore
+                try:
+                    new_path = quote(unquote(parsed_url.path, errors="strict"))
+                except UnicodeDecodeError:
+                    new_path = parsed_url.path
+                href = urlunparse(parsed_url._replace(path=new_path))  # type: ignore
             except ValueError:  # It's not clear if this ever gets thrown
                 return "%s%s%s" % (prefix, text, suffix)
 
