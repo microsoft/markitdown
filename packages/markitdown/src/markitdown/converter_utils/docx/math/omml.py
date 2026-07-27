@@ -88,9 +88,10 @@ class Tag2Method(object):
         process children of the elm,return iterable
         """
         for _e in list(elm):
-            if OMML_NS not in _e.tag:
-                continue
-            stag = _e.tag.replace(OMML_NS, "")
+            if OMML_NS in _e.tag:
+                stag = _e.tag.replace(OMML_NS, "")
+            else:
+                stag = _e.tag.split("}")[-1] if "}" in _e.tag else _e.tag
             if include and (stag not in include):
                 continue
             t = self.call_method(_e, stag=stag)
