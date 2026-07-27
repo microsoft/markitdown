@@ -126,5 +126,20 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
             return "[x] " if el.has_attr("checked") else "[ ] "
         return ""
 
+    def convert_table(
+        self,
+        el: Any,
+        text: str,
+        convert_as_inline: Optional[bool] = False,
+        **kwargs,
+    ) -> str:
+        """Promote first row to table header if <thead> and <th> are absent."""
+        if el and not el.find("thead") and not el.find("th"):
+            first_tr = el.find("tr")
+            if first_tr:
+                for td in first_tr.find_all("td"):
+                    td.name = "th"
+        return super().convert_table(el, text, convert_as_inline, **kwargs)
+
     def convert_soup(self, soup: Any) -> str:
         return super().convert_soup(soup)  # type: ignore
