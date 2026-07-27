@@ -587,6 +587,36 @@ def test_markitdown_llm() -> None:
     validate_strings(result, PPTX_TEST_STRINGS)
 
 
+def test_epub_metadata_nodevalue():
+    from defusedxml.minidom import parseString
+    from markitdown.converters._epub_converter import EpubConverter
+
+    xml_data = (
+        '<package xmlns:dc="http://purl.org/dc/elements/1.1/">'
+        "<dc:title><span>Structured</span> Title</dc:title>"
+        "<dc:creator><name>Author 1</name></dc:creator>"
+        "<dc:creator>Author 2</dc:creator>"
+        "<dc:publisher></dc:publisher>"
+        "<dc:description/>"
+        "</package>"
+    )
+    dom = parseString(xml_data)
+    converter = EpubConverter()
+
+    title = converter._get_text_from_node(dom, "dc:title")
+    assert title == "Structured Title"
+
+    creators = converter._get_all_texts_from_nodes(dom, "dc:creator")
+    assert creators == ["Author 1", "Author 2"]
+
+    publisher = converter._get_text_from_node(dom, "dc:publisher")
+    assert publisher is None
+
+    missing = converter._get_text_from_node(dom, "dc:date")
+    assert missing is None
+
+
+
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     for test in [
@@ -602,6 +632,7 @@ if __name__ == "__main__":
         test_markitdown_exiftool,
         test_markitdown_llm_parameters,
         test_markitdown_llm,
+        test_epub_metadata_nodevalue,
     ]:
         print(f"Running {test.__name__}...", end="")
         test()
