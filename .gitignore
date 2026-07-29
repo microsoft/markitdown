@@ -166,3 +166,9 @@ cython_debug/
 src/.DS_Store
 .DS_Store
 .cursorrules
+# Added by code-review-graph
+.code-review-graph/
+# Claude Code configuration (local only)
+.claude/
+.mcp.json
+CLAUDE.md

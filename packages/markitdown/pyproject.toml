@@ -35,6 +35,7 @@ dependencies = [
 [project.optional-dependencies]
 all = [
   "python-pptx",
+  "unword>=0.2.2",
   "mammoth~=1.11.0",
   "pandas",
   "openpyxl",
@@ -51,6 +52,7 @@ all = [
   "azure-identity",
 ]
 pptx = ["python-pptx"]
+doc = ["unword>=0.2.2"]
 docx = ["mammoth~=1.11.0", "lxml"]
 xlsx = ["pandas", "openpyxl"]
 xls = ["pandas", "xlrd"]
