@@ -1,5 +1,7 @@
 # MarkItDown
 
+[![MCP Toplist](https://mcptoplist.com/badge/pulsemcp%2Fmarkitdown.svg)](https://mcptoplist.com/server/pulsemcp%2Fmarkitdown)
+
 [![PyPI](https://img.shields.io/pypi/v/markitdown.svg)](https://pypi.org/project/markitdown/)
 ![PyPI - Downloads](https://img.shields.io/pypi/dd/markitdown)
 [![Built by AutoGen Team](https://img.shields.io/badge/Built%20by-AutoGen%20Team-blue)](https://github.com/microsoft/autogen)
