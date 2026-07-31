@@ -68,17 +68,21 @@ class ImageConverter(DocumentConverter):
         # Try describing the image with GPT
         llm_client = kwargs.get("llm_client")
         llm_model = kwargs.get("llm_model")
+        llm_prompt = kwargs.get("llm_prompt")
         if llm_client is not None and llm_model is not None:
             llm_description = self._get_llm_description(
                 file_stream,
                 stream_info,
                 client=llm_client,
                 model=llm_model,
-                prompt=kwargs.get("llm_prompt"),
+                prompt=llm_prompt,
             )
 
             if llm_description is not None:
-                md_content += "\n# Description:\n" + llm_description.strip() + "\n"
+                md_content += "\n"
+                if llm_prompt is None or llm_prompt.strip() == "":
+                    md_content += "# Description:\n"
+                md_content += llm_description.strip() + "\n"
 
         return DocumentConverterResult(
             markdown=md_content,
