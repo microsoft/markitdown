@@ -19,6 +19,7 @@ from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 _dependency_exc_info = None
 try:
     import pptx
+    from pptx.enum.chart import XL_CHART_TYPE
 except ImportError:
     # Preserve the error and stack trace for later
     _dependency_exc_info = sys.exc_info()
@@ -29,6 +30,53 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 ]
 
 ACCEPTED_FILE_EXTENSIONS = [".pptx"]
+
+# Chart types drawn on an X/Y (value) axis instead of a category axis. They
+# have no ``chart.plots[0].categories``, so their series data must be read
+# point-by-point rather than row-by-row over categories.
+XY_CHART_TYPES = ()
+BUBBLE_CHART_TYPES = ()
+if _dependency_exc_info is None:
+    XY_CHART_TYPES = (
+        XL_CHART_TYPE.XY_SCATTER,
+        XL_CHART_TYPE.XY_SCATTER_LINES,
+        XL_CHART_TYPE.XY_SCATTER_LINES_NO_MARKERS,
+        XL_CHART_TYPE.XY_SCATTER_SMOOTH,
+        XL_CHART_TYPE.XY_SCATTER_SMOOTH_NO_MARKERS,
+        XL_CHART_TYPE.BUBBLE,
+        XL_CHART_TYPE.BUBBLE_THREE_D_EFFECT,
+    )
+    BUBBLE_CHART_TYPES = (XL_CHART_TYPE.BUBBLE, XL_CHART_TYPE.BUBBLE_THREE_D_EFFECT)
+
+
+def _chart_to_markdown_table(data):
+    """Render a list of rows (first row is the header) as a Markdown table."""
+    if not data:
+        return ""
+    rows = ["| " + " | ".join(map(str, row)) + " |" for row in data]
+    header = rows[0]
+    separator = "|" + "|".join(["---"] * len(data[0])) + "|"
+    return "\n".join([header, separator] + rows[1:])
+
+
+def _xy_point_x(series, idx):
+    """X value of point *idx* in an XY (scatter) series.
+
+    python-pptx only exposes the Y values publicly (``series.values``); the X
+    values live on the internal ``c:xVal`` element, so we read them directly.
+    """
+    x_val = series._element.xVal
+    if x_val is None or idx >= x_val.ptCount_val:
+        return None
+    return x_val.pt_v(idx)
+
+
+def _xy_point_size(series, idx):
+    """Bubble size of point *idx* in a bubble series."""
+    size = series._element.bubbleSize
+    if size is None or idx >= size.ptCount_val:
+        return None
+    return size.pt_v(idx)
 
 
 class PptxConverter(DocumentConverter):
@@ -305,29 +353,46 @@ class PptxConverter(DocumentConverter):
             if chart.has_title:
                 md += f": {chart.chart_title.text_frame.text}"
             md += "\n\n"
-            data = []
-            category_names = [c.label for c in chart.plots[0].categories]
+
             series_list = list(chart.series)
             series_names = [s.name for s in series_list]
-            data.append(["Category"] + series_names)
-
-            # Materialize each series' values once. Accessing series.values[idx]
+            # Materialize each series' Y values once. Accessing series.values[idx]
             # inside the nested loop is O(n^2) in python-pptx (each lookup does an
             # XPath scan of all points), which is extremely slow on large charts.
             series_values = [list(s.values) for s in series_list]
 
+            # Scatter and bubble charts have no category axis: each data point
+            # carries its own X coordinate, so chart.plots[0].categories is empty.
+            # Iterating over categories (as category charts do) would emit zero
+            # data rows and silently drop the entire series.
+            if chart.chart_type in XY_CHART_TYPES:
+                is_bubble = chart.chart_type in BUBBLE_CHART_TYPES
+                header = ["X"]
+                for name in series_names:
+                    header.append(name)
+                    if is_bubble:
+                        header.append(f"{name} (size)")
+                data = [header]
+                num_points = max((len(sv) for sv in series_values), default=0)
+                for idx in range(num_points):
+                    # X is taken from the first series; scatter charts commonly
+                    # share the X axis across series.
+                    row = [_xy_point_x(series_list[0], idx)]
+                    for series, sv in zip(series_list, series_values):
+                        row.append(sv[idx] if idx < len(sv) else None)
+                        if is_bubble:
+                            row.append(_xy_point_size(series, idx))
+                    data.append(row)
+                return md + _chart_to_markdown_table(data)
+
+            category_names = [c.label for c in chart.plots[0].categories]
+            data = [["Category"] + series_names]
             for idx, category in enumerate(category_names):
                 row = [category]
                 for sv in series_values:
                     row.append(sv[idx] if idx < len(sv) else None)
                 data.append(row)
-
-            markdown_table = []
-            for row in data:
-                markdown_table.append("| " + " | ".join(map(str, row)) + " |")
-            header = markdown_table[0]
-            separator = "|" + "|".join(["---"] * len(data[0])) + "|"
-            return md + "\n".join([header, separator] + markdown_table[1:])
+            return md + _chart_to_markdown_table(data)
         except ValueError as e:
             # Handle the specific error for unsupported chart types
             if "unsupported plot type" in str(e):
