@@ -393,6 +393,31 @@ def test_deeply_nested_html_fallback() -> None:
     assert "<p>" not in result.markdown
 
 
+def test_fragment_only_links_render_as_plain_text() -> None:
+    """Fragment-only hrefs (e.g. Word TOC/cross-reference bookmarks such as
+    "#_Toc12345") never resolve in the Markdown output, since heading ids are
+    not preserved. They should render as plain text, not dead links (issue #2125).
+    """
+    markitdown = MarkItDown()
+
+    html = (
+        "<html><body>"
+        '<a href="#_Toc12345">Executive Summary</a>'
+        '<a href="https://example.com">External Link</a>'
+        '<a href="page.html#section">Same-Page Fragment</a>'
+        "</body></html>"
+    )
+
+    result = markitdown.convert_stream(
+        io.BytesIO(html.encode("utf-8")), file_extension=".html"
+    )
+
+    assert "[Executive Summary](#_Toc12345)" not in result.markdown
+    assert "Executive Summary" in result.markdown
+    assert "[External Link](https://example.com)" in result.markdown
+    assert "[Same-Page Fragment](page.html#section)" in result.markdown
+
+
 def test_doc_rlink() -> None:
     # Test for: CVE-2025-11849
     markitdown = MarkItDown()
