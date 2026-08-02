@@ -214,6 +214,22 @@ FUNC = {
     "coth": "\\coth({fe})",
     "sec": "\\sec({fe})",
     "csc": "\\csc({fe})",
+    "log": "\\log({fe})",
+    "ln": "\\ln({fe})",
+    "exp": "\\exp({fe})",
+    "det": "\\det({fe})",
+    "gcd": "\\gcd({fe})",
+    "lcm": "\\lcm({fe})",
+    "lim": "\\lim({fe})",
+    "max": "\\max({fe})",
+    "min": "\\min({fe})",
+    "sup": "\\sup({fe})",
+    "inf": "\\inf({fe})",
+    "dim": "\\dim({fe})",
+    "ker": "\\ker({fe})",
+    "hom": "\\hom({fe})",
+    "deg": "\\deg({fe})",
+    "arg": "\\arg({fe})",
 }
 
 FUNC_PLACE = "{fe}"
