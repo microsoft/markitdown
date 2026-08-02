@@ -12,6 +12,22 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 ACCEPTED_FILE_EXTENSIONS = [".csv"]
 
 
+def _escape_table_cell(value: str) -> str:
+    """Escape a CSV value so it is safe inside a Markdown table cell.
+
+    Both characters handled here silently corrupt the table rather than failing
+    loudly: an unescaped pipe is read as a column separator, and a newline
+    inside a quoted CSV field ends the row early and leaves the remainder as
+    stray text after the table.
+    """
+    return (
+        value.replace("|", "\\|")
+        .replace("\r\n", "<br>")
+        .replace("\n", "<br>")
+        .replace("\r", "<br>")
+    )
+
+
 class CsvConverter(DocumentConverter):
     """
     Converts CSV files to Markdown tables.
@@ -58,7 +74,8 @@ class CsvConverter(DocumentConverter):
         markdown_table = []
 
         # Add header row
-        markdown_table.append("| " + " | ".join(rows[0]) + " |")
+        header = [_escape_table_cell(cell) for cell in rows[0]]
+        markdown_table.append("| " + " | ".join(header) + " |")
 
         # Add separator row
         markdown_table.append("| " + " | ".join(["---"] * len(rows[0])) + " |")
@@ -70,7 +87,9 @@ class CsvConverter(DocumentConverter):
                 row.append("")
             # Truncate if row has more columns than header
             row = row[: len(rows[0])]
-            markdown_table.append("| " + " | ".join(row) + " |")
+            markdown_table.append(
+                "| " + " | ".join(_escape_table_cell(cell) for cell in row) + " |"
+            )
 
         result = "\n".join(markdown_table)
 
