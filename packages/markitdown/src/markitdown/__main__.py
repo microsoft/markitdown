@@ -138,8 +138,19 @@ def main():
         help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
     )
 
+    parser.add_argument(
+        "--gui",
+        action="store_true",
+        help="Launch the MarkItDown Graphical User Interface (GUI).",
+    )
+
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
+
+    if args.gui:
+        from .gui import main as gui_main
+        gui_main()
+        sys.exit(0)
 
     # Parse the extension hint
     extension_hint = args.extension

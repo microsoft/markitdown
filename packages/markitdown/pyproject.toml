@@ -72,6 +72,7 @@ path = "src/markitdown/__about__.py"
 
 [project.scripts]
 markitdown = "markitdown.__main__:main"
+markitdown-gui = "markitdown.gui:main"
 
 [tool.hatch.envs.default]
 features = ["all"]
