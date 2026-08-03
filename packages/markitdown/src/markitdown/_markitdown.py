@@ -20,6 +20,8 @@ from ._stream_info import StreamInfo
 from ._uri_utils import parse_data_uri, file_uri_to_path
 
 from .converters import (
+    ChmConverter,
+    DocConverter,
     PlainTextConverter,
     HtmlConverter,
     RssConverter,
