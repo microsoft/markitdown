@@ -57,6 +57,37 @@ def _merge_partial_numbering_lines(text: str) -> str:
     return "\n".join(result_lines)
 
 
+# Source anchor emitted ahead of each page when source_anchors=True.
+# An HTML comment is invisible in rendered Markdown but survives round-trips
+# and is trivially greppable, so downstream chunkers can attach a stable
+# (file, page) coordinate to every extracted span. The wording matches the
+# `<!-- Slide number: N -->` marker PptxConverter already emits, so one parser
+# handles both.
+SOURCE_ANCHOR_TEMPLATE = "<!-- Page number: {page} -->"
+
+# pdfminer terminates every page with a form feed.
+_PAGE_SEPARATOR = "\f"
+
+
+def _anchor(page_number: int) -> str:
+    """Return the source anchor for a 1-based page number."""
+    return SOURCE_ANCHOR_TEMPLATE.format(page=page_number)
+
+
+def _split_pdfminer_pages(text: str) -> list[str]:
+    """Split a pdfminer whole-document extraction back into per-page strings.
+
+    pdfminer appends a form feed after each page, including the last one, so
+    the trailing empty segment is dropped.
+    """
+    if not text:
+        return []
+    pages = text.split(_PAGE_SEPARATOR)
+    if pages and not pages[-1].strip():
+        pages.pop()
+    return pages
+
+
 # Load dependencies
 _dependency_exc_info = None
 try:
@@ -539,6 +570,10 @@ class PdfConverter(DocumentConverter):
         # Read file stream into BytesIO for compatibility with pdfplumber
         pdf_bytes = io.BytesIO(file_stream.read())
 
+        if kwargs.get("source_anchors", False):
+            markdown = self._convert_with_anchors(pdf_bytes)
+            return DocumentConverterResult(markdown=markdown)
+
         try:
             # Single pass: check every page for form-style content.
             # Pages with tables/forms get rich extraction; plain-text
@@ -587,3 +622,64 @@ class PdfConverter(DocumentConverter):
         markdown = _merge_partial_numbering_lines(markdown)
 
         return DocumentConverterResult(markdown=markdown)
+
+    def _convert_with_anchors(self, pdf_bytes: io.BytesIO) -> str:
+        """Extract page-anchored Markdown.
+
+        Every non-empty page is emitted as `<!-- page:N -->` followed by that
+        page's content, so downstream consumers can cite a (file, page)
+        coordinate for any span. Form-style pages keep the pdfplumber table
+        extraction; prose pages use pdfminer text, which has better spacing.
+        Unlike the flat path, the choice is made per page rather than for the
+        whole document.
+        """
+        pages: dict[int, str] = {}
+        prose_page_indices: list[int] = []
+        total_pages = 0
+
+        try:
+            pdf_bytes.seek(0)
+            with pdfplumber.open(pdf_bytes) as pdf:
+                total_pages = len(pdf.pages)
+                for page_idx, page in enumerate(pdf.pages):
+                    page_content = _extract_form_content_from_words(page)
+                    if page_content is None:
+                        # Not form-style; pdfminer text is preferred below, but
+                        # keep pdfplumber's text as a fallback for this page.
+                        prose_page_indices.append(page_idx)
+                        page_content = page.extract_text() or ""
+                    if page_content.strip():
+                        pages[page_idx] = page_content.strip()
+                    page.close()  # Free cached page data immediately
+        except Exception:
+            pages = {}
+            prose_page_indices = []
+            total_pages = 0
+
+        # One pdfminer pass covers the whole document; split it back per page.
+        if prose_page_indices or not pages:
+            try:
+                pdf_bytes.seek(0)
+                miner_pages = _split_pdfminer_pages(
+                    pdfminer.high_level.extract_text(pdf_bytes)
+                )
+            except Exception:
+                miner_pages = []
+
+            targets = prose_page_indices if pages else range(len(miner_pages))
+            for page_idx in targets:
+                if page_idx < len(miner_pages) and miner_pages[page_idx].strip():
+                    pages[page_idx] = miner_pages[page_idx].strip()
+            total_pages = max(total_pages, len(miner_pages))
+
+        chunks: list[str] = []
+        for page_idx in range(total_pages):
+            body = pages.get(page_idx, "").strip()
+            if not body:
+                continue
+            # Merge partial numbering per page so the anchor line is never
+            # treated as the continuation of a numbered fragment.
+            body = _merge_partial_numbering_lines(body)
+            chunks.append(f"{_anchor(page_idx + 1)}\n{body}")
+
+        return "\n\n".join(chunks).strip()
