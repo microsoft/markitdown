@@ -301,7 +301,7 @@ def _create_llm_kwargs(
         parser.error("--llm-client requires a non-empty --llm-model.")
 
     try:
-        from openai import OpenAI
+        from openai import OpenAI, OpenAIError
     except ModuleNotFoundError as error:
         if error.name == "openai":
             parser.error(
@@ -310,7 +310,14 @@ def _create_llm_kwargs(
             )
         raise
 
-    return {"llm_client": OpenAI(), "llm_model": args.llm_model.strip()}
+    try:
+        llm_client = OpenAI()
+    except OpenAIError:
+        parser.error(
+            "Unable to initialize the OpenAI client. Set OPENAI_API_KEY and try again."
+        )
+
+    return {"llm_client": llm_client, "llm_model": args.llm_model.strip()}
 
 
 def _exit_with_error(message: str):

@@ -70,6 +70,9 @@ def test_invalid_flag() -> None:
 def test_llm_options_are_forwarded_to_all_constructor_paths(
     monkeypatch, arguments, expected_kwargs
 ) -> None:
+    class FakeOpenAIError(Exception):
+        pass
+
     openai_client = Mock()
     openai_constructor = Mock(return_value=openai_client)
     markitdown_constructor = Mock(
@@ -78,7 +81,12 @@ def test_llm_options_are_forwarded_to_all_constructor_paths(
         )
     )
     monkeypatch.setitem(
-        sys.modules, "openai", SimpleNamespace(OpenAI=openai_constructor)
+        sys.modules,
+        "openai",
+        SimpleNamespace(
+            OpenAI=openai_constructor,
+            OpenAIError=FakeOpenAIError,
+        ),
     )
     monkeypatch.setattr(cli, "MarkItDown", markitdown_constructor)
     monkeypatch.setattr(
@@ -192,6 +200,41 @@ def test_openai_missing_package_error_is_actionable(monkeypatch, capsys) -> None
 
     assert exc_info.value.code == 2
     assert "pip install openai" in capsys.readouterr().err
+
+
+def test_openai_missing_api_key_error_is_actionable(monkeypatch, capsys) -> None:
+    class FakeOpenAIError(Exception):
+        pass
+
+    openai_constructor = Mock(
+        side_effect=FakeOpenAIError("The api_key client option must be set")
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "openai",
+        SimpleNamespace(
+            OpenAI=openai_constructor,
+            OpenAIError=FakeOpenAIError,
+        ),
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "markitdown",
+            "input.pdf",
+            "--llm-client",
+            "openai",
+            "--llm-model",
+            "gpt-4o",
+        ],
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli.main()
+
+    assert exc_info.value.code == 2
+    assert "Set OPENAI_API_KEY" in capsys.readouterr().err
 
 
 if __name__ == "__main__":
