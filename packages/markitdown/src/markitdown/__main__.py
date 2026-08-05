@@ -127,6 +127,17 @@ def main():
     )
 
     parser.add_argument(
+        "--llm-client",
+        choices=("openai",),
+        help="LLM client to use. Currently supports: openai.",
+    )
+
+    parser.add_argument(
+        "--llm-model",
+        help="LLM model name. Required when using --llm-client.",
+    )
+
+    parser.add_argument(
         "--list-plugins",
         action="store_true",
         help="List installed 3rd-party plugins. Plugins are loaded when using the -p or --use-plugin option.",
@@ -200,6 +211,8 @@ def main():
             )
         sys.exit(0)
 
+    llm_kwargs = _create_llm_kwargs(parser, args)
+
     if args.use_docintel:
         if args.endpoint is None:
             _exit_with_error(
@@ -209,7 +222,9 @@ def main():
             _exit_with_error("Filename is required when using Document Intelligence.")
 
         markitdown = MarkItDown(
-            enable_plugins=args.use_plugins, docintel_endpoint=args.endpoint
+            enable_plugins=args.use_plugins,
+            docintel_endpoint=args.endpoint,
+            **llm_kwargs,
         )
     elif args.use_cu:
         if args.cu_endpoint is None:
@@ -240,9 +255,11 @@ def main():
                     _exit_with_error(f"Unknown file type: {name}")
             cu_kwargs["cu_file_types"] = cu_types
 
-        markitdown = MarkItDown(enable_plugins=args.use_plugins, **cu_kwargs)
+        markitdown = MarkItDown(
+            enable_plugins=args.use_plugins, **cu_kwargs, **llm_kwargs
+        )
     else:
-        markitdown = MarkItDown(enable_plugins=args.use_plugins)
+        markitdown = MarkItDown(enable_plugins=args.use_plugins, **llm_kwargs)
 
     if args.filename is None:
         result = markitdown.convert_stream(
@@ -270,6 +287,30 @@ def _handle_output(args, result: DocumentConverterResult):
                 sys.stdout.encoding
             )
         )
+
+
+def _create_llm_kwargs(
+    parser: argparse.ArgumentParser, args: argparse.Namespace
+) -> Dict[str, Any]:
+    if args.llm_client is None and args.llm_model is None:
+        return {}
+
+    if args.llm_client is None:
+        parser.error("--llm-model requires --llm-client.")
+    if args.llm_model is None or not args.llm_model.strip():
+        parser.error("--llm-client requires a non-empty --llm-model.")
+
+    try:
+        from openai import OpenAI
+    except ModuleNotFoundError as error:
+        if error.name == "openai":
+            parser.error(
+                "The 'openai' package is required for --llm-client openai. "
+                "Install it with 'pip install openai'."
+            )
+        raise
+
+    return {"llm_client": OpenAI(), "llm_model": args.llm_model.strip()}
 
 
 def _exit_with_error(message: str):
