@@ -10,9 +10,12 @@ OCR block format used by the converter:
     [End OCR]*
 """
 
+import io
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 
@@ -163,48 +166,66 @@ def test_docx_complex_layout(svc: MockOCRService) -> None:
     assert _convert("docx_complex_layout.docx", svc) == expected
 
 
-# ---------------------------------------------------------------------------
-# _inject_placeholders — internal unit tests (no file I/O)
-# ---------------------------------------------------------------------------
+class SequencedOCRService:
+    def extract_text(self, image_stream: Any, **kwargs: Any) -> OCRResult:
+        image_name = image_stream.read().decode()
+        if image_name == "empty":
+            return OCRResult(text="", backend_used="mock")
+        if image_name == "error":
+            raise RuntimeError("OCR unavailable")
+        return OCRResult(text=f"OCR {image_name}", backend_used="mock")
 
 
-def test_inject_placeholders_single_image() -> None:
+class FakeMammothImage:
+    content_type = "image/png"
+    alt_text = None
+
+    def __init__(self, name: str):
+        self._name = name
+
+    def open(self) -> io.BytesIO:
+        return io.BytesIO(self._name.encode())
+
+
+def test_docx_ocr_failures_do_not_shift_later_occurrences() -> None:
+    def convert_to_html(
+        _stream: Any, *, convert_image: Any, **kwargs: Any
+    ) -> SimpleNamespace:
+        image_html = []
+        for image_name in ("empty", "error", "later"):
+            element = convert_image(FakeMammothImage(image_name))[0]
+            placeholder = element.attributes["src"]
+            image_html.append(
+                f'<p><img alt="{placeholder}" src="{placeholder}" /></p>'
+            )
+        return SimpleNamespace(
+            value=f"<p>Before</p>{image_html[0]}<p>Middle</p>"
+            f"{image_html[1]}<p>After</p>{image_html[2]}<p>End</p>"
+        )
+
     converter = DocxConverterWithOCR()
-    html = "<p>Before</p><img src='x.png'/><p>After</p>"
-    result_html, texts = converter._inject_placeholders(html, {"rId1": "TEXT"})
-    assert "<img" not in result_html
-    assert "MARKITDOWNOCRBLOCK0" in result_html
-    assert texts == ["TEXT"]
+    with (
+        patch(
+            "markitdown_ocr._docx_converter_with_ocr.pre_process_docx",
+            return_value=io.BytesIO(b"docx"),
+        ),
+        patch(
+            "markitdown_ocr._docx_converter_with_ocr.mammoth.convert_to_html",
+            side_effect=convert_to_html,
+        ),
+    ):
+        markdown = converter.convert(
+            io.BytesIO(b"docx"),
+            StreamInfo(extension=".docx"),
+            ocr_service=SequencedOCRService(),
+        ).text_content
 
-
-def test_inject_placeholders_two_images_sequential_tokens() -> None:
-    converter = DocxConverterWithOCR()
-    html = "<img src='a.png'/><p>Mid</p><img src='b.png'/>"
-    result_html, texts = converter._inject_placeholders(
-        html, {"rId1": "FIRST", "rId2": "SECOND"}
+    assert "MARKITDOWNOCRBLOCK" not in markdown
+    assert "OCR later" in markdown
+    assert "OCR empty" not in markdown
+    assert markdown.index("Middle") < markdown.index("After") < markdown.index(
+        "*[Image OCR]\nOCR later\n[End OCR]*"
     )
-    assert "MARKITDOWNOCRBLOCK0" in result_html
-    assert "MARKITDOWNOCRBLOCK1" in result_html
-    assert result_html.index("MARKITDOWNOCRBLOCK0") < result_html.index(
-        "MARKITDOWNOCRBLOCK1"
-    )
-    assert len(texts) == 2
-
-
-def test_inject_placeholders_no_img_tag_appends_at_end() -> None:
-    converter = DocxConverterWithOCR()
-    html = "<p>No images</p>"
-    result_html, texts = converter._inject_placeholders(html, {"rId1": "ORPHAN"})
-    assert "MARKITDOWNOCRBLOCK0" in result_html
-    assert texts == ["ORPHAN"]
-
-
-def test_inject_placeholders_empty_map_leaves_html_unchanged() -> None:
-    converter = DocxConverterWithOCR()
-    html = "<p>Content</p><img src='pic.jpg'/>"
-    result_html, texts = converter._inject_placeholders(html, {})
-    assert result_html == html
-    assert texts == []
 
 
 # ---------------------------------------------------------------------------

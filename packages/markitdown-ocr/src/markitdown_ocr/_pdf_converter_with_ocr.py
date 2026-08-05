@@ -191,43 +191,63 @@ class PdfConverterWithOCR(DocumentConverter):
                     # If OCR is enabled, interleave text and images by position
                     if ocr_service:
                         images_on_page = self._extract_page_images(pdf_bytes, page_num)
+                        has_native_text = False
+                        has_image_ocr_text = False
 
                         if images_on_page:
                             # Extract text lines with Y positions
-                            chars = page.chars
+                            try:
+                                chars = page.chars
+                            except Exception:
+                                chars = []
+
                             if chars:
-                                # Group chars into lines based on Y position
-                                lines_with_y = []
-                                current_line = []
-                                current_y = None
+                                try:
+                                    # Group chars into lines based on Y position
+                                    lines_with_y = []
+                                    current_line = []
+                                    current_y = None
 
-                                for char in sorted(
-                                    chars, key=lambda c: (c["top"], c["x0"])
-                                ):
-                                    y = char["top"]
-                                    if current_y is None:
-                                        current_y = y
-                                    elif abs(y - current_y) > 2:  # New line threshold
-                                        if current_line:
-                                            text = "".join(
-                                                [c["text"] for c in current_line]
-                                            )
-                                            lines_with_y.append(
-                                                {"y": current_y, "text": text.strip()}
-                                            )
-                                        current_line = []
-                                        current_y = y
-                                    current_line.append(char)
+                                    for char in sorted(
+                                        chars, key=lambda c: (c["top"], c["x0"])
+                                    ):
+                                        y = char["top"]
+                                        if current_y is None:
+                                            current_y = y
+                                        elif abs(y - current_y) > 2:  # New line threshold
+                                            if current_line:
+                                                text = "".join(
+                                                    [c["text"] for c in current_line]
+                                                )
+                                                lines_with_y.append(
+                                                    {
+                                                        "y": current_y,
+                                                        "text": text.strip(),
+                                                    }
+                                                )
+                                            current_line = []
+                                            current_y = y
+                                        current_line.append(char)
 
-                                # Add last line
-                                if current_line:
-                                    text = "".join([c["text"] for c in current_line])
-                                    lines_with_y.append(
-                                        {"y": current_y, "text": text.strip()}
-                                    )
+                                    # Add last line
+                                    if current_line:
+                                        text = "".join(
+                                            [c["text"] for c in current_line]
+                                        )
+                                        lines_with_y.append(
+                                            {"y": current_y, "text": text.strip()}
+                                        )
+                                except Exception:
+                                    lines_with_y = []
                             else:
                                 # Fallback: use simple text extraction
-                                text_content = page.extract_text() or ""
+                                lines_with_y = []
+
+                            if not lines_with_y:
+                                try:
+                                    text_content = page.extract_text() or ""
+                                except Exception:
+                                    text_content = ""
                                 lines_with_y = [
                                     {"y": i * 10, "text": line}
                                     for i, line in enumerate(text_content.split("\n"))
@@ -236,19 +256,22 @@ class PdfConverterWithOCR(DocumentConverter):
                             # OCR all images
                             image_data = []
                             for img_info in images_on_page:
-                                ocr_result = ocr_service.extract_text(
-                                    img_info["stream"]
-                                )
-                                if ocr_result.text.strip():
-                                    image_data.append(
-                                        {
-                                            "y_pos": img_info["y_pos"],
-                                            "name": img_info["name"],
-                                            "ocr_text": ocr_result.text,
-                                            "backend": ocr_result.backend_used,
-                                            "type": "image",
-                                        }
+                                try:
+                                    ocr_result = ocr_service.extract_text(
+                                        img_info["stream"]
                                     )
+                                    if ocr_result.text.strip():
+                                        image_data.append(
+                                            {
+                                                "y_pos": img_info["y_pos"],
+                                                "name": img_info["name"],
+                                                "ocr_text": ocr_result.text,
+                                                "backend": ocr_result.backend_used,
+                                                "type": "image",
+                                            }
+                                        )
+                                except Exception:
+                                    continue
 
                             # Add text items
                             content_items = [
@@ -261,6 +284,10 @@ class PdfConverterWithOCR(DocumentConverter):
                                 if item["text"]
                             ]
                             content_items.extend(image_data)
+                            has_native_text = any(
+                                item["type"] == "text" for item in content_items
+                            )
+                            has_image_ocr_text = bool(image_data)
 
                             # Sort all items by Y position (top to bottom)
                             content_items.sort(key=lambda x: x["y_pos"])
@@ -277,12 +304,27 @@ class PdfConverterWithOCR(DocumentConverter):
                                     markdown_content.append(img_marker)
                         else:
                             # No images detected - just extract regular text
-                            text_content = page.extract_text() or ""
+                            try:
+                                text_content = page.extract_text() or ""
+                            except Exception:
+                                text_content = ""
                             if text_content.strip():
                                 markdown_content.append(text_content.strip())
+                                has_native_text = True
+
+                        # A page heading alone is not extracted content. OCR this
+                        # individual page only when neither native nor inline OCR
+                        # text was available.
+                        if not has_native_text and not has_image_ocr_text:
+                            markdown_content.append(
+                                self._ocr_rendered_page(page, page_num, ocr_service)
+                            )
                     else:
                         # No OCR, just extract text
-                        text_content = page.extract_text() or ""
+                        try:
+                            text_content = page.extract_text() or ""
+                        except Exception:
+                            text_content = ""
                         if text_content.strip():
                             markdown_content.append(text_content.strip())
 
@@ -357,31 +399,10 @@ class PdfConverterWithOCR(DocumentConverter):
             pdf_bytes.seek(0)
             with pdfplumber.open(pdf_bytes) as pdf:
                 for page_num, page in enumerate(pdf.pages, 1):
-                    try:
-                        markdown_parts.append(f"\n## Page {page_num}\n")
-
-                        # Render page to image
-                        page_img = page.to_image(resolution=300)
-                        img_stream = io.BytesIO()
-                        page_img.original.save(img_stream, format="PNG")
-                        img_stream.seek(0)
-
-                        # Run OCR
-                        ocr_result = ocr_service.extract_text(img_stream)
-
-                        if ocr_result.text.strip():
-                            text = ocr_result.text.strip()
-                            markdown_parts.append(f"*[Image OCR]\n{text}\n[End OCR]*")
-                        else:
-                            markdown_parts.append(
-                                "*[No text could be extracted from this page]*"
-                            )
-
-                    except Exception as e:
-                        markdown_parts.append(
-                            f"*[Error processing page {page_num}: {str(e)}]*"
-                        )
-                        continue
+                    markdown_parts.append(f"\n## Page {page_num}\n")
+                    markdown_parts.append(
+                        self._ocr_rendered_page(page, page_num, ocr_service)
+                    )
 
         except Exception:
             # pdfplumber failed (e.g. malformed EOF) — try PyMuPDF for rendering
@@ -420,3 +441,22 @@ class PdfConverterWithOCR(DocumentConverter):
                 return "*[Error: Could not process scanned PDF]*"
 
         return "\n\n".join(markdown_parts).strip()
+
+    def _ocr_rendered_page(
+        self, page: Any, page_num: int, ocr_service: LLMVisionOCRService
+    ) -> str:
+        """Render and OCR one pdfplumber page without affecting other pages."""
+        try:
+            page_img = page.to_image(resolution=300)
+            img_stream = io.BytesIO()
+            page_img.original.save(img_stream, format="PNG")
+            img_stream.seek(0)
+
+            ocr_result = ocr_service.extract_text(img_stream)
+            if ocr_result.text.strip():
+                text = ocr_result.text.strip()
+                return f"*[Image OCR]\n{text}\n[End OCR]*"
+
+            return "*[No text could be extracted from this page]*"
+        except Exception as e:
+            return f"*[Error processing page {page_num}: {str(e)}]*"
