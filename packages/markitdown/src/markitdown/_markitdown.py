@@ -734,6 +734,15 @@ class MarkItDown:
                     if charset_result is not None:
                         charset = self._normalize_charset(charset_result.encoding)
 
+                        # Detection only saw this first page. If the stream continues
+                        # past it, non-ASCII bytes may appear later and decoding the
+                        # whole stream as ASCII would fail. ASCII is a strict subset of
+                        # UTF-8, so widening the guess still decodes every byte ASCII
+                        # would, plus any multi-byte runs further in. A stream that ends
+                        # within the page was fully inspected, so ASCII stands.
+                        if charset == "ascii" and len(stream_page) == 4096:
+                            charset = "utf-8"
+
                 # Normalize the first extension listed
                 guessed_extension = None
                 if len(result.prediction.output.extensions) > 0:
