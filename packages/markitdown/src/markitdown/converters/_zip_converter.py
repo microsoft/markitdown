@@ -95,15 +95,21 @@ class ZipConverter(DocumentConverter):
 
         with zipfile.ZipFile(file_stream, "r") as zipObj:
             for name in zipObj.namelist():
+                # Directory entries end with "/" and have no file payload.
+                if name.endswith("/"):
+                    continue
                 try:
                     z_file_stream = io.BytesIO(zipObj.read(name))
                     z_file_stream_info = StreamInfo(
                         extension=os.path.splitext(name)[1],
                         filename=os.path.basename(name),
                     )
+                    # Forward caller options (e.g. keep_data_uris) into nested
+                    # conversions so ZIP members behave like standalone files.
                     result = self._markitdown.convert_stream(
                         stream=z_file_stream,
                         stream_info=z_file_stream_info,
+                        **kwargs,
                     )
                     if result is not None:
                         md_content += f"## File: {name}\n\n"
