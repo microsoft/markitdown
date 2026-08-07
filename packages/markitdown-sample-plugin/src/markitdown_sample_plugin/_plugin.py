@@ -33,7 +33,7 @@ def register_converters(markitdown: MarkItDown, **kwargs):
 
 class RtfConverter(DocumentConverter):
     """
-    Converts an RTF file to in the simplest possible way.
+    Converts an RTF file in the simplest possible way.
     """
 
     def accepts(
@@ -60,7 +60,7 @@ class RtfConverter(DocumentConverter):
         stream_info: StreamInfo,
         **kwargs: Any,
     ) -> DocumentConverterResult:
-        # Read the file stream into an str using hte provided charset encoding, or using the system default
+        # Read the file stream into a str using the provided charset encoding, or using the system default
         encoding = stream_info.charset or locale.getpreferredencoding()
         stream_data = file_stream.read().decode(encoding)
 
