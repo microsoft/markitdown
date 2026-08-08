@@ -146,6 +146,8 @@ class DocumentIntelligenceConverter(DocumentConverter):
             DocumentIntelligenceFileType.BMP,
             DocumentIntelligenceFileType.TIFF,
         ],
+        model_id: str = "prebuilt-layout",
+        features: List[str] | None = None,
     ):
         """
         Initialize the DocumentIntelligenceConverter.
@@ -155,10 +157,18 @@ class DocumentIntelligenceConverter(DocumentConverter):
             api_version (str): The API version to use. Defaults to "2024-07-31-preview".
             credential (AzureKeyCredential | TokenCredential | None): The credential to use for authentication.
             file_types (List[DocumentIntelligenceFileType]): The file types to accept. Defaults to all supported file types.
+            model_id (str): The Document Intelligence model to analyze with. Defaults to "prebuilt-layout".
+                Pass e.g. "prebuilt-read" for cheaper plain-text extraction.
+            features (List[str] | None): The analysis add-on features to request for OCR-eligible
+                file types. Defaults to None, which keeps the built-in set (formulas, high
+                resolution OCR, and font style). Pass an empty list to disable all add-ons.
+                Add-ons are never sent for office file types, which do not support them.
         """
 
         super().__init__()
         self._file_types = file_types
+        self._features = features
+        self.model_id = model_id
 
         # Raise an error if the dependencies are not available.
         # This is different than other converters since this one isn't even instantiated
@@ -228,6 +238,9 @@ class DocumentIntelligenceConverter(DocumentConverter):
             if mimetype.startswith(prefix):
                 return []
 
+        if self._features is not None:
+            return list(self._features)
+
         return [
             DocumentAnalysisFeature.FORMULAS,  # enable formula extraction
             DocumentAnalysisFeature.OCR_HIGH_RESOLUTION,  # enable high resolution OCR
@@ -242,7 +255,7 @@ class DocumentIntelligenceConverter(DocumentConverter):
     ) -> DocumentConverterResult:
         # Extract the text using Azure Document Intelligence
         poller = self.doc_intel_client.begin_analyze_document(
-            model_id="prebuilt-layout",
+            model_id=self.model_id,
             body=AnalyzeDocumentRequest(bytes_source=file_stream.read()),
             features=self._analysis_features(stream_info),
             output_content_format=CONTENT_FORMAT,  # TODO: replace with "ContentFormat.MARKDOWN" when the bug is fixed
