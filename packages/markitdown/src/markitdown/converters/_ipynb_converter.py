@@ -77,6 +77,34 @@ class IpynbConverter(DocumentConverter):
                 elif cell_type == "code":
                     # Code cells are wrapped in Markdown code blocks
                     md_output.append(f"```python\n{''.join(source_lines)}\n```")
+
+                    # Extract cell outputs
+                    outputs = cell.get("outputs", [])
+                    if outputs:
+                        output_text = []
+                        for out in outputs:
+                            out_type = out.get("output_type", "")
+                            if out_type == "stream":
+                                output_text.extend(out.get("text", []))
+                            elif out_type in ("execute_result", "display_data"):
+                                data = out.get("data", {})
+                                if "text/plain" in data:
+                                    val = data["text/plain"]
+                                    if isinstance(val, list):
+                                        output_text.extend(val)
+                                    else:
+                                        output_text.append(str(val))
+                            elif out_type == "error":
+                                ename = out.get("ename", "Error")
+                                evalue = out.get("evalue", "")
+                                output_text.append(f"{ename}: {evalue}\n")
+
+                        if output_text:
+                            output_str = "".join(output_text).strip()
+                            if output_str:
+                                md_output.append(
+                                    f"**Output:**\n```text\n{output_str}\n```"
+                                )
                 elif cell_type == "raw":
                     md_output.append(f"```\n{''.join(source_lines)}\n```")
 
