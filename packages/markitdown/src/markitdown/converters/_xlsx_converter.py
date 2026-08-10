@@ -80,11 +80,28 @@ class XlsxConverter(DocumentConverter):
                 _xlsx_dependency_exc_info[2]
             )
 
-        sheets = pd.read_excel(file_stream, sheet_name=None, engine="openpyxl")
+        sheets = pd.read_excel(
+            file_stream, sheet_name=None, engine="openpyxl", header=None
+        )
         md_content = ""
         for s in sheets:
             md_content += f"## {s}\n"
-            html_content = sheets[s].to_html(index=False)
+            sheet = sheets[s].dropna(axis="index", how="all")
+            sheet = sheet.dropna(axis="columns", how="all")
+
+            # Keep conventional tables unchanged, but treat partial first rows as
+            # data (they are commonly titles above a table rather than headers).
+            has_complete_header = not sheet.empty and sheet.iloc[0].notna().all()
+            if has_complete_header:
+                header = sheet.iloc[0]
+                sheet = sheet.iloc[1:].copy()
+                sheet.columns = header.tolist()
+
+            html_content = sheet.to_html(
+                index=False,
+                header=has_complete_header,
+                na_rep="",
+            )
             md_content += (
                 self._html_converter.convert_string(
                     html_content, **kwargs
