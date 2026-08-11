@@ -54,6 +54,12 @@ docker run -it --rm -v /home/user/data:/workdir markitdown-mcp:latest
 
 Once mounted, all files under data will be accessible under `/workdir` in the container. For example, if you have a file `example.txt` in `/home/user/data`, it will be accessible in the container at `/workdir/example.txt`.
 
+## Deploy on Sealos
+
+[![Deploy on Sealos](https://sealos.io/Deploy-on-Sealos.svg)](https://sealos.io/products/app-store/markitdown)
+
+The Sealos template runs the MCP server as a private trusted service, keeps `/workdir` persistent, and exposes the Streamable HTTP and SSE transports over HTTPS for clients you control.
+
 ## Accessing from Claude Desktop
 
 It is recommended to use the Docker image when running the MCP server for Claude Desktop.
