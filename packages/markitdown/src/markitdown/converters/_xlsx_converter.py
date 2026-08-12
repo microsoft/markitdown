@@ -80,7 +80,51 @@ class XlsxConverter(DocumentConverter):
                 _xlsx_dependency_exc_info[2]
             )
 
-        sheets = pd.read_excel(file_stream, sheet_name=None, engine="openpyxl")
+        excel_file = pd.ExcelFile(file_stream, engine="openpyxl")
+        sheet_names = excel_file.sheet_names
+
+        # Handle --list-sheets
+        if kwargs.get("list_sheets"):
+            print("Available sheets:")
+            for i, sheet in enumerate(sheet_names):
+                print(f"  {i+1}. {sheet}")
+            return DocumentConverterResult(markdown="")
+            
+        # Handle --interactive
+        sheet_selection = kwargs.get("sheet_selection") or []
+        if kwargs.get("interactive"):
+            print("Available sheets:")
+            for i, sheet in enumerate(sheet_names):
+                print(f"  {i+1}. {sheet}")
+            
+            selection = input("Enter the numbers or names of the sheets to convert (comma-separated), or press Enter for all: ")
+            if selection.strip():
+                sheet_selection = []
+                for s in selection.split(","):
+                    s = s.strip()
+                    if s.isdigit():
+                        idx = int(s) - 1
+                        if 0 <= idx < len(sheet_names):
+                            sheet_selection.append(sheet_names[idx])
+                        else:
+                            raise ValueError(f"Invalid sheet number: {s}")
+                    else:
+                        if s in sheet_names:
+                            sheet_selection.append(s)
+                        else:
+                            raise ValueError(f"Invalid sheet name: {s}")
+
+        # Ensure sheet_selection contains valid sheets
+        sheets_to_read = sheet_selection if sheet_selection else sheet_names
+        for s in sheets_to_read:
+            if s not in sheet_names:
+                raise ValueError(f"Sheet not found: {s}")
+
+        sheets = pd.read_excel(excel_file, sheet_name=sheets_to_read)
+        if not isinstance(sheets, dict):
+            # Fallback if pandas returns a single DataFrame
+            sheets = {sheets_to_read[0]: sheets}
+
         md_content = ""
         for s in sheets:
             md_content += f"## {s}\n"
@@ -142,7 +186,51 @@ class XlsConverter(DocumentConverter):
                 _xls_dependency_exc_info[2]
             )
 
-        sheets = pd.read_excel(file_stream, sheet_name=None, engine="xlrd")
+        excel_file = pd.ExcelFile(file_stream, engine="xlrd")
+        sheet_names = excel_file.sheet_names
+
+        # Handle --list-sheets
+        if kwargs.get("list_sheets"):
+            print("Available sheets:")
+            for i, sheet in enumerate(sheet_names):
+                print(f"  {i+1}. {sheet}")
+            return DocumentConverterResult(markdown="")
+            
+        # Handle --interactive
+        sheet_selection = kwargs.get("sheet_selection") or []
+        if kwargs.get("interactive"):
+            print("Available sheets:")
+            for i, sheet in enumerate(sheet_names):
+                print(f"  {i+1}. {sheet}")
+            
+            selection = input("Enter the numbers or names of the sheets to convert (comma-separated), or press Enter for all: ")
+            if selection.strip():
+                sheet_selection = []
+                for s in selection.split(","):
+                    s = s.strip()
+                    if s.isdigit():
+                        idx = int(s) - 1
+                        if 0 <= idx < len(sheet_names):
+                            sheet_selection.append(sheet_names[idx])
+                        else:
+                            raise ValueError(f"Invalid sheet number: {s}")
+                    else:
+                        if s in sheet_names:
+                            sheet_selection.append(s)
+                        else:
+                            raise ValueError(f"Invalid sheet name: {s}")
+
+        # Ensure sheet_selection contains valid sheets
+        sheets_to_read = sheet_selection if sheet_selection else sheet_names
+        for s in sheets_to_read:
+            if s not in sheet_names:
+                raise ValueError(f"Sheet not found: {s}")
+
+        sheets = pd.read_excel(excel_file, sheet_name=sheets_to_read)
+        if not isinstance(sheets, dict):
+            # Fallback if pandas returns a single DataFrame
+            sheets = {sheets_to_read[0]: sheets}
+
         md_content = ""
         for s in sheets:
             md_content += f"## {s}\n"
