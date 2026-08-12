@@ -59,6 +59,12 @@ PRIORITY_GENERIC_FILE_FORMAT = (
     10.0  # Near catch-all converters for mimetypes like text/*, etc.
 )
 
+# Defaults for fetching HTTP/HTTPS URIs, guarding against hanging or
+# unbounded responses from untrusted endpoints. Both can be overridden per
+# call via the "timeout" and "max_response_size" keyword arguments.
+DEFAULT_REQUESTS_TIMEOUT = 30  # seconds
+DEFAULT_MAX_RESPONSE_SIZE = 100 * 1024 * 1024  # 100 MB
+
 
 _plugins: Union[None, List[Any]] = None  # If None, plugins have not been loaded yet.
 
@@ -472,7 +478,11 @@ class MarkItDown:
             )
         # HTTP/HTTPS URIs
         elif uri.startswith("http:") or uri.startswith("https:"):
-            response = self._requests_session.get(uri, stream=True)
+            response = self._requests_session.get(
+                uri,
+                stream=True,
+                timeout=kwargs.get("timeout", DEFAULT_REQUESTS_TIMEOUT),
+            )
             response.raise_for_status()
             return self.convert_response(
                 response,
@@ -546,9 +556,27 @@ class MarkItDown:
             # Deprecated -- use stream_info
             base_guess = base_guess.copy_and_update(url=url)
 
-        # Read into BytesIO
+        # Read into BytesIO, refusing responses that exceed the size limit
+        max_response_size = kwargs.get("max_response_size", DEFAULT_MAX_RESPONSE_SIZE)
+
+        content_length = response.headers.get("content-length")
+        if (
+            content_length is not None
+            and content_length.isdigit()
+            and int(content_length) > max_response_size
+        ):
+            raise FileConversionException(
+                f"Response from {response.url} declares {content_length} bytes, which exceeds the maximum supported size ({max_response_size} bytes)."
+            )
+
         buffer = io.BytesIO()
+        total_read = 0
         for chunk in response.iter_content(chunk_size=512):
+            total_read += len(chunk)
+            if total_read > max_response_size:
+                raise FileConversionException(
+                    f"Response from {response.url} exceeded the maximum supported size ({max_response_size} bytes)."
+                )
             buffer.write(chunk)
         buffer.seek(0)
 
