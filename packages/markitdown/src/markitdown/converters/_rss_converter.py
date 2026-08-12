@@ -1,4 +1,5 @@
 from defusedxml import minidom
+from xml.dom import Node
 from xml.dom.minidom import Document, Element
 from typing import BinaryIO, Any, Union
 from bs4 import BeautifulSoup
@@ -112,9 +113,9 @@ class RssConverter(DocumentConverter):
             md_text += f"{subtitle}\n"
         for entry in entries:
             entry_title = self._get_data_by_tag_name(entry, "title")
-            entry_summary = self._get_data_by_tag_name(entry, "summary")
+            entry_summary = self._get_atom_content(entry, "summary")
             entry_updated = self._get_data_by_tag_name(entry, "updated")
-            entry_content = self._get_data_by_tag_name(entry, "content")
+            entry_content = self._get_atom_content(entry, "content")
 
             if entry_title:
                 md_text += f"\n## {entry_title}\n"
@@ -128,6 +129,21 @@ class RssConverter(DocumentConverter):
         return DocumentConverterResult(
             markdown=md_text,
             title=title,
+        )
+
+    def _get_atom_content(self, entry: Element, tag_name: str) -> Union[str, None]:
+        nodes = entry.getElementsByTagName(tag_name)
+        if not nodes:
+            return None
+
+        node = nodes[0]
+        if node.getAttribute("type").lower() != "xhtml":
+            return self._get_data_by_tag_name(entry, tag_name)
+
+        return "".join(
+            child.toxml()
+            for child in node.childNodes
+            if child.nodeType == Node.ELEMENT_NODE
         )
 
     def _parse_rss_type(self, doc: Document) -> DocumentConverterResult:
