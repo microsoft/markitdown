@@ -2,7 +2,7 @@ import zipfile
 import io
 import os
 
-from typing import BinaryIO, Any, TYPE_CHECKING
+from typing import BinaryIO, Any, List, TYPE_CHECKING
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
@@ -17,6 +17,18 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 ]
 
 ACCEPTED_FILE_EXTENSIONS = [".zip"]
+
+# Safety limits applied when extracting untrusted archives, guarding against
+# decompression bombs. Each limit can be overridden per conversion via the
+# corresponding keyword argument (e.g., convert(..., zip_max_members=500)).
+DEFAULT_MAX_MEMBERS = 10000
+DEFAULT_MAX_TOTAL_UNCOMPRESSED_SIZE = 500 * 1024 * 1024  # 500 MB
+DEFAULT_MAX_COMPRESSION_RATIO = 100.0
+
+# The compression ratio check only applies to members whose declared
+# uncompressed size exceeds this floor. Smaller members are cheap to extract
+# regardless of ratio, and small files can legitimately compress very well.
+COMPRESSION_RATIO_MIN_MEMBER_SIZE = 1024 * 1024  # 1 MB
 
 
 class ZipConverter(DocumentConverter):
@@ -56,6 +68,14 @@ class ZipConverter(DocumentConverter):
     - Uses appropriate converters for each file type
     - Preserves formatting of converted content
     - Cleans up temporary files after processing
+
+    Resource limits for untrusted archives (configurable via keyword arguments):
+    - zip_max_members: maximum number of archive members (default 10000)
+    - zip_max_total_uncompressed_size: maximum cumulative uncompressed bytes
+      (default 500 MB)
+    - zip_max_compression_ratio: maximum per-member compression ratio for
+      members larger than 1 MB (default 100)
+    Archives exceeding these limits fail with a FileConversionException.
     """
 
     def __init__(
@@ -90,13 +110,64 @@ class ZipConverter(DocumentConverter):
         stream_info: StreamInfo,
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
+        max_members = kwargs.get("zip_max_members", DEFAULT_MAX_MEMBERS)
+        max_total_uncompressed_size = kwargs.get(
+            "zip_max_total_uncompressed_size", DEFAULT_MAX_TOTAL_UNCOMPRESSED_SIZE
+        )
+        max_compression_ratio = kwargs.get(
+            "zip_max_compression_ratio", DEFAULT_MAX_COMPRESSION_RATIO
+        )
+
         file_path = stream_info.url or stream_info.local_path or stream_info.filename
         md_content = f"Content from the zip file `{file_path}`:\n\n"
 
         with zipfile.ZipFile(file_stream, "r") as zipObj:
-            for name in zipObj.namelist():
+            infos = zipObj.infolist()
+            if len(infos) > max_members:
+                raise FileConversionException(
+                    f"ZIP archive contains {len(infos)} members, which exceeds the maximum supported ({max_members})."
+                )
+
+            total_uncompressed_size = 0
+            for info in infos:
+                name = info.filename
+
+                # Fast-fail on members with an extreme compression ratio
+                if (
+                    info.file_size > COMPRESSION_RATIO_MIN_MEMBER_SIZE
+                    and info.file_size / max(info.compress_size, 1)
+                    > max_compression_ratio
+                ):
+                    raise FileConversionException(
+                        f"ZIP member '{name}' has a compression ratio of {info.file_size / max(info.compress_size, 1):.0f}:1, which exceeds the maximum supported ({max_compression_ratio}:1)."
+                    )
+
+                # Fast-fail if the declared sizes alone exceed the budget
+                if (
+                    total_uncompressed_size + info.file_size
+                    > max_total_uncompressed_size
+                ):
+                    raise FileConversionException(
+                        f"Extracting ZIP member '{name}' would exceed the maximum supported total uncompressed size ({max_total_uncompressed_size} bytes)."
+                    )
+
+                # Read the member in chunks, tracking the actual decompressed
+                # size, since header sizes in crafted archives cannot be trusted
+                chunks: List[bytes] = []
+                with zipObj.open(info) as z_file:
+                    while True:
+                        chunk = z_file.read(65536)
+                        if not chunk:
+                            break
+                        total_uncompressed_size += len(chunk)
+                        if total_uncompressed_size > max_total_uncompressed_size:
+                            raise FileConversionException(
+                                f"ZIP archive exceeded the maximum supported total uncompressed size ({max_total_uncompressed_size} bytes) while extracting '{name}'."
+                            )
+                        chunks.append(chunk)
+
                 try:
-                    z_file_stream = io.BytesIO(zipObj.read(name))
+                    z_file_stream = io.BytesIO(b"".join(chunks))
                     z_file_stream_info = StreamInfo(
                         extension=os.path.splitext(name)[1],
                         filename=os.path.basename(name),
