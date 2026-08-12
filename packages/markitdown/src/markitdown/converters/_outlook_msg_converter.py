@@ -1,5 +1,6 @@
 import sys
 from typing import Any, Union, BinaryIO
+from charset_normalizer import from_bytes
 from .._stream_info import StreamInfo
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
@@ -100,9 +101,9 @@ class OutlookMsgConverter(DocumentConverter):
 
         # Get headers
         headers = {
-            "From": self._get_stream_data(msg, "__substg1.0_0C1F001F"),
-            "To": self._get_stream_data(msg, "__substg1.0_0E04001F"),
-            "Subject": self._get_stream_data(msg, "__substg1.0_0037001F"),
+            "From": self._get_property_data(msg, "0C1F"),  # PR_SENDER_EMAIL_ADDRESS
+            "To": self._get_property_data(msg, "0E04"),  # PR_DISPLAY_TO
+            "Subject": self._get_property_data(msg, "0037"),  # PR_SUBJECT
         }
 
         # Add headers to markdown
@@ -113,7 +114,7 @@ class OutlookMsgConverter(DocumentConverter):
         md_content += "\n## Content\n\n"
 
         # Get email body
-        body = self._get_stream_data(msg, "__substg1.0_1000001F")
+        body = self._get_property_data(msg, "1000")  # PR_BODY
         if body:
             md_content += body
 
@@ -123,6 +124,45 @@ class OutlookMsgConverter(DocumentConverter):
             markdown=md_content.strip(),
             title=headers.get("Subject"),
         )
+
+    def _get_property_data(self, msg: Any, property_tag: str) -> Union[str, None]:
+        """Helper to read a MAPI string property, whichever string type is used.
+
+        Outlook stores each string property either as PT_UNICODE (stream type
+        001F, UTF-16LE) or as PT_STRING8 (stream type 001E, the message's 8-bit
+        code page), depending on whether the message was saved in Unicode or in
+        the legacy non-Unicode format. A message carries one or the other, so
+        reading only 001F returns nothing at all for a non-Unicode .msg.
+        """
+        value = self._get_stream_data(msg, "__substg1.0_%s001F" % property_tag)
+        if value:
+            return value
+        return self._get_ansi_stream_data(msg, "__substg1.0_%s001E" % property_tag)
+
+    def _get_ansi_stream_data(self, msg: Any, stream_path: str) -> Union[str, None]:
+        """Helper to extract and decode a PT_STRING8 stream from the MSG file.
+
+        These streams record no encoding of their own -- they are written in
+        the message's code page -- so the charset has to be detected, as is
+        done elsewhere for other 8-bit sources.
+        """
+        assert olefile is not None
+        assert isinstance(msg, olefile.OleFileIO)
+
+        try:
+            if not msg.exists(stream_path):
+                return None
+            data = msg.openstream(stream_path).read()
+        except Exception:
+            return None
+
+        if not data:
+            return None
+
+        detected = from_bytes(data).best()
+        if detected is not None:
+            return str(detected).strip()
+        return data.decode("utf-8", errors="ignore").strip()
 
     def _get_stream_data(self, msg: Any, stream_path: str) -> Union[str, None]:
         """Helper to safely extract and decode stream data from the MSG file."""
