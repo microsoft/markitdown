@@ -10,12 +10,16 @@ the SVG. When a picture has no raster fallback the ``<a:blip>`` has no
 """
 import os
 
-from lxml import etree
-from pptx import Presentation
-from pptx.enum.shapes import MSO_SHAPE_TYPE
+import pytest
 
+pptx = pytest.importorskip("pptx")
+lxml = pytest.importorskip("lxml")
+
+from lxml import etree
 from markitdown import MarkItDown
 from markitdown.converters._pptx_converter import PptxConverter
+from pptx import Presentation
+from pptx.enum.shapes import MSO_SHAPE_TYPE
 
 TEST_FILES_DIR = os.path.join(os.path.dirname(__file__), "test_files")
 
