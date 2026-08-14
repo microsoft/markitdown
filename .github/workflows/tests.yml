@@ -1,0 +1,18 @@
+name: tests
+on: [pull_request]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: |
+            3.10
+            3.11
+            3.12
+      - name: Install Hatch
+        run: pipx install hatch
+      - name: Run tests
+        run: cd packages/markitdown; hatch test

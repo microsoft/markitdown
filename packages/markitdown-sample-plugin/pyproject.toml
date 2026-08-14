@@ -1,0 +1,70 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "markitdown-sample-plugin"
+dynamic = ["version"]
+description = 'A sample plugin for the "markitdown" library.'
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+keywords = []
+authors = [
+  { name = "Adam Fourney", email = "adamfo@microsoft.com" },
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+]
+dependencies = [
+  "markitdown>=0.1.0a1",
+  "striprtf",
+]
+
+[project.urls]
+Documentation = "https://github.com/microsoft/markitdown#readme"
+Issues = "https://github.com/microsoft/markitdown/issues"
+Source = "https://github.com/microsoft/markitdown"
+
+[tool.hatch.version]
+path = "src/markitdown_sample_plugin/__about__.py"
+
+# IMPORTANT: MarkItDown will look for this entry point to find the plugin.
+[project.entry-points."markitdown.plugin"]
+sample_plugin = "markitdown_sample_plugin"
+
+[tool.hatch.envs.types]
+extra-dependencies = [
+  "mypy>=1.0.0",
+]
+[tool.hatch.envs.types.scripts]
+check = "mypy --install-types --non-interactive {args:src/markitdown_sample_plugin tests}"
+
+[tool.coverage.run]
+source_pkgs = ["markitdown-sample-plugin", "tests"]
+branch = true
+parallel = true
+omit = [
+  "src/markitdown_sample_plugin/__about__.py",
+]
+
+[tool.coverage.paths]
+markitdown-sample-plugin = ["src/markitdown_sample_plugin", "*/markitdown-sample-plugin/src/markitdown_sample_plugin"]
+tests = ["tests", "*/markitdown-sample-plugin/tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+]
+
+[tool.hatch.build.targets.sdist]
+only-include = ["src/markitdown_sample_plugin"]

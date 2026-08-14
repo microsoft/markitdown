@@ -1,0 +1,20 @@
+name: pre-commit
+on: [pull_request]
+
+jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install pre-commit
+        run: |
+          pip install pre-commit
+          pre-commit install --install-hooks
+
+      - name: Run pre-commit
+        run: pre-commit run --all-files
