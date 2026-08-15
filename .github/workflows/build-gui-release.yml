@@ -1,0 +1,63 @@
+name: Build MarkItDown GUI (Linux release binary)
+
+# Builds a standalone, single-file Linux executable of the MarkItDown GUI
+# with PyInstaller and attaches it to a GitHub Release, so end users can
+# download it and run it with nothing else installed.
+#
+# This is the "zero manual pip install" distribution path; the build steps
+# themselves live in packages/markitdown-gui/packaging/build_linux.sh. The
+# fallback path (run.sh bootstrapping a venv on first run) doesn't need this
+# workflow at all -- it works straight from a source checkout.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch: {} # allows a manual "Run workflow" for testing, without a release
+
+jobs:
+  build-linux:
+    # Building on an older Ubuntu maximizes compatibility: a binary linked
+    # against an older glibc runs fine on newer distros (incl. Mint 22.x,
+    # which is Ubuntu 24.04-based), but not the other way around.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Tk (needed to build; end users of the binary won't need it)
+        run: sudo apt-get update && sudo apt-get install -y python3-tk
+
+      - name: Build standalone binary
+        run: bash packages/markitdown-gui/packaging/build_linux.sh
+
+      - name: Assemble release bundle (run.sh + binary side by side)
+        run: |
+          set -euo pipefail
+          mkdir -p release-bundle
+          cp run.sh release-bundle/
+          cp packages/markitdown-gui/packaging/dist/markitdown-gui release-bundle/
+          chmod +x release-bundle/run.sh release-bundle/markitdown-gui
+          cd release-bundle
+          zip -r "../markitdown-gui-linux-x86_64.zip" .
+
+      - name: Upload bundle + bare binary to the release
+        if: github.event_name == 'release'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" \
+            markitdown-gui-linux-x86_64.zip \
+            packages/markitdown-gui/packaging/dist/markitdown-gui#markitdown-gui-linux-x86_64 \
+            --clobber
+
+      - name: Upload build artifacts (manual/workflow_dispatch runs)
+        if: github.event_name != 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: markitdown-gui-linux-x86_64
+          path: |
+            markitdown-gui-linux-x86_64.zip
+            packages/markitdown-gui/packaging/dist/markitdown-gui

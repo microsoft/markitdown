@@ -1,0 +1,54 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "markitdown-gui"
+dynamic = ["version"]
+description = 'A small Tkinter desktop GUI for the "markitdown" library, styled to match Linux Mint Cinnamon (Mint-Y-Dark-Purple).'
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+keywords = []
+authors = [
+  { name = "Ayush Chaugule" },
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: X11 Applications",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: Implementation :: CPython",
+]
+dependencies = [
+  "markitdown>=0.1.7,<0.2.0",
+]
+
+[project.optional-dependencies]
+# Everything needed to convert every "local file" format the GUI advertises,
+# without pulling in the Azure cloud extras (az-doc-intel / az-content-understanding)
+# or youtube-transcription, which are meaningless in a file-picker-only offline GUI.
+# This is what build_linux.sh installs into the throwaway build venv before running
+# PyInstaller, so the standalone binary has everything baked in.
+bundle = [
+  "markitdown[pptx,docx,xlsx,xls,pdf,outlook,audio-transcription]>=0.1.7,<0.2.0",
+  "pyinstaller>=6.0",
+]
+
+[project.urls]
+Source = "https://github.com/Ayush-Chaugule/gui-markitdown"
+
+[tool.hatch.version]
+path = "src/markitdown_gui/__about__.py"
+
+[project.scripts]
+markitdown-gui = "markitdown_gui.__main__:main"
+
+[tool.hatch.envs.default]
+features = ["bundle"]
+
+[tool.hatch.build.targets.sdist]
+only-include = ["src/markitdown_gui"]

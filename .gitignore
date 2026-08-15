@@ -166,3 +166,16 @@ cython_debug/
 src/.DS_Store
 .DS_Store
 .cursorrules
+
+
+#agents
+CLAUDE.md
+
+# markitdown-gui: local envs and build output. `dist/`, `build/`, and
+# `*.spec` above already cover PyInstaller's own output dirs and the spec
+# file it regenerates each run; these cover the venvs that aren't caught by
+# the generic .venv/venv/env patterns because of their project-specific names.
+/.markitdown-gui-venv/
+packages/markitdown-gui/.build-venv/
+/release-bundle/
+/markitdown-gui-linux-x86_64.zip
