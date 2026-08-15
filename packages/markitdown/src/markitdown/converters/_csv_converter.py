@@ -47,9 +47,18 @@ class CsvConverter(DocumentConverter):
         else:
             content = str(from_bytes(file_stream.read()).best())
 
+        # Excel and other tools prepend a UTF-8 BOM to CSV exports; strip it so
+        # it does not end up inside the first header cell.
+        content = content.lstrip("\ufeff")
+
         # Parse CSV content
         reader = csv.reader(io.StringIO(content))
         rows = list(reader)
+
+        # Blank lines parse as empty rows. A single leading or trailing blank
+        # line used to shift every column, so skip them before deciding what
+        # the table looks like.
+        rows = [row for row in rows if row]
 
         if not rows:
             return DocumentConverterResult(markdown="")
