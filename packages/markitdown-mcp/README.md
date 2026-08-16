@@ -1,5 +1,7 @@
 # MarkItDown-MCP
 
+[![context cost](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fathakur3%2Fmcp-context-cost%2Fmain%2Fbadges%2Fmarkitdown.json)](https://athakur3.github.io/mcp-context-cost/METHODOLOGY)
+
 > [!IMPORTANT]
 > The MarkItDown-MCP package is meant for **local use**, with local trusted agents. In particular, when running the MCP server with Streamable HTTP or SSE, it binds to `localhost` by default, and is not exposed to other machines on the network or Internet. In this configuration, it is meant to be a direct alternative to the STDIO transport, which may be more convenient in some cases. DO NOT bind the server to other interfaces unless you understand the [security implications](#security-considerations) of doing so.
 
