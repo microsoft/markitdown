@@ -83,8 +83,19 @@ class XlsxConverter(DocumentConverter):
         sheets = pd.read_excel(file_stream, sheet_name=None, engine="openpyxl")
         md_content = ""
         for s in sheets:
+            df = sheets[s]
+            df = df.dropna(how="all", axis=0).dropna(how="all", axis=1)
+            if df.empty:
+                continue
+
+            # Rename Unnamed: columns to empty strings
+            df.columns = [
+                "" if str(col).startswith("Unnamed:") else str(col)
+                for col in df.columns
+            ]
+
             md_content += f"## {s}\n"
-            html_content = sheets[s].to_html(index=False)
+            html_content = df.to_html(index=False, na_rep="")
             md_content += (
                 self._html_converter.convert_string(
                     html_content, **kwargs
@@ -145,8 +156,19 @@ class XlsConverter(DocumentConverter):
         sheets = pd.read_excel(file_stream, sheet_name=None, engine="xlrd")
         md_content = ""
         for s in sheets:
+            df = sheets[s]
+            df = df.dropna(how="all", axis=0).dropna(how="all", axis=1)
+            if df.empty:
+                continue
+
+            # Rename Unnamed: columns to empty strings
+            df.columns = [
+                "" if str(col).startswith("Unnamed:") else str(col)
+                for col in df.columns
+            ]
+
             md_content += f"## {s}\n"
-            html_content = sheets[s].to_html(index=False)
+            html_content = df.to_html(index=False, na_rep="")
             md_content += (
                 self._html_converter.convert_string(
                     html_content, **kwargs
