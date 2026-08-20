@@ -71,6 +71,13 @@ class FileConversionException(MarkItDownException):
                     if attempt.exc_info is None:
                         message += f" -  {type(attempt.converter).__name__} provided no execution info."
                     else:
-                        message += f" - {type(attempt.converter).__name__} threw {attempt.exc_info[0].__name__} with message: {attempt.exc_info[1]}\n"
+                        converter_name = type(attempt.converter).__name__
+                        exc_name = attempt.exc_info[0].__name__
+                        exc_msg = attempt.exc_info[1]
+                        if converter_name in ("DocxConverter", "PptxConverter", "XlsxConverter"):
+                            ext = {"DocxConverter": ".docx", "PptxConverter": ".pptx", "XlsxConverter": ".xlsx"}[converter_name]
+                            message += f" - {converter_name}: File claims to be {ext} but is not valid Office Open XML. ({exc_name}: {exc_msg})\n"
+                        else:
+                            message += f" - {converter_name} threw {exc_name} with message: {exc_msg}\n"
 
         super().__init__(message)
