@@ -4,6 +4,20 @@ import markdownify
 from typing import Any, Optional
 from urllib.parse import quote, unquote, urlparse, urlunparse
 
+# Matches square brackets that are not already backslash-escaped. CommonMark
+# only permits brackets inside link text / image alt text when they are escaped
+# or appear as a matched pair, so unbalanced brackets otherwise break the link.
+_UNESCAPED_BRACKET_RE = re.compile(r"(?<!\\)([\[\]])")
+
+
+def _escape_brackets(text: str) -> str:
+    """Backslash-escape square brackets so they can't terminate a link label.
+
+    See #1302. Escaped brackets render identically to balanced ones, so this is
+    applied unconditionally rather than only to unbalanced input.
+    """
+    return _UNESCAPED_BRACKET_RE.sub(r"\\\1", text)
+
 
 class _CustomMarkdownify(markdownify.MarkdownConverter):
     """
@@ -77,7 +91,8 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
             title = href
         title_part = ' "%s"' % title.replace('"', r"\"") if title else ""
         return (
-            "%s[%s](%s%s)%s" % (prefix, text, href, title_part, suffix)
+            "%s[%s](%s%s)%s"
+            % (prefix, _escape_brackets(text), href, title_part, suffix)
             if href
             else text
         )
@@ -107,7 +122,7 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         if src.startswith("data:") and not self.options["keep_data_uris"]:
             src = src.split(",")[0] + "..."
 
-        return "![%s](%s%s)" % (alt, src, title_part)
+        return "![%s](%s%s)" % (_escape_brackets(alt), src, title_part)
 
     def convert_input(
         self,

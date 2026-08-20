@@ -393,6 +393,46 @@ def test_deeply_nested_html_fallback() -> None:
     assert "<p>" not in result.markdown
 
 
+def test_link_text_bracket_escaping() -> None:
+    """Square brackets in link text and image alt text must be escaped so they
+    can't terminate the label early (issue #1302).
+
+    Unbalanced brackets are the breaking case: '[Unbalanced ] close](url)' is
+    not a link at all per CommonMark, and is emitted verbatim by parsers.
+    Balanced brackets happen to survive unescaped, but escaping them renders
+    identically, so it is applied unconditionally.
+    """
+    markitdown = MarkItDown()
+
+    html = (
+        "<html><body>"
+        '<p><a href="https://example.com/a">Learn [GPT]</a></p>'
+        '<p><a href="https://example.com/b">Unbalanced ] close</a></p>'
+        '<p><a href="https://example.com/c">Unbalanced [ open</a></p>'
+        '<p><img src="pic.png" alt="Figure [1]"></p>'
+        '<p><img src="pic2.png" alt="Bad ] alt"></p>'
+        "<p>Plain [text] outside a link</p>"
+        "</body></html>"
+    )
+    result = markitdown.convert_stream(
+        io.BytesIO(html.encode("utf-8")), file_extension=".html"
+    )
+
+    assert r"[Learn \[GPT\]](https://example.com/a)" in result.markdown
+    assert r"[Unbalanced \] close](https://example.com/b)" in result.markdown
+    assert r"[Unbalanced \[ open](https://example.com/c)" in result.markdown
+    assert r"![Figure \[1\]](pic.png)" in result.markdown
+    assert r"![Bad \] alt](pic2.png)" in result.markdown
+
+    # Brackets in ordinary text are not link syntax and must be left alone.
+    assert "Plain [text] outside a link" in result.markdown
+
+    # Escaping must be idempotent -- never double-escape an already-escaped
+    # bracket (markdownify emits these when escape_misc is enabled).
+    assert "\\\\[" not in result.markdown
+    assert "\\\\]" not in result.markdown
+
+
 def test_doc_rlink() -> None:
     # Test for: CVE-2025-11849
     markitdown = MarkItDown()
