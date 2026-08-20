@@ -54,6 +54,16 @@ class IpynbConverter(DocumentConverter):
         notebook_content = file_stream.read().decode(encoding=encoding)
         return self._convert(json.loads(notebook_content))
 
+    def _get_source_lines(self, source: Any) -> list[str]:
+        """Normalize cell source representations (str, list, None) into a list of line strings."""
+        if source is None:
+            return []
+        if isinstance(source, str):
+            return source.splitlines(keepends=True)
+        if isinstance(source, list):
+            return [str(line) for line in source]
+        return []
+
     def _convert(self, notebook_content: dict) -> DocumentConverterResult:
         """Helper function that converts notebook JSON content to Markdown."""
         try:
@@ -62,7 +72,7 @@ class IpynbConverter(DocumentConverter):
 
             for cell in notebook_content.get("cells", []):
                 cell_type = cell.get("cell_type", "")
-                source_lines = cell.get("source", [])
+                source_lines = self._get_source_lines(cell.get("source"))
 
                 if cell_type == "markdown":
                     md_output.append("".join(source_lines))
@@ -83,7 +93,8 @@ class IpynbConverter(DocumentConverter):
             md_text = "\n\n".join(md_output)
 
             # Check for title in notebook metadata
-            title = notebook_content.get("metadata", {}).get("title", title)
+            metadata = notebook_content.get("metadata") or {}
+            title = metadata.get("title", title)
 
             return DocumentConverterResult(
                 markdown=md_text,
