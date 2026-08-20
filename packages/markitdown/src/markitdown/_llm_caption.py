@@ -1,7 +1,7 @@
 from typing import BinaryIO, Union
 import base64
 import mimetypes
-from .._stream_info import StreamInfo
+from _stream_info import StreamInfo
 
 
 def llm_caption(
