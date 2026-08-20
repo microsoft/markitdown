@@ -3,6 +3,7 @@ import io
 import os
 import re
 import shutil
+import zipfile
 import pytest
 from unittest.mock import MagicMock
 
@@ -250,6 +251,45 @@ def test_file_uris() -> None:
     netloc, path = file_uri_to_path(file_uri)
     assert netloc is None
     assert path == "/path/to/file.txt"
+
+
+def test_epub_percent_encoded_manifest_href() -> None:
+    epub = io.BytesIO()
+    with zipfile.ZipFile(epub, "w") as z:
+        z.writestr(
+            "META-INF/container.xml",
+            """<?xml version="1.0"?>
+<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0">
+  <rootfiles>
+    <rootfile full-path="OPS/content.opf" media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>""",
+        )
+        z.writestr(
+            "OPS/content.opf",
+            """<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title>Encoded href test</dc:title>
+  </metadata>
+  <manifest>
+    <item id="chapter" href="chapter%201.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine><itemref idref="chapter"/></spine>
+</package>""",
+        )
+        z.writestr(
+            "OPS/chapter 1.xhtml",
+            """<html xmlns="http://www.w3.org/1999/xhtml">
+<body><h1>Encoded Chapter</h1><p>visible text marker</p></body>
+</html>""",
+        )
+
+    epub.seek(0)
+    result = MarkItDown().convert(epub, stream_info=StreamInfo(extension=".epub"))
+
+    assert "Encoded Chapter" in result.markdown
+    assert "visible text marker" in result.markdown
 
 
 def test_docx_comments() -> None:
