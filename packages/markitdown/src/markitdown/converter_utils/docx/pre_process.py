@@ -1,7 +1,8 @@
 import zipfile
 from io import BytesIO
 from typing import BinaryIO
-from xml.etree import ElementTree as ET
+from defusedxml import ElementTree as ET
+from lxml import etree
 
 from bs4 import BeautifulSoup, Tag
 
@@ -107,7 +108,14 @@ def _pre_process_math(content: bytes) -> bytes:
     Returns:
         bytes: The processed content with OMML elements replaced by their LaTeX equivalents, encoded as bytes.
     """
-    soup = BeautifulSoup(content.decode(), features="xml")
+    # Sanitize XML to prevent XXE and entity expansion attacks (CWE-611).
+    # Parse with lxml using resolve_entities=False so that external/internal
+    # entity references are never expanded, then re-serialize the clean tree.
+    safe_parser = etree.XMLParser(resolve_entities=False, no_network=True)
+    tree = etree.fromstring(content, parser=safe_parser)
+    sanitized_content = etree.tostring(tree, xml_declaration=True, encoding="utf-8")
+
+    soup = BeautifulSoup(sanitized_content, features="xml")
     for tag in soup.find_all("oMathPara"):
         _replace_equations(tag)
     for tag in soup.find_all("oMath"):
