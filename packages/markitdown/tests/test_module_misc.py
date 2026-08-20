@@ -587,9 +587,46 @@ def test_markitdown_llm() -> None:
     validate_strings(result, PPTX_TEST_STRINGS)
 
 
+def test_ipynb_code_cell_with_backtick_fence() -> None:
+    """A notebook code/raw cell whose source itself contains a ``` fence must
+    be wrapped in a longer fence, otherwise the inner backticks close the code
+    block early and the cell's content leaks out as prose. The cell source must
+    survive verbatim as a single fenced block."""
+    import json
+
+    inner = 'print("""\n```\nnot python\n```\n""")'
+    notebook = {
+        "nbformat": 4,
+        "nbformat_minor": 5,
+        "metadata": {},
+        "cells": [
+            {
+                "cell_type": "code",
+                "source": [inner],
+                "metadata": {},
+                "outputs": [],
+                "execution_count": None,
+            }
+        ],
+    }
+    result = MarkItDown().convert_stream(
+        io.BytesIO(json.dumps(notebook).encode("utf-8")), file_extension=".ipynb"
+    )
+
+    # The opening fence must be longer than the 3-backtick run inside the cell.
+    fence_match = re.match(r"(`{4,})python\n", result.markdown)
+    assert fence_match, (
+        f"code cell was not wrapped in a long-enough fence: {result.markdown!r}"
+    )
+    fence = fence_match.group(1)
+    # The cell's source must appear intact, enclosed by the longer fence.
+    assert f"{fence}python\n{inner}\n{fence}" in result.markdown
+
+
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     for test in [
+        test_ipynb_code_cell_with_backtick_fence,
         test_stream_info_operations,
         test_data_uris,
         test_file_uris,

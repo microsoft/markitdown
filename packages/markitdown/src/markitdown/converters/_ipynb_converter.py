@@ -1,9 +1,23 @@
 from typing import BinaryIO, Any
 import json
+import re
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._exceptions import FileConversionException
 from .._stream_info import StreamInfo
+
+
+def _fenced_code_block(content: str, info_string: str = "") -> str:
+    """Wrap content in a Markdown code fence that is guaranteed not to be
+    closed prematurely by backticks inside the content. Per CommonMark, the
+    fence must be longer than the longest run of backticks it contains, so a
+    cell that itself prints ``` (common in notebooks demoing Markdown) does not
+    leak out as prose."""
+    longest_backtick_run = max(
+        (len(m) for m in re.findall(r"`+", content)), default=0
+    )
+    fence = "`" * max(3, longest_backtick_run + 1)
+    return f"{fence}{info_string}\n{content}\n{fence}"
 
 CANDIDATE_MIME_TYPE_PREFIXES = [
     "application/json",
@@ -76,9 +90,11 @@ class IpynbConverter(DocumentConverter):
 
                 elif cell_type == "code":
                     # Code cells are wrapped in Markdown code blocks
-                    md_output.append(f"```python\n{''.join(source_lines)}\n```")
+                    md_output.append(
+                        _fenced_code_block("".join(source_lines), "python")
+                    )
                 elif cell_type == "raw":
-                    md_output.append(f"```\n{''.join(source_lines)}\n```")
+                    md_output.append(_fenced_code_block("".join(source_lines)))
 
             md_text = "\n\n".join(md_output)
 
