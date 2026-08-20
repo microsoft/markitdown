@@ -126,6 +126,11 @@ class MarkItDown:
         self._llm_prompt: Union[str | None] = None
         self._exiftool_path: Union[str | None] = None
         self._style_map: Union[str | None] = None
+        self._extract_images: bool = bool(kwargs.get("extract_images", False))
+        self._output_dir: Union[str | Path | None] = kwargs.get("output_dir")
+
+        if self._extract_images and self._output_dir is None:
+            raise ValueError("output_dir is required when extract_images=True")
 
         # Register the converters
         self._converters: List[ConverterRegistration] = []
@@ -563,6 +568,11 @@ class MarkItDown:
     ) -> DocumentConverterResult:
         res: Union[None, DocumentConverterResult] = None
 
+        extract_images = bool(kwargs.get("extract_images", self._extract_images))
+        output_dir = kwargs.get("output_dir", self._output_dir)
+        if extract_images and output_dir is None:
+            raise ValueError("output_dir is required when extract_images=True")
+
         # Keep track of which converters throw exceptions
         failed_attempts: List[FailedConversionAttempt] = []
 
@@ -599,6 +609,12 @@ class MarkItDown:
 
                 if "exiftool_path" not in _kwargs and self._exiftool_path is not None:
                     _kwargs["exiftool_path"] = self._exiftool_path
+
+                if "extract_images" not in _kwargs:
+                    _kwargs["extract_images"] = extract_images
+
+                if "output_dir" not in _kwargs and output_dir is not None:
+                    _kwargs["output_dir"] = output_dir
 
                 # Add the list of converters for nested processing
                 _kwargs["_parent_converters"] = self._converters

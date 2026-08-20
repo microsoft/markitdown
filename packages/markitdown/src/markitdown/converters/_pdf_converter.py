@@ -1,6 +1,8 @@
 import sys
 import io
 import re
+from dataclasses import dataclass
+from pathlib import Path
 from typing import BinaryIO, Any
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
@@ -9,6 +11,19 @@ from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 
 # Pattern for MasterFormat-style partial numbering (e.g., ".1", ".2", ".10")
 PARTIAL_NUMBERING_PATTERN = re.compile(r"^\.\d+$")
+
+
+@dataclass(frozen=True)
+class _PositionedMarkdownItem:
+    top: float
+    markdown: str
+    order: int
+
+
+@dataclass(frozen=True)
+class _ExtractedPdfImage:
+    top: float
+    markdown: str
 
 
 def _merge_partial_numbering_lines(text: str) -> str:
@@ -492,6 +507,217 @@ def _extract_tables_from_words(page: Any) -> list[list[list[str]]]:
     return [table_rows]
 
 
+def _image_extension_from_bytes(data: bytes) -> str | None:
+    """Return a common image extension when bytes are already image-encoded."""
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "png"
+    if data.startswith(b"\xff\xd8\xff"):
+        return "jpg"
+    if data.startswith(b"GIF87a") or data.startswith(b"GIF89a"):
+        return "gif"
+    if data.startswith(b"II*\x00") or data.startswith(b"MM\x00*"):
+        return "tiff"
+    if data.startswith(b"\x00\x00\x00\x0cjP  \r\n\x87\n") or data.startswith(
+        b"\xff\x4f\xff\x51"
+    ):
+        return "jp2"
+    return None
+
+
+def _safe_image_bbox(
+    image: dict[str, Any], page: Any
+) -> tuple[float, float, float, float] | None:
+    x0 = float(image.get("x0", 0) or 0)
+    x1 = float(image.get("x1", 0) or 0)
+    top = float(image.get("top", image.get("y0", 0)) or 0)
+    bottom = float(image.get("bottom", image.get("y1", 0)) or 0)
+
+    width = float(getattr(page, "width", x1) or x1)
+    height = float(getattr(page, "height", bottom) or bottom)
+
+    x0 = max(0, min(x0, width))
+    x1 = max(0, min(x1, width))
+    top = max(0, min(top, height))
+    bottom = max(0, min(bottom, height))
+
+    if x1 <= x0 or bottom <= top:
+        return None
+
+    return (x0, top, x1, bottom)
+
+
+def _write_rendered_image(
+    page: Any, bbox: tuple[float, float, float, float], path: Path
+) -> bool:
+    try:
+        cropped_page = page.crop(bbox)
+        page_image = cropped_page.to_image(resolution=600)
+        page_image.original.save(path, format="PNG")
+        return path.exists() and path.stat().st_size > 0
+    except Exception:
+        return False
+
+
+def _write_stream_image(
+    image: dict[str, Any], path_without_suffix: Path
+) -> Path | None:
+    stream = image.get("stream")
+    if stream is None or not hasattr(stream, "get_data"):
+        return None
+
+    try:
+        data = stream.get_data()
+    except Exception:
+        return None
+
+    if not data:
+        return None
+
+    extension = _image_extension_from_bytes(data)
+    if extension is None:
+        return None
+
+    path = path_without_suffix.with_suffix(f".{extension}")
+    try:
+        path.write_bytes(data)
+    except Exception:
+        return None
+
+    if path.exists() and path.stat().st_size > 0:
+        return path
+    return None
+
+
+def _extract_pdf_images_from_page(
+    page: Any,
+    *,
+    page_num: int,
+    images_dir: Path,
+) -> list[_ExtractedPdfImage]:
+    images = list(getattr(page, "images", []) or [])
+    if not images and hasattr(page, "objects"):
+        images = list(getattr(page, "objects", {}).get("image", []) or [])
+
+    extracted: list[_ExtractedPdfImage] = []
+    for image_idx, image in enumerate(images, start=1):
+        bbox = _safe_image_bbox(image, page)
+        top = bbox[1] if bbox is not None else float(image.get("top", 0) or 0)
+        path_without_suffix = images_dir / f"page{page_num}-image{image_idx}"
+
+        image_path = _write_stream_image(image, path_without_suffix)
+        if image_path is None and bbox is not None:
+            rendered_path = path_without_suffix.with_suffix(".png")
+            if _write_rendered_image(page, bbox, rendered_path):
+                image_path = rendered_path
+
+        if image_path is None:
+            continue
+
+        rel_path = Path("images") / image_path.name
+        alt_text = f"Image {image_idx} on page {page_num}"
+        extracted.append(
+            _ExtractedPdfImage(
+                top=top,
+                markdown=f"![{alt_text}]({rel_path.as_posix()})",
+            )
+        )
+
+    return extracted
+
+
+def _extract_text_items_from_page(page: Any) -> list[_PositionedMarkdownItem]:
+    form_content = _extract_form_content_from_words(page)
+    if form_content is not None:
+        return [_PositionedMarkdownItem(top=0, markdown=form_content, order=0)]
+
+    try:
+        lines = page.extract_text_lines()
+        items = [
+            _PositionedMarkdownItem(
+                top=float(line.get("top", idx) or idx),
+                markdown=str(line.get("text", "")).strip(),
+                order=idx,
+            )
+            for idx, line in enumerate(lines)
+            if str(line.get("text", "")).strip()
+        ]
+        if items:
+            return items
+    except Exception:
+        pass
+
+    try:
+        words = page.extract_words(keep_blank_chars=True, x_tolerance=3, y_tolerance=3)
+        if words:
+            rows_by_y: dict[float, list[dict]] = {}
+            y_tolerance = 5.0
+            for word in words:
+                y_key = round(float(word["top"]) / y_tolerance) * y_tolerance
+                rows_by_y.setdefault(y_key, []).append(word)
+
+            items = []
+            for order, y_key in enumerate(sorted(rows_by_y.keys())):
+                row_words = sorted(rows_by_y[y_key], key=lambda w: w["x0"])
+                text = " ".join(w["text"] for w in row_words).strip()
+                if text:
+                    items.append(
+                        _PositionedMarkdownItem(top=y_key, markdown=text, order=order)
+                    )
+            if items:
+                return items
+    except Exception:
+        pass
+
+    text = page.extract_text() or ""
+    return [
+        _PositionedMarkdownItem(top=float(idx), markdown=line.strip(), order=idx)
+        for idx, line in enumerate(text.splitlines())
+        if line.strip()
+    ]
+
+
+def _convert_pdf_with_image_extraction(
+    pdf_bytes: io.BytesIO,
+    *,
+    output_dir: str | Path,
+) -> str:
+    output_root = Path(output_dir)
+    images_dir = output_root / "images"
+    images_dir.mkdir(parents=True, exist_ok=True)
+
+    chunks: list[str] = []
+    with pdfplumber.open(pdf_bytes) as pdf:
+        for page_idx, page in enumerate(pdf.pages):
+            page_num = page_idx + 1
+            try:
+                items: list[_PositionedMarkdownItem] = _extract_text_items_from_page(
+                    page
+                )
+                image_items = _extract_pdf_images_from_page(
+                    page,
+                    page_num=page_num,
+                    images_dir=images_dir,
+                )
+
+                for image_order, image in enumerate(image_items):
+                    items.append(
+                        _PositionedMarkdownItem(
+                            top=image.top,
+                            markdown=image.markdown,
+                            order=10_000 + image_order,
+                        )
+                    )
+
+                items.sort(key=lambda item: (item.top, item.order))
+                page_markdown = "\n\n".join(item.markdown for item in items).strip()
+                if page_markdown:
+                    chunks.append(page_markdown)
+            finally:
+                page.close()
+
+    return "\n\n".join(chunks).strip()
+
+
 class PdfConverter(DocumentConverter):
     """
     Converts PDFs to Markdown.
@@ -524,59 +750,75 @@ class PdfConverter(DocumentConverter):
         **kwargs: Any,
     ) -> DocumentConverterResult:
         if _dependency_exc_info is not None:
+            missing_dependency_exception = _dependency_exc_info[1]
+            assert missing_dependency_exception is not None
             raise MissingDependencyException(
                 MISSING_DEPENDENCY_MESSAGE.format(
                     converter=type(self).__name__,
                     extension=".pdf",
                     feature="pdf",
                 )
-            ) from _dependency_exc_info[1].with_traceback(
-                _dependency_exc_info[2]
-            )  # type: ignore[union-attr]
+            ) from missing_dependency_exception.with_traceback(_dependency_exc_info[2])
 
         assert isinstance(file_stream, io.IOBase)
 
         # Read file stream into BytesIO for compatibility with pdfplumber
         pdf_bytes = io.BytesIO(file_stream.read())
 
-        try:
-            # Single pass: check every page for form-style content.
-            # Pages with tables/forms get rich extraction; plain-text
-            # pages are collected separately. page.close() is called
-            # after each page to free pdfplumber's cached objects and
-            # keep memory usage constant regardless of page count.
-            markdown_chunks: list[str] = []
-            form_page_count = 0
-            plain_page_indices: list[int] = []
+        extract_images = bool(kwargs.get("extract_images", False))
+        output_dir = kwargs.get("output_dir")
 
-            with pdfplumber.open(pdf_bytes) as pdf:
-                for page_idx, page in enumerate(pdf.pages):
-                    page_content = _extract_form_content_from_words(page)
+        if extract_images:
+            if output_dir is None:
+                raise ValueError("output_dir is required when extract_images=True")
 
-                    if page_content is not None:
-                        form_page_count += 1
-                        if page_content.strip():
-                            markdown_chunks.append(page_content)
-                    else:
-                        plain_page_indices.append(page_idx)
-                        text = page.extract_text()
-                        if text and text.strip():
-                            markdown_chunks.append(text.strip())
-
-                    page.close()  # Free cached page data immediately
-
-            # If no pages had form-style content, use pdfminer for
-            # the whole document (better text spacing for prose).
-            if form_page_count == 0:
+            try:
+                markdown = _convert_pdf_with_image_extraction(
+                    pdf_bytes,
+                    output_dir=output_dir,
+                )
+            except Exception:
                 pdf_bytes.seek(0)
                 markdown = pdfminer.high_level.extract_text(pdf_bytes)
-            else:
-                markdown = "\n\n".join(markdown_chunks).strip()
+        else:
+            try:
+                # Single pass: check every page for form-style content.
+                # Pages with tables/forms get rich extraction; plain-text
+                # pages are collected separately. page.close() is called
+                # after each page to free pdfplumber's cached objects and
+                # keep memory usage constant regardless of page count.
+                markdown_chunks: list[str] = []
+                form_page_count = 0
+                plain_page_indices: list[int] = []
 
-        except Exception:
-            # Fallback if pdfplumber fails
-            pdf_bytes.seek(0)
-            markdown = pdfminer.high_level.extract_text(pdf_bytes)
+                with pdfplumber.open(pdf_bytes) as pdf:
+                    for page_idx, page in enumerate(pdf.pages):
+                        page_content = _extract_form_content_from_words(page)
+
+                        if page_content is not None:
+                            form_page_count += 1
+                            if page_content.strip():
+                                markdown_chunks.append(page_content)
+                        else:
+                            plain_page_indices.append(page_idx)
+                            text = page.extract_text()
+                            if text and text.strip():
+                                markdown_chunks.append(text.strip())
+
+                        page.close()  # Free cached page data immediately
+
+                # If no pages had form-style content, use pdfminer for
+                # the whole document (better text spacing for prose).
+                if form_page_count == 0:
+                    pdf_bytes.seek(0)
+                    markdown = pdfminer.high_level.extract_text(pdf_bytes)
+                else:
+                    markdown = "\n\n".join(markdown_chunks).strip()
+
+            except Exception:
+                # Fallback if pdfplumber fails
+                pdf_bytes.seek(0)
+                markdown = pdfminer.high_level.extract_text(pdf_bytes)
 
         # Fallback if still empty
         if not markdown:
