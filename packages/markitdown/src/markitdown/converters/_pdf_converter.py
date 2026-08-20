@@ -1,5 +1,6 @@
 import sys
 import io
+import os
 import re
 from typing import BinaryIO, Any
 
@@ -492,6 +493,169 @@ def _extract_tables_from_words(page: Any) -> list[list[list[str]]]:
     return [table_rows]
 
 
+def _detect_image_ext(data: bytes) -> str | None:
+    """Return a file extension for common image byte signatures."""
+    if data[:8] == b"\x89PNG\r\n\x1a\n":
+        return ".png"
+    if data[:2] == b"\xff\xd8":
+        return ".jpg"
+    if data[:4] == b"GIF8":
+        return ".gif"
+    if data[:4] == b"RIFF" and len(data) > 12 and data[8:12] == b"WEBP":
+        return ".webp"
+    if data[:2] == b"BM":
+        return ".bmp"
+    return None
+
+
+def _write_pdf_image(
+    page: Any,
+    image: dict,
+    images_dir: str,
+    images_rel_dir: str,
+    image_index: int,
+) -> dict[str, Any] | None:
+    image_bytes = b""
+    ext: str | None = None
+    stream = image.get("stream")
+
+    if stream is not None and hasattr(stream, "get_data"):
+        try:
+            raw_bytes = stream.get_data()
+            raw_ext = _detect_image_ext(raw_bytes)
+            if raw_ext is not None:
+                image_bytes = raw_bytes
+                ext = raw_ext
+            else:
+                try:
+                    from PIL import Image  # type: ignore[import-not-found]
+
+                    try:
+                        pil_image = Image.open(io.BytesIO(raw_bytes))
+                    except Exception:
+                        width, height = image.get("srcsize") or (
+                            image.get("width"),
+                            image.get("height"),
+                        )
+                        colorspace = str(image.get("colorspace", "")).lower()
+                        mode = "L" if "gray" in colorspace else "RGB"
+                        pil_image = Image.frombytes(
+                            mode,
+                            (int(width), int(height)),
+                            raw_bytes,
+                        )
+
+                    with pil_image:
+                        if pil_image.mode not in ("RGB", "L", "RGBA"):
+                            pil_image = pil_image.convert("RGB")
+                        out = io.BytesIO()
+                        pil_image.save(out, format="PNG")
+                        image_bytes = out.getvalue()
+                        ext = ".png"
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    if not image_bytes:
+        try:
+            x0 = image.get("x0", 0)
+            x1 = image.get("x1", 0)
+            top = image.get("top", 0)
+            bottom = image.get("bottom", 0)
+            if x1 <= x0 or bottom <= top:
+                return None
+
+            cropped_page = page.within_bbox((x0, top, x1, bottom))
+            page_image = cropped_page.to_image(resolution=150)
+            out = io.BytesIO()
+            page_image.original.save(out, format="PNG")
+            image_bytes = out.getvalue()
+            ext = ".png"
+        except Exception:
+            return None
+
+    if ext is None:
+        ext = ".png"
+
+    filename = f"image_{image_index}{ext}"
+    os.makedirs(images_dir, exist_ok=True)
+    with open(os.path.join(images_dir, filename), "wb") as image_file:
+        image_file.write(image_bytes)
+
+    return {
+        "top": image.get("top", 0),
+        "markdown": f"![image_{image_index}]({images_rel_dir}/{filename})",
+    }
+
+
+def _extract_text_lines_with_positions(page: Any) -> list[dict[str, Any]]:
+    words = page.extract_words(keep_blank_chars=True, x_tolerance=3, y_tolerance=3)
+    if not words:
+        text = page.extract_text()
+        if text and text.strip():
+            return [
+                {"top": float(idx), "text": line.strip()}
+                for idx, line in enumerate(text.splitlines())
+                if line.strip()
+            ]
+        return []
+
+    y_tolerance = 5
+    rows_by_y: dict[float, list[dict]] = {}
+    for word in words:
+        y_key = round(word["top"] / y_tolerance) * y_tolerance
+        rows_by_y.setdefault(y_key, []).append(word)
+
+    lines: list[dict[str, Any]] = []
+    for y_key in sorted(rows_by_y.keys()):
+        row_words = sorted(rows_by_y[y_key], key=lambda w: w["x0"])
+        text = " ".join(word["text"] for word in row_words).strip()
+        if text:
+            lines.append({"top": y_key, "text": text})
+    return lines
+
+
+def _extract_pdf_with_images(
+    pdf_bytes: io.BytesIO,
+    images_dir: str,
+    images_rel_dir: str,
+) -> str:
+    markdown_chunks: list[str] = []
+    image_index = 1
+
+    with pdfplumber.open(pdf_bytes) as pdf:
+        for page in pdf.pages:
+            items: list[dict[str, Any]] = [
+                {"top": line["top"], "markdown": line["text"]}
+                for line in _extract_text_lines_with_positions(page)
+            ]
+
+            for image in getattr(page, "images", []) or []:
+                image_item = _write_pdf_image(
+                    page,
+                    image,
+                    images_dir,
+                    images_rel_dir,
+                    image_index,
+                )
+                if image_item is not None:
+                    items.append(image_item)
+                    image_index += 1
+
+            page_markdown = "\n\n".join(
+                item["markdown"]
+                for item in sorted(items, key=lambda item: item["top"])
+                if item["markdown"].strip()
+            )
+            if page_markdown.strip():
+                markdown_chunks.append(page_markdown.strip())
+
+            page.close()
+
+    return "\n\n".join(markdown_chunks).strip()
+
+
 class PdfConverter(DocumentConverter):
     """
     Converts PDFs to Markdown.
@@ -538,6 +702,22 @@ class PdfConverter(DocumentConverter):
 
         # Read file stream into BytesIO for compatibility with pdfplumber
         pdf_bytes = io.BytesIO(file_stream.read())
+
+        if kwargs.get("extract_images", False):
+            images_dir = kwargs["images_dir"]
+            images_rel_dir = kwargs.get("images_rel_dir", "images")
+            try:
+                markdown = _extract_pdf_with_images(
+                    pdf_bytes,
+                    images_dir=images_dir,
+                    images_rel_dir=images_rel_dir,
+                )
+            except Exception:
+                pdf_bytes.seek(0)
+                markdown = pdfminer.high_level.extract_text(pdf_bytes)
+
+            markdown = _merge_partial_numbering_lines(markdown)
+            return DocumentConverterResult(markdown=markdown)
 
         try:
             # Single pass: check every page for form-style content.

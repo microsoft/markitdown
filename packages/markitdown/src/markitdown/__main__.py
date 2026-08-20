@@ -3,12 +3,36 @@
 # SPDX-License-Identifier: MIT
 import argparse
 import sys
+import os
 import codecs
+import zipfile
+from datetime import datetime
 from typing import Any, Dict
 from textwrap import dedent
 from importlib.metadata import entry_points
 from .__about__ import __version__
 from ._markitdown import MarkItDown, StreamInfo, DocumentConverterResult
+
+
+def count_docx_images(filename: str) -> int:
+    """快速预检：统计 DOCX 中嵌入的图片数量"""
+    try:
+        with zipfile.ZipFile(filename) as z:
+            return len([f for f in z.namelist() if f.startswith("word/media/")])
+    except (zipfile.BadZipFile, FileNotFoundError):
+        return 0
+
+
+def ask_extract_images(image_count: int) -> bool:
+    """交互式询问是否提取图片"""
+    if not sys.stdin.isatty():
+        return False  # 非交互终端，不询问
+    print(f"\n📄 检测到文档中包含 {image_count} 张图片")
+    try:
+        answer = input("   是否提取图片到本地文件？(y/n): ").strip().lower()
+        return answer in ("y", "yes")
+    except (EOFError, KeyboardInterrupt):
+        return False
 
 
 def main():
@@ -138,6 +162,24 @@ def main():
         help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
     )
 
+    parser.add_argument(
+        "--extract-images",
+        action="store_true",
+        help="Extract embedded images from DOCX/PDF to a local directory.",
+    )
+
+    parser.add_argument(
+        "--no-extract-images",
+        action="store_true",
+        help="Do not extract images (skip interactive prompt).",
+    )
+
+    parser.add_argument(
+        "--images-dir",
+        default="images",
+        help="Base directory name for extracted images (default: images). A timestamp suffix is added.",
+    )
+
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
 
@@ -244,25 +286,62 @@ def main():
     else:
         markitdown = MarkItDown(enable_plugins=args.use_plugins)
 
+    # --- 图片提取逻辑 ---
+    extract_images = False
+    if args.extract_images:
+        extract_images = True
+    elif args.no_extract_images:
+        extract_images = False
+    elif args.filename and args.output and args.filename.lower().endswith(".docx"):
+        count = count_docx_images(args.filename)
+        if count > 0:
+            extract_images = ask_extract_images(count)
+
+    # 构建 kwargs
+    convert_kwargs: Dict[str, Any] = {
+        "keep_data_uris": args.keep_data_uris,
+    }
+
+    if extract_images and args.output:
+        images_dir_name = _timestamped_images_dir_name(args.images_dir or "images")
+        args._actual_images_dir = images_dir_name
+        abs_images_dir = os.path.join(
+            os.path.dirname(os.path.abspath(args.output)),
+            images_dir_name,
+        )
+        os.makedirs(abs_images_dir, exist_ok=True)
+        convert_kwargs["extract_images"] = True
+        convert_kwargs["images_dir"] = abs_images_dir
+        convert_kwargs["images_rel_dir"] = images_dir_name
+        # extract_images 优先于 keep_data_uris
+        convert_kwargs["keep_data_uris"] = False
+
+    # --- 转换 ---
     if args.filename is None:
         result = markitdown.convert_stream(
             sys.stdin.buffer,
             stream_info=stream_info,
-            keep_data_uris=args.keep_data_uris,
+            **convert_kwargs,
         )
     else:
         result = markitdown.convert(
-            args.filename, stream_info=stream_info, keep_data_uris=args.keep_data_uris
+            args.filename,
+            stream_info=stream_info,
+            **convert_kwargs,
         )
 
-    _handle_output(args, result)
+    _handle_output(args, result, extract_images=extract_images)
 
 
-def _handle_output(args, result: DocumentConverterResult):
+def _handle_output(args, result: DocumentConverterResult, extract_images: bool = False):
     """Handle output to stdout or file"""
     if args.output:
         with open(args.output, "w", encoding="utf-8") as f:
             f.write(result.markdown)
+        if extract_images:
+            images_dir = getattr(args, "_actual_images_dir", args.images_dir or "images")
+            print(f"[OK] Generated {args.output}")
+            print(f"[OK] Images extracted to ./{images_dir}/")
     else:
         # Handle stdout encoding errors more gracefully
         print(
@@ -275,6 +354,11 @@ def _handle_output(args, result: DocumentConverterResult):
 def _exit_with_error(message: str):
     print(message)
     sys.exit(1)
+
+
+def _timestamped_images_dir_name(base_name: str) -> str:
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return f"{base_name.rstrip(os.sep)}_{timestamp}"
 
 
 if __name__ == "__main__":
