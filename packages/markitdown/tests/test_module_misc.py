@@ -253,12 +253,38 @@ def test_file_uris() -> None:
 
 
 def test_docx_comments() -> None:
-    # Test DOCX processing, with comments and setting style_map on init
-    markitdown_with_style_map = MarkItDown(style_map="comment-reference => ")
-    result = markitdown_with_style_map.convert(
-        os.path.join(TEST_FILES_DIR, "test_with_comment.docx")
-    )
+    docx_file = os.path.join(TEST_FILES_DIR, "test_with_comment.docx")
+
+    # Comments remain excluded by default for backwards compatibility.
+    result = MarkItDown().convert(docx_file)
+    validate_strings(result, [], exclude_strings=DOCX_COMMENT_TEST_STRINGS[-2:])
+
+    # Comments can be enabled for a single conversion.
+    result = MarkItDown().convert(docx_file, include_comments=True)
     validate_strings(result, DOCX_COMMENT_TEST_STRINGS)
+    assert "(#comment-0)" in result.text_content
+    assert "(#comment-ref-0)" in result.text_content
+
+    # The option can also be set when constructing a reusable converter.
+    markitdown_with_comments = MarkItDown(include_comments=True)
+    result = markitdown_with_comments.convert(docx_file)
+    validate_strings(result, DOCX_COMMENT_TEST_STRINGS)
+
+    # Per-conversion options take precedence over constructor options.
+    result = markitdown_with_comments.convert(docx_file, include_comments=False)
+    validate_strings(result, [], exclude_strings=DOCX_COMMENT_TEST_STRINGS[-2:])
+
+
+def test_docx_comments_preserve_custom_style_map() -> None:
+    docx_file = os.path.join(TEST_FILES_DIR, "test_with_comment.docx")
+    result = MarkItDown().convert(
+        docx_file,
+        include_comments=True,
+        style_map="p[style-name='heading 1'] => h6:fresh",
+    )
+
+    assert "###### Abstract" in result.text_content
+    validate_strings(result, DOCX_COMMENT_TEST_STRINGS[-2:])
 
 
 def test_docx_equations() -> None:

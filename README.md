@@ -88,6 +88,13 @@ You can also pipe content:
 cat path-to-file.pdf | markitdown
 ```
 
+Reviewer comments are excluded from DOCX output by default. Include them, along
+with references to their locations in the document, with `--include-comments`:
+
+```bash
+markitdown reviewed-document.docx --include-comments
+```
+
 ### Optional Dependencies
 MarkItDown has optional dependencies for activating various file formats. Earlier in this document, we installed all optional dependencies with the `[all]` option. However, you can also install them individually for more control. For example:
 
@@ -256,6 +263,17 @@ from markitdown import MarkItDown
 md = MarkItDown(enable_plugins=False) # Set to True to enable plugins
 result = md.convert("test.xlsx")
 print(result.text_content)
+```
+
+To include reviewer comments when converting a DOCX file, pass
+`include_comments=True`. The option can be supplied to an individual conversion
+or to the `MarkItDown` constructor:
+
+```python
+result = md.convert("reviewed-document.docx", include_comments=True)
+
+md_with_comments = MarkItDown(include_comments=True)
+result = md_with_comments.convert("reviewed-document.docx")
 ```
 
 Document Intelligence conversion in Python:

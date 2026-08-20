@@ -126,6 +126,7 @@ class MarkItDown:
         self._llm_prompt: Union[str | None] = None
         self._exiftool_path: Union[str | None] = None
         self._style_map: Union[str | None] = None
+        self._include_comments: Union[bool | None] = None
 
         # Register the converters
         self._converters: List[ConverterRegistration] = []
@@ -151,6 +152,7 @@ class MarkItDown:
             self._llm_prompt = kwargs.get("llm_prompt")
             self._exiftool_path = kwargs.get("exiftool_path")
             self._style_map = kwargs.get("style_map")
+            self._include_comments = kwargs.get("include_comments")
 
             if self._exiftool_path is None:
                 self._exiftool_path = os.getenv("EXIFTOOL_PATH")
@@ -596,6 +598,12 @@ class MarkItDown:
 
                 if "style_map" not in _kwargs and self._style_map is not None:
                     _kwargs["style_map"] = self._style_map
+
+                if (
+                    "include_comments" not in _kwargs
+                    and self._include_comments is not None
+                ):
+                    _kwargs["include_comments"] = self._include_comments
 
                 if "exiftool_path" not in _kwargs and self._exiftool_path is not None:
                     _kwargs["exiftool_path"] = self._exiftool_path
