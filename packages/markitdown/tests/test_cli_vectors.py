@@ -3,6 +3,7 @@ import os
 import time
 import pytest
 import subprocess
+import sys
 import locale
 from typing import List
 
@@ -20,8 +21,8 @@ else:
     )
 
 skip_remote = (
-    True if os.environ.get("GITHUB_ACTIONS") else False
-)  # Don't run these tests in CI
+    True if os.environ.get("RUN_REMOTE_TESTS") != "1" else False
+)  # By default skip network tests unless RUN_REMOTE_TESTS=1
 
 TEST_FILES_DIR = os.path.join(os.path.dirname(__file__), "test_files")
 TEST_FILES_URL = "https://raw.githubusercontent.com/microsoft/markitdown/refs/heads/main/packages/markitdown/tests/test_files"
@@ -46,13 +47,14 @@ def test_output_to_stdout(shared_tmp_dir, test_vector) -> None:
 
     result = subprocess.run(
         [
-            "python",
+            sys.executable,
             "-m",
             "markitdown",
             os.path.join(TEST_FILES_DIR, test_vector.filename),
         ],
         capture_output=True,
         text=True,
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
     )
 
     assert result.returncode == 0, f"CLI exited with error: {result.stderr}"
@@ -69,7 +71,7 @@ def test_output_to_file(shared_tmp_dir, test_vector) -> None:
     output_file = os.path.join(shared_tmp_dir, test_vector.filename + ".output")
     result = subprocess.run(
         [
-            "python",
+            sys.executable,
             "-m",
             "markitdown",
             "-o",
@@ -83,7 +85,7 @@ def test_output_to_file(shared_tmp_dir, test_vector) -> None:
     assert result.returncode == 0, f"CLI exited with error: {result.stderr}"
     assert os.path.exists(output_file), f"Output file not created: {output_file}"
 
-    with open(output_file, "r") as f:
+    with open(output_file, "r", encoding="utf-8") as f:
         output_data = f.read()
         for test_string in test_vector.must_include:
             assert test_string in output_data
@@ -104,7 +106,7 @@ def test_input_from_stdin_without_hints(shared_tmp_dir, test_vector) -> None:
 
     result = subprocess.run(
         [
-            "python",
+            sys.executable,
             "-m",
             "markitdown",
             os.path.join(TEST_FILES_DIR, test_vector.filename),
@@ -114,7 +116,7 @@ def test_input_from_stdin_without_hints(shared_tmp_dir, test_vector) -> None:
         text=False,
     )
 
-    stdout = result.stdout.decode(locale.getpreferredencoding())
+    stdout = result.stdout.decode('utf-8')
     assert (
         result.returncode == 0
     ), f"CLI exited with error: {result.stderr.decode('utf-8')}"
@@ -135,12 +137,12 @@ def test_convert_url(shared_tmp_dir, test_vector):
 
     time.sleep(1)  # Ensure we don't hit rate limits
     result = subprocess.run(
-        ["python", "-m", "markitdown", TEST_FILES_URL + "/" + test_vector.filename],
+        [sys.executable, "-m", "markitdown", TEST_FILES_URL + "/" + test_vector.filename],
         capture_output=True,
         text=False,
     )
 
-    stdout = result.stdout.decode(locale.getpreferredencoding())
+    stdout = result.stdout.decode('utf-8')
     assert result.returncode == 0, f"CLI exited with error: {result.stderr}"
     for test_string in test_vector.must_include:
         assert test_string in stdout
@@ -155,7 +157,7 @@ def test_output_to_file_with_data_uris(shared_tmp_dir, test_vector) -> None:
     output_file = os.path.join(shared_tmp_dir, test_vector.filename + ".output")
     result = subprocess.run(
         [
-            "python",
+            sys.executable,
             "-m",
             "markitdown",
             "--keep-data-uris",
@@ -170,7 +172,7 @@ def test_output_to_file_with_data_uris(shared_tmp_dir, test_vector) -> None:
     assert result.returncode == 0, f"CLI exited with error: {result.stderr}"
     assert os.path.exists(output_file), f"Output file not created: {output_file}"
 
-    with open(output_file, "r") as f:
+    with open(output_file, "r", encoding="utf-8") as f:
         output_data = f.read()
         for test_string in test_vector.must_include:
             assert test_string in output_data
