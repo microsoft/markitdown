@@ -122,5 +122,18 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
             return "[x] " if el.has_attr("checked") else "[ ] "
         return ""
 
+    def process_text(self, el: Any, *args: Any, **kwargs: Any) -> str:
+        text = super().process_text(el, *args, **kwargs)  # type: ignore
+        
+        # Escape markdown special characters to prevent markdown injection.
+        # Pipe characters break markdown tables if left unescaped mid-line.
+        text = text.replace('|', r'\|')
+        
+        # Escape markdown block characters at the beginning of the text node or line
+        # to prevent them from being parsed as headings, lists, blockquotes, etc.
+        # markdownify handles some inline escaping, but we need to ensure block starters are escaped.
+        text = re.sub(r"(?m)^([#>+\-=])", r"\\\1", text)
+        return text
+
     def convert_soup(self, soup: Any) -> str:
         return super().convert_soup(soup)  # type: ignore
