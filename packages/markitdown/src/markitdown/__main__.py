@@ -138,6 +138,22 @@ def main():
         help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
     )
 
+    parser.add_argument(
+        "--llm-client",
+        choices=["openai"],
+        help="LLM client to use for converters that support vision or OCR. Currently supports 'openai'.",
+    )
+
+    parser.add_argument(
+        "--llm-model",
+        help="LLM model to pass to converters that use --llm-client.",
+    )
+
+    parser.add_argument(
+        "--llm-prompt",
+        help="Optional prompt override for converters that use --llm-client.",
+    )
+
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
 
@@ -200,6 +216,8 @@ def main():
             )
         sys.exit(0)
 
+    llm_kwargs = _parse_llm_options(args)
+
     if args.use_docintel:
         if args.endpoint is None:
             _exit_with_error(
@@ -209,7 +227,7 @@ def main():
             _exit_with_error("Filename is required when using Document Intelligence.")
 
         markitdown = MarkItDown(
-            enable_plugins=args.use_plugins, docintel_endpoint=args.endpoint
+            enable_plugins=args.use_plugins, docintel_endpoint=args.endpoint, **llm_kwargs
         )
     elif args.use_cu:
         if args.cu_endpoint is None:
@@ -240,9 +258,9 @@ def main():
                     _exit_with_error(f"Unknown file type: {name}")
             cu_kwargs["cu_file_types"] = cu_types
 
-        markitdown = MarkItDown(enable_plugins=args.use_plugins, **cu_kwargs)
+        markitdown = MarkItDown(enable_plugins=args.use_plugins, **llm_kwargs, **cu_kwargs)
     else:
-        markitdown = MarkItDown(enable_plugins=args.use_plugins)
+        markitdown = MarkItDown(enable_plugins=args.use_plugins, **llm_kwargs)
 
     if args.filename is None:
         result = markitdown.convert_stream(
@@ -256,6 +274,40 @@ def main():
         )
 
     _handle_output(args, result)
+
+
+def _parse_llm_options(args) -> dict[str, Any]:
+    if args.llm_client is None:
+        if args.llm_model or args.llm_prompt:
+            _exit_with_error("--llm-model and --llm-prompt require --llm-client.")
+        return {}
+
+    if not args.llm_model:
+        _exit_with_error("--llm-client requires --llm-model.")
+
+    llm_kwargs: dict[str, Any] = {
+        "llm_client": _create_llm_client(args.llm_client),
+        "llm_model": args.llm_model,
+    }
+    if args.llm_prompt:
+        llm_kwargs["llm_prompt"] = args.llm_prompt
+    return llm_kwargs
+
+
+def _create_llm_client(client_name: str) -> Any:
+    if client_name == "openai":
+        try:
+            from openai import OpenAI
+        except ImportError as ex:
+            _exit_with_error(
+                "The OpenAI client is required for --llm-client openai. Install it with `pip install openai`."
+            )
+            raise AssertionError("unreachable") from ex
+
+        return OpenAI()
+
+    _exit_with_error(f"Unsupported LLM client: {client_name}")
+    raise AssertionError("unreachable")
 
 
 def _handle_output(args, result: DocumentConverterResult):
