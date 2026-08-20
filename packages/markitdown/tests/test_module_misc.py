@@ -587,6 +587,42 @@ def test_markitdown_llm() -> None:
     validate_strings(result, PPTX_TEST_STRINGS)
 
 
+def test_odt_converter() -> None:
+    """OdtConverter converts basic ODT content to Markdown."""
+    import zipfile
+    import io as io_module
+    from markitdown.converters._odt_converter import OdtConverter
+
+    content = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<office:document-content'
+        ' xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"'
+        ' xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"'
+        ' office:version="1.2">'
+        "<office:body><office:text>"
+        '<text:h text:outline-level="1">Title</text:h>'
+        "<text:p>Body text.</text:p>"
+        "<text:list>"
+        "<text:list-item><text:p>A</text:p></text:list-item>"
+        "<text:list-item><text:p>B</text:p></text:list-item>"
+        "</text:list>"
+        "</office:text></office:body></office:document-content>"
+    )
+
+    buf = io_module.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("content.xml", content)
+    buf.seek(0)
+
+    converter = OdtConverter()
+    result = converter.convert(buf, StreamInfo(extension=".odt"))
+    md = result.markdown
+    assert "Title" in md
+    assert "Body text" in md
+    assert "- A" in md
+    assert "- B" in md
+
+
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     for test in [
@@ -602,6 +638,7 @@ if __name__ == "__main__":
         test_markitdown_exiftool,
         test_markitdown_llm_parameters,
         test_markitdown_llm,
+        test_odt_converter,
     ]:
         print(f"Running {test.__name__}...", end="")
         test()
