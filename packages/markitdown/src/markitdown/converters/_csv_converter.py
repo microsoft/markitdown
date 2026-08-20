@@ -1,9 +1,18 @@
-import csv
 import io
+import sys
 from typing import BinaryIO, Any
 from charset_normalizer import from_bytes
+from ._html_converter import HtmlConverter
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
+from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+
+# Load dependencies
+_dependency_exc_info = None
+try:
+    import pandas as pd
+except ImportError:
+    _dependency_exc_info = sys.exc_info()
 
 ACCEPTED_MIME_TYPE_PREFIXES = [
     "text/csv",
@@ -19,6 +28,7 @@ class CsvConverter(DocumentConverter):
 
     def __init__(self):
         super().__init__()
+        self._html_converter = HtmlConverter()
 
     def accepts(
         self,
@@ -41,37 +51,31 @@ class CsvConverter(DocumentConverter):
         stream_info: StreamInfo,
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
+        if _dependency_exc_info is not None:
+            raise MissingDependencyException(
+                MISSING_DEPENDENCY_MESSAGE.format(
+                    converter=type(self).__name__,
+                    extension=".csv",
+                    feature="csv",
+                )
+            ) from _dependency_exc_info[1].with_traceback(
+                _dependency_exc_info[2]
+            )  # type: ignore[union-attr]
         # Read the file content
         if stream_info.charset:
             content = file_stream.read().decode(stream_info.charset)
         else:
             content = str(from_bytes(file_stream.read()).best())
 
-        # Parse CSV content
-        reader = csv.reader(io.StringIO(content))
-        rows = list(reader)
+        # Parse CSV content using pandas
+        df = pd.read_csv(io.StringIO(content))
 
-        if not rows:
+        if df.empty:
             return DocumentConverterResult(markdown="")
 
-        # Create markdown table
-        markdown_table = []
+        html_content = df.to_html(index=False)
+        md_content = self._html_converter.convert_string(
+            html_content, **kwargs
+        ).markdown.strip()
 
-        # Add header row
-        markdown_table.append("| " + " | ".join(rows[0]) + " |")
-
-        # Add separator row
-        markdown_table.append("| " + " | ".join(["---"] * len(rows[0])) + " |")
-
-        # Add data rows
-        for row in rows[1:]:
-            # Make sure row has the same number of columns as header
-            while len(row) < len(rows[0]):
-                row.append("")
-            # Truncate if row has more columns than header
-            row = row[: len(rows[0])]
-            markdown_table.append("| " + " | ".join(row) + " |")
-
-        result = "\n".join(markdown_table)
-
-        return DocumentConverterResult(markdown=result)
+        return DocumentConverterResult(markdown=md_content.strip())
