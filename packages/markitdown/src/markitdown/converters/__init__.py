@@ -26,6 +26,7 @@ from ._cu_converter import (
     ContentUnderstandingFileType,
 )
 from ._epub_converter import EpubConverter
+from ._svg_converter import SvgConverter
 from ._csv_converter import CsvConverter
 
 __all__ = [
@@ -50,5 +51,6 @@ __all__ = [
     "ContentUnderstandingConverter",
     "ContentUnderstandingFileType",
     "EpubConverter",
+    "SvgConverter",
     "CsvConverter",
 ]
