@@ -322,6 +322,190 @@ class MarkItDown:
                 f"Invalid source type: {type(source)}. Expected str, requests.Response, BinaryIO."
             )
 
+    def get_metadata(
+        self,
+        source: Union[str, requests.Response, Path, BinaryIO],
+        *,
+        stream_info: Optional[StreamInfo] = None,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """
+        Extract lightweight metadata for a file or stream (e.g. mimetype, detected converter)
+        without executing the full conversion pipeline.
+        """
+        # Local path or URL
+        if isinstance(source, str):
+            if (
+                source.startswith("http:")
+                or source.startswith("https:")
+                or source.startswith("file:")
+                or source.startswith("data:")
+            ):
+                # For URIs/URLs, convert them to a stream or resolve them
+                # Here we parse them or let requests handle them if it's a URL
+                # For simplicity, resolve via requests if it's an HTTP URL, otherwise treat as stream
+                if source.startswith("http:") or source.startswith("https:"):
+                    response = requests.get(source, stream=True)
+                    return self.get_metadata(response, stream_info=stream_info, **kwargs)
+                else:
+                    # Parse local file URI
+                    from ._uri_utils import parse_data_uri, file_uri_to_path
+                    if source.startswith("data:"):
+                        mime, charset, data = parse_data_uri(source)
+                        stream = io.BytesIO(data)
+                        res_stream_info = StreamInfo(mimetype=mime, charset=charset)
+                        if stream_info:
+                            res_stream_info = res_stream_info.copy_and_update(stream_info)
+                        return self.get_metadata_stream(stream, stream_info=res_stream_info, **kwargs)
+                    else:
+                        netloc, path = file_uri_to_path(source)
+                        return self.get_metadata_local(path, stream_info=stream_info, **kwargs)
+            else:
+                # Local path
+                return self.get_metadata_local(source, stream_info=stream_info, **kwargs)
+        
+        # Path object
+        if isinstance(source, Path):
+            return self.get_metadata_local(source, stream_info=stream_info, **kwargs)
+            
+        # Binary stream
+        if (
+            hasattr(source, "read")
+            and callable(source.read)
+            and not isinstance(source, io.TextIOBase)
+        ):
+            return self.get_metadata_stream(source, stream_info=stream_info, **kwargs)
+            
+        # Requests Response
+        if isinstance(source, requests.Response):
+            stream = io.BytesIO(source.content)
+            url = source.url
+            filename = os.path.basename(urlparse(url).path)
+            content_type = source.headers.get("content-type")
+            mimetype = None
+            charset = None
+            if content_type:
+                parts = [p.strip() for p in content_type.split(";")]
+                mimetype = parts[0]
+                for p in parts[1:]:
+                    if p.startswith("charset="):
+                        charset = p[len("charset="):]
+            
+            res_stream_info = StreamInfo(
+                mimetype=mimetype,
+                charset=charset,
+                filename=filename,
+                url=url,
+            )
+            if stream_info:
+                res_stream_info = res_stream_info.copy_and_update(stream_info)
+            return self.get_metadata_stream(stream, stream_info=res_stream_info, **kwargs)
+
+        raise TypeError(
+            f"Invalid source type: {type(source)}. Expected str, requests.Response, BinaryIO, Path."
+        )
+
+    def get_metadata_local(
+        self,
+        path: Union[str, Path],
+        *,
+        stream_info: Optional[StreamInfo] = None,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        if isinstance(path, Path):
+            path = str(path)
+
+        base_guess = StreamInfo(
+            local_path=path,
+            extension=os.path.splitext(path)[1],
+            filename=os.path.basename(path),
+        )
+        if stream_info is not None:
+            base_guess = base_guess.copy_and_update(stream_info)
+
+        size_bytes = os.path.getsize(path)
+        with open(path, "rb") as fh:
+            metadata = self.get_metadata_stream(fh, stream_info=base_guess, **kwargs)
+            metadata["path"] = path
+            metadata["size_bytes"] = size_bytes
+            return metadata
+
+    def get_metadata_stream(
+        self,
+        stream: BinaryIO,
+        *,
+        stream_info: Optional[StreamInfo] = None,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        # Remember the initial stream position
+        cur_pos = stream.tell()
+        
+        # Calculate size by seeking to the end
+        try:
+            stream.seek(0, io.SEEK_END)
+            size_bytes = stream.tell() - cur_pos
+        except Exception:
+            size_bytes = None
+        finally:
+            stream.seek(cur_pos)
+
+        base_guess = stream_info or StreamInfo()
+        guesses = self._get_stream_info_guesses(file_stream=stream, base_guess=base_guess)
+        
+        detected_converter = None
+        matched_mimetype = None
+        
+        sorted_registrations = sorted(self._converters, key=lambda x: x.priority)
+        
+        # Setup kwargs similar to _convert
+        _kwargs = {k: v for k, v in kwargs.items()}
+        if "llm_client" not in _kwargs and self._llm_client is not None:
+            _kwargs["llm_client"] = self._llm_client
+        if "llm_model" not in _kwargs and self._llm_model is not None:
+            _kwargs["llm_model"] = self._llm_model
+        if "llm_prompt" not in _kwargs and self._llm_prompt is not None:
+            _kwargs["llm_prompt"] = self._llm_prompt
+        if "style_map" not in _kwargs and self._style_map is not None:
+            _kwargs["style_map"] = self._style_map
+        if "exiftool_path" not in _kwargs and self._exiftool_path is not None:
+            _kwargs["exiftool_path"] = self._exiftool_path
+        _kwargs["_parent_converters"] = self._converters
+
+        for guess_info in guesses + [StreamInfo()]:
+            for converter_registration in sorted_registrations:
+                converter = converter_registration.converter
+                
+                # Check if the converter accepts the stream
+                _accepts = False
+                try:
+                    _kwargs_copy = _kwargs.copy()
+                    if guess_info.extension is not None:
+                        _kwargs_copy["file_extension"] = guess_info.extension
+                    if guess_info.url is not None:
+                        _kwargs_copy["url"] = guess_info.url
+                        
+                    _accepts = converter.accepts(stream, guess_info, **_kwargs_copy)
+                except Exception:
+                    pass
+                finally:
+                    stream.seek(cur_pos)
+
+                if _accepts:
+                    detected_converter = type(converter).__name__
+                    matched_mimetype = guess_info.mimetype
+                    break
+            if detected_converter:
+                break
+                
+        metadata = {
+            "mime_type": matched_mimetype or base_guess.mimetype,
+            "detected_converter": detected_converter,
+        }
+        if size_bytes is not None:
+            metadata["size_bytes"] = size_bytes
+            
+        return metadata
+
     def convert_local(
         self,
         path: Union[str, Path],

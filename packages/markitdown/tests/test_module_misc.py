@@ -587,6 +587,16 @@ def test_markitdown_llm() -> None:
     validate_strings(result, PPTX_TEST_STRINGS)
 
 
+def test_get_metadata() -> None:
+    markitdown = MarkItDown()
+    docx_file = os.path.join(TEST_FILES_DIR, "test.docx")
+    metadata = markitdown.get_metadata(docx_file)
+    assert metadata["detected_converter"] == "DocxConverter"
+    assert "application/vnd.openxmlformats-officedocument.wordprocessingml.document" in metadata["mime_type"]
+    assert metadata["size_bytes"] > 0
+    assert metadata["path"] == docx_file
+
+
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     for test in [
@@ -602,6 +612,7 @@ if __name__ == "__main__":
         test_markitdown_exiftool,
         test_markitdown_llm_parameters,
         test_markitdown_llm,
+        test_get_metadata,
     ]:
         print(f"Running {test.__name__}...", end="")
         test()
