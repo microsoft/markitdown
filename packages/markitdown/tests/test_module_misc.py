@@ -274,6 +274,40 @@ def test_docx_equations() -> None:
     assert block_equations, "No block equations found in the document."
 
 
+def test_docx_internal_hyperlinks() -> None:
+    import tempfile
+    from docx import Document
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+
+    doc = Document()
+    p = doc.add_paragraph()
+
+    # Add internal anchor (a TOC entry)
+    hl = OxmlElement('w:hyperlink')
+    hl.set(qn('w:anchor'), '_Toc12345')
+    r = OxmlElement('w:r')
+    t = OxmlElement('w:t')
+    t.text = "Executive Summary"
+    r.append(t)
+    hl.append(r)
+    p._p.append(hl)
+
+    path = os.path.join(tempfile.gettempdir(), "test_internal_hyperlinks.docx")
+    try:
+        doc.save(path)
+        markitdown = MarkItDown()
+        result = markitdown.convert(path)
+        # Should be converted to plain text, not a markdown hyperlink
+        assert "Executive Summary" in result.text_content
+        assert "[Executive Summary]" not in result.text_content
+        assert "#_Toc12345" not in result.text_content
+    finally:
+        if os.path.exists(path):
+            os.remove(path)
+
+
+
 def test_input_as_strings() -> None:
     markitdown = MarkItDown()
 
@@ -594,6 +628,7 @@ if __name__ == "__main__":
         test_data_uris,
         test_file_uris,
         test_docx_comments,
+        test_docx_internal_hyperlinks,
         test_input_as_strings,
         test_markitdown_remote,
         test_speech_transcription,
