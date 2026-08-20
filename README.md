@@ -82,10 +82,27 @@ Or use `-o` to specify the output file:
 markitdown path-to-file.pdf -o document.md
 ```
 
+For DOCX files with merged or nested tables, use HTML table output to preserve
+structure that Markdown pipe tables cannot represent:
+
+```bash
+markitdown report.docx --docx-table-format html > report.md
+```
+
 You can also pipe content:
 
 ```bash
 cat path-to-file.pdf | markitdown
+```
+
+### Python API
+
+```python
+from markitdown import MarkItDown
+
+md = MarkItDown(docx_table_format="html")
+result = md.convert("report.docx")
+print(result.text_content)
 ```
 
 ### Optional Dependencies

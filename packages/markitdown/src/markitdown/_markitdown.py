@@ -192,7 +192,12 @@ class MarkItDown:
             self.register_converter(WikipediaConverter())
             self.register_converter(YouTubeConverter())
             self.register_converter(BingSerpConverter())
-            self.register_converter(DocxConverter())
+            self.register_converter(
+                DocxConverter(
+                    docx_table_format=kwargs.get("docx_table_format", "markdown"),
+                    docx_markdownify_options=kwargs.get("docx_markdownify_options"),
+                )
+            )
             self.register_converter(XlsxConverter())
             self.register_converter(XlsConverter())
             self.register_converter(PptxConverter())

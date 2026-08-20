@@ -32,13 +32,20 @@ pip install -e 'packages/markitdown[all]'
 markitdown path-to-file.pdf > document.md
 ```
 
+For DOCX files with merged or nested tables, use HTML table output to preserve
+structure that Markdown pipe tables cannot represent:
+
+```bash
+markitdown report.docx --docx-table-format html > report.md
+```
+
 ### Python API
 
 ```python
 from markitdown import MarkItDown
 
-md = MarkItDown()
-result = md.convert("test.xlsx")
+md = MarkItDown(docx_table_format="html")
+result = md.convert("test.docx")
 print(result.text_content)
 ```
 

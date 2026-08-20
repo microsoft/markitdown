@@ -138,6 +138,13 @@ def main():
         help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
     )
 
+    parser.add_argument(
+        "--docx-table-format",
+        choices=("markdown", "html"),
+        default="markdown",
+        help="Format to use for DOCX tables. Use 'html' to preserve merged and nested table structure.",
+    )
+
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
 
@@ -209,7 +216,9 @@ def main():
             _exit_with_error("Filename is required when using Document Intelligence.")
 
         markitdown = MarkItDown(
-            enable_plugins=args.use_plugins, docintel_endpoint=args.endpoint
+            enable_plugins=args.use_plugins,
+            docintel_endpoint=args.endpoint,
+            docx_table_format=args.docx_table_format,
         )
     elif args.use_cu:
         if args.cu_endpoint is None:
@@ -240,9 +249,16 @@ def main():
                     _exit_with_error(f"Unknown file type: {name}")
             cu_kwargs["cu_file_types"] = cu_types
 
-        markitdown = MarkItDown(enable_plugins=args.use_plugins, **cu_kwargs)
+        markitdown = MarkItDown(
+            enable_plugins=args.use_plugins,
+            docx_table_format=args.docx_table_format,
+            **cu_kwargs,
+        )
     else:
-        markitdown = MarkItDown(enable_plugins=args.use_plugins)
+        markitdown = MarkItDown(
+            enable_plugins=args.use_plugins,
+            docx_table_format=args.docx_table_format,
+        )
 
     if args.filename is None:
         result = markitdown.convert_stream(
