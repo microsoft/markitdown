@@ -264,12 +264,16 @@ def _handle_output(args, result: DocumentConverterResult):
         with open(args.output, "w", encoding="utf-8") as f:
             f.write(result.markdown)
     else:
-        # Handle stdout encoding errors more gracefully
-        print(
-            result.markdown.encode(sys.stdout.encoding, errors="replace").decode(
-                sys.stdout.encoding
+        # Handle stdout encoding errors more gracefully by attempting to set UTF-8
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")
+            print(result.markdown)
+        except Exception:
+            # Fallback to replacing unencodable characters
+            encoding = sys.stdout.encoding or "utf-8"
+            print(
+                result.markdown.encode(encoding, errors="replace").decode(encoding)
             )
-        )
 
 
 def _exit_with_error(message: str):

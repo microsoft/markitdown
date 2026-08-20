@@ -2,13 +2,15 @@
 import subprocess
 from markitdown import __version__
 
+import sys
+
 # This file contains CLI tests that are not directly tested by the FileTestVectors.
 # This includes things like help messages, version numbers, and invalid flags.
 
 
 def test_version() -> None:
     result = subprocess.run(
-        ["python", "-m", "markitdown", "--version"], capture_output=True, text=True
+        [sys.executable, "-m", "markitdown", "--version"], capture_output=True, text=True, encoding="utf-8"
     )
 
     assert result.returncode == 0, f"CLI exited with error: {result.stderr}"
@@ -17,7 +19,7 @@ def test_version() -> None:
 
 def test_invalid_flag() -> None:
     result = subprocess.run(
-        ["python", "-m", "markitdown", "--foobar"], capture_output=True, text=True
+        [sys.executable, "-m", "markitdown", "--foobar"], capture_output=True, text=True, encoding="utf-8"
     )
 
     assert result.returncode != 0, f"CLI exited with error: {result.stderr}"
