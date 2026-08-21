@@ -47,6 +47,11 @@ def parse_data_uri(uri: str) -> Tuple[str | None, Dict[str, str], bytes]:
         elif len(part) > 0:
             attributes[part] = ""
 
-    content = base64.b64decode(data) if is_base64 else unquote_to_bytes(data)
+    if is_base64:
+        # Re-pad before decoding: many encoders emit base64 without the trailing
+        # "=" padding, which base64.b64decode rejects with binascii.Error.
+        content = base64.b64decode(data + "=" * (-len(data) % 4))
+    else:
+        content = unquote_to_bytes(data)
 
     return mime_type, attributes, content
