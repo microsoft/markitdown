@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: MIT
 import argparse
 import sys
+import os
 import codecs
 from typing import Any, Dict
 from textwrap import dedent
@@ -98,13 +99,13 @@ def main():
         "-e",
         "--endpoint",
         type=str,
-        help="Document Intelligence Endpoint. Required if using Document Intelligence.",
+        help="Document Intelligence Endpoint. Required if using Document Intelligence (or set MARKITDOWN_DOCINTEL_ENDPOINT).",
     )
 
     parser.add_argument(
         "--cu-endpoint",
         type=str,
-        help="Content Understanding Endpoint. Required if using --use-cu.",
+        help="Content Understanding Endpoint. Required if using --use-cu (or set MARKITDOWN_CU_ENDPOINT).",
     )
 
     parser.add_argument(
@@ -201,26 +202,32 @@ def main():
         sys.exit(0)
 
     if args.use_docintel:
-        if args.endpoint is None:
+        docintel_endpoint = args.endpoint or os.environ.get(
+            "MARKITDOWN_DOCINTEL_ENDPOINT"
+        )
+        if docintel_endpoint is None:
             _exit_with_error(
-                "Document Intelligence Endpoint is required when using Document Intelligence."
+                "Document Intelligence Endpoint is required when using Document Intelligence. "
+                "Pass -e / --endpoint or set MARKITDOWN_DOCINTEL_ENDPOINT."
             )
         elif args.filename is None:
             _exit_with_error("Filename is required when using Document Intelligence.")
 
         markitdown = MarkItDown(
-            enable_plugins=args.use_plugins, docintel_endpoint=args.endpoint
+            enable_plugins=args.use_plugins, docintel_endpoint=docintel_endpoint
         )
     elif args.use_cu:
-        if args.cu_endpoint is None:
+        cu_endpoint = args.cu_endpoint or os.environ.get("MARKITDOWN_CU_ENDPOINT")
+        if cu_endpoint is None:
             _exit_with_error(
-                "Content Understanding Endpoint (--cu-endpoint) is required when using --use-cu."
+                "Content Understanding Endpoint (--cu-endpoint) is required when using --use-cu. "
+                "Pass --cu-endpoint or set MARKITDOWN_CU_ENDPOINT."
             )
         elif args.filename is None:
             _exit_with_error("Filename is required when using Content Understanding.")
 
         cu_kwargs: Dict[str, Any] = {
-            "cu_endpoint": args.cu_endpoint,
+            "cu_endpoint": cu_endpoint,
         }
         if args.cu_analyzer is not None:
             cu_kwargs["cu_analyzer_id"] = args.cu_analyzer
