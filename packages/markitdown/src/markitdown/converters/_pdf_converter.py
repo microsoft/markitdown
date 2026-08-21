@@ -10,6 +10,17 @@ from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 # Pattern for MasterFormat-style partial numbering (e.g., ".1", ".2", ".10")
 PARTIAL_NUMBERING_PATTERN = re.compile(r"^\.\d+$")
 
+# Thresholds for the PyMuPDF inline-image-truncation recovery pass below.
+# Only attempt the (relatively expensive) PyMuPDF re-extraction when the
+# primary parsers' output is short enough to plausibly be truncated.
+PYMUPDF_FALLBACK_MAX_PRIMARY_LENGTH = 2048
+# Prefer the PyMuPDF result when it recovers meaningfully more text than the
+# primary parsers, either proportionally (50% more) or in absolute terms
+# (200+ extra characters), to avoid swapping in a result that isn't a real
+# improvement.
+PYMUPDF_FALLBACK_MIN_LENGTH_RATIO = 1.5
+PYMUPDF_FALLBACK_MIN_LENGTH_DELTA = 200
+
 
 def _merge_partial_numbering_lines(text: str) -> str:
     """
@@ -57,6 +68,29 @@ def _merge_partial_numbering_lines(text: str) -> str:
     return "\n".join(result_lines)
 
 
+def _extract_with_pymupdf(pdf_bytes: io.BytesIO) -> str | None:
+    """Extract text with PyMuPDF when the primary PDF parsers look truncated."""
+    if fitz is None:
+        return None
+
+    pdf_bytes.seek(0)
+    # Use a zero-copy view into the already-buffered bytes instead of
+    # `pdf_bytes.read()`, which would duplicate the whole PDF in memory.
+    view = pdf_bytes.getbuffer()
+    try:
+        chunks: list[str] = []
+        with fitz.open(stream=view, filetype="pdf") as doc:
+            for page in doc:
+                text = page.get_text("text")
+                if text and text.strip():
+                    chunks.append(text.strip())
+    finally:
+        view.release()
+
+    markdown = "\n\n".join(chunks).strip()
+    return markdown or None
+
+
 # Load dependencies
 _dependency_exc_info = None
 try:
@@ -65,6 +99,11 @@ try:
     import pdfplumber
 except ImportError:
     _dependency_exc_info = sys.exc_info()
+
+try:
+    import fitz
+except ImportError:
+    fitz = None
 
 
 ACCEPTED_MIME_TYPE_PREFIXES = [
@@ -536,6 +575,9 @@ class PdfConverter(DocumentConverter):
 
         assert isinstance(file_stream, io.IOBase)
 
+        markdown_chunks: list[str] = []
+        has_images = False
+
         # Read file stream into BytesIO for compatibility with pdfplumber
         pdf_bytes = io.BytesIO(file_stream.read())
 
@@ -545,12 +587,14 @@ class PdfConverter(DocumentConverter):
             # pages are collected separately. page.close() is called
             # after each page to free pdfplumber's cached objects and
             # keep memory usage constant regardless of page count.
-            markdown_chunks: list[str] = []
             form_page_count = 0
             plain_page_indices: list[int] = []
 
             with pdfplumber.open(pdf_bytes) as pdf:
                 for page_idx, page in enumerate(pdf.pages):
+                    has_images = has_images or bool(getattr(page, "images", None))
+
+                    # Try form-style word position extraction
                     page_content = _extract_form_content_from_words(page)
 
                     if page_content is not None:
@@ -582,6 +626,31 @@ class PdfConverter(DocumentConverter):
         if not markdown:
             pdf_bytes.seek(0)
             markdown = pdfminer.high_level.extract_text(pdf_bytes)
+
+        # Recover from inline-image truncation cases where the primary parsers
+        # return a much shorter body than an optional PyMuPDF pass.
+        if (
+            fitz is not None
+            and has_images
+            and markdown
+            and len(markdown) < PYMUPDF_FALLBACK_MAX_PRIMARY_LENGTH
+        ):
+            try:
+                pymupdf_markdown = _extract_with_pymupdf(pdf_bytes)
+            except Exception:
+                pymupdf_markdown = None
+            else:
+                if pymupdf_markdown is not None:
+                    primary_length = len(markdown.strip())
+                    pymupdf_length = len(pymupdf_markdown.strip())
+                    if pymupdf_length > primary_length and (
+                        primary_length == 0
+                        or pymupdf_length
+                        >= primary_length * PYMUPDF_FALLBACK_MIN_LENGTH_RATIO
+                        or pymupdf_length - primary_length
+                        >= PYMUPDF_FALLBACK_MIN_LENGTH_DELTA
+                    ):
+                        markdown = pymupdf_markdown
 
         # Post-process to merge MasterFormat-style partial numbering with following text
         markdown = _merge_partial_numbering_lines(markdown)

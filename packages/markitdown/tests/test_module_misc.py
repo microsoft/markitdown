@@ -6,6 +6,9 @@ import shutil
 import pytest
 from unittest.mock import MagicMock
 
+from markitdown.converters._csv_converter import CsvConverter
+import markitdown.converters._pdf_converter as pdf_converter_module
+
 from markitdown._uri_utils import parse_data_uri, file_uri_to_path
 
 from markitdown import (
@@ -485,6 +488,87 @@ def test_exceptions() -> None:
         )
     assert len(exc_info.value.attempts) == 1
     assert type(exc_info.value.attempts[0].converter).__name__ == "PptxConverter"
+
+
+def test_pdf_converter_prefers_pymupdf_when_primary_extraction_is_truncated(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _FakePage:
+        images = [object()]
+
+        def extract_words(self, keep_blank_chars=True, x_tolerance=3, y_tolerance=3):
+            return []
+
+        def extract_text(self):
+            return "BEFORE_IMAGE: this text should be extracted"
+
+    class _FakePdf:
+        pages = [_FakePage()]
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    class _FakePyMuPdfPage:
+        def get_text(self, kind):
+            assert kind == "text"
+            return (
+                "BEFORE_IMAGE: this text should be extracted\n"
+                "AFTER_IMAGE: this text should also be extracted"
+            )
+
+    class _FakePyMuPdfDoc:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def __iter__(self):
+            return iter([_FakePyMuPdfPage()])
+
+    class _FakeFitz:
+        @staticmethod
+        def open(*args, **kwargs):
+            return _FakePyMuPdfDoc()
+
+    monkeypatch.setattr(pdf_converter_module.pdfplumber, "open", lambda _: _FakePdf())
+    monkeypatch.setattr(
+        pdf_converter_module.pdfminer.high_level,
+        "extract_text",
+        lambda _: "BEFORE_IMAGE: this text should be extracted",
+    )
+    # Patch the module-level `fitz` name itself (not an attribute on it), since
+    # `fitz` is `None` when PyMuPDF isn't installed and `setattr(None, ...)` fails.
+    monkeypatch.setattr(pdf_converter_module, "fitz", _FakeFitz)
+
+    converter = pdf_converter_module.PdfConverter()
+    result = converter.convert(
+        io.BytesIO(b"%PDF-1.4 fake"),
+        StreamInfo(mimetype="application/pdf", extension=".pdf"),
+    )
+
+    assert "BEFORE_IMAGE: this text should be extracted" in result.markdown
+    assert "AFTER_IMAGE: this text should also be extracted" in result.markdown
+
+
+def test_csv_converter_skips_leading_blank_rows() -> None:
+    converter = CsvConverter()
+    result = converter.convert(
+        io.BytesIO(b"\nname,age\nbob,3\nalice,7\n"),
+        StreamInfo(mimetype="text/csv", extension=".csv", charset="utf-8"),
+    )
+
+    assert result.markdown == "\n".join(
+        [
+            "| name | age |",
+            "| --- | --- |",
+            "| bob | 3 |",
+            "| alice | 7 |",
+        ]
+    )
 
 
 @pytest.mark.skipif(
