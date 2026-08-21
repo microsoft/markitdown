@@ -88,6 +88,28 @@ You can also pipe content:
 cat path-to-file.pdf | markitdown
 ```
 
+### Desktop UI (PyQt6)
+
+Install with GUI support:
+
+```bash
+pip install 'markitdown[gui]'
+```
+
+Then launch:
+
+```bash
+markitdown-gui
+```
+
+You can also launch the same UI from the main CLI:
+
+```bash
+markitdown --gui
+```
+
+The UI supports selecting multiple files at once and writes one `.md` output per input file.
+
 ### Optional Dependencies
 MarkItDown has optional dependencies for activating various file formats. Earlier in this document, we installed all optional dependencies with the `[all]` option. However, you can also install them individually for more control. For example:
 
@@ -100,6 +122,7 @@ will install only the dependencies for PDF, DOCX, and PPTX files.
 At the moment, the following optional dependencies are available:
 
 * `[all]` Installs all optional dependencies
+* `[gui]` Installs dependencies for the PyQt6 desktop UI (multi-file conversion)
 * `[pptx]` Installs dependencies for PowerPoint files
 * `[docx]` Installs dependencies for Word files
 * `[xlsx]` Installs dependencies for Excel files

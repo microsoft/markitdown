@@ -138,8 +138,20 @@ def main():
         help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
     )
 
+    parser.add_argument(
+        "--gui",
+        action="store_true",
+        help="Launch the PyQt6 desktop UI for selecting and converting multiple files.",
+    )
+
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
+
+    if args.gui:
+        from ._qt_gui import main as gui_main
+
+        gui_main()
+        return
 
     # Parse the extension hint
     extension_hint = args.extension

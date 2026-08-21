@@ -32,6 +32,28 @@ pip install -e 'packages/markitdown[all]'
 markitdown path-to-file.pdf > document.md
 ```
 
+### Desktop UI (PyQt6)
+
+Install the GUI extra:
+
+```bash
+pip install 'markitdown[gui]'
+```
+
+Launch the desktop app:
+
+```bash
+markitdown-gui
+```
+
+Or from the main CLI:
+
+```bash
+markitdown --gui
+```
+
+The desktop UI lets you select multiple files in one operation and converts each file to a `.md` Markdown file.
+
 ### Python API
 
 ```python

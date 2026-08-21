@@ -50,6 +50,7 @@ all = [
   "azure-ai-contentunderstanding>=1.2.0b1",
   "azure-identity",
 ]
+gui = ["PyQt6"]
 pptx = ["python-pptx"]
 docx = ["mammoth~=1.11.0", "lxml"]
 xlsx = ["pandas", "openpyxl"]
@@ -72,6 +73,7 @@ path = "src/markitdown/__about__.py"
 
 [project.scripts]
 markitdown = "markitdown.__main__:main"
+markitdown-gui = "markitdown._qt_gui:main"
 
 [tool.hatch.envs.default]
 features = ["all"]
