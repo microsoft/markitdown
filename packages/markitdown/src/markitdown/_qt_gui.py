@@ -15,7 +15,7 @@ class _MainWindowFactory:
     @staticmethod
     def create():
         try:
-            from PyQt6.QtCore import Qt
+            from PyQt6.QtCore import QObject, QThread, Qt, pyqtSignal, pyqtSlot
             from PyQt6.QtWidgets import (
                 QApplication,
                 QCheckBox,
@@ -30,6 +30,7 @@ class _MainWindowFactory:
                 QMessageBox,
                 QPushButton,
                 QPlainTextEdit,
+                QProgressBar,
                 QVBoxLayout,
                 QWidget,
             )
@@ -38,6 +39,78 @@ class _MainWindowFactory:
                 "PyQt6 is not installed. Install with: pip install 'markitdown[gui]'"
             ) from exc
 
+        class ConversionWorker(QObject):
+            progress = pyqtSignal(int, int)
+            log = pyqtSignal(str)
+            finished = pyqtSignal(int, int)
+
+            def __init__(
+                self,
+                source_files: List[Path],
+                target_directory: Path | None,
+                enable_plugins: bool,
+            ):
+                super().__init__()
+                self._source_files = source_files
+                self._target_directory = target_directory
+                self._enable_plugins = enable_plugins
+
+            @pyqtSlot()
+            def run(self):
+                converter = MarkItDown(enable_plugins=self._enable_plugins)
+                success_count = 0
+                failure_count = 0
+                seen_outputs: set[Path] = set()
+
+                for index, source_file in enumerate(self._source_files, start=1):
+                    try:
+                        output_file = self._resolve_output_path(
+                            source_file=source_file,
+                            target_directory=self._target_directory,
+                            seen_outputs=seen_outputs,
+                        )
+                        result = converter.convert(str(source_file))
+                        output_file.write_text(result.markdown, encoding="utf-8")
+                        success_count += 1
+                        self.log.emit(f"OK: {source_file} -> {output_file}")
+                    except Exception as exc:
+                        failure_count += 1
+                        self.log.emit(f"ERROR: {source_file} ({exc})")
+                    finally:
+                        self.progress.emit(index, len(self._source_files))
+
+                self.finished.emit(success_count, failure_count)
+
+            @staticmethod
+            def _resolve_output_path(
+                source_file: Path,
+                target_directory: Path | None,
+                seen_outputs: set[Path],
+            ) -> Path:
+                if target_directory is None:
+                    candidate = source_file.with_suffix(".md")
+                else:
+                    candidate = target_directory / f"{source_file.stem}.md"
+
+                if candidate not in seen_outputs:
+                    seen_outputs.add(candidate)
+                    return candidate
+
+                index = 1
+                while True:
+                    if target_directory is None:
+                        next_candidate = source_file.with_name(
+                            f"{source_file.stem}_{index}.md"
+                        )
+                    else:
+                        next_candidate = (
+                            target_directory / f"{source_file.stem}_{index}.md"
+                        )
+                    if next_candidate not in seen_outputs:
+                        seen_outputs.add(next_candidate)
+                        return next_candidate
+                    index += 1
+
         class MarkItDownWindow(QMainWindow):
             def __init__(self):
                 super().__init__()
@@ -45,6 +118,8 @@ class _MainWindowFactory:
                 self.resize(920, 620)
 
                 self._selected_files: List[Path] = []
+                self._conversion_thread: QThread | None = None
+                self._conversion_worker: ConversionWorker | None = None
 
                 central = QWidget(self)
                 self.setCentralWidget(central)
@@ -97,6 +172,11 @@ class _MainWindowFactory:
                 self.convert_button = QPushButton("Convert to Markdown")
                 self.convert_button.setEnabled(False)
                 run_layout.addWidget(self.convert_button)
+                self.progress_bar = QProgressBar()
+                self.progress_bar.setRange(0, 1)
+                self.progress_bar.setValue(0)
+                self.progress_bar.setFormat("Ready")
+                run_layout.addWidget(self.progress_bar, 1)
                 run_layout.addStretch(1)
                 root_layout.addLayout(run_layout)
 
@@ -153,35 +233,6 @@ class _MainWindowFactory:
                 if directory:
                     self.output_dir_edit.setText(directory)
 
-            def _resolve_output_path(
-                self,
-                source_file: Path,
-                target_directory: Path | None,
-                seen_outputs: set[Path],
-            ) -> Path:
-                if target_directory is None:
-                    candidate = source_file.with_suffix(".md")
-                else:
-                    candidate = target_directory / f"{source_file.stem}.md"
-
-                # Avoid collisions when different source files share the same stem.
-                if candidate not in seen_outputs:
-                    seen_outputs.add(candidate)
-                    return candidate
-
-                index = 1
-                while True:
-                    if target_directory is None:
-                        next_candidate = source_file.with_name(
-                            f"{source_file.stem}_{index}.md"
-                        )
-                    else:
-                        next_candidate = target_directory / f"{source_file.stem}_{index}.md"
-                    if next_candidate not in seen_outputs:
-                        seen_outputs.add(next_candidate)
-                        return next_candidate
-                    index += 1
-
             def _convert_files(self):
                 if not self._selected_files:
                     QMessageBox.information(self, "No files", "Select files first.")
@@ -202,33 +253,45 @@ class _MainWindowFactory:
                     target_directory = Path(raw_output_dir)
                     target_directory.mkdir(parents=True, exist_ok=True)
 
-                self.convert_button.setEnabled(False)
+                self._set_conversion_controls_enabled(False)
+                self.progress_bar.setRange(0, len(self._selected_files))
+                self.progress_bar.setValue(0)
+                self.progress_bar.setFormat("Converting %v of %m files")
                 self._append_log("Starting conversion...")
 
-                converter = MarkItDown(enable_plugins=self.use_plugins_checkbox.isChecked())
-                success_count = 0
-                failure_count = 0
-                seen_outputs: set[Path] = set()
+                self._conversion_thread = QThread(self)
+                self._conversion_worker = ConversionWorker(
+                    source_files=list(self._selected_files),
+                    target_directory=target_directory,
+                    enable_plugins=self.use_plugins_checkbox.isChecked(),
+                )
+                self._conversion_worker.moveToThread(self._conversion_thread)
+                self._conversion_thread.started.connect(self._conversion_worker.run)
+                self._conversion_worker.log.connect(self._append_log)
+                self._conversion_worker.progress.connect(self._update_progress)
+                self._conversion_worker.finished.connect(self._conversion_finished)
+                self._conversion_worker.finished.connect(self._conversion_thread.quit)
+                self._conversion_worker.finished.connect(
+                    self._conversion_worker.deleteLater
+                )
+                self._conversion_thread.finished.connect(
+                    self._conversion_thread.deleteLater
+                )
+                self._conversion_thread.finished.connect(self._clear_conversion_thread)
+                self._conversion_thread.start()
 
-                for source_file in self._selected_files:
-                    try:
-                        output_file = self._resolve_output_path(
-                            source_file=source_file,
-                            target_directory=target_directory,
-                            seen_outputs=seen_outputs,
-                        )
-                        result = converter.convert(str(source_file))
-                        output_file.write_text(result.markdown, encoding="utf-8")
-                        success_count += 1
-                        self._append_log(f"OK: {source_file} -> {output_file}")
-                    except Exception as exc:
-                        failure_count += 1
-                        self._append_log(f"ERROR: {source_file} ({exc})")
+            @pyqtSlot(int, int)
+            def _update_progress(self, completed: int, total: int):
+                self.progress_bar.setMaximum(total)
+                self.progress_bar.setValue(completed)
 
+            @pyqtSlot(int, int)
+            def _conversion_finished(self, success_count: int, failure_count: int):
                 self._append_log(
                     f"Finished. Success: {success_count}, Failed: {failure_count}."
                 )
-                self.convert_button.setEnabled(True)
+                self.progress_bar.setFormat("Finished: %v of %m files")
+                self._set_conversion_controls_enabled(True)
 
                 if failure_count > 0:
                     QMessageBox.warning(
@@ -242,6 +305,24 @@ class _MainWindowFactory:
                         "Conversion completed",
                         f"Converted {success_count} file(s) to Markdown.",
                     )
+
+            @pyqtSlot()
+            def _clear_conversion_thread(self):
+                self._conversion_worker = None
+                self._conversion_thread = None
+
+            def _set_conversion_controls_enabled(self, enabled: bool):
+                self.select_files_button.setEnabled(enabled)
+                self.clear_files_button.setEnabled(enabled)
+                self.write_next_to_source_checkbox.setEnabled(enabled)
+                self.output_dir_edit.setEnabled(
+                    enabled and not self.write_next_to_source_checkbox.isChecked()
+                )
+                self.select_output_button.setEnabled(
+                    enabled and not self.write_next_to_source_checkbox.isChecked()
+                )
+                self.use_plugins_checkbox.setEnabled(enabled)
+                self.convert_button.setEnabled(enabled and bool(self._selected_files))
 
             def _append_log(self, message: str):
                 self.log_box.appendPlainText(message)
