@@ -79,7 +79,7 @@ markitdown-gui = "markitdown._qt_gui:main"
 features = ["all"]
 
 [tool.hatch.envs.hatch-test]
-features = ["all"]
+features = ["all", "gui"]
 extra-dependencies = [
   "openai",
 ]
