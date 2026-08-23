@@ -1,3 +1,5 @@
+import warnings
+
 from defusedxml import minidom
 from xml.dom.minidom import Document, Element
 from typing import BinaryIO, Any, Union
@@ -173,6 +175,17 @@ class RssConverter(DocumentConverter):
             # using bs4 because many RSS feeds have HTML-styled content
             soup = BeautifulSoup(content, "html.parser")
             return _CustomMarkdownify(**self._kwargs).convert_soup(soup)
+        except RecursionError:
+            # Deeply nested item content can exceed Python's recursion limit
+            # during markdownify's recursive DOM traversal.  Fall back to
+            # BeautifulSoup's iterative get_text() so the caller still gets
+            # usable plain-text content instead of raw HTML.
+            warnings.warn(
+                "RSS item content is too deeply nested for markdown conversion "
+                "(RecursionError). Falling back to plain-text extraction.",
+                stacklevel=2,
+            )
+            return BeautifulSoup(content, "html.parser").get_text("\n", strip=True)
         except BaseException as _:
             return content
 
