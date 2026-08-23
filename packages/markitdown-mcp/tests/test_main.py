@@ -5,7 +5,6 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from markitdown_mcp.__main__ import convert_to_markdown, mcp
 
 URI = "file:///tmp/example.txt"
