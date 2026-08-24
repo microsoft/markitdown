@@ -1,7 +1,7 @@
 import sys
 
 from typing import BinaryIO, Any
-from charset_normalizer import from_bytes
+from .._charset_utils import decode_bytes
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
 
@@ -63,9 +63,6 @@ class PlainTextConverter(DocumentConverter):
         stream_info: StreamInfo,
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
-        if stream_info.charset:
-            text_content = file_stream.read().decode(stream_info.charset)
-        else:
-            text_content = str(from_bytes(file_stream.read()).best())
+        text_content = decode_bytes(file_stream.read(), stream_info.charset)
 
         return DocumentConverterResult(markdown=text_content)

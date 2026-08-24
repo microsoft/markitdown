@@ -1,7 +1,7 @@
 import csv
 import io
 from typing import BinaryIO, Any
-from charset_normalizer import from_bytes
+from .._charset_utils import decode_bytes
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
 
@@ -42,10 +42,7 @@ class CsvConverter(DocumentConverter):
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
         # Read the file content
-        if stream_info.charset:
-            content = file_stream.read().decode(stream_info.charset)
-        else:
-            content = str(from_bytes(file_stream.read()).best())
+        content = decode_bytes(file_stream.read(), stream_info.charset)
 
         # Parse CSV content
         reader = csv.reader(io.StringIO(content))

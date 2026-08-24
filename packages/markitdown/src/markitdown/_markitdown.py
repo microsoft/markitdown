@@ -14,7 +14,6 @@ from warnings import warn
 import requests
 import magika
 import charset_normalizer
-import codecs
 
 from ._stream_info import StreamInfo
 from ._uri_utils import parse_data_uri, file_uri_to_path
@@ -44,6 +43,7 @@ from .converters import (
 
 from ._base_converter import DocumentConverter, DocumentConverterResult
 
+from ._charset_utils import normalize_charset
 from ._exceptions import (
     FileConversionException,
     UnsupportedFormatException,
@@ -734,6 +734,14 @@ class MarkItDown:
                     if charset_result is not None:
                         charset = self._normalize_charset(charset_result.encoding)
 
+                        # The charset was sniffed from a prefix of the stream, but
+                        # is used to decode all of it. ASCII is a strict subset of
+                        # UTF-8, so widening the guess decodes genuine ASCII
+                        # identically, while also handling a stream whose first
+                        # non-ASCII character falls beyond the sniffed prefix.
+                        if charset == self._normalize_charset("ascii"):
+                            charset = self._normalize_charset("utf-8")
+
                 # Normalize the first extension listed
                 guessed_extension = None
                 if len(result.prediction.output.extensions) > 0:
@@ -798,9 +806,4 @@ class MarkItDown:
         """
         Normalize a charset string to a canonical form.
         """
-        if charset is None:
-            return None
-        try:
-            return codecs.lookup(charset).name
-        except LookupError:
-            return charset
+        return normalize_charset(charset)
