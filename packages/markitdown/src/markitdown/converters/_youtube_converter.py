@@ -75,7 +75,7 @@ class YouTubeConverter(DocumentConverter):
     ) -> DocumentConverterResult:
         # Parse the stream
         encoding = "utf-8" if stream_info.charset is None else stream_info.charset
-        soup = bs4.BeautifulSoup(file_stream, "html.parser", from_encoding=encoding)
+        soup = bs4.BeautifulSoup(file_stream, "html.parser", encoding=encoding)
 
         # Read the meta tags
         metadata: Dict[str, str] = {}
@@ -145,46 +145,76 @@ class YouTubeConverter(DocumentConverter):
             webpage_text += f"\n### Description\n{description}\n"
 
         if IS_YOUTUBE_TRANSCRIPT_CAPABLE:
-            ytt_api = YouTubeTranscriptApi()
             transcript_text = ""
             parsed_url = urlparse(stream_info.url)  # type: ignore
             params = parse_qs(parsed_url.query)  # type: ignore
             if "v" in params and params["v"][0]:
                 video_id = str(params["v"][0])
-                transcript_list = ytt_api.list(video_id)
-                languages = ["en"]
-                for transcript in transcript_list:
-                    languages.append(transcript.language_code)
-                    break
-                try:
-                    youtube_transcript_languages = kwargs.get(
-                        "youtube_transcript_languages", languages
-                    )
-                    # Retry the transcript fetching operation
-                    transcript = self._retry_operation(
-                        lambda: ytt_api.fetch(
-                            video_id, languages=youtube_transcript_languages
-                        ),
-                        retries=3,  # Retry 3 times
-                        delay=2,  # 2 seconds delay between retries
-                    )
-
-                    if transcript:
-                        transcript_text = " ".join(
-                            [part.text for part in transcript]
-                        )  # type: ignore
-                except Exception as e:
-                    # No transcript available
-                    if len(languages) == 1:
-                        print(f"Error fetching transcript: {e}")
+                
+                # Use the class method directly to list transcripts
+                transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+                
+                # Determine target languages for fetching/translation
+                # Prioritize 'youtube_transcript_languages' from kwargs
+                target_languages = kwargs.get("youtube_transcript_languages")
+                
+                # If not provided, try to infer from available transcripts
+                if not target_languages:
+                    available_languages = [t.language_code for t in transcript_list]
+                    if "en" in available_languages:
+                        target_languages = ["en"]
+                    elif available_languages:
+                        target_languages = [available_languages[0]] # Take the first available
                     else:
-                        # Translate transcript into first kwarg
-                        transcript = (
-                            transcript_list.find_transcript(languages)
-                            .translate(youtube_transcript_languages[0])
-                            .fetch()
+                        target_languages = [] # No languages found
+                
+                if target_languages:
+                    try:
+                        # Attempt to find and fetch the transcript in the target languages
+                        # find_transcript takes a list of preferred language codes
+                        transcript_obj = transcript_list.find_transcript(target_languages)
+                        
+                        # Retry the transcript fetching operation
+                        transcript_data = self._retry_operation(
+                            lambda: transcript_obj.fetch(), # Call fetch on the Transcript object
+                            retries=3,
+                            delay=2,
                         )
-                        transcript_text = " ".join([part.text for part in transcript])
+
+                        if transcript_data:
+                            # fetch() returns a list of dictionaries, each with a 'text' key
+                            transcript_text = " ".join(
+                                [part["text"] for part in transcript_data] # Corrected access to 'text'
+                            )
+                    except Exception as e:
+                        # If direct fetch fails, try to translate if a target language is specified
+                        print(f"Error fetching transcript for {target_languages}: {e}")
+                        
+                        if target_languages and target_languages[0]:
+                            try:
+                                source_transcript_obj = None
+                                # Try to find 'en' first as a source for translation
+                                try:
+                                    source_transcript_obj = transcript_list.find_transcript(["en"])
+                                except Exception:
+                                    pass
+                                
+                                if not source_transcript_obj and transcript_list:
+                                    # If 'en' not found, or if transcript_list is not empty, get the first available
+                                    source_transcript_obj = transcript_list[0]
+                                
+                                if source_transcript_obj:
+                                    translated_transcript_data = source_transcript_obj.translate(
+                                        target_languages[0] # Target language for translation
+                                    ).fetch()
+                                    transcript_text = " ".join([part["text"] for part in translated_transcript_data])
+                                else:
+                                    print(f"No suitable source transcript found for translation to {target_languages[0]}.")
+                            except Exception as translate_e:
+                                print(f"Error during translation attempt to {target_languages[0]}: {translate_e}")
+                else:
+                    print("No target languages specified or inferred for YouTube transcript.")
+
             if transcript_text:
                 webpage_text += f"\n### Transcript\n{transcript_text}\n"
 
