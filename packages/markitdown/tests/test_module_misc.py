@@ -261,6 +261,26 @@ def test_docx_comments() -> None:
     validate_strings(result, DOCX_COMMENT_TEST_STRINGS)
 
 
+def test_html_strikethrough_variants(tmp_path) -> None:
+    html = """<!doctype html>
+<html><body>
+<p>Plain <s>s element</s> after.</p>
+<p>Plain <del>del element</del> after.</p>
+<p>Plain <strike>strike element</strike> after.</p>
+<p>Plain <span style="text-decoration: line-through;">inline CSS line-through</span> after.</p>
+<p>Plain <span style="text-decoration-line: line-through;">CSS text-decoration-line</span> after.</p>
+</body></html>
+"""
+    path = tmp_path / "strike.html"
+    path.write_text(html, encoding="utf-8")
+    markdown = MarkItDown().convert(str(path)).markdown
+    assert "~~s element~~" in markdown
+    assert "~~del element~~" in markdown
+    assert "~~strike element~~" in markdown
+    assert "~~inline CSS line-through~~" in markdown
+    assert "~~CSS text-decoration-line~~" in markdown
+
+
 def test_docx_equations() -> None:
     markitdown = MarkItDown()
     docx_file = os.path.join(TEST_FILES_DIR, "equations.docx")
