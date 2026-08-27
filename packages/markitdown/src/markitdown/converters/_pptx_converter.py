@@ -98,22 +98,33 @@ class PptxConverter(DocumentConverter):
                     llm_description = ""
                     alt_text = ""
 
+                    # Resolve the image blob, handling SVG images that lack a
+                    # rasterized fallback (shape.image raises in that case).
+                    (
+                        image_blob,
+                        image_content_type,
+                        image_filename,
+                    ) = self._get_image_info(shape)
+
                     # Potentially generate a description using an LLM
                     llm_client = kwargs.get("llm_client")
                     llm_model = kwargs.get("llm_model")
-                    if llm_client is not None and llm_model is not None:
+                    if (
+                        llm_client is not None
+                        and llm_model is not None
+                        and image_blob is not None
+                    ):
                         # Prepare a file_stream and stream_info for the image data
-                        image_filename = shape.image.filename
                         image_extension = None
                         if image_filename:
                             image_extension = os.path.splitext(image_filename)[1]
                         image_stream_info = StreamInfo(
-                            mimetype=shape.image.content_type,
+                            mimetype=image_content_type,
                             extension=image_extension,
                             filename=image_filename,
                         )
 
-                        image_stream = io.BytesIO(shape.image.blob)
+                        image_stream = io.BytesIO(image_blob)
 
                         # Caption the image
                         try:
@@ -141,10 +152,9 @@ class PptxConverter(DocumentConverter):
                     alt_text = re.sub(r"\s+", " ", alt_text).strip()
 
                     # If keep_data_uris is True, use base64 encoding for images
-                    if kwargs.get("keep_data_uris", False):
-                        blob = shape.image.blob
-                        content_type = shape.image.content_type or "image/png"
-                        b64_string = base64.b64encode(blob).decode("utf-8")
+                    if kwargs.get("keep_data_uris", False) and image_blob is not None:
+                        content_type = image_content_type or "image/png"
+                        b64_string = base64.b64encode(image_blob).decode("utf-8")
                         md_content += f"\n![{alt_text}](data:{content_type};base64,{b64_string})\n"
                     else:
                         # A placeholder name
@@ -199,12 +209,69 @@ class PptxConverter(DocumentConverter):
 
         return DocumentConverterResult(markdown=md_content.strip())
 
+    def _find_svg_blip_part(self, shape):
+        """Return the image part referenced by an ``<asvg:svgBlip>``, if any.
+
+        PowerPoint stores SVG pictures as a blip whose main ``r:embed`` points
+        to a rasterized PNG fallback, plus an ``<asvg:svgBlip>`` extension
+        pointing to the SVG. When there is no raster fallback the ``<a:blip>``
+        has no ``r:embed`` at all, so python-pptx's ``shape.image`` fails. This
+        resolves the SVG part directly from the ``svgBlip`` extension.
+        """
+        try:
+            nsmap = {
+                "asvg": "http://schemas.microsoft.com/office/drawing/2016/SVG/main",
+            }
+            r_embed = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed"
+            for svg_blip in shape._element.findall(".//asvg:svgBlip", nsmap):
+                embed_rid = svg_blip.get(r_embed)
+                if not embed_rid:
+                    continue
+                return shape.part.related_part(embed_rid)
+        except Exception:
+            pass
+        return None
+
+    def _get_image_info(self, shape):
+        """Return (blob, content_type, filename) for a picture shape.
+
+        Handles SVG images that lack a rasterized fallback. In that case
+        ``shape.image`` raises ``ValueError("no embedded image")`` because the
+        ``<a:blip>`` has no ``r:embed`` attribute (only an ``<asvg:svgBlip>``
+        extension). We fall back to resolving the SVG blip directly.
+        """
+        try:
+            image = shape.image
+            return image.blob, image.content_type, image.filename
+        except Exception:
+            pass
+
+        # Fall back to an embedded SVG blip (image without a raster fallback)
+        part = self._find_svg_blip_part(shape)
+        if part is not None:
+            try:
+                filename = os.path.basename(getattr(part, "partname", "") or "") or None
+                return part.blob, "image/svg+xml", filename
+            except Exception:
+                pass
+
+        return None, None, None
+
     def _is_picture(self, shape):
         if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.PICTURE:
             return True
         if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.PLACEHOLDER:
-            if hasattr(shape, "image"):
-                return True
+            # ``shape.image`` can raise (e.g. ValueError "no embedded image")
+            # for SVG placeholders without a raster fallback, so guard against
+            # any exception rather than relying on hasattr (which only swallows
+            # AttributeError).
+            try:
+                if shape.image is not None:
+                    return True
+            except Exception:
+                # Still a picture if it carries an embedded SVG blip.
+                if self._find_svg_blip_part(shape) is not None:
+                    return True
         return False
 
     def _is_table(self, shape):
