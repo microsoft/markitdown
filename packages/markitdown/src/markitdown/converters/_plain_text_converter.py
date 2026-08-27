@@ -63,9 +63,16 @@ class PlainTextConverter(DocumentConverter):
         stream_info: StreamInfo,
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
+        raw_content = file_stream.read()
         if stream_info.charset:
-            text_content = file_stream.read().decode(stream_info.charset)
+            try:
+                text_content = raw_content.decode(stream_info.charset)
+            except UnicodeDecodeError:
+                # The charset was guessed from a small sample of the content
+                # (e.g. the first 4k bytes) and may not hold for the whole
+                # file. Fall back to detecting from the full content.
+                text_content = str(from_bytes(raw_content).best())
         else:
-            text_content = str(from_bytes(file_stream.read()).best())
+            text_content = str(from_bytes(raw_content).best())
 
         return DocumentConverterResult(markdown=text_content)
