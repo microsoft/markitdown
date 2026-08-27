@@ -193,7 +193,9 @@ class MarkItDown:
             self.register_converter(YouTubeConverter())
             self.register_converter(BingSerpConverter())
             self.register_converter(DocxConverter())
-            self.register_converter(XlsxConverter())
+            self.register_converter(
+                XlsxConverter(config=kwargs.get("xlsx_config"))
+            )
             self.register_converter(XlsConverter())
             self.register_converter(PptxConverter())
             self.register_converter(AudioConverter())
