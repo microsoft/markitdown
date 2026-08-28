@@ -2,8 +2,9 @@
 #
 # SPDX-License-Identifier: MIT
 import argparse
-import sys
 import codecs
+import io
+import sys
 from typing import Any, Dict
 from textwrap import dedent
 from importlib.metadata import entry_points
@@ -245,8 +246,9 @@ def main():
         markitdown = MarkItDown(enable_plugins=args.use_plugins)
 
     if args.filename is None:
+        # Windows pipe-backed stdin can report seekable() even though it cannot rewind.
         result = markitdown.convert_stream(
-            sys.stdin.buffer,
+            io.BytesIO(sys.stdin.buffer.read()),
             stream_info=stream_info,
             keep_data_uris=args.keep_data_uris,
         )
