@@ -10,7 +10,6 @@ from azure.ai.contentunderstanding.models import (
     DocumentContent,
     StringField,
 )
-
 from markitdown import StreamInfo
 from markitdown.converters._cu_converter import (
     ContentUnderstandingConverter,
@@ -21,7 +20,6 @@ from markitdown.converters._cu_converter import (
     _get_modality,
     _resolve_analyzer_modality,
 )
-
 
 # Content Understanding
 
@@ -710,6 +708,60 @@ class TestConvert:
         )
         assert "mimeType: image/jpeg" in result.markdown
         assert "# Photo" in result.markdown
+
+    def test_deletes_result_after_conversion(self):
+        conv = _make_converter()
+        conv._client = MagicMock()
+        mock_poller = MagicMock(operation_id="operation-123")
+        mock_poller.result.return_value = MagicMock(contents=[])
+        conv._client.begin_analyze_binary.return_value = mock_poller
+
+        with patch(
+            "markitdown.converters._cu_converter.to_llm_input",
+            return_value="converted",
+        ):
+            result = conv.convert(
+                io.BytesIO(b"fake content"),
+                StreamInfo(extension=".pdf", mimetype="application/pdf"),
+            )
+
+        assert result.markdown == "converted"
+        conv._client.delete_result.assert_called_once_with("operation-123")
+
+    def test_deletes_result_when_conversion_fails(self):
+        conv = _make_converter()
+        conv._client = MagicMock()
+        mock_poller = MagicMock(operation_id="operation-123")
+        mock_poller.result.side_effect = RuntimeError("analysis failed")
+        conv._client.begin_analyze_binary.return_value = mock_poller
+
+        with pytest.raises(RuntimeError, match="analysis failed"):
+            conv.convert(
+                io.BytesIO(b"fake content"),
+                StreamInfo(extension=".pdf", mimetype="application/pdf"),
+            )
+
+        conv._client.delete_result.assert_called_once_with("operation-123")
+
+    def test_delete_failure_does_not_hide_conversion(self, caplog):
+        conv = _make_converter()
+        conv._client = MagicMock()
+        mock_poller = MagicMock(operation_id="operation-123")
+        mock_poller.result.return_value = MagicMock(contents=[])
+        conv._client.begin_analyze_binary.return_value = mock_poller
+        conv._client.delete_result.side_effect = PermissionError("forbidden")
+
+        with patch(
+            "markitdown.converters._cu_converter.to_llm_input",
+            return_value="converted",
+        ):
+            result = conv.convert(
+                io.BytesIO(b"fake content"),
+                StreamInfo(extension=".pdf", mimetype="application/pdf"),
+            )
+
+        assert result.markdown == "converted"
+        assert "Could not delete Content Understanding result" in caplog.text
 
 
 # ---------------------------------------------------------------------------
