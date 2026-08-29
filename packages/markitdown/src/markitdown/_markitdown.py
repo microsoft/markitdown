@@ -46,7 +46,6 @@ from .converters import (
 
 from ._base_converter import DocumentConverter, DocumentConverterResult
 
-
 from ._exceptions import (
     FileConversionException,
     UnsupportedFormatException,
@@ -290,7 +289,7 @@ class MarkItDown:
                     warn(f"Plugin '{plugin}' failed to register converters:\n{tb}")
             self._plugins_enabled = True
         else:
-            warn("Plugins converters are already enabled.", RuntimeWarning)
+            warn("Plugin converters are already enabled.", RuntimeWarning)
 
     def convert(
         self,
@@ -624,7 +623,7 @@ class MarkItDown:
                 # Add the list of converters for nested processing
                 _kwargs["_parent_converters"] = self._converters
 
-                # Add legaxy kwargs
+                # Add legacy kwargs
                 if stream_info is not None:
                     if stream_info.extension is not None:
                         _kwargs["file_extension"] = stream_info.extension
@@ -675,7 +674,7 @@ class MarkItDown:
         )
 
     def register_page_converter(self, converter: DocumentConverter) -> None:
-        """DEPRECATED: User register_converter instead."""
+        """DEPRECATED: Use register_converter instead."""
         warn(
             "register_page_converter is deprecated. Use register_converter instead.",
             DeprecationWarning,
@@ -692,9 +691,9 @@ class MarkItDown:
         Register a DocumentConverter with a given priority.
 
         Priorities work as follows: By default, most converters get priority
-        DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT (== 0). The exception
+        PRIORITY_SPECIFIC_FILE_FORMAT (== 0). The exception
         is the PlainTextConverter, HtmlConverter, and ZipConverter, which get
-        priority PRIORITY_SPECIFIC_FILE_FORMAT (== 10), with lower values
+        priority PRIORITY_GENERIC_FILE_FORMAT (== 10), with lower values
         being tried first (i.e., higher priority).
 
         Just prior to conversion, the converters are sorted by priority, using

@@ -165,7 +165,7 @@ class DocumentIntelligenceConverter(DocumentConverter):
         # unless explicitly requested.
         if _dependency_exc_info is not None:
             raise MissingDependencyException(
-                "DocumentIntelligenceConverter requires the optional dependency [az-doc-intel] (or [all]) to be installed. E.g., `pip install markitdown[az-doc-intel]`"
+                "DocumentIntelligenceConverter requires the optional dependency [az-doc-intel] (or [all]) to be installed. E.g., `pip install 'markitdown[az-doc-intel]'`"
             ) from _dependency_exc_info[
                 1
             ].with_traceback(  # type: ignore[union-attr]
@@ -207,7 +207,7 @@ class DocumentIntelligenceConverter(DocumentConverter):
     def _analysis_features(self, stream_info: StreamInfo) -> List[str]:
         """
         Helper needed to determine which analysis features to use.
-        Certain document analysis features are not availiable for
+        Certain document analysis features are not available for
         office filetypes (.xlsx, .pptx, .html, .docx)
         """
         mimetype = (stream_info.mimetype or "").lower()

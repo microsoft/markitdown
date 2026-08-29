@@ -25,7 +25,7 @@ MIME_TYPE_MAPPING = {
 
 class EpubConverter(HtmlConverter):
     """
-    Converts EPUB files to Markdown. Style information (e.g.m headings) and tables are preserved where possible.
+    Converts EPUB files to Markdown. Style information (e.g., headings) and tables are preserved where possible.
     """
 
     def __init__(self):
@@ -57,7 +57,7 @@ class EpubConverter(HtmlConverter):
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
         with zipfile.ZipFile(file_stream, "r") as z:
-            # Extracts metadata (title, authors, language, publisher, date, description, cover) from an EPUB file."""
+            # Extracts metadata (title, authors, language, publisher, date, description, cover) from an EPUB file.
 
             # Locate content.opf
             container_dom = minidom.parse(z.open("META-INF/container.xml"))
