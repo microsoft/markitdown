@@ -108,6 +108,9 @@ def _pre_process_math(content: bytes) -> bytes:
         bytes: The processed content with OMML elements replaced by their LaTeX equivalents, encoded as bytes.
     """
     soup = BeautifulSoup(content.decode(), features="xml")
+    # Normalize dstrike to strike to preserve strikethrough semantics
+    for tag in soup.find_all("dstrike"):
+        tag.name = "strike"
     for tag in soup.find_all("oMathPara"):
         _replace_equations(tag)
     for tag in soup.find_all("oMath"):
