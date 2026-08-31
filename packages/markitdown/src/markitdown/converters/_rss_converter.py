@@ -114,7 +114,9 @@ class RssConverter(DocumentConverter):
         title = self._get_data_by_tag_name(root, "title")
         subtitle = self._get_data_by_tag_name(root, "subtitle")
         entries = root.getElementsByTagName("entry")
-        md_text = f"# {title}\n"
+        md_text = ""
+        if title:
+            md_text += f"# {title}\n"
         if subtitle:
             md_text += f"{subtitle}\n"
         for entry in entries:
@@ -152,8 +154,11 @@ class RssConverter(DocumentConverter):
         channel_title = self._get_data_by_tag_name(channel, "title")
         channel_description = self._get_data_by_tag_name(channel, "description")
         items = channel.getElementsByTagName("item")
+        # Initialize before conditionals: feeds may omit <title> entirely
+        # (would otherwise raise UnboundLocalError on the first +=).
+        md_text = ""
         if channel_title:
-            md_text = f"# {channel_title}\n"
+            md_text += f"# {channel_title}\n"
         if channel_description:
             md_text += f"{channel_description}\n"
         for item in items:
@@ -201,14 +206,18 @@ class RssConverter(DocumentConverter):
     def _get_data_by_tag_name(
         self, element: Element, tag_name: str
     ) -> Union[str, None]:
-        """Get data from first child element with the given tag name.
-        Returns None when no such element is found.
+        """Get data from the first *direct* child element with the given tag name.
+
+        ``Element.getElementsByTagName`` is recursive, so using it for channel
+        or feed metadata would incorrectly pick up nested ``<item>`` /
+        ``<entry>`` titles when the parent omits its own ``<title>``.
+        Returns None when no such direct child is found.
         """
-        nodes = element.getElementsByTagName(tag_name)
-        if not nodes:
-            return None
-        fc = nodes[0].firstChild
-        if fc:
-            if hasattr(fc, "data"):
+        for node in element.childNodes:
+            if getattr(node, "tagName", None) != tag_name:
+                continue
+            fc = node.firstChild
+            if fc and hasattr(fc, "data"):
                 return fc.data
+            return None
         return None
