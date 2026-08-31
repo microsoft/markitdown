@@ -60,7 +60,11 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
                 parsed_url = urlparse(href)  # type: ignore
                 if parsed_url.scheme and parsed_url.scheme.lower() not in ["http", "https", "file"]:  # type: ignore
                     return "%s%s%s" % (prefix, text, suffix)
-                href = urlunparse(parsed_url._replace(path=quote(unquote(parsed_url.path))))  # type: ignore
+                try:
+                    new_path = quote(unquote(parsed_url.path, errors="strict"))
+                except UnicodeDecodeError:
+                    new_path = parsed_url.path
+                href = urlunparse(parsed_url._replace(path=new_path))  # type: ignore
             except ValueError:  # It's not clear if this ever gets thrown
                 return "%s%s%s" % (prefix, text, suffix)
 
@@ -121,6 +125,21 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         if el.get("type") == "checkbox":
             return "[x] " if el.has_attr("checked") else "[ ] "
         return ""
+
+    def convert_table(
+        self,
+        el: Any,
+        text: str,
+        convert_as_inline: Optional[bool] = False,
+        **kwargs,
+    ) -> str:
+        """Promote first row to table header if <thead> and <th> are absent."""
+        if el and not el.find("thead") and not el.find("th"):
+            first_tr = el.find("tr")
+            if first_tr:
+                for td in first_tr.find_all("td"):
+                    td.name = "th"
+        return super().convert_table(el, text, convert_as_inline, **kwargs)
 
     def convert_soup(self, soup: Any) -> str:
         return super().convert_soup(soup)  # type: ignore
