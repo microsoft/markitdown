@@ -357,6 +357,7 @@ class MarkItDown:
             guesses = self._get_stream_info_guesses(
                 file_stream=fh, base_guess=base_guess
             )
+            print(f"Guesses for {path}: {guesses}")
             return self._convert(file_stream=fh, stream_info_guesses=guesses, **kwargs)
 
     def convert_stream(
@@ -726,9 +727,9 @@ class MarkItDown:
                 # If it's text, also guess the charset
                 charset = None
                 if result.prediction.output.is_text:
-                    # Read the first 4k to guess the charset
+                    # Read the first 64k to guess the charset
                     file_stream.seek(cur_pos)
-                    stream_page = file_stream.read(4096)
+                    stream_page = file_stream.read(65536)
                     charset_result = charset_normalizer.from_bytes(stream_page).best()
 
                     if charset_result is not None:
