@@ -338,6 +338,7 @@ def test_get_content_disposition_filename_decodes_rfc5987() -> None:
         == "d\u00e1t\u00e1.csv"
     )
 
+
 def test_pptx_chart_multi_series_conversion() -> None:
     """Charts with multiple series and many categories must convert correctly.
 
