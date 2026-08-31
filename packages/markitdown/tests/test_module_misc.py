@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 
 from markitdown._uri_utils import parse_data_uri, file_uri_to_path
 from markitdown._markitdown import _get_content_disposition_filename
+from markitdown.converters import RssConverter
 
 from markitdown import (
     MarkItDown,
@@ -434,6 +435,7 @@ def test_deeply_nested_html_fallback() -> None:
             # Should have emitted a warning about the fallback
             recursion_warnings = [x for x in w if "deeply nested" in str(x.message)]
             assert len(recursion_warnings) > 0
+
     finally:
         sys.setrecursionlimit(original_limit)
 
@@ -486,6 +488,16 @@ def test_deeply_nested_rss_item_fallback() -> None:
         "</channel>"
         "</rss>"
     )
+    atom = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<feed xmlns="http://www.w3.org/2005/Atom">'
+        "<title>Test Feed</title>"
+        "<entry>"
+        "<title>Deep Entry</title>"
+        f'<content type="html"><![CDATA[{item_html}]]></content>'
+        "</entry>"
+        "</feed>"
+    )
 
     try:
         sys.setrecursionlimit(low_limit)
@@ -499,6 +511,21 @@ def test_deeply_nested_rss_item_fallback() -> None:
             # Should have emitted a warning about the fallback
             recursion_warnings = [x for x in w if "deeply nested" in str(x.message)]
             assert len(recursion_warnings) > 0
+
+        # strict=True should expose the conversion failure rather than applying
+        # the plain-text fallback.
+        with pytest.raises(RecursionError):
+            RssConverter().convert(
+                io.BytesIO(rss.encode("utf-8")),
+                StreamInfo(extension=".rss"),
+                strict=True,
+            )
+        with pytest.raises(RecursionError):
+            RssConverter().convert(
+                io.BytesIO(atom.encode("utf-8")),
+                StreamInfo(extension=".atom"),
+                strict=True,
+            )
     finally:
         sys.setrecursionlimit(original_limit)
 
@@ -709,7 +736,7 @@ def test_json_with_late_non_ascii_character(tmp_path) -> None:
             "title": "Example record",
             "abstract": "This is sample test. " * 500,
         },
-        "notes": "non-ASCII character: è",
+        "notes": "non-ASCII character: Ã¨",
     }
     json_path = tmp_path / "input.json"
     json_path.write_text(
@@ -718,7 +745,7 @@ def test_json_with_late_non_ascii_character(tmp_path) -> None:
 
     result = MarkItDown().convert(str(json_path))
 
-    assert "non-ASCII character: è" in result.text_content
+    assert "non-ASCII character: Ã¨" in result.text_content
 
 
 if __name__ == "__main__":
