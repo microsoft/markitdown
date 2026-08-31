@@ -357,7 +357,6 @@ class MarkItDown:
             guesses = self._get_stream_info_guesses(
                 file_stream=fh, base_guess=base_guess
             )
-            print(f"Guesses for {path}: {guesses}")
             return self._convert(file_stream=fh, stream_info_guesses=guesses, **kwargs)
 
     def convert_stream(
