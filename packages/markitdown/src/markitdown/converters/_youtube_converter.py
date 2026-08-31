@@ -7,6 +7,7 @@ from urllib.parse import parse_qs, urlparse, unquote
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
+from .._exceptions import FileConversionException
 
 # Optional YouTube transcription support
 try:
@@ -113,7 +114,6 @@ class YouTubeConverter(DocumentConverter):
                     break
         except Exception as e:
             print(f"Error extracting description: {e}")
-            pass
 
         # Start preparing the page
         webpage_text = "# YouTube\n"
@@ -218,7 +218,7 @@ class YouTubeConverter(DocumentConverter):
         elif isinstance(json, dict):
             for k, v in json.items():
                 if k == key:
-                    return json[k]
+                    return v
                 if result := self._findKey(v, key):
                     return result
         return None
@@ -235,4 +235,4 @@ class YouTubeConverter(DocumentConverter):
                     time.sleep(delay)  # Wait before retrying
                 attempt += 1
         # If all attempts fail, raise the last exception
-        raise Exception(f"Operation failed after {retries} attempts.")
+        raise FileConversionException(f"Operation failed after {retries} attempts.")
