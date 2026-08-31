@@ -597,7 +597,9 @@ def test_json_with_late_non_ascii_character(tmp_path) -> None:
         "notes": "non-ASCII character: è",
     }
     json_path = tmp_path / "input.json"
-    json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
 
     result = MarkItDown().convert(str(json_path))
 
