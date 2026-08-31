@@ -135,12 +135,20 @@ The `markitdown-ocr` plugin adds OCR support to PDF, DOCX, PPTX, and XLSX conver
 
 ```bash
 pip install markitdown-ocr
-pip install openai  # or any OpenAI-compatible client
+pip install openai
 ```
 
 **Usage:**
 
-Pass the same `llm_client` and `llm_model` you would use for image descriptions:
+```bash
+markitdown document.pdf --use-plugins --llm-client openai --llm-model gpt-4o
+```
+
+The CLI creates an `openai.OpenAI()` client only when both LLM options are supplied.
+Install it with `pip install openai` and set `OPENAI_API_KEY`.
+
+Or use the Python API and pass the same `llm_client` and `llm_model` you would use
+for image descriptions:
 
 ```python
 from markitdown import MarkItDown
