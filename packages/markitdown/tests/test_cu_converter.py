@@ -902,6 +902,41 @@ class TestCLIArgs:
         )
         assert capsys.readouterr().out == "converted\n"
 
+    def test_use_cu_reads_from_stdin(self, capsys):
+        """--use-cu should preserve the CLI's filename-optional stdin mode."""
+        import markitdown.__main__ as markitdown_cli
+
+        input_buffer = io.BytesIO(b"fake pdf")
+        stdin = MagicMock(buffer=input_buffer)
+        markitdown_instance = MagicMock()
+        markitdown_instance.convert_stream.return_value.markdown = "converted"
+        markitdown_cls = MagicMock(return_value=markitdown_instance)
+
+        with patch.object(
+            sys,
+            "argv",
+            [
+                "markitdown",
+                "--use-cu",
+                "--cu-endpoint",
+                "https://fake-cu",
+            ],
+        ), patch.object(sys, "stdin", stdin), patch.object(
+            markitdown_cli, "MarkItDown", markitdown_cls
+        ):
+            markitdown_cli.main()
+
+        markitdown_cls.assert_called_once_with(
+            enable_plugins=False,
+            cu_endpoint="https://fake-cu",
+        )
+        markitdown_instance.convert_stream.assert_called_once_with(
+            input_buffer,
+            stream_info=None,
+            keep_data_uris=False,
+        )
+        assert capsys.readouterr().out == "converted\n"
+
 
 # ---------------------------------------------------------------------------
 # MissingDependencyException test
