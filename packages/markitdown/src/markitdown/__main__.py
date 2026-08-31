@@ -138,6 +138,12 @@ def main():
         help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
     )
 
+    parser.add_argument(
+        "--include-comments",
+        action="store_true",
+        help="Include reviewer comments when converting DOCX files.",
+    )
+
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
 
@@ -242,15 +248,23 @@ def main():
     else:
         markitdown = MarkItDown(enable_plugins=args.use_plugins)
 
+    conversion_kwargs: Dict[str, Any] = {
+        "keep_data_uris": args.keep_data_uris,
+    }
+    if args.include_comments:
+        conversion_kwargs["include_comments"] = True
+
     if args.filename is None:
         result = markitdown.convert_stream(
             sys.stdin.buffer,
             stream_info=stream_info,
-            keep_data_uris=args.keep_data_uris,
+            **conversion_kwargs,
         )
     else:
         result = markitdown.convert(
-            args.filename, stream_info=stream_info, keep_data_uris=args.keep_data_uris
+            args.filename,
+            stream_info=stream_info,
+            **conversion_kwargs,
         )
 
     _handle_output(args, result)
