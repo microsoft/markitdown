@@ -8,6 +8,7 @@ import pytest
 from unittest.mock import MagicMock
 
 from markitdown._uri_utils import parse_data_uri, file_uri_to_path
+from markitdown._markitdown import _get_content_disposition_filename
 
 from markitdown import (
     MarkItDown,
@@ -327,6 +328,15 @@ def test_convert_response_prefers_extended_content_disposition_filename() -> Non
         ]
     )
 
+
+def test_get_content_disposition_filename_decodes_rfc5987() -> None:
+    assert (
+        _get_content_disposition_filename(
+            "attachment; filename=fallback.txt; "
+            "filename*=UTF-8''d%C3%A1t%C3%A1%2Ecsv"
+        )
+        == "d\u00e1t\u00e1.csv"
+    )
 
 def test_pptx_chart_multi_series_conversion() -> None:
     """Charts with multiple series and many categories must convert correctly.
