@@ -1,5 +1,6 @@
 #!/usr/bin/env python3 -m pytest
 import io
+import json
 import os
 import re
 import shutil
@@ -624,6 +625,24 @@ def test_markitdown_llm() -> None:
         assert test_string in result.text_content
     # Standard alt text is included
     validate_strings(result, PPTX_TEST_STRINGS)
+
+
+def test_json_with_late_non_ascii_character(tmp_path) -> None:
+    payload = {
+        "record": {
+            "title": "Example record",
+            "abstract": "This is sample test. " * 500,
+        },
+        "notes": "non-ASCII character: è",
+    }
+    json_path = tmp_path / "input.json"
+    json_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+    result = MarkItDown().convert(str(json_path))
+
+    assert "non-ASCII character: è" in result.text_content
 
 
 if __name__ == "__main__":

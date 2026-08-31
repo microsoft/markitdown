@@ -38,6 +38,8 @@ class IpynbConverter(DocumentConverter):
                         "nbformat" in notebook_content
                         and "nbformat_minor" in notebook_content
                     )
+                except Exception as e:
+                    pass
                 finally:
                     file_stream.seek(cur_pos)
 
