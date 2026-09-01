@@ -261,7 +261,10 @@ def test_file_uris() -> None:
 def test_file_uri_with_percent_encoded_windows_drive(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    from nturl2path import url2pathname as windows_url2pathname
+
     monkeypatch.setattr(uri_utils, "os", SimpleNamespace(name="nt", path=ntpath))
+    monkeypatch.setattr(uri_utils, "url2pathname", windows_url2pathname)
 
     netloc, path = uri_utils.file_uri_to_path("file:///C%3A/Temp/example.md")
 
