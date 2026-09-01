@@ -281,6 +281,44 @@ def test_docx_comments() -> None:
     validate_strings(result, DOCX_COMMENT_TEST_STRINGS)
 
 
+def test_html_strikethrough_variants(tmp_path) -> None:
+    html = """<!doctype html>
+<html><body>
+<p>Plain <s>s element</s> after.</p>
+<p>Plain <del>del element</del> after.</p>
+<p>Plain <strike>strike element</strike> after.</p>
+<p>Spaces A<strike> B </strike>C.</p>
+<p>Runs D<strike>  E  </strike>F.</p>
+<p>Empty G<strike></strike>H.</p>
+<p>Newline I<strike>J
+K</strike>L.</p>
+<p>Break M<strike>N<br>O</strike>P.</p>
+</body></html>
+"""
+    path = tmp_path / "strike.html"
+    path.write_text(html, encoding="utf-8")
+    markdown = MarkItDown().convert(str(path)).markdown
+
+    assert markdown == "\n\n".join(
+        [
+            # <s>, <del> and the obsolete <strike> all mean strikethrough
+            "Plain ~~s element~~ after.",
+            "Plain ~~del element~~ after.",
+            "Plain ~~strike element~~ after.",
+            # Surrounding whitespace stays outside of the markup ...
+            "Spaces A ~~B~~ C.",
+            # ... and runs of it collapse to a single space
+            "Runs D ~~E~~ F.",
+            # An empty element contributes nothing
+            "Empty GH.",
+            # A line break inside the element is kept, and the markup
+            # survives it because strikethrough may span a single newline
+            "Newline I~~J\nK~~L.",
+            "Break M~~N\nO~~P.",
+        ]
+    )
+
+
 def test_docx_equations() -> None:
     markitdown = MarkItDown()
     docx_file = os.path.join(TEST_FILES_DIR, "equations.docx")
@@ -763,6 +801,61 @@ def test_json_with_late_non_ascii_character(tmp_path) -> None:
     result = MarkItDown().convert(str(json_path))
 
     assert "non-ASCII character: Ã¨" in result.text_content
+
+
+###############################################################################
+# CSV converter: BOM handling and blank-row handling
+###############################################################################
+
+
+def _convert_csv(data: bytes, charset: str | None = None) -> str:
+    stream_info = StreamInfo(extension=".csv", charset=charset)
+    return (
+        MarkItDown()
+        .convert_stream(io.BytesIO(data), stream_info=stream_info)
+        .text_content
+    )
+
+
+def test_csv_utf8_bom_is_stripped_from_the_header() -> None:
+    result = _convert_csv(b"\xef\xbb\xbfname,age\nAlice,30\n")
+
+    assert "\ufeff" not in result
+    assert result.startswith("| name | age |")
+    assert "| Alice | 30 |" in result
+
+
+def test_csv_utf8_bom_is_stripped_when_charset_is_known() -> None:
+    result = _convert_csv(b"\xef\xbb\xbfname,age\nAlice,30\n", charset="utf-8")
+
+    assert "\ufeff" not in result
+    assert result.startswith("| name | age |")
+
+
+def test_csv_leading_blank_line_does_not_destroy_the_table() -> None:
+    result = _convert_csv(b"\nname,age\nAlice,30\n")
+
+    assert result == "| name | age |\n| --- | --- |\n| Alice | 30 |"
+
+
+def test_csv_trailing_blank_lines_are_skipped() -> None:
+    result = _convert_csv(b"name,age\nAlice,30\n\n\n")
+
+    assert result == "| name | age |\n| --- | --- |\n| Alice | 30 |"
+
+
+def test_csv_blank_lines_between_rows_are_kept() -> None:
+    result = _convert_csv(b"name,age\n\nAlice,30\n\nBob,40\n")
+
+    assert (
+        result == "| name | age |\n| --- | --- |\n| Alice | 30 |\n|  |  |\n| Bob | 40 |"
+    )
+
+
+def test_csv_all_blank_input_returns_empty_markdown() -> None:
+    result = _convert_csv(b"\n\n\n")
+
+    assert result == ""
 
 
 if __name__ == "__main__":
