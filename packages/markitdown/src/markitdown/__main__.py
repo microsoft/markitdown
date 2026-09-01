@@ -216,8 +216,6 @@ def main():
             _exit_with_error(
                 "Content Understanding Endpoint (--cu-endpoint) is required when using --use-cu."
             )
-        elif args.filename is None:
-            _exit_with_error("Filename is required when using Content Understanding.")
 
         cu_kwargs: Dict[str, Any] = {
             "cu_endpoint": args.cu_endpoint,
