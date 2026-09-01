@@ -206,7 +206,7 @@ def main():
     if args.use_docintel:
         if args.endpoint is None:
             _exit_with_error(
-                "Document Intelligence Endpoint is required when using Document Intelligence."
+                "Document Intelligence Endpoint is required when using Document Intelligence. "
                 "Pass -e/--endpoint or set MARKITDOWN_DOCINTEL_ENDPOINT."
             )
         elif args.filename is None:
