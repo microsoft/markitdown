@@ -12,6 +12,21 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 ACCEPTED_FILE_EXTENSIONS = [".csv"]
 
 
+def _trim_outer_blank_rows(rows: list[list[str]]) -> None:
+    """Remove empty rows from the beginning and end, and immediately after the header. This operation is performed in-place."""
+    # Pop empty rows from the beginning
+    while len(rows) > 0 and not rows[0]:
+        rows.pop(0)
+
+    # Pop empty rows after the header
+    while len(rows) > 1 and not rows[1]:
+        rows.pop(1)
+
+    # Pop empty rows from the end
+    while len(rows) > 0 and not rows[-1]:
+        rows.pop(-1)
+
+
 class CsvConverter(DocumentConverter):
     """
     Converts CSV files to Markdown tables.
@@ -54,11 +69,7 @@ class CsvConverter(DocumentConverter):
         # Parse CSV content
         reader = csv.reader(io.StringIO(content))
         rows = list(reader)
-
-        # Blank lines parse as empty rows. A single leading or trailing blank
-        # line used to shift every column, so skip them before deciding what
-        # the table looks like.
-        rows = [row for row in rows if row]
+        _trim_outer_blank_rows(rows)
 
         if not rows:
             return DocumentConverterResult(markdown="")
