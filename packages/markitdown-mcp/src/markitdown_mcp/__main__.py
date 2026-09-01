@@ -1,4 +1,5 @@
 import contextlib
+import os
 import sys
 from collections.abc import AsyncIterator
 from mcp.server.mcpserver import MCPServer
@@ -13,17 +14,31 @@ mcp = MCPServer("markitdown")
 @mcp.tool()
 async def convert_to_markdown(uri: str) -> str:
     """Convert a resource described by an http:, https:, file: or data: URI to markdown"""
-    return MarkItDown().convert_uri(uri).markdown
+    return MarkItDown(enable_plugins=check_plugins_enabled()).convert_uri(uri).markdown
 
 
-def create_starlette_app(mcp_server: MCPServer, *, debug: bool = False) -> Starlette:
+def check_plugins_enabled() -> bool:
+    return os.getenv("MARKITDOWN_ENABLE_PLUGINS", "false").strip().lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+
+
+def create_starlette_app(
+    mcp_server: MCPServer, *, host: str = "127.0.0.1", debug: bool = False
+) -> Starlette:
     # Two sub-apps supply the routes: /sse + /messages/ from the SSE transport,
     # and /mcp from Streamable HTTP. Their routes are merged into one app so the
     # published URL surface is unchanged.
-    sse_app = mcp_server.sse_app()
+    # The host must match what uvicorn binds to: the SDK derives its
+    # Host/Origin allowlist from it, and a localhost default would reject
+    # remote requests with 421 when serving on another interface.
+    sse_app = mcp_server.sse_app(host=host)
     http_app = mcp_server.streamable_http_app(
         json_response=True,
         stateless_http=True,
+        host=host,
     )
 
     @contextlib.asynccontextmanager
@@ -73,10 +88,23 @@ def main():
         sys.exit(1)
 
     if use_http:
-        starlette_app = create_starlette_app(mcp, debug=True)
+        host = args.host if args.host else "127.0.0.1"
+        if args.host and args.host not in ("127.0.0.1", "localhost"):
+            print(
+                "\n"
+                "WARNING: The server is being bound to a non-localhost interface "
+                f"({host}).\n"
+                "This exposes the server to other machines on the network or Internet.\n"
+                "The server has NO authentication and runs with your user's privileges.\n"
+                "Any process or user that can reach this interface can read files and\n"
+                "fetch network resources accessible to this user.\n"
+                "Only proceed if you understand the security implications.\n",
+                file=sys.stderr,
+            )
+        starlette_app = create_starlette_app(mcp, host=host, debug=True)
         uvicorn.run(
             starlette_app,
-            host=args.host if args.host else "127.0.0.1",
+            host=host,
             port=args.port if args.port else 3001,
         )
     else:
