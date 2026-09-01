@@ -1,12 +1,15 @@
 #!/usr/bin/env python3 -m pytest
 import io
 import json
+import ntpath
 import os
 import re
 import shutil
+from types import SimpleNamespace
 import pytest
 from unittest.mock import MagicMock
 
+import markitdown._uri_utils as uri_utils
 from markitdown._uri_utils import parse_data_uri, file_uri_to_path
 from markitdown._markitdown import _get_content_disposition_filename
 from markitdown.converters import RssConverter
@@ -253,6 +256,20 @@ def test_file_uris() -> None:
     netloc, path = file_uri_to_path(file_uri)
     assert netloc is None
     assert path == "/path/to/file.txt"
+
+
+def test_file_uri_with_percent_encoded_windows_drive(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from nturl2path import url2pathname as windows_url2pathname
+
+    monkeypatch.setattr(uri_utils, "os", SimpleNamespace(name="nt", path=ntpath))
+    monkeypatch.setattr(uri_utils, "url2pathname", windows_url2pathname)
+
+    netloc, path = uri_utils.file_uri_to_path("file:///C%3A/Temp/example.md")
+
+    assert netloc is None
+    assert path == r"C:\Temp\example.md"
 
 
 def test_docx_comments() -> None:
