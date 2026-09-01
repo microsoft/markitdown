@@ -122,33 +122,9 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
             return "[x] " if el.has_attr("checked") else "[ ] "
         return ""
 
-    def convert_strike(
-        self,
-        el: Any,
-        text: str,
-        convert_as_inline: Optional[bool] = False,
-        **kwargs,
-    ) -> str:
+    def convert_strike(self, el: Any, text: str, *args, **kwargs) -> str:
         """Obsolete <strike> is still in the wild; treat it like <s>/<del>."""
-prefix, suffix, text = markdownify.chomp(text)  # type: ignore
-        return f"{prefix}~~{text}~~{suffix}" if text else ""
-
-    def convert_span(
-        self,
-        el: Any,
-        text: str,
-        convert_as_inline: Optional[bool] = False,
-        **kwargs,
-    ) -> str:
-        """Preserve CSS line-through as Markdown strikethrough."""
-        if text and self._has_line_through(el):
-            return f"~~{text}~~"
-        return text
-
-    @staticmethod
-    def _has_line_through(el: Any) -> bool:
-        style = (el.get("style") or "").lower()
-        return "line-through" in style
+        return self.convert_s(el, text, *args, **kwargs)  # type: ignore
 
     def convert_soup(self, soup: Any) -> str:
         return super().convert_soup(soup)  # type: ignore

@@ -270,18 +270,36 @@ def test_html_strikethrough_variants(tmp_path) -> None:
 <p>Plain <s>s element</s> after.</p>
 <p>Plain <del>del element</del> after.</p>
 <p>Plain <strike>strike element</strike> after.</p>
-<p>Plain <span style="text-decoration: line-through;">inline CSS line-through</span> after.</p>
-<p>Plain <span style="text-decoration-line: line-through;">CSS text-decoration-line</span> after.</p>
+<p>Spaces A<strike> B </strike>C.</p>
+<p>Runs D<strike>  E  </strike>F.</p>
+<p>Empty G<strike></strike>H.</p>
+<p>Newline I<strike>J
+K</strike>L.</p>
+<p>Break M<strike>N<br>O</strike>P.</p>
 </body></html>
 """
     path = tmp_path / "strike.html"
     path.write_text(html, encoding="utf-8")
     markdown = MarkItDown().convert(str(path)).markdown
-    assert "~~s element~~" in markdown
-    assert "~~del element~~" in markdown
-    assert "~~strike element~~" in markdown
-    assert "~~inline CSS line-through~~" in markdown
-    assert "~~CSS text-decoration-line~~" in markdown
+
+    assert markdown == "\n\n".join(
+        [
+            # <s>, <del> and the obsolete <strike> all mean strikethrough
+            "Plain ~~s element~~ after.",
+            "Plain ~~del element~~ after.",
+            "Plain ~~strike element~~ after.",
+            # Surrounding whitespace stays outside of the markup ...
+            "Spaces A ~~B~~ C.",
+            # ... and runs of it collapse to a single space
+            "Runs D ~~E~~ F.",
+            # An empty element contributes nothing
+            "Empty GH.",
+            # A line break inside the element is kept, and the markup
+            # survives it because strikethrough may span a single newline
+            "Newline I~~J\nK~~L.",
+            "Break M~~N\nO~~P.",
+        ]
+    )
 
 
 def test_docx_equations() -> None:
