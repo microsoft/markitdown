@@ -130,7 +130,8 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         **kwargs,
     ) -> str:
         """Obsolete <strike> is still in the wild; treat it like <s>/<del>."""
-        return f"~~{text}~~" if text else ""
+prefix, suffix, text = markdownify.chomp(text)  # type: ignore
+        return f"{prefix}~~{text}~~{suffix}" if text else ""
 
     def convert_span(
         self,
