@@ -70,7 +70,7 @@ def run_server(requests, expected_responses):
         process.stdin.close()
         process.terminate()
         process.wait(timeout=10)
-    return responses
+    return sorted(responses, key=lambda response: response["id"])
 
 
 def test_legacy_initialize_handshake(fixture_uri):
