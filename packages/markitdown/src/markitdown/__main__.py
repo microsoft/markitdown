@@ -5,11 +5,13 @@ import argparse
 import os
 import sys
 import codecs
+import json
 from typing import Any, Dict
 from textwrap import dedent
 from importlib.metadata import entry_points
 from .__about__ import __version__
 from ._markitdown import MarkItDown, StreamInfo, DocumentConverterResult
+
 
 
 def main():
@@ -59,6 +61,13 @@ def main():
         "-o",
         "--output",
         help="Output file name. If not provided, output is written to stdout.",
+    )
+    
+    parser.add_argument(
+    "--output-format", 
+    choices=["markdown", "json"], 
+    default="markdown", 
+    help="Output format: 'markdown' (default) or structured 'json'."
     )
 
     parser.add_argument(
@@ -263,6 +272,15 @@ def main():
 
 def _handle_output(args, result: DocumentConverterResult):
     """Handle output to stdout or file"""
+    if getattr(args, "output_format", "markdown") == "json":
+        # Convert the raw markdown to structured dictionary
+        structured_data = convert_markdown_to_json(result.markdown)
+        
+        if args.output:
+            with open(args.output, "w", encoding="utf-8") as f:
+                json.dump(structured_data, f, indent=2, ensure_ascii=False)
+        else:
+            print(json.dumps(structured_data, indent=2, ensure_ascii=False))
     if args.output:
         with open(args.output, "w", encoding="utf-8") as f:
             f.write(result.markdown)
