@@ -33,6 +33,39 @@ ACCEPTED_XLS_MIME_TYPE_PREFIXES = [
 ACCEPTED_XLS_FILE_EXTENSIONS = [".xls"]
 
 
+def _trim_trailing_empty(df: "pd.DataFrame") -> "pd.DataFrame":
+    """Trim trailing all-NaN rows and columns from a DataFrame.
+
+    Excel files often pad to fixed dimensions (e.g. 256 columns in .xls)
+    even when only a few columns contain data.  When every empty cell is
+    rendered to HTML/Markdown, this padding can cause extreme memory usage
+    and enormous output (a 57 KB .xls producing 95 MB of Markdown).
+
+    Only *trailing* empties are removed so that intentional blank rows or
+    columns used as visual separators within the data are preserved.
+    """
+    if df.empty:
+        return df
+
+    # Trim trailing all-NaN columns
+    has_data = df.notna().any()  # bool per column
+    if not has_data.any():
+        return df.iloc[:0, :0]
+    last_col = has_data.values[::-1].argmax()  # first True from the right
+    if last_col > 0:
+        df = df.iloc[:, : len(has_data) - last_col]
+
+    # Trim trailing all-NaN rows
+    has_data = df.notna().any(axis=1)  # bool per row
+    if not has_data.any():
+        return df.iloc[:0, :0]
+    last_row = has_data.values[::-1].argmax()  # first True from the bottom
+    if last_row > 0:
+        df = df.iloc[: len(has_data) - last_row]
+
+    return df
+
+
 class XlsxConverter(DocumentConverter):
     """
     Converts XLSX files to Markdown, with each sheet presented as a separate Markdown table.
@@ -84,7 +117,8 @@ class XlsxConverter(DocumentConverter):
         md_content = ""
         for s in sheets:
             md_content += f"## {s}\n"
-            html_content = sheets[s].to_html(index=False)
+            df = _trim_trailing_empty(sheets[s])
+            html_content = df.to_html(index=False)
             md_content += (
                 self._html_converter.convert_string(
                     html_content, **kwargs
@@ -146,7 +180,8 @@ class XlsConverter(DocumentConverter):
         md_content = ""
         for s in sheets:
             md_content += f"## {s}\n"
-            html_content = sheets[s].to_html(index=False)
+            df = _trim_trailing_empty(sheets[s])
+            html_content = df.to_html(index=False)
             md_content += (
                 self._html_converter.convert_string(
                     html_content, **kwargs
