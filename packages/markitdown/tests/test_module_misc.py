@@ -800,10 +800,9 @@ def test_zip_stream_no_filename_header() -> None:
     result = markitdown.convert_stream(
         buf, stream_info=StreamInfo(mimetype="application/zip")
     )
-    assert (
-        "None" not in result.markdown
-    ), f"Header must not contain literal 'None'; got: {result.markdown[:120]!r}"
-    assert "Content from the zip file" in result.markdown
+    assert result.markdown.startswith(
+        "Content from the zip file `(unknown)`:\n\n"
+    )
     assert "Hello world" in result.markdown
     
     
