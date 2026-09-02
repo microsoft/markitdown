@@ -47,4 +47,6 @@ def llm_caption(
 
     # Call the OpenAI API
     response = client.chat.completions.create(model=model, messages=messages)
+    if not response.choices:
+        return None
     return response.choices[0].message.content
