@@ -727,6 +727,19 @@ def test_exceptions() -> None:
     assert type(exc_info.value.attempts[0].converter).__name__ == "PptxConverter"
 
 
+def test_invalid_source_type_error_lists_supported_types() -> None:
+    markitdown = MarkItDown()
+
+    with pytest.raises(TypeError) as exc_info:
+        markitdown.convert(None)
+
+    message = str(exc_info.value)
+    assert "str" in message
+    assert "pathlib.Path" in message
+    assert "requests.Response" in message
+    assert "BinaryIO" in message
+
+
 @pytest.mark.skipif(
     skip_exiftool,
     reason="do not run if exiftool is not installed",
