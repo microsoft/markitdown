@@ -7,6 +7,7 @@ import io
 import re
 import sys
 from typing import Any, BinaryIO, Optional
+from concurrent.futures import ThreadPoolExecutor
 
 from markitdown.converters import HtmlConverter
 from markitdown.converter_utils.docx.pre_process import pre_process_docx
@@ -36,10 +37,15 @@ class DocxConverterWithOCR(HtmlConverter):
     Maintains document flow while extracting text from images inline.
     """
 
-    def __init__(self, ocr_service: Optional[LLMVisionOCRService] = None):
+    def __init__(
+        self,
+        ocr_service: Optional[LLMVisionOCRService] = None,
+        max_workers: int = 1,
+    ):
         super().__init__()
         self._html_converter = HtmlConverter()
         self.ocr_service = ocr_service
+        self.max_workers = max_workers
 
     def accepts(
         self,
@@ -138,19 +144,36 @@ class DocxConverterWithOCR(HtmlConverter):
             file_stream.seek(0)
             doc = Document(file_stream)
 
+            tasks = []
+            def _do_ocr(task: tuple[str, io.BytesIO]) -> tuple[str, str]:
+                r_id, image_stream = task
+                result = ocr_service.extract_text(image_stream)
+                return (r_id, result.text.strip() if result.text else "")
+
+
             for rel in doc.part.rels.values():
                 if "image" in rel.target_ref.lower():
                     try:
-                        image_bytes = rel.target_part.blob
-                        image_stream = io.BytesIO(image_bytes)
-                        ocr_result = ocr_service.extract_text(image_stream)
-
-                        if ocr_result.text.strip():
-                            # Store raw text only — markers added later
-                            ocr_map[rel.rId] = ocr_result.text.strip()
+                        if self.max_workers > 1:
+                            # use thread pool
+                            tasks.append((rel.rId, io.BytesIO(rel.target_part.blob)))
+                        else:
+                            # use normal mode
+                            r_id, text = _do_ocr((rel.rId, io.BytesIO(rel.target_part.blob)))
+                            ocr_map[r_id] = text
 
                     except Exception:
                         continue
+
+            if not tasks:
+                return ocr_map
+
+            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                results = list(executor.map(_do_ocr, tasks))
+
+            for r_id, text in results:
+                if text:
+                    ocr_map[r_id] = text
 
         except Exception:
             pass
