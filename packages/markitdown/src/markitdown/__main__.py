@@ -6,7 +6,6 @@ import os
 import sys
 import codecs
 import io
-import sys
 from typing import Any, Dict
 from textwrap import dedent
 from importlib.metadata import entry_points
