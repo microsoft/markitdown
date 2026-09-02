@@ -24,3 +24,34 @@ def test_docintel_accepts_html_mimetype():
     assert conv.accepts(io.BytesIO(b""), stream_info)
     stream_info = StreamInfo(mimetype="application/xhtml+xml", extension=None)
     assert conv.accepts(io.BytesIO(b""), stream_info)
+
+
+def test_docintel_api_version_default_none():
+    from unittest.mock import patch
+
+    with patch(
+        "markitdown.converters._doc_intel_converter.DocumentIntelligenceClient"
+    ) as mock_client:
+        conv = DocumentIntelligenceConverter(
+            endpoint="https://example.cognitiveservices.azure.com/",
+        )
+        assert conv.api_version is None
+        mock_client.assert_called_once()
+        _, kwargs = mock_client.call_args
+        assert "api_version" not in kwargs
+
+
+def test_docintel_api_version_custom():
+    from unittest.mock import patch
+
+    with patch(
+        "markitdown.converters._doc_intel_converter.DocumentIntelligenceClient"
+    ) as mock_client:
+        conv = DocumentIntelligenceConverter(
+            endpoint="https://example.cognitiveservices.azure.com/",
+            api_version="2024-07-31-preview",
+        )
+        assert conv.api_version == "2024-07-31-preview"
+        mock_client.assert_called_once()
+        _, kwargs = mock_client.call_args
+        assert kwargs.get("api_version") == "2024-07-31-preview"

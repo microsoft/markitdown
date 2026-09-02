@@ -12,7 +12,10 @@ def file_uri_to_path(file_uri: str) -> Tuple[str | None, str]:
         raise ValueError(f"Not a file URL: {file_uri}")
 
     netloc = parsed.netloc if parsed.netloc else None
-    path = os.path.abspath(url2pathname(parsed.path))
+    path = url2pathname(parsed.path)
+    if os.name == "nt" and path[:1] in "/\\" and path[2:3] == ":":
+        path = path[1:]
+    path = os.path.abspath(path)
     return netloc, path
 
 
