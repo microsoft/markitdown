@@ -4,6 +4,7 @@ import json
 import ntpath
 import os
 import re
+import sys
 import shutil
 from types import SimpleNamespace
 import pytest
@@ -225,8 +226,8 @@ def test_data_uris() -> None:
     assert attributes["charset"] == "utf-8"
     assert data == b"Hello, World!"
 
-
-def test_file_uris() -> None:
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX-specific test")
+def test_file_uris_posix() -> None:
     # Test file URI with an empty host
     file_uri = "file:///path/to/file.txt"
     netloc, path = file_uri_to_path(file_uri)
@@ -257,6 +258,37 @@ def test_file_uris() -> None:
     assert netloc is None
     assert path == "/path/to/file.txt"
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-specific test")
+def test_file_uris_windows() -> None:
+    # Test file URI with an empty host
+    file_uri = "file:///C:/path/to/file.txt"
+    netloc, path = file_uri_to_path(file_uri)
+    assert netloc is None
+    assert path == "C:\\path\\to\\file.txt"
+
+    # Test file URI with no host
+    file_uri = "file:/C:/path/to/file.txt"
+    netloc, path = file_uri_to_path(file_uri)
+    assert netloc is None
+    assert path == "C:\\path\\to\\file.txt"
+
+    # Test file URI with localhost
+    file_uri = "file://localhost/C:/path/to/file.txt"
+    netloc, path = file_uri_to_path(file_uri)
+    assert netloc == "localhost"
+    assert path == "C:\\path\\to\\file.txt"
+
+    # Test file URI with query parameters
+    file_uri = "file:///C:/path/to/file.txt?param=value"
+    netloc, path = file_uri_to_path(file_uri)
+    assert netloc is None
+    assert path == "C:\\path\\to\\file.txt"
+
+    # Test file URI with fragment
+    file_uri = "file:///C:/path/to/file.txt#fragment"
+    netloc, path = file_uri_to_path(file_uri)
+    assert netloc is None
+    assert path == "C:\\path\\to\\file.txt"
 
 def test_file_uri_with_percent_encoded_windows_drive(
     monkeypatch: pytest.MonkeyPatch,
