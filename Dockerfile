@@ -30,4 +30,9 @@ ARG GROUPID=nogroup
 
 USER $USERID:$GROUPID
 
+#Prevent Python from writing .pyc files and __pycache__ folders to disk
+#Make the runtime faster
+
+ENV PYTHONDONTWRITEBYTECODE=1
+
 ENTRYPOINT [ "markitdown" ]
