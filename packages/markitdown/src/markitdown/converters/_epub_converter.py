@@ -151,7 +151,8 @@ class EpubConverter(HtmlConverter):
     def _collect_node_text(self, node: Any, text_parts: List[str]) -> None:
         """Recursively collect text node values from a DOM node."""
         for child in node.childNodes:
-            if child.nodeValue:
-                text_parts.append(child.nodeValue)
+            if child.nodeType in (child.TEXT_NODE, child.CDATA_SECTION_NODE):
+                if child.nodeValue:
+                    text_parts.append(child.nodeValue)
             elif child.hasChildNodes():
                 self._collect_node_text(child, text_parts)
