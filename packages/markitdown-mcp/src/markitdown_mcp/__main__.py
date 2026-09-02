@@ -1,6 +1,7 @@
 import contextlib
 import sys
 import os
+from pathlib import Path
 from collections.abc import AsyncIterator
 from mcp.server.fastmcp import FastMCP
 from starlette.applications import Starlette
@@ -21,6 +22,47 @@ mcp = FastMCP("markitdown")
 async def convert_to_markdown(uri: str) -> str:
     """Convert a resource described by an http:, https:, file: or data: URI to markdown"""
     return MarkItDown(enable_plugins=check_plugins_enabled()).convert_uri(uri).markdown
+
+
+@mcp.tool()
+async def convert_file(file_path: str) -> str:
+    """Convert a local file (given as an absolute or relative filesystem path) to markdown.
+
+    This is a convenience wrapper around ``convert_to_markdown`` for callers that already
+    have a plain path rather than a ``file:`` URI. Paths are resolved against the current
+    working directory; non-existent paths raise FileNotFoundError.
+    """
+    resolved = Path(file_path).expanduser().resolve(strict=True)
+    return MarkItDown(enable_plugins=check_plugins_enabled()).convert_local(str(resolved)).markdown
+
+
+@mcp.tool()
+async def convert_directory(dir_path: str, recursive: bool = True) -> dict[str, str]:
+    """Convert every file in a directory to markdown.
+
+    Returns a mapping of ``relative_path`` to converted markdown. Unreadable or
+    unsupported files are skipped silently so a single bad file does not abort
+    the batch; their paths simply don't appear in the result dictionary.
+    ``recursive=True`` descends into sub-directories, ``False`` processes only
+    the immediate directory.
+    """
+    base = Path(dir_path).expanduser().resolve(strict=True)
+    if not base.is_dir():
+        raise NotADirectoryError(f"Not a directory: {base}")
+
+    md = MarkItDown(enable_plugins=check_plugins_enabled())
+    files = base.rglob("*") if recursive else base.iterdir()
+
+    result: dict[str, str] = {}
+    for path in files:
+        if not path.is_file():
+            continue
+        try:
+            result[str(path.relative_to(base))] = md.convert_local(str(path)).markdown
+        except Exception:
+            # Best-effort batch: skip files that fail individually.
+            continue
+    return result
 
 
 def check_plugins_enabled() -> bool:
