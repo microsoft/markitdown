@@ -1,6 +1,7 @@
 import sys
 import io
 import re
+import warnings
 from typing import BinaryIO, Any
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
@@ -9,6 +10,11 @@ from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 
 # Pattern for MasterFormat-style partial numbering (e.g., ".1", ".2", ".10")
 PARTIAL_NUMBERING_PATTERN = re.compile(r"^\.\d+$")
+INLINE_IMAGE_START_PATTERN = re.compile(rb"(?:^|\s)BI\s+")
+INLINE_IMAGE_DATA_PATTERN = re.compile(rb"\sID\s+")
+INLINE_IMAGE_END_PATTERN = re.compile(rb"\sEI(?:\s|$)")
+PYMUPDF_RECOVERY_MARGIN = 500
+PYMUPDF_RECOVERY_RATIO = 1.3
 
 
 def _merge_partial_numbering_lines(text: str) -> str:
@@ -55,6 +61,49 @@ def _merge_partial_numbering_lines(text: str) -> str:
             i += 1
 
     return "\n".join(result_lines)
+
+
+def _contains_inline_image(pdf_bytes: bytes) -> bool:
+    return (
+        INLINE_IMAGE_START_PATTERN.search(pdf_bytes) is not None
+        and INLINE_IMAGE_DATA_PATTERN.search(pdf_bytes) is not None
+        and INLINE_IMAGE_END_PATTERN.search(pdf_bytes) is not None
+    )
+
+
+def _extract_text_with_pymupdf(pdf_bytes: bytes) -> str | None:
+    try:
+        import fitz  # type: ignore[import-not-found]
+    except ImportError:
+        return None
+
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    try:
+        return "\n".join(page.get_text("text") for page in doc).strip()
+    finally:
+        doc.close()
+
+
+def _maybe_recover_inline_image_text(pdf_bytes: bytes, markdown: str) -> str:
+    if not _contains_inline_image(pdf_bytes):
+        return markdown
+
+    pymupdf_text = _extract_text_with_pymupdf(pdf_bytes)
+    if not pymupdf_text:
+        if len((markdown or "").strip()) < 1024:
+            warnings.warn(
+                "PDF text extraction may be incomplete after inline image data. "
+                "Install the optional PyMuPDF extra to enable recovery for this case.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+        return markdown
+
+    current_len = len((markdown or "").strip())
+    if len(pymupdf_text) > current_len * PYMUPDF_RECOVERY_RATIO + PYMUPDF_RECOVERY_MARGIN:
+        return pymupdf_text
+
+    return markdown
 
 
 # Load dependencies
@@ -530,9 +579,9 @@ class PdfConverter(DocumentConverter):
                     extension=".pdf",
                     feature="pdf",
                 )
-            ) from _dependency_exc_info[1].with_traceback(
+            ) from _dependency_exc_info[1].with_traceback(  # type: ignore[union-attr]
                 _dependency_exc_info[2]
-            )  # type: ignore[union-attr]
+            )
 
         assert isinstance(file_stream, io.IOBase)
 
@@ -585,5 +634,6 @@ class PdfConverter(DocumentConverter):
 
         # Post-process to merge MasterFormat-style partial numbering with following text
         markdown = _merge_partial_numbering_lines(markdown)
+        markdown = _maybe_recover_inline_image_text(pdf_bytes.getvalue(), markdown)
 
         return DocumentConverterResult(markdown=markdown)

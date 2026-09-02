@@ -105,6 +105,7 @@ At the moment, the following optional dependencies are available:
 * `[xlsx]` Installs dependencies for Excel files
 * `[xls]` Installs dependencies for older Excel files
 * `[pdf]` Installs dependencies for PDF files
+* `[pymupdf]` Enables an optional PDF text recovery fallback for some malformed inline images
 * `[outlook]` Installs dependencies for Outlook messages
 * `[az-doc-intel]` Installs dependencies for Azure Document Intelligence
 * `[az-content-understanding]` Installs dependencies for Azure Content Understanding
