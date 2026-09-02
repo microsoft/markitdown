@@ -3,8 +3,6 @@ Enhanced DOCX Converter with OCR support for embedded images.
 Extracts images from Word documents and performs OCR while maintaining context.
 """
 
-import io
-import re
 import sys
 from typing import Any, BinaryIO, Optional
 
@@ -21,12 +19,11 @@ from ._ocr_service import LLMVisionOCRService
 _dependency_exc_info = None
 try:
     import mammoth
-    from docx import Document
 except ImportError:
     _dependency_exc_info = sys.exc_info()
 
-# Placeholder injected into HTML so that mammoth never sees the OCR markers.
-# Must be a single token with no special markdown characters.
+# Placeholder carried through Mammoth and HTML-to-Markdown conversion.
+# It must be a single token with no special markdown characters.
 _PLACEHOLDER = "MARKITDOWNOCRBLOCK{}"
 
 
@@ -83,35 +80,56 @@ class DocxConverterWithOCR(HtmlConverter):
         )
 
         if ocr_service:
-            # 1. Extract and OCR images — returns raw text per image
-            file_stream.seek(0)
-            image_ocr_map = self._extract_and_ocr_images(file_stream, ocr_service)
+            ocr_text_by_placeholder: dict[str, str] = {}
+            image_occurrence = 0
 
-            # 2. Convert DOCX → HTML via mammoth
+            def convert_image(image: Any) -> dict[str, str]:
+                nonlocal image_occurrence
+
+                placeholder = _PLACEHOLDER.format(image_occurrence)
+                image_occurrence += 1
+
+                try:
+                    with image.open() as image_stream:
+                        ocr_result = ocr_service.extract_text(image_stream)
+                    text = ocr_result.text.strip()
+                    if text:
+                        ocr_text_by_placeholder[placeholder] = text
+                except Exception:
+                    pass
+
+                # Keep every occurrence in the converted output, including empty
+                # or failed OCR, so later images cannot shift to an earlier slot.
+                return {"src": placeholder, "alt": placeholder}
+
+            # Convert DOCX → HTML while Mammoth visits every image occurrence.
             file_stream.seek(0)
             pre_process_stream = pre_process_docx(file_stream)
             html_result = mammoth.convert_to_html(
-                pre_process_stream, style_map=kwargs.get("style_map")
+                pre_process_stream,
+                style_map=kwargs.get("style_map"),
+                convert_image=mammoth.images.img_element(convert_image),
             ).value
 
-            # 3. Replace <img> tags with plain placeholder tokens so that
-            #    mammoth's HTML→markdown step never escapes our OCR markers.
-            html_with_placeholders, ocr_texts = self._inject_placeholders(
-                html_result, image_ocr_map
-            )
-
-            # 4. Convert HTML → markdown
+            # Convert HTML → markdown before adding OCR text so formatting in OCR
+            # output is not escaped by the markdown converter.
             md_result = self._html_converter.convert_string(
-                html_with_placeholders, **kwargs
+                html_result, **kwargs
             )
             md = md_result.markdown
 
-            # 5. Swap placeholders for the actual OCR blocks (post-conversion
-            #    so * and _ are never escaped by the markdown converter).
-            for i, raw_text in enumerate(ocr_texts):
-                placeholder = _PLACEHOLDER.format(i)
+            for placeholder, raw_text in ocr_text_by_placeholder.items():
                 ocr_block = f"*[Image OCR]\n{raw_text}\n[End OCR]*"
-                md = md.replace(placeholder, ocr_block)
+                md = md.replace(
+                    f"![{placeholder}]({placeholder})",
+                    ocr_block,
+                )
+
+            # Remove failed or empty OCR occurrences only after successful
+            # placeholders have been substituted at their original positions.
+            for occurrence in range(image_occurrence):
+                placeholder = _PLACEHOLDER.format(occurrence)
+                md = md.replace(f"![{placeholder}]({placeholder})", "")
 
             return DocumentConverterResult(markdown=md)
         else:
@@ -122,68 +140,3 @@ class DocxConverterWithOCR(HtmlConverter):
                 mammoth.convert_to_html(pre_process_stream, style_map=style_map).value,
                 **kwargs,
             )
-
-    def _extract_and_ocr_images(
-        self, file_stream: BinaryIO, ocr_service: LLMVisionOCRService
-    ) -> dict[str, str]:
-        """
-        Extract images from DOCX and OCR them.
-
-        Returns:
-            Dict mapping image relationship IDs to raw OCR text (no markers).
-        """
-        ocr_map = {}
-
-        try:
-            file_stream.seek(0)
-            doc = Document(file_stream)
-
-            for rel in doc.part.rels.values():
-                if "image" in rel.target_ref.lower():
-                    try:
-                        image_bytes = rel.target_part.blob
-                        image_stream = io.BytesIO(image_bytes)
-                        ocr_result = ocr_service.extract_text(image_stream)
-
-                        if ocr_result.text.strip():
-                            # Store raw text only — markers added later
-                            ocr_map[rel.rId] = ocr_result.text.strip()
-
-                    except Exception:
-                        continue
-
-        except Exception:
-            pass
-
-        return ocr_map
-
-    def _inject_placeholders(
-        self, html: str, ocr_map: dict[str, str]
-    ) -> tuple[str, list[str]]:
-        """
-        Replace <img> tags with numbered placeholder tokens.
-
-        Returns:
-            (html_with_placeholders, ordered list of raw OCR texts)
-        """
-        if not ocr_map:
-            return html, []
-
-        ocr_texts = list(ocr_map.values())
-        used: list[int] = []
-
-        def replace_img(match: re.Match) -> str:  # type: ignore[type-arg]
-            for i in range(len(ocr_texts)):
-                if i not in used:
-                    used.append(i)
-                    return f"<p>{_PLACEHOLDER.format(i)}</p>"
-            return ""  # remove image if all OCR texts already used
-
-        result = re.sub(r"<img[^>]*>", replace_img, html)
-
-        # Any OCR texts that had no matching <img> tag go at the end
-        for i in range(len(ocr_texts)):
-            if i not in used:
-                result += f"<p>{_PLACEHOLDER.format(i)}</p>"
-
-        return result, ocr_texts

@@ -144,17 +144,30 @@ def test_pdf_complex_layout(svc: MockOCRService) -> None:
 
 
 # ---------------------------------------------------------------------------
-# pdf_multipage.pdf — pdfplumber/pdfminer fail (EOF); PyMuPDF fallback used
+# pdf_multipage.pdf — native text and inline images remain in document order
 # ---------------------------------------------------------------------------
 
 
 def test_pdf_multipage(svc: MockOCRService) -> None:
-    # pdfplumber cannot open this file (Unexpected EOF), so _ocr_full_pages
-    # falls back to PyMuPDF for page rendering.  Each page becomes one OCR block.
     expected = (
-        f"## Page 1\n\n\n{_OCR_BLOCK}\n\n\n"
-        f"## Page 2\n\n\n{_OCR_BLOCK}\n\n\n"
-        f"## Page 3\n\n\n{_OCR_BLOCK}"
+        "## Page 1\n\n\n"
+        "Page 1 - Content before image\n\n"
+        "This is important text that appears BEFORE the image.\n\n\n\n"
+        f"{_OCR_BLOCK}\n\n\n"
+        "This text appears AFTER the image on page 1.\n\n"
+        "More content follows here.\n\n\n"
+        "## Page 2\n\n\n"
+        "Page 2 - Content with image at end\n\n"
+        "Main content of page 2 starts here.\n\n"
+        "This is paragraph 1.\n\n"
+        "This is paragraph 2.\n\n"
+        "Final paragraph before image.\n\n\n\n"
+        f"{_OCR_BLOCK}\n\n\n\n"
+        "## Page 3\n\n\n"
+        "Page 3 - Image at top\n\n\n\n"
+        f"{_OCR_BLOCK}\n\n\n"
+        "Content that follows the image.\n\n"
+        "This text is AFTER the image."
     )
     assert _convert("pdf_multipage.pdf", svc) == expected
 
@@ -216,6 +229,74 @@ def test_pdf_scanned_fallback_format(svc: MockOCRService) -> None:
     assert (
         md == expected
     ), f"_ocr_full_pages must produce:\n{expected!r}\nActual:\n{md!r}"
+
+
+# ---------------------------------------------------------------------------
+# Per-page fallback — mixed native/scanned pages use OCR only where needed
+# ---------------------------------------------------------------------------
+
+
+def test_pdf_page_fallback_skips_native_text_and_ocrs_empty_page(
+    svc: MockOCRService,
+) -> None:
+    converter = PdfConverterWithOCR()
+    native_page = MagicMock()
+    native_page.extract_text.return_value = "Native page text"
+    scanned_page = MagicMock()
+    scanned_page.extract_text.return_value = ""
+
+    mock_pdf = MagicMock()
+    mock_pdf.pages = [native_page, scanned_page]
+    mock_pdf.__enter__.return_value = mock_pdf
+
+    with (
+        patch("pdfplumber.open", return_value=mock_pdf),
+        patch.object(converter, "_extract_page_images", return_value=[]),
+    ):
+        markdown = converter.convert(
+            io.BytesIO(b"pdf"), StreamInfo(extension=".pdf"), ocr_service=svc
+        ).text_content
+
+    assert "Native page text" in markdown
+    assert markdown.count(_OCR_BLOCK) == 1
+    native_page.to_image.assert_not_called()
+    scanned_page.to_image.assert_called_once_with(resolution=300)
+
+
+def test_pdf_page_fallback_runs_when_inline_image_ocr_is_empty() -> None:
+    converter = PdfConverterWithOCR()
+    page = MagicMock()
+    page.chars = []
+    page.extract_text.return_value = ""
+
+    mock_pdf = MagicMock()
+    mock_pdf.pages = [page]
+    mock_pdf.__enter__.return_value = mock_pdf
+
+    empty_service = MagicMock()
+    empty_service.extract_text.side_effect = [
+        OCRResult(text="", backend_used="mock"),
+        OCRResult(text="Full page OCR", backend_used="mock"),
+    ]
+
+    with (
+        patch("pdfplumber.open", return_value=mock_pdf),
+        patch.object(
+            converter,
+            "_extract_page_images",
+            return_value=[
+                {"stream": io.BytesIO(b"image"), "y_pos": 0, "name": "image"}
+            ],
+        ),
+    ):
+        markdown = converter.convert(
+            io.BytesIO(b"pdf"),
+            StreamInfo(extension=".pdf"),
+            ocr_service=empty_service,
+        ).text_content
+
+    assert "Full page OCR" in markdown
+    page.to_image.assert_called_once_with(resolution=300)
 
 
 # ---------------------------------------------------------------------------
