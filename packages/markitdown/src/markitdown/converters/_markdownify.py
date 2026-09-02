@@ -33,10 +33,22 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
     """
 
     def __init__(self, **options: Any):
+        self._preserve_complex_tables = options.pop("preserve_complex_tables", False)
         options["heading_style"] = options.get("heading_style", markdownify.ATX)
         options["keep_data_uris"] = options.get("keep_data_uris", False)
         # Explicitly cast options to the expected type if necessary
         super().__init__(**options)
+
+    def convert_table(self, el: Any, text: str, parent_tags: set[str]) -> str:
+        """Preserve tables with merged cells when Markdown cannot represent them."""
+        if self._preserve_complex_tables:
+            for cell in el.find_all(["td", "th"]):
+                for attribute in ("rowspan", "colspan"):
+                    span = cell.get(attribute)
+                    if span is not None and span.isdigit() and int(span) > 1:
+                        return f"\n\n{el}\n\n"
+
+        return super().convert_table(el, text, parent_tags)
 
     def convert_hn(
         self,
