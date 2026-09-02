@@ -42,6 +42,7 @@ from .converters import (
     DocumentIntelligenceConverter,
     ContentUnderstandingConverter,
     CsvConverter,
+    TwelveLabsConverter,
 )
 
 from ._base_converter import DocumentConverter, DocumentConverterResult
@@ -265,6 +266,26 @@ class MarkItDown:
 
                 self.register_converter(
                     ContentUnderstandingConverter(**cu_args),
+                )
+
+            # Register the TwelveLabs (Pegasus) video converter at the top of the
+            # stack if an API key is provided (via kwarg or TWELVELABS_API_KEY).
+            twelvelabs_api_key = kwargs.get("twelvelabs_api_key") or os.getenv(
+                "TWELVELABS_API_KEY"
+            )
+            if twelvelabs_api_key is not None:
+                tl_args: Dict[str, Any] = {"api_key": twelvelabs_api_key}
+
+                tl_model = kwargs.get("twelvelabs_model")
+                if tl_model is not None:
+                    tl_args["model_name"] = tl_model
+
+                tl_prompt = kwargs.get("twelvelabs_prompt")
+                if tl_prompt is not None:
+                    tl_args["prompt"] = tl_prompt
+
+                self.register_converter(
+                    TwelveLabsConverter(**tl_args),
                 )
 
             self._builtins_enabled = True
