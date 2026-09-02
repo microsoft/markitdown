@@ -366,7 +366,7 @@ class oMath2Latex(Tag2Method):
         bo = ""
         for stag, t, e in self.process_children_list(elm):
             if stag == "naryPr":
-                bo = get_char(t.chr, store=CHR_BO)
+                bo = get_char(t.chr, default=CHR_DEFAULT.get("NARY_VAL"), store=CHR_BO)
             else:
                 res.append(t)
         return bo + BLANK.join(res)

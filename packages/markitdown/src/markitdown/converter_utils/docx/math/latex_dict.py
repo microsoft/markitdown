@@ -225,6 +225,8 @@ BRK = "\\\\"
 CHR_DEFAULT = {
     "ACC_VAL": "\\hat{{{0}}}",
     "GROUP_CHR_VAL": "\\underbrace{{{0}}}",
+    # Omitting m:chr under m:naryPr means U+222B INTEGRAL (ISO/IEC 29500-1).
+    "NARY_VAL": "\\int",
 }
 
 POS = {
