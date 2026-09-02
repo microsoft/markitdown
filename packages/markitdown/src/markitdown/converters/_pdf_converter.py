@@ -492,6 +492,59 @@ def _extract_tables_from_words(page: Any) -> list[list[list[str]]]:
     return [table_rows]
 
 
+def _parse_pdf_date(date_str: str) -> str:
+    """Parse a PDF date string (D:YYYYMMDDHHmmSS...) into YYYY-MM-DD format."""
+    if not isinstance(date_str, str) or not date_str.startswith("D:"):
+        return date_str
+    raw = date_str[2:]  # Strip "D:"
+    try:
+        year = raw[0:4]
+        month = raw[4:6] if len(raw) >= 6 else "01"
+        day = raw[6:8] if len(raw) >= 8 else "01"
+        return f"{year}-{month}-{day}"
+    except Exception:
+        return date_str
+
+
+def _extract_pdf_metadata(metadata: dict[str, Any]) -> str:
+    """Format a pdfplumber metadata dict as a markdown Document Properties section.
+
+    Returns an empty string if no relevant fields are present.
+    """
+    field_map = [
+        ("Title", "Title"),
+        ("Author", "Author"),
+        ("Subject", "Subject"),
+        ("Keywords", "Keywords"),
+        ("Creator", "Creator"),
+        ("Producer", "Producer"),
+        ("CreationDate", "Created"),
+        ("ModDate", "Modified"),
+    ]
+
+    lines: list[str] = []
+    for pdf_key, label in field_map:
+        value = metadata.get(pdf_key, "")
+        if not value:
+            continue
+        if isinstance(value, bytes):
+            try:
+                value = value.decode("utf-8", errors="replace")
+            except Exception:
+                continue
+        value = str(value).strip()
+        if not value:
+            continue
+        if pdf_key in ("CreationDate", "ModDate"):
+            value = _parse_pdf_date(value)
+        lines.append(f"- **{label}:** {value}")
+
+    if not lines:
+        return ""
+
+    return "## Document Properties\n\n" + "\n".join(lines) + "\n\n"
+
+
 class PdfConverter(DocumentConverter):
     """
     Converts PDFs to Markdown.
@@ -548,8 +601,11 @@ class PdfConverter(DocumentConverter):
             markdown_chunks: list[str] = []
             form_page_count = 0
             plain_page_indices: list[int] = []
+            metadata_str = ""
 
             with pdfplumber.open(pdf_bytes) as pdf:
+                metadata_str = _extract_pdf_metadata(pdf.metadata or {})
+
                 for page_idx, page in enumerate(pdf.pages):
                     page_content = _extract_form_content_from_words(page)
 
@@ -575,6 +631,7 @@ class PdfConverter(DocumentConverter):
 
         except Exception:
             # Fallback if pdfplumber fails
+            metadata_str = ""
             pdf_bytes.seek(0)
             markdown = pdfminer.high_level.extract_text(pdf_bytes)
 
@@ -585,5 +642,8 @@ class PdfConverter(DocumentConverter):
 
         # Post-process to merge MasterFormat-style partial numbering with following text
         markdown = _merge_partial_numbering_lines(markdown)
+
+        if metadata_str:
+            markdown = metadata_str + markdown
 
         return DocumentConverterResult(markdown=markdown)
