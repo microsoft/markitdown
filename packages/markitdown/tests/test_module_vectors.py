@@ -3,6 +3,8 @@ import os
 import time
 import pytest
 import base64
+import re
+import zipfile
 
 from pathlib import Path
 
@@ -197,6 +199,37 @@ def test_convert_stream_keep_data_uris(test_vector):
             assert string in result.markdown
         for string in test_vector.must_not_include:
             assert string not in result.markdown
+
+
+def test_convert_docx_with_style_missing_type(tmp_path):
+    """DOCX conversion should not fail when a style entry is missing w:type."""
+    source_path = os.path.join(TEST_FILES_DIR, "test.docx")
+    malformed_path = tmp_path / "missing_style_type.docx"
+
+    with zipfile.ZipFile(source_path, mode="r") as zip_input:
+        with zipfile.ZipFile(malformed_path, mode="w") as zip_output:
+            for item in zip_input.infolist():
+                content = zip_input.read(item.filename)
+                if item.filename == "word/styles.xml":
+                    styles_xml = content.decode("utf-8")
+                    styles_xml, count = re.subn(
+                        r'<w:style\s+w:type="[^"]+"(\s+w:styleId="1")',
+                        r"<w:style\1",
+                        styles_xml,
+                    )
+                    # Guard against a future fixture change silently
+                    # neutralizing this test.
+                    assert count == 1
+                    content = styles_xml.encode("utf-8")
+                zip_output.writestr(item, content)
+
+    result = MarkItDown().convert(str(malformed_path))
+
+    assert (
+        "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation"
+        in result.markdown
+    )
+    assert "# Abstract" in result.markdown
 
 
 if __name__ == "__main__":

@@ -54,7 +54,7 @@ class OutlookMsgConverter(DocumentConverter):
         finally:
             file_stream.seek(cur_pos)
 
-        # Brue force, check if it's an Outlook file
+        # Brute force, check if it's an Outlook file
         try:
             if olefile is not None:
                 msg = olefile.OleFileIO(file_stream)
