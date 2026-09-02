@@ -122,5 +122,9 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
             return "[x] " if el.has_attr("checked") else "[ ] "
         return ""
 
+    def convert_strike(self, el: Any, text: str, *args, **kwargs) -> str:
+        """Obsolete <strike> is still in the wild; treat it like <s>/<del>."""
+        return self.convert_s(el, text, *args, **kwargs)  # type: ignore
+
     def convert_soup(self, soup: Any) -> str:
         return super().convert_soup(soup)  # type: ignore

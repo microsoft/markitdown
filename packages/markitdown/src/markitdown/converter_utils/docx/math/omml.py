@@ -66,10 +66,15 @@ def escape_latex(strs):
 
 
 def get_val(key, default=None, store=CHR):
-    if key is not None:
-        return key if not store else store.get(key, key)
-    else:
+    if key is None or not store:
         return default
+    return store.get(key, default)
+
+
+def get_char(key, default=None, store=CHR):
+    if key is None:
+        return default
+    return store.get(key, key) if store else key
 
 
 class Tag2Method(object):
@@ -223,8 +228,8 @@ class oMath2Latex(Tag2Method):
         c_dict = self.process_children_dict(elm)
         pr = c_dict["dPr"]
         null = D_DEFAULT.get("null")
-        s_val = get_val(pr.begChr, default=D_DEFAULT.get("left"), store=T)
-        e_val = get_val(pr.endChr, default=D_DEFAULT.get("right"), store=T)
+        s_val = get_char(pr.begChr, default=D_DEFAULT.get("left"), store=T)
+        e_val = get_char(pr.endChr, default=D_DEFAULT.get("right"), store=T)
         return pr.text + D.format(
             left=null if not s_val else escape_latex(s_val),
             text=c_dict["e"],
@@ -284,7 +289,7 @@ class oMath2Latex(Tag2Method):
         """
         c_dict = self.process_children_dict(elm)
         pr = c_dict["groupChrPr"]
-        latex_s = get_val(pr.chr)
+        latex_s = get_val(pr.chr, default=CHR_DEFAULT.get("GROUP_CHR_VAL"), store=CHR)
         return pr.text + latex_s.format(c_dict["e"])
 
     def do_rad(self, elm):
@@ -361,7 +366,7 @@ class oMath2Latex(Tag2Method):
         bo = ""
         for stag, t, e in self.process_children_list(elm):
             if stag == "naryPr":
-                bo = get_val(t.chr, store=CHR_BO)
+                bo = get_char(t.chr, store=CHR_BO)
             else:
                 res.append(t)
         return bo + BLANK.join(res)
