@@ -4,6 +4,7 @@
 
 from ._plain_text_converter import PlainTextConverter
 from ._html_converter import HtmlConverter
+from ._wechat_converter import WeChatConverter
 from ._rss_converter import RssConverter
 from ._wikipedia_converter import WikipediaConverter
 from ._youtube_converter import YouTubeConverter
@@ -31,6 +32,7 @@ from ._csv_converter import CsvConverter
 __all__ = [
     "PlainTextConverter",
     "HtmlConverter",
+    "WeChatConverter",
     "RssConverter",
     "WikipediaConverter",
     "YouTubeConverter",

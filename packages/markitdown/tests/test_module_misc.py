@@ -87,6 +87,8 @@ BLOG_TEST_STRINGS = [
     "an example where high cost can easily prevent a generic complex",
 ]
 
+WECHAT_TEST_URL = "https://mp.weixin.qq.com/s/test-wechat-article"
+
 LLM_TEST_STRINGS = [
     "5bda1dd6",
 ]
@@ -224,6 +226,27 @@ def test_data_uris() -> None:
     assert len(attributes) == 1
     assert attributes["charset"] == "utf-8"
     assert data == b"Hello, World!"
+
+
+def test_wechat_uri_uses_browser_like_headers() -> None:
+    with open(os.path.join(TEST_FILES_DIR, "test_wechat_article.html"), "rb") as fh:
+        html = fh.read()
+
+    mock_response = MagicMock()
+    mock_response.headers = {"content-type": "text/html; charset=utf-8"}
+    mock_response.url = WECHAT_TEST_URL
+    mock_response.iter_content.return_value = [html]
+
+    mock_session = MagicMock()
+    mock_session.get.return_value = mock_response
+
+    result = MarkItDown(requests_session=mock_session).convert_uri(WECHAT_TEST_URL)
+
+    _, kwargs = mock_session.get.call_args
+    assert kwargs["stream"] is True
+    assert kwargs["headers"]["Referer"] == "https://mp.weixin.qq.com/"
+    assert "Mozilla/5.0" in kwargs["headers"]["User-Agent"]
+    assert "# 示例微信文章" in result.markdown
 
 
 def test_file_uris() -> None:

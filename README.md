@@ -17,7 +17,7 @@ MarkItDown currently supports the conversion from:
 - Excel
 - Images (EXIF metadata and OCR)
 - Audio (EXIF metadata and speech transcription)
-- HTML
+- HTML and web pages, including WeChat public account articles
 - Text-based formats (CSV, JSON, XML)
 - ZIP files (iterates over contents)
 - YouTube URLs
@@ -87,6 +87,19 @@ You can also pipe content:
 ```bash
 cat path-to-file.pdf | markitdown
 ```
+
+### Web Pages
+
+MarkItDown can convert web pages directly:
+
+```bash
+markitdown "https://example.com/article" -o article.md
+```
+
+For WeChat public account articles (`mp.weixin.qq.com/s/...`), MarkItDown focuses on
+the article title, account metadata, cover image, body content, and in-article images
+while omitting common platform chrome such as reader prompts, QR/follow overlays,
+related-reading lists, and social action labels.
 
 ### Optional Dependencies
 MarkItDown has optional dependencies for activating various file formats. Earlier in this document, we installed all optional dependencies with the `[all]` option. However, you can also install them individually for more control. For example:
