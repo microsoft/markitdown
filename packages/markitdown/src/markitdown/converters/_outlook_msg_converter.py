@@ -1,3 +1,6 @@
+from ast import Set
+import email
+import re
 import sys
 from typing import Any, Union, BinaryIO
 from .._stream_info import StreamInfo
@@ -98,23 +101,62 @@ class OutlookMsgConverter(DocumentConverter):
         # Extract email metadata
         md_content = "# Email Message\n\n"
 
+        # Get raw headers
+        raw_headers = self._get_stream_data(msg, "__substg1.0_007D001F")
+
+        # Add the email date to markdown
+        if raw_headers:
+            parsed_headers = email.message_from_string(raw_headers)
+            email_date = parsed_headers.get("Date")
+
+            if email_date:
+                md_content += f"- **Date:** {email_date}\n"
+
+        # Fallback
+
         # Get headers
         headers = {
-            "From": self._get_stream_data(msg, "__substg1.0_0C1F001F"),
+            "From": self._get_sender(msg),
             "To": self._get_stream_data(msg, "__substg1.0_0E04001F"),
+            "Cc": self._get_stream_data(msg, "__substg1.0_0E03001F"),
+            "Bcc": self._get_stream_data(msg, "__substg1.0_0E02001F"),
             "Subject": self._get_stream_data(msg, "__substg1.0_0037001F"),
         }
 
         # Add headers to markdown
         for key, value in headers.items():
             if value:
-                md_content += f"**{key}:** {value}\n"
+                md_content += f"- **{key}:** {value}\n"
+
+        # Add attachment info
+        attach_dirs = self._get_attach_dirs(msg)
+
+        if attach_dirs:
+            md_content += "\n\n## Attachments\n\n"
+
+            for attach_dir in sorted(attach_dirs):
+                md_content += self._get_attach_info(msg, attach_dir)
 
         md_content += "\n## Content\n\n"
 
         # Get email body
         body = self._get_stream_data(msg, "__substg1.0_1000001F")
+        # Fallback
+        if not body:
+            body = self._get_stream_data(msg, "__substg1.0_10130102")
+
         if body:
+            # Remove styles and scripts
+            body = re.sub(
+                r"<(style|script)[^>]*>.*?</\1>",
+                "",
+                body,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+
+            # Remove HTML code
+            body = re.sub(r"<[^>]+>", "", body).strip()
+
             md_content += body
 
         msg.close()
@@ -134,16 +176,79 @@ class OutlookMsgConverter(DocumentConverter):
         try:
             if msg.exists(stream_path):
                 data = msg.openstream(stream_path).read()
-                # Try UTF-16 first (common for .msg files)
-                try:
-                    return data.decode("utf-16-le").strip()
-                except UnicodeDecodeError:
-                    # Fall back to UTF-8
+
+                # Check the property type (the last 4 characters of the path)
+                prop_type = stream_path[-4:]
+                if prop_type == "001F":
+                    # PT_UNICODE: Decode as UTF-16-LE
+                    return data.decode("utf-16-le").replace("\x00", "").strip()
+                else:
+                    # PT_BINARY (0102) or PT_STRING8 (001E): Decode as UTF-8
                     try:
-                        return data.decode("utf-8").strip()
+                        return data.decode("utf-8").replace("\x00", "").strip()
                     except UnicodeDecodeError:
-                        # Last resort - ignore errors
-                        return data.decode("utf-8", errors="ignore").strip()
+                        # Fallback for older legacy encodings
+                        return (
+                            data.decode("windows-1252", errors="ignore")
+                            .replace("\x00", "")
+                            .strip()
+                        )
         except Exception:
             pass
         return None
+
+    def _get_attach_info(self, msg: any, attach_dir: any):
+        # Get the filename
+        filename = self._get_stream_data(msg, f"{attach_dir}/__substg1.0_3707001F")
+        # Fallbacks
+        if not filename:
+            filename = self._get_stream_data(msg, f"{attach_dir}/__substg1.0_3704001F")
+        if not filename:
+            filename = "Unknown_Filename"
+
+        # Get the file size
+        data_stream_path = f"{attach_dir}/__substg1.0_37010102"
+        size_bytes = 0
+
+        try:
+            if msg.exists(data_stream_path):
+                size_bytes = msg.get_size(data_stream_path)
+        except Exception:
+            pass
+
+        # Format file size
+        if size_bytes >= 1048576:
+            size_str = f"{size_bytes / 1048576:.2f} MB"
+        else:
+            size_str = f"{size_bytes / 1024:.2f} KB"
+
+        return f"* {filename} ({size_str})\n"
+
+    def _get_attach_dirs(self, msg: any):
+        attach_dirs = set()
+
+        try:
+            for stream_path in msg.listdir():
+                if stream_path[0].startswith("__attach_version1.0_"):
+                    attach_dirs.add(stream_path[0])
+        except Exception:
+            pass
+        return attach_dirs
+
+    def _get_sender(self, msg: Any):
+        # When the downloaded .msg file came from the sent folder, the sender is behind a different path
+        try:
+            sender = self._get_stream_data(msg, "__substg1.0_5D01001F")
+
+            if not sender:
+                sender = self._get_stream_data(msg, "__substg1.0_0C1F001F")
+
+            if sender and (sender.startswith("/O=") or sender.startswith("/o=")):
+                raw_headers = self._get_stream_data(msg, "__substg1.0_007D001F")
+                if raw_headers:
+                    parsed_headers = email.message_from_string(raw_headers)
+                    if parsed_headers.get("From"):
+                        sender = parsed_headers.get("From")
+        except Exception:
+            pass
+        return sender
