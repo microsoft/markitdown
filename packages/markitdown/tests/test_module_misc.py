@@ -1,12 +1,18 @@
 #!/usr/bin/env python3 -m pytest
 import io
+import json
+import ntpath
 import os
 import re
 import shutil
+from types import SimpleNamespace
 import pytest
 from unittest.mock import MagicMock
 
+import markitdown._uri_utils as uri_utils
 from markitdown._uri_utils import parse_data_uri, file_uri_to_path
+from markitdown._markitdown import _get_content_disposition_filename
+from markitdown.converters import RssConverter
 
 from markitdown import (
     MarkItDown,
@@ -126,7 +132,7 @@ def test_stream_info_operations() -> None:
             **{keyword: f"{keyword}.2"}
         )
 
-        # Make sure the targted attribute is updated
+        # Make sure the targeted attribute is updated
         assert getattr(updated_stream_info, keyword) == f"{keyword}.2"
 
         # Make sure the other attributes are unchanged
@@ -143,7 +149,7 @@ def test_stream_info_operations() -> None:
             StreamInfo(**{keyword: f"{keyword}.2"})
         )
 
-        # Make sure the targted attribute is updated
+        # Make sure the targeted attribute is updated
         assert getattr(updated_stream_info, keyword) == f"{keyword}.2"
 
         # Make sure the other attributes are unchanged
@@ -252,6 +258,20 @@ def test_file_uris() -> None:
     assert path == "/path/to/file.txt"
 
 
+def test_file_uri_with_percent_encoded_windows_drive(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from nturl2path import url2pathname as windows_url2pathname
+
+    monkeypatch.setattr(uri_utils, "os", SimpleNamespace(name="nt", path=ntpath))
+    monkeypatch.setattr(uri_utils, "url2pathname", windows_url2pathname)
+
+    netloc, path = uri_utils.file_uri_to_path("file:///C%3A/Temp/example.md")
+
+    assert netloc is None
+    assert path == r"C:\Temp\example.md"
+
+
 def test_docx_comments() -> None:
     # Test DOCX processing, with comments and setting style_map on init
     markitdown_with_style_map = MarkItDown(style_map="comment-reference => ")
@@ -259,6 +279,44 @@ def test_docx_comments() -> None:
         os.path.join(TEST_FILES_DIR, "test_with_comment.docx")
     )
     validate_strings(result, DOCX_COMMENT_TEST_STRINGS)
+
+
+def test_html_strikethrough_variants(tmp_path) -> None:
+    html = """<!doctype html>
+<html><body>
+<p>Plain <s>s element</s> after.</p>
+<p>Plain <del>del element</del> after.</p>
+<p>Plain <strike>strike element</strike> after.</p>
+<p>Spaces A<strike> B </strike>C.</p>
+<p>Runs D<strike>  E  </strike>F.</p>
+<p>Empty G<strike></strike>H.</p>
+<p>Newline I<strike>J
+K</strike>L.</p>
+<p>Break M<strike>N<br>O</strike>P.</p>
+</body></html>
+"""
+    path = tmp_path / "strike.html"
+    path.write_text(html, encoding="utf-8")
+    markdown = MarkItDown().convert(str(path)).markdown
+
+    assert markdown == "\n\n".join(
+        [
+            # <s>, <del> and the obsolete <strike> all mean strikethrough
+            "Plain ~~s element~~ after.",
+            "Plain ~~del element~~ after.",
+            "Plain ~~strike element~~ after.",
+            # Surrounding whitespace stays outside of the markup ...
+            "Spaces A ~~B~~ C.",
+            # ... and runs of it collapse to a single space
+            "Runs D ~~E~~ F.",
+            # An empty element contributes nothing
+            "Empty GH.",
+            # A line break inside the element is kept, and the markup
+            # survives it because strikethrough may span a single newline
+            "Newline I~~J\nK~~L.",
+            "Break M~~N\nO~~P.",
+        ]
+    )
 
 
 def test_docx_equations() -> None:
@@ -286,6 +344,110 @@ def test_input_as_strings() -> None:
     input_data = b"   \n\n\n<html><body><h1>Test</h1></body></html>"
     result = markitdown.convert_stream(io.BytesIO(input_data))
     assert "# Test" in result.text_content
+
+
+def _mock_response(content_disposition: str) -> MagicMock:
+    response = MagicMock()
+    response.headers = {"content-disposition": content_disposition}
+    response.url = "https://example.com/download"
+    response.iter_content.return_value = [b"name,value\nalpha,beta\n"]
+    response.raise_for_status.return_value = None
+    return response
+
+
+def test_convert_response_uses_rfc5987_content_disposition_filename() -> None:
+    markitdown = MarkItDown()
+    result = markitdown.convert_response(
+        _mock_response("attachment; filename*=UTF-8''data.csv")
+    )
+
+    assert result.markdown == "\n".join(
+        [
+            "| name | value |",
+            "| --- | --- |",
+            "| alpha | beta |",
+        ]
+    )
+
+
+def test_convert_response_prefers_extended_content_disposition_filename() -> None:
+    markitdown = MarkItDown()
+    result = markitdown.convert_response(
+        _mock_response("attachment; filename=fallback.txt; filename*=UTF-8''data.csv")
+    )
+
+    assert result.markdown == "\n".join(
+        [
+            "| name | value |",
+            "| --- | --- |",
+            "| alpha | beta |",
+        ]
+    )
+
+
+def test_get_content_disposition_filename_decodes_rfc5987() -> None:
+    assert (
+        _get_content_disposition_filename(
+            "attachment; filename=fallback.txt; "
+            "filename*=UTF-8''d%C3%A1t%C3%A1%2Ecsv"
+        )
+        == "d\u00e1t\u00e1.csv"
+    )
+
+
+def test_pptx_chart_multi_series_conversion() -> None:
+    """Charts with multiple series and many categories must convert correctly.
+
+    Regression test for the slow path in PptxConverter._convert_chart_to_markdown,
+    where ``series.values[idx]`` was evaluated inside the (category x series) loop.
+    In python-pptx each ``series.values`` access rescans the cached points via
+    XPath (O(n) per lookup), so the old code was O(n^2) per series (and rebuilt
+    the whole tuple for every category), making large charts extremely slow.
+
+    The values are now materialized once per series. This test builds a chart
+    with enough categories that the regressed code path would be pathologically
+    slow, and verifies the resulting Markdown table is correct across series.
+    """
+    pptx = pytest.importorskip("pptx")
+    from pptx.util import Inches
+    from pptx.chart.data import CategoryChartData
+    from pptx.enum.chart import XL_CHART_TYPE
+
+    n_categories = 200
+    categories = [f"C{i}" for i in range(n_categories)]
+    series_a = [float(i) for i in range(n_categories)]
+    series_b = [float(i * 2) for i in range(n_categories)]
+
+    presentation = pptx.Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[5])
+    chart_data = CategoryChartData()
+    chart_data.categories = categories
+    chart_data.add_series("Series A", series_a)
+    chart_data.add_series("Series B", series_b)
+    slide.shapes.add_chart(
+        XL_CHART_TYPE.COLUMN_CLUSTERED,
+        Inches(1),
+        Inches(1),
+        Inches(8),
+        Inches(5),
+        chart_data,
+    )
+
+    buffer = io.BytesIO()
+    presentation.save(buffer)
+    buffer.seek(0)
+
+    result = MarkItDown().convert_stream(buffer, file_extension=".pptx")
+    md = result.markdown
+
+    # Both series headers are present
+    assert "Series A" in md
+    assert "Series B" in md
+    # First and last categories are present (nothing truncated)
+    assert "| C0 |" in md
+    assert f"| C{n_categories - 1} |" in md
+    # A representative row carries the correct value for each series
+    assert "| C10 | 10.0 | 20.0 |" in md
 
 
 def test_deeply_nested_html_fallback() -> None:
@@ -328,11 +490,102 @@ def test_deeply_nested_html_fallback() -> None:
             # Should have emitted a warning about the fallback
             recursion_warnings = [x for x in w if "deeply nested" in str(x.message)]
             assert len(recursion_warnings) > 0
+
     finally:
         sys.setrecursionlimit(original_limit)
 
     # The output should contain the text content, not raw HTML
     assert "Deep content" in result.markdown
+    assert "bold text" in result.markdown
+    assert "<div" not in result.markdown
+    assert "<p>" not in result.markdown
+
+
+def test_deeply_nested_rss_item_fallback() -> None:
+    """Deeply nested HTML inside an RSS item should fall back to plain-text
+    extraction instead of silently embedding raw unconverted HTML in the
+    markdown output (same failure class as the HTML converter fix in #1644).
+
+    Note: This test uses sys.setrecursionlimit to guarantee a RecursionError
+    regardless of the host environment's default limit, making it deterministic
+    across different platforms and CI configurations.
+    """
+    import sys
+    import warnings
+
+    markitdown = MarkItDown()
+
+    # Use a small recursion limit so the test is environment-independent.
+    # We restore the original limit in a finally block to avoid side-effects.
+    original_limit = sys.getrecursionlimit()
+    low_limit = 200  # well below markdownify's traversal depth for depth=500
+
+    # Build an RSS item whose content is deeply nested HTML
+    depth = 500
+    item_html = ""
+    for _ in range(depth):
+        item_html += '<div style="margin-left:10px">'
+    item_html += "<p>Deep feed content with <b>bold text</b></p>"
+    for _ in range(depth):
+        item_html += "</div>"
+
+    rss = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<rss version="2.0" '
+        'xmlns:content="http://purl.org/rss/1.0/modules/content/">'
+        "<channel>"
+        "<title>Test Feed</title>"
+        "<description>A test feed</description>"
+        "<item>"
+        "<title>Deep Item</title>"
+        f"<content:encoded><![CDATA[{item_html}]]></content:encoded>"
+        "</item>"
+        "</channel>"
+        "</rss>"
+    )
+    atom = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<feed xmlns="http://www.w3.org/2005/Atom">'
+        "<title>Test Feed</title>"
+        "<entry>"
+        "<title>Deep Entry</title>"
+        f'<content type="html"><![CDATA[{item_html}]]></content>'
+        "</entry>"
+        "</feed>"
+    )
+
+    try:
+        sys.setrecursionlimit(low_limit)
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = markitdown.convert_stream(
+                io.BytesIO(rss.encode("utf-8")),
+                file_extension=".rss",
+            )
+
+            # Should have emitted a warning about the fallback
+            recursion_warnings = [x for x in w if "deeply nested" in str(x.message)]
+            assert len(recursion_warnings) > 0
+
+        # strict=True should expose the conversion failure rather than applying
+        # the plain-text fallback.
+        with pytest.raises(RecursionError):
+            RssConverter().convert(
+                io.BytesIO(rss.encode("utf-8")),
+                StreamInfo(extension=".rss"),
+                strict=True,
+            )
+        with pytest.raises(RecursionError):
+            RssConverter().convert(
+                io.BytesIO(atom.encode("utf-8")),
+                StreamInfo(extension=".atom"),
+                strict=True,
+            )
+    finally:
+        sys.setrecursionlimit(original_limit)
+
+    # The output should contain the text content, not raw HTML
+    assert "Deep feed content" in result.markdown
     assert "bold text" in result.markdown
     assert "<div" not in result.markdown
     assert "<p>" not in result.markdown
@@ -559,6 +812,171 @@ def test_ipynb_accepts_non_ascii() -> None:
 
     result = converter.accepts(io.BytesIO(notebook_bytes), stream_info_json)
     assert result is True
+    
+    
+def test_epub_metadata_nodevalue():
+    from defusedxml.minidom import parseString
+    from markitdown.converters._epub_converter import EpubConverter
+
+    xml_data = (
+        '<package xmlns:dc="http://purl.org/dc/elements/1.1/">'
+        "<dc:title><span>Structured</span> Title</dc:title>"
+        "<dc:creator><name>Author 1</name></dc:creator>"
+        "<dc:creator>Author 2</dc:creator>"
+        "<dc:publisher></dc:publisher>"
+        "<dc:description/>"
+        "</package>"
+    )
+    dom = parseString(xml_data)
+    converter = EpubConverter()
+
+    title = converter._get_text_from_node(dom, "dc:title")
+    assert title == "Structured Title"
+
+    creators = converter._get_all_texts_from_nodes(dom, "dc:creator")
+    assert creators == ["Author 1", "Author 2"]
+
+    publisher = converter._get_text_from_node(dom, "dc:publisher")
+    assert publisher is None
+
+    missing = converter._get_text_from_node(dom, "dc:date")
+    assert missing is None
+
+
+def test_json_with_late_non_ascii_character(tmp_path) -> None:
+    payload = {
+        "record": {
+            "title": "Example record",
+            "abstract": "This is sample test. " * 500,
+        },
+        "notes": "non-ASCII character: Ã¨",
+    }
+    json_path = tmp_path / "input.json"
+    json_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+    result = MarkItDown().convert(str(json_path))
+
+    assert "non-ASCII character: Ã¨" in result.text_content
+
+
+###############################################################################
+# CSV converter.
+###############################################################################
+
+
+def _convert_csv(data: bytes, charset: str | None = None) -> str:
+    stream_info = StreamInfo(extension=".csv", charset=charset)
+    return (
+        MarkItDown()
+        .convert_stream(io.BytesIO(data), stream_info=stream_info)
+        .text_content
+    )
+
+
+def test_csv_utf8_bom_is_stripped_from_the_header() -> None:
+    result = _convert_csv(b"\xef\xbb\xbfname,age\nAlice,30\n")
+
+    assert "\ufeff" not in result
+    assert result.startswith("| name | age |")
+    assert "| Alice | 30 |" in result
+
+
+def test_csv_utf8_bom_is_stripped_when_charset_is_known() -> None:
+    result = _convert_csv(b"\xef\xbb\xbfname,age\nAlice,30\n", charset="utf-8")
+
+    assert "\ufeff" not in result
+    assert result.startswith("| name | age |")
+
+
+def test_csv_leading_blank_line_does_not_destroy_the_table() -> None:
+    result = _convert_csv(b"\nname,age\nAlice,30\n")
+
+    assert result == "| name | age |\n| --- | --- |\n| Alice | 30 |"
+
+
+def test_csv_trailing_blank_lines_are_skipped() -> None:
+    result = _convert_csv(b"name,age\nAlice,30\n\n\n")
+
+    assert result == "| name | age |\n| --- | --- |\n| Alice | 30 |"
+
+
+def test_csv_blank_lines_between_rows_are_kept() -> None:
+    result = _convert_csv(b"name,age\n\nAlice,30\n\nBob,40\n")
+
+    assert (
+        result == "| name | age |\n| --- | --- |\n| Alice | 30 |\n|  |  |\n| Bob | 40 |"
+    )
+
+
+def test_csv_all_blank_input_returns_empty_markdown() -> None:
+    result = _convert_csv(b"\n\n\n")
+
+    assert result == ""
+
+
+def test_csv_pipe_in_cell_is_escaped() -> None:
+    result = _convert_csv(b'name,description\nWidget,"cheap | fast"\n')
+
+    # The pipe must be escaped rather than emitted raw, or it splits the row.
+    assert "| Widget | cheap \\| fast |" in result
+
+
+def test_csv_pipe_preceded_by_backslash_is_still_escaped() -> None:
+    # `left\|right` must not become `left\\|right`: the doubled backslash is a
+    # literal backslash, which would leave the pipe acting as a delimiter and
+    # let a renderer drop `right`. The run of backslashes is doubled instead,
+    # so the escaping `\|` survives.
+    result = _convert_csv(b'name,description\nWidget,"left\\|right"\n')
+
+    assert r"| Widget | left\\\|right |" in result
+
+
+def test_csv_pipe_preceded_by_two_backslashes_is_still_escaped() -> None:
+    # An even-length run is just as dangerous once the naive `\|` is appended,
+    # so check a longer run as well.
+    result = _convert_csv(b'name,description\nWidget,"left\\\\|right"\n')
+
+    assert r"| Widget | left\\\\\|right |" in result
+
+
+def test_csv_newline_in_quoted_cell_does_not_split_the_row() -> None:
+    result = _convert_csv(b'name,notes\nWidget,"line one\nline two"\n')
+
+    # The table must stay on one line per record; the embedded break collapses
+    # to a space.
+    assert len(result.splitlines()) == 3
+    assert "| Widget | line one line two |" in result
+
+
+def test_csv_carriage_returns_in_quoted_cell_collapse_to_spaces() -> None:
+    result = _convert_csv(b'name,notes\nWidget,"line one\r\nline two\rline three"\n')
+
+    assert len(result.splitlines()) == 3
+    assert "| Widget | line one line two line three |" in result
+
+
+def test_csv_pipe_in_header_is_escaped() -> None:
+    result = _convert_csv(b'"a | b",c\n1,2\n')
+
+    assert "| a \\| b | c |" in result
+
+
+def test_csv_plain_values_are_unchanged() -> None:
+    # Guards against over-escaping ordinary content.
+    result = _convert_csv(b"name,description\nWidget,cheap and fast\n")
+
+    assert "| Widget | cheap and fast |" in result
+    assert "\\" not in result
+
+
+def test_csv_backslash_without_a_pipe_is_left_alone() -> None:
+    # Only backslashes that guard a pipe are doubled; a Windows path stays
+    # readable.
+    result = _convert_csv(b"name,path\nWidget,C:\\temp\\file.txt\n")
+
+    assert r"| Widget | C:\temp\file.txt |" in result
 
 
 if __name__ == "__main__":
@@ -577,6 +995,7 @@ if __name__ == "__main__":
         test_markitdown_llm_parameters,
         test_markitdown_llm,
         test_ipynb_accepts_non_ascii,
+        test_epub_metadata_nodevalue,
     ]:
         print(f"Running {test.__name__}...", end="")
         test()
