@@ -12,6 +12,9 @@ from mcp.server import Server
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from markitdown import MarkItDown
 import uvicorn
+from pathlib import Path
+from typing import Optional, Dict, Any
+import json
 
 # Initialize FastMCP server for MarkItDown (SSE)
 mcp = FastMCP("markitdown")
@@ -21,6 +24,120 @@ mcp = FastMCP("markitdown")
 async def convert_to_markdown(uri: str) -> str:
     """Convert a resource described by an http:, https:, file: or data: URI to markdown"""
     return MarkItDown(enable_plugins=check_plugins_enabled()).convert_uri(uri).markdown
+
+
+@mcp.tool()
+async def convert_and_save(
+    uri: str,
+    output_path: str,
+    return_content: bool = False
+) -> Dict[str, Any]:
+    """Convert a resource to markdown and save to file, optionally returning content
+    
+    Args:
+        uri: URI to convert (http, https, file, or data URI)
+        output_path: Path where to save the markdown file
+        return_content: Whether to return the markdown content (default: False)
+        
+    Returns:
+        Dictionary with conversion metadata including success status, file path, and size
+    """
+    try:
+        # Convert the document
+        markitdown = MarkItDown(enable_plugins=check_plugins_enabled())
+        result = markitdown.convert_uri(uri)
+        
+        # Ensure output directory exists
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Write to file
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(result.markdown)
+        
+        # Get file size
+        file_size = output_path.stat().st_size
+        
+        # Prepare response
+        response = {
+            "success": True,
+            "saved_to": str(output_path.resolve()),
+            "size": file_size,
+            "title": result.title if result.title else None,
+        }
+        
+        # Optionally include content
+        if return_content:
+            response["content"] = result.markdown
+            
+        return response
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "saved_to": None,
+            "size": 0,
+            "title": None,
+        }
+
+
+@mcp.tool()
+async def convert_to_markdown_with_options(
+    uri: str,
+    return_content: bool = True,
+    save_to: Optional[str] = None
+) -> Dict[str, Any]:
+    """Convert a resource to markdown with flexible output options
+    
+    Args:
+        uri: URI to convert (http, https, file, or data URI)
+        return_content: Whether to return the markdown content (default: True)
+        save_to: Optional path to save the markdown file
+        
+    Returns:
+        Dictionary with conversion results and metadata
+    """
+    try:
+        # Convert the document
+        markitdown = MarkItDown(enable_plugins=check_plugins_enabled())
+        result = markitdown.convert_uri(uri)
+        
+        # Prepare base response
+        response = {
+            "success": True,
+            "title": result.title if result.title else None,
+        }
+        
+        # Handle file saving
+        if save_to:
+            output_path = Path(save_to)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            with open(output_path, "w", encoding="utf-8") as f:
+                f.write(result.markdown)
+            
+            response["saved_to"] = str(output_path.resolve())
+            response["size"] = output_path.stat().st_size
+        else:
+            response["saved_to"] = None
+            response["size"] = len(result.markdown.encode('utf-8'))
+            
+        # Optionally include content
+        if return_content:
+            response["content"] = result.markdown
+            
+        return response
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "content": None if return_content else None,
+            "saved_to": None,
+            "size": 0,
+            "title": None,
+        }
 
 
 def check_plugins_enabled() -> bool:
