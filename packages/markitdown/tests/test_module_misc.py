@@ -788,6 +788,7 @@ def test_markitdown_llm() -> None:
 def test_ipynb_converter_accepts_handling_decode_error() -> None:
     from markitdown.converters._ipynb_converter import IpynbConverter
     from io import BytesIO
+
     converter = IpynbConverter()
     # A stream of non-decodable bytes (binary data like French PDF bytes)
     stream = BytesIO(b"\xc3\x28\x91\xff\x00")
@@ -796,8 +797,8 @@ def test_ipynb_converter_accepts_handling_decode_error() -> None:
 
     # This should return False gracefully and NOT raise UnicodeDecodeError/ValueError
     assert not converter.accepts(stream, stream_info)
-    
-    
+
+
 def test_epub_metadata_nodevalue():
     from defusedxml.minidom import parseString
     from markitdown.converters._epub_converter import EpubConverter
