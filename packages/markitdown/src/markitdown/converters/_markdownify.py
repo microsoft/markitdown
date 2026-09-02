@@ -60,7 +60,7 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         convert_as_inline: Optional[bool] = False,
         **kwargs,
     ):
-        """Same as usual converter, but removes Javascript links and escapes URIs."""
+        """Same as usual converter, but removes JavaScript links and escapes URIs."""
         prefix, suffix, text = markdownify.chomp(text)  # type: ignore
         if not text:
             return ""
@@ -144,6 +144,10 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         if el.get("type") == "checkbox":
             return "[x] " if el.has_attr("checked") else "[ ] "
         return ""
+
+    def convert_strike(self, el: Any, text: str, *args, **kwargs) -> str:
+        """Obsolete <strike> is still in the wild; treat it like <s>/<del>."""
+        return self.convert_s(el, text, *args, **kwargs)  # type: ignore
 
     def convert_soup(self, soup: Any) -> str:
         return super().convert_soup(soup)  # type: ignore

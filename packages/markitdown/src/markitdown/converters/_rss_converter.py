@@ -1,3 +1,5 @@
+import warnings
+
 from defusedxml import minidom
 from xml.dom.minidom import Document, Element
 from typing import BinaryIO, Any, Union
@@ -87,18 +89,23 @@ class RssConverter(DocumentConverter):
         stream_info: StreamInfo,
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
+        # Pop our own keyword before forwarding the rest to markdownify.
+        # strict=True raises RecursionError instead of falling back to plain text.
+        strict: bool = kwargs.pop("strict", False)
         self._kwargs = kwargs
         doc = minidom.parse(file_stream)
         feed_type = self._feed_type(doc)
 
         if feed_type == "rss":
-            return self._parse_rss_type(doc)
+            return self._parse_rss_type(doc, strict=strict)
         elif feed_type == "atom":
-            return self._parse_atom_type(doc)
+            return self._parse_atom_type(doc, strict=strict)
         else:
             raise ValueError("Unknown feed type")
 
-    def _parse_atom_type(self, doc: Document) -> DocumentConverterResult:
+    def _parse_atom_type(
+        self, doc: Document, *, strict: bool = False
+    ) -> DocumentConverterResult:
         """Parse the type of an Atom feed.
 
         Returns None if the feed type is not recognized or something goes wrong.
@@ -121,16 +128,18 @@ class RssConverter(DocumentConverter):
             if entry_updated:
                 md_text += f"Updated on: {entry_updated}\n"
             if entry_summary:
-                md_text += self._parse_content(entry_summary)
+                md_text += self._parse_content(entry_summary, strict=strict)
             if entry_content:
-                md_text += self._parse_content(entry_content)
+                md_text += self._parse_content(entry_content, strict=strict)
 
         return DocumentConverterResult(
             markdown=md_text,
             title=title,
         )
 
-    def _parse_rss_type(self, doc: Document) -> DocumentConverterResult:
+    def _parse_rss_type(
+        self, doc: Document, *, strict: bool = False
+    ) -> DocumentConverterResult:
         """Parse the type of an RSS feed.
 
         Returns None if the feed type is not recognized or something goes wrong.
@@ -158,21 +167,34 @@ class RssConverter(DocumentConverter):
             if pubDate:
                 md_text += f"Published on: {pubDate}\n"
             if description:
-                md_text += self._parse_content(description)
+                md_text += self._parse_content(description, strict=strict)
             if content:
-                md_text += self._parse_content(content)
+                md_text += self._parse_content(content, strict=strict)
 
         return DocumentConverterResult(
             markdown=md_text,
             title=channel_title,
         )
 
-    def _parse_content(self, content: str) -> str:
+    def _parse_content(self, content: str, *, strict: bool = False) -> str:
         """Parse the content of an RSS feed item"""
         try:
             # using bs4 because many RSS feeds have HTML-styled content
             soup = BeautifulSoup(content, "html.parser")
             return _CustomMarkdownify(**self._kwargs).convert_soup(soup)
+        except RecursionError:
+            if strict:
+                raise
+            # Deeply nested item content can exceed Python's recursion limit
+            # during markdownify's recursive DOM traversal.  Fall back to
+            # BeautifulSoup's iterative get_text() so the caller still gets
+            # usable plain-text content instead of raw HTML.
+            warnings.warn(
+                "RSS item content is too deeply nested for markdown conversion "
+                "(RecursionError). Falling back to plain-text extraction.",
+                stacklevel=2,
+            )
+            return BeautifulSoup(content, "html.parser").get_text("\n", strip=True)
         except BaseException as _:
             return content
 
