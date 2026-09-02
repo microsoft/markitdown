@@ -1,6 +1,7 @@
 import warnings
 
 from defusedxml import minidom
+from xml.dom import Node
 from xml.dom.minidom import Document, Element
 from typing import BinaryIO, Any, Union
 from bs4 import BeautifulSoup
@@ -26,6 +27,8 @@ CANDIDATE_MIME_TYPE_PREFIXES = [
 CANDIDATE_FILE_EXTENSIONS = [
     ".xml",
 ]
+
+XHTML_NAMESPACE = "http://www.w3.org/1999/xhtml"
 
 
 class RssConverter(DocumentConverter):
@@ -119,9 +122,9 @@ class RssConverter(DocumentConverter):
             md_text += f"{subtitle}\n"
         for entry in entries:
             entry_title = self._get_data_by_tag_name(entry, "title")
-            entry_summary = self._get_data_by_tag_name(entry, "summary")
+            entry_summary = self._get_atom_content(entry, "summary")
             entry_updated = self._get_data_by_tag_name(entry, "updated")
-            entry_content = self._get_data_by_tag_name(entry, "content")
+            entry_content = self._get_atom_content(entry, "content")
 
             if entry_title:
                 md_text += f"\n## {entry_title}\n"
@@ -136,6 +139,37 @@ class RssConverter(DocumentConverter):
             markdown=md_text,
             title=title,
         )
+
+    def _get_atom_content(self, entry: Element, tag_name: str) -> Union[str, None]:
+        nodes = entry.getElementsByTagName(tag_name)
+        if not nodes:
+            return None
+
+        node = nodes[0]
+        if node.getAttribute("type").lower() != "xhtml":
+            return self._get_data_by_tag_name(entry, tag_name)
+
+        return "".join(
+            self._localize_xhtml_names(child.cloneNode(True)).toxml()
+            for child in node.childNodes
+            if child.nodeType == Node.ELEMENT_NODE
+        )
+
+    def _localize_xhtml_names(self, node: Node) -> Node:
+        """Rewrite prefixed XHTML element names to their local HTML names.
+
+        Atom permits XHTML content to be namespace-prefixed (e.g. ``x:strong``).
+        The downstream HTML converter dispatches on HTML tag names, so the
+        prefix has to be dropped or the element is treated as an unknown tag
+        and its formatting is lost.
+        """
+        if node.nodeType == Node.ELEMENT_NODE:
+            if node.prefix and node.namespaceURI == XHTML_NAMESPACE:
+                node.tagName = node.nodeName = node.localName
+                node.prefix = None
+            for child in node.childNodes:
+                self._localize_xhtml_names(child)
+        return node
 
     def _parse_rss_type(
         self, doc: Document, *, strict: bool = False
@@ -152,8 +186,9 @@ class RssConverter(DocumentConverter):
         channel_title = self._get_data_by_tag_name(channel, "title")
         channel_description = self._get_data_by_tag_name(channel, "description")
         items = channel.getElementsByTagName("item")
+        md_text = ""
         if channel_title:
-            md_text = f"# {channel_title}\n"
+            md_text += f"# {channel_title}\n"
         if channel_description:
             md_text += f"{channel_description}\n"
         for item in items:

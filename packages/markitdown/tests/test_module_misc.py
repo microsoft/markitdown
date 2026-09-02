@@ -5,6 +5,7 @@ import ntpath
 import os
 import re
 import shutil
+import zipfile
 from types import SimpleNamespace
 import pytest
 from unittest.mock import MagicMock
@@ -224,6 +225,21 @@ def test_data_uris() -> None:
     assert len(attributes) == 1
     assert attributes["charset"] == "utf-8"
     assert data == b"Hello, World!"
+
+
+def test_uppercase_data_image_uri_is_truncated_by_default() -> None:
+    markitdown = MarkItDown()
+    html = b'<html><body><img alt="dot" src="DATA:image/png;base64,AAAA"></body></html>'
+    stream_info = StreamInfo(mimetype="text/html", extension=".html")
+
+    result = markitdown.convert_stream(io.BytesIO(html), stream_info=stream_info)
+    assert result.markdown == "![dot](DATA:image/png;base64...)"
+    assert "AAAA" not in result.markdown
+
+    result = markitdown.convert_stream(
+        io.BytesIO(html), stream_info=stream_info, keep_data_uris=True
+    )
+    assert result.markdown == "![dot](DATA:image/png;base64,AAAA)"
 
 
 def test_file_uris() -> None:
@@ -783,6 +799,24 @@ def test_markitdown_llm() -> None:
         assert test_string in result.text_content
     # Standard alt text is included
     validate_strings(result, PPTX_TEST_STRINGS)
+
+
+def test_zip_stream_no_filename_header() -> None:
+    """Regression test: ZipConverter must not render the literal string 'None'
+    in the output header when the stream has no associated URL, local path, or
+    filename (e.g. when called via convert_stream() without stream_info)."""
+    markitdown = MarkItDown()
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("hello.txt", "Hello world")
+    buf.seek(0)
+
+    result = markitdown.convert_stream(
+        buf, stream_info=StreamInfo(mimetype="application/zip")
+    )
+    assert result.markdown.startswith("Content from the zip file `(unknown)`:\n\n")
+    assert "Hello world" in result.markdown
 
 
 def test_ipynb_accepts_non_ascii() -> None:
