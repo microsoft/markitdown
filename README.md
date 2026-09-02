@@ -294,6 +294,22 @@ result = md.convert("example.jpg")
 print(result.text_content)
 ```
 
+Any OpenAI-compatible client works. For example, to use [MiniMax](https://www.minimaxi.com):
+
+```python
+from markitdown import MarkItDown
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="YOUR_MINIMAX_API_KEY",
+    base_url="https://api.minimax.io/v1",
+)
+# Default to MiniMax-M3 (latest flagship); "MiniMax-M2.7" is also supported.
+md = MarkItDown(llm_client=client, llm_model="MiniMax-M3")
+result = md.convert("example.jpg")
+print(result.text_content)
+```
+
 ### Docker
 
 ```sh
