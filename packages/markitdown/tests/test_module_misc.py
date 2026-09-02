@@ -227,6 +227,21 @@ def test_data_uris() -> None:
     assert data == b"Hello, World!"
 
 
+def test_uppercase_data_image_uri_is_truncated_by_default() -> None:
+    markitdown = MarkItDown()
+    html = b'<html><body><img alt="dot" src="DATA:image/png;base64,AAAA"></body></html>'
+    stream_info = StreamInfo(mimetype="text/html", extension=".html")
+
+    result = markitdown.convert_stream(io.BytesIO(html), stream_info=stream_info)
+    assert result.markdown == "![dot](DATA:image/png;base64...)"
+    assert "AAAA" not in result.markdown
+
+    result = markitdown.convert_stream(
+        io.BytesIO(html), stream_info=stream_info, keep_data_uris=True
+    )
+    assert result.markdown == "![dot](DATA:image/png;base64,AAAA)"
+
+
 def test_file_uris() -> None:
     # Test file URI with an empty host
     file_uri = "file:///path/to/file.txt"
