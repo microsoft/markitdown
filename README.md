@@ -294,6 +294,18 @@ result = md.convert("example.jpg")
 print(result.text_content)
 ```
 
+You can also convert images from remote URLs:
+
+```python
+from markitdown import MarkItDown
+from openai import OpenAI
+
+client = OpenAI()
+md = MarkItDown(llm_client=client, llm_model="gpt-4o")
+result = md.convert("https://example.com/image.png")
+print(result.text_content)
+```
+
 ### Docker
 
 ```sh
