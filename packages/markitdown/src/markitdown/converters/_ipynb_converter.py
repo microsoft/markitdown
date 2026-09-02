@@ -64,7 +64,11 @@ class IpynbConverter(DocumentConverter):
 
             for cell in notebook_content.get("cells", []):
                 cell_type = cell.get("cell_type", "")
-                source_lines = cell.get("source", [])
+                source = cell.get("source", [])
+                # nbformat allows source to be a string or list of strings
+                if isinstance(source, str):
+                    source = source.splitlines(keepends=True)
+                source_lines = source
 
                 if cell_type == "markdown":
                     md_output.append("".join(source_lines))
