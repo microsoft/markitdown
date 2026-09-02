@@ -1,5 +1,6 @@
 import csv
 import io
+import re
 from typing import BinaryIO, Any
 from charset_normalizer import from_bytes
 from .._base_converter import DocumentConverter, DocumentConverterResult
@@ -12,15 +13,21 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 ACCEPTED_FILE_EXTENSIONS = [".csv"]
 
 
+# Matches a pipe together with the (possibly empty) run of backslashes in front
+# of it, so that run can be doubled before the pipe is escaped.
+_PIPE_ESCAPE_RE = re.compile(r"(\\*)\|")
+
+
 def _escape_table_cell(value: str) -> str:
-    """Escape a CSV value so it is safe inside a Markdown table cell."""
-    return (
-        value.replace("|", "\\|")
-        .replace("\r\n", " ")
-        .replace("\n", " ")
-        .replace("\r", " ")
-    )
-  
+    r"""Escape a CSV value so it is safe inside a Markdown table cell.
+
+    A pipe is a column separator, so it must be escaped.
+    Line breaks would end the row early, so they collapse to a single space.
+    """
+    value = _PIPE_ESCAPE_RE.sub(lambda m: m.group(1) * 2 + r"\|", value)
+    return value.replace("\r\n", " ").replace("\n", " ").replace("\r", " ")
+
+
 def _trim_outer_blank_rows(rows: list[list[str]]) -> None:
     """Remove empty rows from the beginning and end, and immediately after the header. This operation is performed in-place."""
     # Pop empty rows from the beginning
