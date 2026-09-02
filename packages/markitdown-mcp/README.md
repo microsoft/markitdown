@@ -36,6 +36,12 @@ markitdown-mcp --http --host 127.0.0.1 --port 3001
 ```
 
 ## Running in Docker
+Clone and navigate to folder
+
+```
+git clone git@github.com:microsoft/markitdown.git
+cd markitdown/packages/markitdown-mcp
+```
 
 To run `markitdown-mcp` in Docker, build the Docker image using the provided Dockerfile:
 ```bash
