@@ -1,24 +1,9 @@
 #!/usr/bin/env python3 -m pytest
-"""Tests for .msg files saved in the legacy non-Unicode format.
-
-Every string property in a .msg is stored under a stream whose name ends in
-its MAPI type: ``001F`` for PT_UNICODE (UTF-16LE) or ``001E`` for PT_STRING8
-(the message's 8-bit code page). Outlook writes one or the other for a given
-message, never both, so a message saved in the non-Unicode format has no
-``001F`` streams at all.
-
-The converter addressed only the ``001F`` names, so such a message produced a
-document with every header missing and no body -- just the "# Email Message"
-and "## Content" scaffolding -- with no error raised to signal the loss.
-
-A .msg is an OLE2 compound file and nothing in the dependency set can write
-that container, so these tests serve the streams through a stand-in for
-``olefile.OleFileIO`` rather than a binary fixture. ``test_outlook_msg.msg``
-in the test vectors covers the Unicode format end to end.
-"""
+"""Tests for .msg files saved in the legacy non-Unicode format."""
 
 import io
 import os
+import struct
 from unittest.mock import patch
 
 import olefile
@@ -41,6 +26,33 @@ BODY = (
     "Un saludo,\r\nAna"
 )
 
+# Strings short enough, and in code pages close enough, that charset detection
+# picks the wrong codec: charset_normalizer reads the first as UTF-16BE
+# ("勩獵淩") and the second as CP1125 ("╧ЁштхҐ ьшЁ").
+AMBIGUOUS_LATIN = "Résumé"
+AMBIGUOUS_CYRILLIC = "Привет мир"
+
+PR_MESSAGE_CODEPAGE = 0x3FFD
+PR_INTERNET_CPID = 0x3FDE
+
+# Property ids of the string properties the converter reads.
+SENDER_TAG = "0C1F"
+RECIPIENT_TAG = "0E04"
+SUBJECT_TAG = "0037"
+BODY_TAG = "1000"
+
+
+def _properties_stream(codepages: dict) -> bytes:
+    """Build a top-level message property stream declaring the given code pages.
+
+    A 32-byte header, then one 16-byte entry per property: tag, flags, value.
+    """
+    data = b"\x00" * 32
+    for property_id, codepage in codepages.items():
+        tag = (property_id << 16) | 0x0003  # PT_LONG
+        data += struct.pack("<III", tag, 0x00000006, codepage) + b"\x00" * 4
+    return data
+
 
 def _unicode_streams() -> dict:
     """The streams Outlook writes when saving in the Unicode format."""
@@ -52,14 +64,23 @@ def _unicode_streams() -> dict:
     }
 
 
-def _ansi_streams() -> dict:
-    """The same message saved in the non-Unicode format (code page 1252)."""
-    return {
-        "__substg1.0_0C1F001E": SENDER.encode("cp1252"),
-        "__substg1.0_0E04001E": RECIPIENT.encode("cp1252"),
-        "__substg1.0_0037001E": SUBJECT.encode("cp1252"),
-        "__substg1.0_1000001E": BODY.encode("cp1252"),
+def _ansi_streams(encoding: str = "cp1252", codepage: int = 1252) -> dict:
+    """The same message saved in the non-Unicode format, in a declared code page.
+
+    Passing ``codepage=0`` leaves the declaration out, as a malformed message
+    would, so that only detection is left to fall back on.
+    """
+    streams = {
+        "__substg1.0_0C1F001E": SENDER.encode(encoding),
+        "__substg1.0_0E04001E": RECIPIENT.encode(encoding),
+        "__substg1.0_0037001E": SUBJECT.encode(encoding),
+        "__substg1.0_1000001E": BODY.encode(encoding),
     }
+    if codepage:
+        streams["__properties_version1.0"] = _properties_stream(
+            {PR_MESSAGE_CODEPAGE: codepage}
+        )
+    return streams
 
 
 def _fake_olefile(streams: dict):
@@ -111,6 +132,113 @@ def test_ansi_message_is_not_silently_empty() -> None:
     assert "**Subject:**" in markdown
 
 
+def test_declared_codepage_decodes_cyrillic_headers() -> None:
+    """A CP1251 header is decoded from the declared code page, not detected.
+
+    Detection reads this subject as CP1125 and yields "╧ЁштхҐ ьшЁ".
+    """
+    streams = {
+        "__substg1.0_0037001E": AMBIGUOUS_CYRILLIC.encode("cp1251"),
+        "__properties_version1.0": _properties_stream({PR_MESSAGE_CODEPAGE: 1251}),
+    }
+
+    assert f"**Subject:** {AMBIGUOUS_CYRILLIC}" in _convert(streams)
+
+
+def test_declared_codepage_decodes_short_latin_headers() -> None:
+    """A short CP1252 header is decoded from the declared code page.
+
+    Detection reads these six bytes as UTF-16BE and yields "勩獵淩".
+    """
+    streams = {
+        "__substg1.0_0037001E": AMBIGUOUS_LATIN.encode("cp1252"),
+        "__properties_version1.0": _properties_stream({PR_MESSAGE_CODEPAGE: 1252}),
+    }
+
+    assert f"**Subject:** {AMBIGUOUS_LATIN}" in _convert(streams)
+
+
+def test_internet_codepage_decodes_the_body() -> None:
+    """PidTagInternetCodepage describes the body, PidTagMessageCodepage the rest."""
+    streams = {
+        "__substg1.0_0037001E": AMBIGUOUS_LATIN.encode("cp1252"),
+        "__substg1.0_1000001E": AMBIGUOUS_CYRILLIC.encode("cp1251"),
+        "__properties_version1.0": _properties_stream(
+            {PR_MESSAGE_CODEPAGE: 1252, PR_INTERNET_CPID: 1251}
+        ),
+    }
+    markdown = _convert(streams)
+
+    assert f"**Subject:** {AMBIGUOUS_LATIN}" in markdown
+    assert AMBIGUOUS_CYRILLIC in markdown
+
+
+def test_greek_codepage_is_honored() -> None:
+    """CP1253 bytes are Greek, however little of the alphabet a header shows."""
+    subject = "Ελληνικά"
+    streams = {
+        "__substg1.0_0037001E": subject.encode("cp1253"),
+        "__properties_version1.0": _properties_stream({PR_MESSAGE_CODEPAGE: 1253}),
+    }
+
+    assert f"**Subject:** {subject}" in _convert(streams)
+
+
+def test_codepage_needing_a_codec_alias_is_honored() -> None:
+    """Code pages whose codec is not named "cp<CPID>" still have to map.
+
+    Python has no "cp28595" -- ISO 8859-5 is reached under its own name.
+    """
+    subject = AMBIGUOUS_CYRILLIC
+    streams = {
+        "__substg1.0_0037001E": subject.encode("iso8859-5"),
+        "__properties_version1.0": _properties_stream({PR_MESSAGE_CODEPAGE: 28595}),
+    }
+
+    assert f"**Subject:** {subject}" in _convert(streams)
+
+
+def test_utf8_codepage_is_honored() -> None:
+    """PT_STRING8 may be UTF-8, which the message declares as code page 65001."""
+    streams = {
+        "__substg1.0_0037001E": SUBJECT.encode("utf-8"),
+        "__properties_version1.0": _properties_stream({PR_MESSAGE_CODEPAGE: 65001}),
+    }
+
+    assert f"**Subject:** {SUBJECT}" in _convert(streams)
+
+
+def test_missing_codepage_falls_back_to_detection() -> None:
+    """Without a declaration there is nothing to go on but the bytes."""
+    markdown = _convert(_ansi_streams(codepage=0))
+
+    assert f"**From:** {SENDER}" in markdown
+    assert "Te confirmo la reunión del martes" in markdown
+
+
+def test_unsupported_codepage_falls_back_to_detection() -> None:
+    """A code page Python cannot decode must not lose the message either."""
+    streams = _ansi_streams()
+    streams["__properties_version1.0"] = _properties_stream(
+        {PR_MESSAGE_CODEPAGE: 99999}
+    )
+    markdown = _convert(streams)
+
+    assert f"**From:** {SENDER}" in markdown
+    assert "Te confirmo la reunión del martes" in markdown
+
+
+def test_undecodable_bytes_fall_back_to_detection() -> None:
+    """A declaration the bytes contradict must not raise, nor drop the field."""
+    streams = {
+        # US-ASCII (code page 20127) cannot represent the accents in the body.
+        "__substg1.0_1000001E": BODY.encode("cp1252"),
+        "__properties_version1.0": _properties_stream({PR_MESSAGE_CODEPAGE: 20127}),
+    }
+
+    assert "Te confirmo la reunión del martes" in _convert(streams)
+
+
 def test_unicode_message_is_unaffected() -> None:
     """The Unicode format must keep taking the same path as before."""
     markdown = _convert(_unicode_streams())
@@ -131,8 +259,6 @@ def test_real_unicode_fixture_still_converts() -> None:
 
 
 if __name__ == "__main__":
-    test_ansi_message_keeps_headers_and_body()
-    test_ansi_message_is_not_silently_empty()
-    test_unicode_message_is_unaffected()
-    test_real_unicode_fixture_still_converts()
-    print("All tests passed!")
+    import pytest
+
+    pytest.main([__file__, "-v"])
