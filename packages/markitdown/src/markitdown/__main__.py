@@ -142,6 +142,12 @@ def main():
         help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
     )
 
+    parser.add_argument(
+        "--export-data-uris",
+        metavar="PREFIX",
+        help="Export data URIs, saving them with the selected prefix, which can contain a path. Saved files will have the path '{PREFIX}image{N}.{ext}' where 'N' is a sequential number and 'ext' is the file extension matching the image MIME type.",
+    )
+
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
 
@@ -248,16 +254,26 @@ def main():
     else:
         markitdown = MarkItDown(enable_plugins=args.use_plugins)
 
+    if args.export_data_uris:
+        if args.keep_data_uris:
+            _exit_with_error(
+                "--export-data-uris and --keep-data-uris are mutually exclusive."
+            )
+
     if args.filename is None:
         # Windows pipe-backed stdin can report seekable() even though it cannot rewind.
         result = markitdown.convert_stream(
             io.BytesIO(sys.stdin.buffer.read()),
             stream_info=stream_info,
             keep_data_uris=args.keep_data_uris,
+            export_data_uris=args.export_data_uris,
         )
     else:
         result = markitdown.convert(
-            args.filename, stream_info=stream_info, keep_data_uris=args.keep_data_uris
+            args.filename,
+            stream_info=stream_info,
+            keep_data_uris=args.keep_data_uris,
+            export_data_uris=args.export_data_uris,
         )
 
     _handle_output(args, result)
