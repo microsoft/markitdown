@@ -32,6 +32,48 @@ ACCEPTED_XLS_MIME_TYPE_PREFIXES = [
 ]
 ACCEPTED_XLS_FILE_EXTENSIONS = [".xls"]
 
+# Source anchor emitted ahead of each sheet when source_anchors=True. Paired
+# with the injected `xlsx-row` column, this gives every cell a stable
+# (file, sheet, spreadsheet row) coordinate for downstream citation.
+SHEET_ANCHOR_TEMPLATE = "<!-- Sheet name: {sheet} -->"
+
+# Name of the injected 1-based spreadsheet row column.
+ROW_ANCHOR_COLUMN = "xlsx-row"
+
+# pandas.read_excel consumes row 1 as the header, so the first data row is 2.
+_FIRST_DATA_ROW = 2
+
+
+def _sheet_anchor(sheet_name: str) -> str:
+    """Return the source anchor for a sheet."""
+    return SHEET_ANCHOR_TEMPLATE.format(sheet=sheet_name)
+
+
+def _with_row_anchors(frame: Any) -> Any:
+    """Return a copy of `frame` with a leading 1-based spreadsheet row column."""
+    frame = frame.copy()
+    frame.insert(
+        0, ROW_ANCHOR_COLUMN, range(_FIRST_DATA_ROW, len(frame) + _FIRST_DATA_ROW)
+    )
+    return frame
+
+
+def _sheets_to_markdown(sheets: Any, html_converter: Any, kwargs: Any) -> str:
+    """Render every sheet as a Markdown table, optionally with source anchors."""
+    source_anchors = bool(kwargs.get("source_anchors", False))
+    md_content = ""
+    for s in sheets:
+        if source_anchors:
+            md_content += f"{_sheet_anchor(s)}\n"
+        md_content += f"## {s}\n"
+        frame = _with_row_anchors(sheets[s]) if source_anchors else sheets[s]
+        html_content = frame.to_html(index=False)
+        md_content += (
+            html_converter.convert_string(html_content, **kwargs).markdown.strip()
+            + "\n\n"
+        )
+    return md_content.strip()
+
 
 class XlsxConverter(DocumentConverter):
     """
@@ -81,18 +123,9 @@ class XlsxConverter(DocumentConverter):
             )
 
         sheets = pd.read_excel(file_stream, sheet_name=None, engine="openpyxl")
-        md_content = ""
-        for s in sheets:
-            md_content += f"## {s}\n"
-            html_content = sheets[s].to_html(index=False)
-            md_content += (
-                self._html_converter.convert_string(
-                    html_content, **kwargs
-                ).markdown.strip()
-                + "\n\n"
-            )
-
-        return DocumentConverterResult(markdown=md_content.strip())
+        return DocumentConverterResult(
+            markdown=_sheets_to_markdown(sheets, self._html_converter, kwargs)
+        )
 
 
 class XlsConverter(DocumentConverter):
@@ -143,15 +176,6 @@ class XlsConverter(DocumentConverter):
             )
 
         sheets = pd.read_excel(file_stream, sheet_name=None, engine="xlrd")
-        md_content = ""
-        for s in sheets:
-            md_content += f"## {s}\n"
-            html_content = sheets[s].to_html(index=False)
-            md_content += (
-                self._html_converter.convert_string(
-                    html_content, **kwargs
-                ).markdown.strip()
-                + "\n\n"
-            )
-
-        return DocumentConverterResult(markdown=md_content.strip())
+        return DocumentConverterResult(
+            markdown=_sheets_to_markdown(sheets, self._html_converter, kwargs)
+        )
