@@ -149,10 +149,12 @@ class DocxConverterWithOCR(HtmlConverter):
                             # Store raw text only — markers added later
                             ocr_map[rel.rId] = ocr_result.text.strip()
 
-                    except Exception:
+                    except Exception as e:
+                        print(f"Error OCRing image: {e}", file=sys.stderr)
                         continue
 
-        except Exception:
+        except Exception as e:
+            print(f"Error processing DOCX file: {e}", file=sys.stderr)
             pass
 
         return ocr_map
