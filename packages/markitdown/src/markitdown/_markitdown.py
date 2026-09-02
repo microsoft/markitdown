@@ -6,6 +6,8 @@ import shutil
 import traceback
 import io
 from dataclasses import dataclass
+from email.message import Message
+from email.utils import collapse_rfc2231_value
 from importlib.metadata import entry_points
 from typing import Any, List, Dict, Optional, Union, BinaryIO
 from pathlib import Path
@@ -49,6 +51,23 @@ from ._exceptions import (
     UnsupportedFormatException,
     FailedConversionAttempt,
 )
+
+
+def _get_content_disposition_filename(content_disposition: str) -> Optional[str]:
+    message = Message()
+    message["content-disposition"] = content_disposition
+
+    fallback_filename: Optional[str] = None
+    extended_filename: Optional[str] = None
+    for key, value in message.get_params(header="content-disposition", unquote=True):
+        if key != "filename":
+            continue
+        if isinstance(value, tuple):
+            extended_filename = collapse_rfc2231_value(value)
+        elif fallback_filename is None:
+            fallback_filename = value
+
+    return extended_filename or fallback_filename
 
 
 # Lower priority values are tried first.
@@ -270,7 +289,7 @@ class MarkItDown:
                     warn(f"Plugin '{plugin}' failed to register converters:\n{tb}")
             self._plugins_enabled = True
         else:
-            warn("Plugins converters are already enabled.", RuntimeWarning)
+            warn("Plugin converters are already enabled.", RuntimeWarning)
 
     def convert(
         self,
@@ -288,12 +307,8 @@ class MarkItDown:
 
         # Local path or url
         if isinstance(source, str):
-            if (
-                source.startswith("http:")
-                or source.startswith("https:")
-                or source.startswith("file:")
-                or source.startswith("data:")
-            ):
+            scheme = urlparse(source.strip()).scheme.lower()
+            if scheme in ("http", "https", "file", "data"):
                 # Rename the url argument to mock_url
                 # (Deprecated -- use stream_info)
                 _kwargs = {k: v for k, v in kwargs.items()}
@@ -437,9 +452,10 @@ class MarkItDown:
         **kwargs: Any,
     ) -> DocumentConverterResult:
         uri = uri.strip()
+        scheme = urlparse(uri).scheme.lower()
 
         # File URIs
-        if uri.startswith("file:"):
+        if scheme == "file":
             netloc, path = file_uri_to_path(uri)
             if netloc and netloc != "localhost":
                 raise ValueError(
@@ -453,7 +469,7 @@ class MarkItDown:
                 **kwargs,
             )
         # Data URIs
-        elif uri.startswith("data:"):
+        elif scheme == "data":
             mimetype, attributes, data = parse_data_uri(uri)
 
             base_guess = StreamInfo(
@@ -471,7 +487,7 @@ class MarkItDown:
                 **kwargs,
             )
         # HTTP/HTTPS URIs
-        elif uri.startswith("http:") or uri.startswith("https:"):
+        elif scheme in ("http", "https"):
             response = self._requests_session.get(uri, stream=True)
             response.raise_for_status()
             return self.convert_response(
@@ -512,9 +528,10 @@ class MarkItDown:
         filename: Optional[str] = None
         extension: Optional[str] = None
         if "content-disposition" in response.headers:
-            m = re.search(r"filename=([^;]+)", response.headers["content-disposition"])
-            if m:
-                filename = m.group(1).strip("\"'")
+            filename = _get_content_disposition_filename(
+                response.headers["content-disposition"]
+            )
+            if filename is not None:
                 _, _extension = os.path.splitext(filename)
                 if len(_extension) > 0:
                     extension = _extension
@@ -603,7 +620,7 @@ class MarkItDown:
                 # Add the list of converters for nested processing
                 _kwargs["_parent_converters"] = self._converters
 
-                # Add legaxy kwargs
+                # Add legacy kwargs
                 if stream_info is not None:
                     if stream_info.extension is not None:
                         _kwargs["file_extension"] = stream_info.extension
@@ -654,7 +671,7 @@ class MarkItDown:
         )
 
     def register_page_converter(self, converter: DocumentConverter) -> None:
-        """DEPRECATED: User register_converter instead."""
+        """DEPRECATED: Use register_converter instead."""
         warn(
             "register_page_converter is deprecated. Use register_converter instead.",
             DeprecationWarning,
@@ -671,9 +688,9 @@ class MarkItDown:
         Register a DocumentConverter with a given priority.
 
         Priorities work as follows: By default, most converters get priority
-        DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT (== 0). The exception
+        PRIORITY_SPECIFIC_FILE_FORMAT (== 0). The exception
         is the PlainTextConverter, HtmlConverter, and ZipConverter, which get
-        priority PRIORITY_SPECIFIC_FILE_FORMAT (== 10), with lower values
+        priority PRIORITY_GENERIC_FILE_FORMAT (== 10), with lower values
         being tried first (i.e., higher priority).
 
         Just prior to conversion, the converters are sorted by priority, using
@@ -726,9 +743,9 @@ class MarkItDown:
                 # If it's text, also guess the charset
                 charset = None
                 if result.prediction.output.is_text:
-                    # Read the first 4k to guess the charset
+                    # Read the first 64k to guess the charset
                     file_stream.seek(cur_pos)
-                    stream_page = file_stream.read(4096)
+                    stream_page = file_stream.read(65536)
                     charset_result = charset_normalizer.from_bytes(stream_page).best()
 
                     if charset_result is not None:
