@@ -1,12 +1,18 @@
 #!/usr/bin/env python3 -m pytest
 import io
+import json
+import ntpath
 import os
 import re
 import shutil
+from types import SimpleNamespace
 import pytest
 from unittest.mock import MagicMock
 
+import markitdown._uri_utils as uri_utils
 from markitdown._uri_utils import parse_data_uri, file_uri_to_path
+from markitdown._markitdown import _get_content_disposition_filename
+from markitdown.converters import RssConverter
 
 from markitdown import (
     MarkItDown,
@@ -252,6 +258,20 @@ def test_file_uris() -> None:
     assert path == "/path/to/file.txt"
 
 
+def test_file_uri_with_percent_encoded_windows_drive(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from nturl2path import url2pathname as windows_url2pathname
+
+    monkeypatch.setattr(uri_utils, "os", SimpleNamespace(name="nt", path=ntpath))
+    monkeypatch.setattr(uri_utils, "url2pathname", windows_url2pathname)
+
+    netloc, path = uri_utils.file_uri_to_path("file:///C%3A/Temp/example.md")
+
+    assert netloc is None
+    assert path == r"C:\Temp\example.md"
+
+
 def test_docx_comments() -> None:
     # Test DOCX processing, with comments and setting style_map on init
     markitdown_with_style_map = MarkItDown(style_map="comment-reference => ")
@@ -259,6 +279,44 @@ def test_docx_comments() -> None:
         os.path.join(TEST_FILES_DIR, "test_with_comment.docx")
     )
     validate_strings(result, DOCX_COMMENT_TEST_STRINGS)
+
+
+def test_html_strikethrough_variants(tmp_path) -> None:
+    html = """<!doctype html>
+<html><body>
+<p>Plain <s>s element</s> after.</p>
+<p>Plain <del>del element</del> after.</p>
+<p>Plain <strike>strike element</strike> after.</p>
+<p>Spaces A<strike> B </strike>C.</p>
+<p>Runs D<strike>  E  </strike>F.</p>
+<p>Empty G<strike></strike>H.</p>
+<p>Newline I<strike>J
+K</strike>L.</p>
+<p>Break M<strike>N<br>O</strike>P.</p>
+</body></html>
+"""
+    path = tmp_path / "strike.html"
+    path.write_text(html, encoding="utf-8")
+    markdown = MarkItDown().convert(str(path)).markdown
+
+    assert markdown == "\n\n".join(
+        [
+            # <s>, <del> and the obsolete <strike> all mean strikethrough
+            "Plain ~~s element~~ after.",
+            "Plain ~~del element~~ after.",
+            "Plain ~~strike element~~ after.",
+            # Surrounding whitespace stays outside of the markup ...
+            "Spaces A ~~B~~ C.",
+            # ... and runs of it collapse to a single space
+            "Runs D ~~E~~ F.",
+            # An empty element contributes nothing
+            "Empty GH.",
+            # A line break inside the element is kept, and the markup
+            # survives it because strikethrough may span a single newline
+            "Newline I~~J\nK~~L.",
+            "Break M~~N\nO~~P.",
+        ]
+    )
 
 
 def test_docx_equations() -> None:
@@ -286,6 +344,55 @@ def test_input_as_strings() -> None:
     input_data = b"   \n\n\n<html><body><h1>Test</h1></body></html>"
     result = markitdown.convert_stream(io.BytesIO(input_data))
     assert "# Test" in result.text_content
+
+
+def _mock_response(content_disposition: str) -> MagicMock:
+    response = MagicMock()
+    response.headers = {"content-disposition": content_disposition}
+    response.url = "https://example.com/download"
+    response.iter_content.return_value = [b"name,value\nalpha,beta\n"]
+    response.raise_for_status.return_value = None
+    return response
+
+
+def test_convert_response_uses_rfc5987_content_disposition_filename() -> None:
+    markitdown = MarkItDown()
+    result = markitdown.convert_response(
+        _mock_response("attachment; filename*=UTF-8''data.csv")
+    )
+
+    assert result.markdown == "\n".join(
+        [
+            "| name | value |",
+            "| --- | --- |",
+            "| alpha | beta |",
+        ]
+    )
+
+
+def test_convert_response_prefers_extended_content_disposition_filename() -> None:
+    markitdown = MarkItDown()
+    result = markitdown.convert_response(
+        _mock_response("attachment; filename=fallback.txt; filename*=UTF-8''data.csv")
+    )
+
+    assert result.markdown == "\n".join(
+        [
+            "| name | value |",
+            "| --- | --- |",
+            "| alpha | beta |",
+        ]
+    )
+
+
+def test_get_content_disposition_filename_decodes_rfc5987() -> None:
+    assert (
+        _get_content_disposition_filename(
+            "attachment; filename=fallback.txt; "
+            "filename*=UTF-8''d%C3%A1t%C3%A1%2Ecsv"
+        )
+        == "d\u00e1t\u00e1.csv"
+    )
 
 
 def test_pptx_chart_multi_series_conversion() -> None:
@@ -383,11 +490,102 @@ def test_deeply_nested_html_fallback() -> None:
             # Should have emitted a warning about the fallback
             recursion_warnings = [x for x in w if "deeply nested" in str(x.message)]
             assert len(recursion_warnings) > 0
+
     finally:
         sys.setrecursionlimit(original_limit)
 
     # The output should contain the text content, not raw HTML
     assert "Deep content" in result.markdown
+    assert "bold text" in result.markdown
+    assert "<div" not in result.markdown
+    assert "<p>" not in result.markdown
+
+
+def test_deeply_nested_rss_item_fallback() -> None:
+    """Deeply nested HTML inside an RSS item should fall back to plain-text
+    extraction instead of silently embedding raw unconverted HTML in the
+    markdown output (same failure class as the HTML converter fix in #1644).
+
+    Note: This test uses sys.setrecursionlimit to guarantee a RecursionError
+    regardless of the host environment's default limit, making it deterministic
+    across different platforms and CI configurations.
+    """
+    import sys
+    import warnings
+
+    markitdown = MarkItDown()
+
+    # Use a small recursion limit so the test is environment-independent.
+    # We restore the original limit in a finally block to avoid side-effects.
+    original_limit = sys.getrecursionlimit()
+    low_limit = 200  # well below markdownify's traversal depth for depth=500
+
+    # Build an RSS item whose content is deeply nested HTML
+    depth = 500
+    item_html = ""
+    for _ in range(depth):
+        item_html += '<div style="margin-left:10px">'
+    item_html += "<p>Deep feed content with <b>bold text</b></p>"
+    for _ in range(depth):
+        item_html += "</div>"
+
+    rss = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<rss version="2.0" '
+        'xmlns:content="http://purl.org/rss/1.0/modules/content/">'
+        "<channel>"
+        "<title>Test Feed</title>"
+        "<description>A test feed</description>"
+        "<item>"
+        "<title>Deep Item</title>"
+        f"<content:encoded><![CDATA[{item_html}]]></content:encoded>"
+        "</item>"
+        "</channel>"
+        "</rss>"
+    )
+    atom = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<feed xmlns="http://www.w3.org/2005/Atom">'
+        "<title>Test Feed</title>"
+        "<entry>"
+        "<title>Deep Entry</title>"
+        f'<content type="html"><![CDATA[{item_html}]]></content>'
+        "</entry>"
+        "</feed>"
+    )
+
+    try:
+        sys.setrecursionlimit(low_limit)
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = markitdown.convert_stream(
+                io.BytesIO(rss.encode("utf-8")),
+                file_extension=".rss",
+            )
+
+            # Should have emitted a warning about the fallback
+            recursion_warnings = [x for x in w if "deeply nested" in str(x.message)]
+            assert len(recursion_warnings) > 0
+
+        # strict=True should expose the conversion failure rather than applying
+        # the plain-text fallback.
+        with pytest.raises(RecursionError):
+            RssConverter().convert(
+                io.BytesIO(rss.encode("utf-8")),
+                StreamInfo(extension=".rss"),
+                strict=True,
+            )
+        with pytest.raises(RecursionError):
+            RssConverter().convert(
+                io.BytesIO(atom.encode("utf-8")),
+                StreamInfo(extension=".atom"),
+                strict=True,
+            )
+    finally:
+        sys.setrecursionlimit(original_limit)
+
+    # The output should contain the text content, not raw HTML
+    assert "Deep feed content" in result.markdown
     assert "bold text" in result.markdown
     assert "<div" not in result.markdown
     assert "<p>" not in result.markdown
@@ -585,6 +783,79 @@ def test_markitdown_llm() -> None:
         assert test_string in result.text_content
     # Standard alt text is included
     validate_strings(result, PPTX_TEST_STRINGS)
+
+
+def test_json_with_late_non_ascii_character(tmp_path) -> None:
+    payload = {
+        "record": {
+            "title": "Example record",
+            "abstract": "This is sample test. " * 500,
+        },
+        "notes": "non-ASCII character: Ã¨",
+    }
+    json_path = tmp_path / "input.json"
+    json_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+    result = MarkItDown().convert(str(json_path))
+
+    assert "non-ASCII character: Ã¨" in result.text_content
+
+
+###############################################################################
+# CSV converter: BOM handling and blank-row handling
+###############################################################################
+
+
+def _convert_csv(data: bytes, charset: str | None = None) -> str:
+    stream_info = StreamInfo(extension=".csv", charset=charset)
+    return (
+        MarkItDown()
+        .convert_stream(io.BytesIO(data), stream_info=stream_info)
+        .text_content
+    )
+
+
+def test_csv_utf8_bom_is_stripped_from_the_header() -> None:
+    result = _convert_csv(b"\xef\xbb\xbfname,age\nAlice,30\n")
+
+    assert "\ufeff" not in result
+    assert result.startswith("| name | age |")
+    assert "| Alice | 30 |" in result
+
+
+def test_csv_utf8_bom_is_stripped_when_charset_is_known() -> None:
+    result = _convert_csv(b"\xef\xbb\xbfname,age\nAlice,30\n", charset="utf-8")
+
+    assert "\ufeff" not in result
+    assert result.startswith("| name | age |")
+
+
+def test_csv_leading_blank_line_does_not_destroy_the_table() -> None:
+    result = _convert_csv(b"\nname,age\nAlice,30\n")
+
+    assert result == "| name | age |\n| --- | --- |\n| Alice | 30 |"
+
+
+def test_csv_trailing_blank_lines_are_skipped() -> None:
+    result = _convert_csv(b"name,age\nAlice,30\n\n\n")
+
+    assert result == "| name | age |\n| --- | --- |\n| Alice | 30 |"
+
+
+def test_csv_blank_lines_between_rows_are_kept() -> None:
+    result = _convert_csv(b"name,age\n\nAlice,30\n\nBob,40\n")
+
+    assert (
+        result == "| name | age |\n| --- | --- |\n| Alice | 30 |\n|  |  |\n| Bob | 40 |"
+    )
+
+
+def test_csv_all_blank_input_returns_empty_markdown() -> None:
+    result = _convert_csv(b"\n\n\n")
+
+    assert result == ""
 
 
 if __name__ == "__main__":

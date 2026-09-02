@@ -13,19 +13,27 @@ ACCEPTED_FILE_EXTENSIONS = [".csv"]
 
 
 def _escape_table_cell(value: str) -> str:
-    """Escape a CSV value so it is safe inside a Markdown table cell.
-
-    Both characters handled here silently corrupt the table rather than failing
-    loudly: an unescaped pipe is read as a column separator, and a newline
-    inside a quoted CSV field ends the row early and leaves the remainder as
-    stray text after the table.
-    """
+    """Escape a CSV value so it is safe inside a Markdown table cell."""
     return (
         value.replace("|", "\\|")
-        .replace("\r\n", "<br>")
-        .replace("\n", "<br>")
-        .replace("\r", "<br>")
+        .replace("\r\n", " ")
+        .replace("\n", " ")
+        .replace("\r", " ")
     )
+  
+def _trim_outer_blank_rows(rows: list[list[str]]) -> None:
+    """Remove empty rows from the beginning and end, and immediately after the header. This operation is performed in-place."""
+    # Pop empty rows from the beginning
+    while len(rows) > 0 and not rows[0]:
+        rows.pop(0)
+
+    # Pop empty rows after the header
+    while len(rows) > 1 and not rows[1]:
+        rows.pop(1)
+
+    # Pop empty rows from the end
+    while len(rows) > 0 and not rows[-1]:
+        rows.pop(-1)
 
 
 class CsvConverter(DocumentConverter):
@@ -63,9 +71,14 @@ class CsvConverter(DocumentConverter):
         else:
             content = str(from_bytes(file_stream.read()).best())
 
+        # Excel and other tools prepend a UTF-8 BOM to CSV exports; strip it so
+        # it does not end up inside the first header cell.
+        content = content.lstrip("\ufeff")
+
         # Parse CSV content
         reader = csv.reader(io.StringIO(content))
         rows = list(reader)
+        _trim_outer_blank_rows(rows)
 
         if not rows:
             return DocumentConverterResult(markdown="")
