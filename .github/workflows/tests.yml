@@ -12,6 +12,7 @@ jobs:
             3.10
             3.11
             3.12
+            3.14
       - name: Install Hatch
         run: pipx install hatch
       - name: Run tests
