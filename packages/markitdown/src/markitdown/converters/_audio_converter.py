@@ -88,10 +88,13 @@ class AudioConverter(DocumentConverter):
         else:
             audio_format = None
 
+        # Figure out the audio language for transcription, default to "en-US"
+        language = kwargs.get("language", "en-US")
+
         # Transcribe
         if audio_format:
             try:
-                transcript = transcribe_audio(file_stream, audio_format=audio_format)
+                transcript = transcribe_audio(file_stream, audio_format=audio_format, language=language)
                 if transcript:
                     md_content += "\n\n### Audio Transcript:\n" + transcript
             except MissingDependencyException:
