@@ -189,6 +189,39 @@ def test_pdf_scanned_report(svc: MockOCRService) -> None:
     assert _convert("pdf_scanned_report.pdf", svc) == expected
 
 
+def test_pdf_mixed_text_and_scanned_pages_ocrs_empty_page(
+    svc: MockOCRService,
+) -> None:
+    converter = PdfConverterWithOCR()
+
+    text_page = MagicMock()
+    text_page.chars = []
+    text_page.extract_text.return_value = "First page text"
+
+    scanned_page = MagicMock()
+    scanned_page.chars = []
+    scanned_page.extract_text.return_value = ""
+    scanned_page.to_image.return_value.original.save.side_effect = (
+        lambda stream, format: stream.write(b"fake-png")
+    )
+
+    mock_pdf = MagicMock()
+    mock_pdf.pages = [text_page, scanned_page]
+    mock_pdf.__enter__.return_value = mock_pdf
+
+    with patch("pdfplumber.open", return_value=mock_pdf), patch.object(
+        converter, "_extract_page_images", return_value=[]
+    ):
+        md = converter.convert(
+            io.BytesIO(b"%PDF-1.7"), StreamInfo(extension=".pdf"), ocr_service=svc
+        ).text_content
+
+    assert "First page text" in md
+    assert "## Page 2" in md
+    assert _OCR_BLOCK in md
+    scanned_page.to_image.assert_called_once_with(resolution=300)
+
+
 # ---------------------------------------------------------------------------
 # Scanned PDF fallback path (pdfplumber finds no text → full-page OCR)
 # ---------------------------------------------------------------------------
