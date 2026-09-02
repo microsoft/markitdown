@@ -129,7 +129,7 @@ def _pre_process_styles(content: bytes) -> bytes:
     plain body text). A style with no ``w:styleId`` cannot be referenced by the
     document body, so it is removed.
     """
-    soup = BeautifulSoup(content.decode(), features="xml")
+    soup = BeautifulSoup(content, features="xml")
     for tag in soup.find_all("w:style"):
         if not tag.has_attr("w:styleId"):
             tag.decompose()
