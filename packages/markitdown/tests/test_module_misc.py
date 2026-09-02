@@ -6,8 +6,8 @@ import os
 import re
 import shutil
 import zipfile
-from types import SimpleNamespace
 import pytest
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import markitdown._uri_utils as uri_utils
@@ -372,6 +372,77 @@ def test_docx_equations() -> None:
     # Find block equations wrapped with double $$ and check if they are present
     block_equations = re.findall(r"\$\$(.+?)\$\$", result.text_content)
     assert block_equations, "No block equations found in the document."
+
+
+def test_xlsx_legacy_show_zeroes_sheetview(tmp_path) -> None:
+    from openpyxl import Workbook
+
+    base_path = tmp_path / "base.xlsx"
+    xlsx_path = tmp_path / "legacy_show_zeroes.xlsx"
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Data"
+    sheet["A1"] = "hello"
+    sheet["B1"] = "world"
+    # A cell whose text is byte-identical to the malformed attribute. openpyxl stores it
+    # as an inline string, so it lands in the very worksheet part that gets repaired.
+    sheet["A2"] = ' showZeroes="0" '
+    workbook.save(base_path)
+
+    with zipfile.ZipFile(base_path) as source:
+        with zipfile.ZipFile(xlsx_path, "w", zipfile.ZIP_DEFLATED) as target:
+            for item in source.infolist():
+                data = source.read(item.filename)
+                if item.filename == "xl/worksheets/sheet1.xml":
+                    data = data.replace(
+                        b"<sheetView ", b'<sheetView showZeroes="0" ', 1
+                    )
+                    # Guard the fixture: the sheet view attribute and the cell text must
+                    # both live here, or this test stops exercising the repair.
+                    assert data.count(b'showZeroes="0"') == 2
+                target.writestr(item, data)
+
+    result = MarkItDown().convert(str(xlsx_path))
+
+    assert "## Data" in result.markdown
+    assert "hello" in result.markdown
+    assert "world" in result.markdown
+
+    # The repair must not reach into the worksheet's data: the cell keeps its text ...
+    assert 'showZeroes="0"' in result.markdown
+    # ... and no part of the document was silently renamed on the way through.
+    assert "showZeros" not in result.markdown
+
+
+def test_xlsx_show_zeroes_rename_is_scoped_to_sheet_view_tags() -> None:
+    from markitdown.converters._xlsx_converter import _rename_show_zeroes_attribute
+
+    worksheet_xml = (
+        b"<worksheet><sheetViews>"
+        b'<sheetView showZeroes="0" workbookViewId="0"/>'
+        b'<sheetView\n\tshowZeroes="1"\ttabSelected="1"/>'
+        b"</sheetViews>"
+        # openpyxl ignores custom sheet views entirely, so they need no repair
+        b'<customSheetViews><customSheetView showZeroes="0"/></customSheetViews>'
+        b'<sheetData><row r="1">'
+        b'<c r="A1" t="inlineStr"><is><t xml:space="preserve"> showZeroes="0" '
+        b"</t></is></c>"
+        b'<c r="B1"><f>IF(A1=" showZeroes=","x","y")</f><v>y</v></c>'
+        b"</row></sheetData></worksheet>"
+    )
+
+    repaired = _rename_show_zeroes_attribute(worksheet_xml)
+
+    # Every <sheetView> start tag is repaired, whatever separates its attributes ...
+    assert repaired.count(b"showZeros=") == 2
+    assert b'<sheetView showZeros="0" workbookViewId="0"/>' in repaired
+    assert b'<sheetView\n\tshowZeros="1"\ttabSelected="1"/>' in repaired
+
+    # ... and nothing outside those start tags is rewritten.
+    assert b'<t xml:space="preserve"> showZeroes="0" </t>' in repaired
+    assert b'<f>IF(A1=" showZeroes=","x","y")</f>' in repaired
+    assert b'<customSheetView showZeroes="0"/>' in repaired
 
 
 def test_input_as_strings() -> None:
