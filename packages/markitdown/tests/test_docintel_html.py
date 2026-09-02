@@ -24,3 +24,15 @@ def test_docintel_accepts_html_mimetype():
     assert conv.accepts(io.BytesIO(b""), stream_info)
     stream_info = StreamInfo(mimetype="application/xhtml+xml", extension=None)
     assert conv.accepts(io.BytesIO(b""), stream_info)
+
+
+def test_docintel_accepts_doc_extension_for_docx_type():
+    conv = _make_converter([DocumentIntelligenceFileType.DOCX])
+    stream_info = StreamInfo(mimetype=None, extension=".doc")
+    assert conv.accepts(io.BytesIO(b""), stream_info)
+
+
+def test_docintel_accepts_msword_mimetype_for_docx_type():
+    conv = _make_converter([DocumentIntelligenceFileType.DOCX])
+    stream_info = StreamInfo(mimetype="application/msword", extension=None)
+    assert conv.accepts(io.BytesIO(b""), stream_info)

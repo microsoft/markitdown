@@ -76,6 +76,7 @@ def _get_mime_type_prefixes(types: List[DocumentIntelligenceFileType]) -> List[s
             prefixes.append(
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
+            prefixes.append("application/msword")
         elif type_ == DocumentIntelligenceFileType.PPTX:
             prefixes.append(
                 "application/vnd.openxmlformats-officedocument.presentationml"
@@ -107,6 +108,7 @@ def _get_file_extensions(types: List[DocumentIntelligenceFileType]) -> List[str]
     for type_ in types:
         if type_ == DocumentIntelligenceFileType.DOCX:
             extensions.append(".docx")
+            extensions.append(".doc")
         elif type_ == DocumentIntelligenceFileType.PPTX:
             extensions.append(".pptx")
         elif type_ == DocumentIntelligenceFileType.XLSX:
