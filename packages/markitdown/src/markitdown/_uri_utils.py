@@ -20,7 +20,7 @@ def file_uri_to_path(file_uri: str) -> Tuple[str | None, str]:
 
 
 def parse_data_uri(uri: str) -> Tuple[str | None, Dict[str, str], bytes]:
-    if not uri.startswith("data:"):
+    if uri[:5].lower() != "data:":
         raise ValueError("Not a data URI")
 
     header, _, data = uri.partition(",")
