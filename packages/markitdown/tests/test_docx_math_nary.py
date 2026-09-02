@@ -46,5 +46,7 @@ def test_nary_with_explicit_chr_is_unchanged():
     assert latex == "\\sum_{0}^{1}x"
 
 
-def test_nary_without_nary_pr_does_not_crash():
-    assert _nary("") == "_{0}^{1}x"
+def test_nary_without_nary_pr_defaults_to_integral():
+    # m:naryPr is optional. Absent, every property takes its default, so the
+    # operator is still U+222B rather than nothing.
+    assert _nary("") == "\\int_{0}^{1}x"
