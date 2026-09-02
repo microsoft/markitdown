@@ -40,6 +40,8 @@ class IpynbConverter(DocumentConverter):
                     )
                 except (UnicodeDecodeError, ValueError, LookupError):
                     return False
+                except Exception as e:
+                    pass
                 finally:
                     file_stream.seek(cur_pos)
 
