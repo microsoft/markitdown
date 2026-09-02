@@ -117,7 +117,7 @@ class RssConverter(DocumentConverter):
         title = self._get_data_by_tag_name(root, "title")
         subtitle = self._get_data_by_tag_name(root, "subtitle")
         entries = root.getElementsByTagName("entry")
-        md_text = f"# {title}\n"
+        md_text = f"# {title}\n" if title else ""
         if subtitle:
             md_text += f"{subtitle}\n"
         for entry in entries:
