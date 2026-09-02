@@ -1,12 +1,15 @@
 #!/usr/bin/env python3 -m pytest
 import io
 import json
+import ntpath
 import os
 import re
 import shutil
+from types import SimpleNamespace
 import pytest
 from unittest.mock import MagicMock
 
+import markitdown._uri_utils as uri_utils
 from markitdown._uri_utils import parse_data_uri, file_uri_to_path
 from markitdown._markitdown import _get_content_disposition_filename
 from markitdown.converters import RssConverter
@@ -255,6 +258,20 @@ def test_file_uris() -> None:
     assert path == "/path/to/file.txt"
 
 
+def test_file_uri_with_percent_encoded_windows_drive(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from nturl2path import url2pathname as windows_url2pathname
+
+    monkeypatch.setattr(uri_utils, "os", SimpleNamespace(name="nt", path=ntpath))
+    monkeypatch.setattr(uri_utils, "url2pathname", windows_url2pathname)
+
+    netloc, path = uri_utils.file_uri_to_path("file:///C%3A/Temp/example.md")
+
+    assert netloc is None
+    assert path == r"C:\Temp\example.md"
+
+
 def test_docx_comments() -> None:
     # Test DOCX processing, with comments and setting style_map on init
     markitdown_with_style_map = MarkItDown(style_map="comment-reference => ")
@@ -262,6 +279,44 @@ def test_docx_comments() -> None:
         os.path.join(TEST_FILES_DIR, "test_with_comment.docx")
     )
     validate_strings(result, DOCX_COMMENT_TEST_STRINGS)
+
+
+def test_html_strikethrough_variants(tmp_path) -> None:
+    html = """<!doctype html>
+<html><body>
+<p>Plain <s>s element</s> after.</p>
+<p>Plain <del>del element</del> after.</p>
+<p>Plain <strike>strike element</strike> after.</p>
+<p>Spaces A<strike> B </strike>C.</p>
+<p>Runs D<strike>  E  </strike>F.</p>
+<p>Empty G<strike></strike>H.</p>
+<p>Newline I<strike>J
+K</strike>L.</p>
+<p>Break M<strike>N<br>O</strike>P.</p>
+</body></html>
+"""
+    path = tmp_path / "strike.html"
+    path.write_text(html, encoding="utf-8")
+    markdown = MarkItDown().convert(str(path)).markdown
+
+    assert markdown == "\n\n".join(
+        [
+            # <s>, <del> and the obsolete <strike> all mean strikethrough
+            "Plain ~~s element~~ after.",
+            "Plain ~~del element~~ after.",
+            "Plain ~~strike element~~ after.",
+            # Surrounding whitespace stays outside of the markup ...
+            "Spaces A ~~B~~ C.",
+            # ... and runs of it collapse to a single space
+            "Runs D ~~E~~ F.",
+            # An empty element contributes nothing
+            "Empty GH.",
+            # A line break inside the element is kept, and the markup
+            # survives it because strikethrough may span a single newline
+            "Newline I~~J\nK~~L.",
+            "Break M~~N\nO~~P.",
+        ]
+    )
 
 
 def test_docx_equations() -> None:
@@ -730,6 +785,64 @@ def test_markitdown_llm() -> None:
     validate_strings(result, PPTX_TEST_STRINGS)
 
 
+def test_ipynb_accepts_non_ascii() -> None:
+    """IpynbConverter.accepts() must not raise on non-ASCII binary content."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    converter = IpynbConverter()
+
+    # Binary content that is not valid UTF-8 (simulates non-ASCII file)
+    binary_data = b"\x80\x81\x82\x83"
+    stream_info = StreamInfo(mimetype="application/json", charset="utf-8")
+
+    # Should return False without raising
+    result = converter.accepts(io.BytesIO(binary_data), stream_info)
+    assert result is False
+
+    # French PDF content (UTF-8 bytes that would crash if decoded as ASCII)
+    french_bytes = "lettre d'information sur l'événement".encode("utf-8")
+    stream_info_ascii = StreamInfo(mimetype="application/json", charset="ascii")
+
+    result = converter.accepts(io.BytesIO(french_bytes), stream_info_ascii)
+    assert result is False
+
+    # Valid notebook content should still be accepted
+    notebook_bytes = b'{"nbformat": 4, "nbformat_minor": 5, "cells": []}'
+    stream_info_json = StreamInfo(mimetype="application/json", charset="utf-8")
+
+    result = converter.accepts(io.BytesIO(notebook_bytes), stream_info_json)
+    assert result is True
+
+
+def test_epub_metadata_nodevalue():
+    from defusedxml.minidom import parseString
+    from markitdown.converters._epub_converter import EpubConverter
+
+    xml_data = (
+        '<package xmlns:dc="http://purl.org/dc/elements/1.1/">'
+        "<dc:title><span>Structured</span> Title</dc:title>"
+        "<dc:creator><name>Author 1</name></dc:creator>"
+        "<dc:creator>Author 2</dc:creator>"
+        "<dc:publisher></dc:publisher>"
+        "<dc:description/>"
+        "</package>"
+    )
+    dom = parseString(xml_data)
+    converter = EpubConverter()
+
+    title = converter._get_text_from_node(dom, "dc:title")
+    assert title == "Structured Title"
+
+    creators = converter._get_all_texts_from_nodes(dom, "dc:creator")
+    assert creators == ["Author 1", "Author 2"]
+
+    publisher = converter._get_text_from_node(dom, "dc:publisher")
+    assert publisher is None
+
+    missing = converter._get_text_from_node(dom, "dc:date")
+    assert missing is None
+
+
 def test_json_with_late_non_ascii_character(tmp_path) -> None:
     payload = {
         "record": {
@@ -749,7 +862,7 @@ def test_json_with_late_non_ascii_character(tmp_path) -> None:
 
 
 ###############################################################################
-# CSV converter: BOM handling and blank-row handling
+# CSV converter.
 ###############################################################################
 
 
@@ -803,6 +916,69 @@ def test_csv_all_blank_input_returns_empty_markdown() -> None:
     assert result == ""
 
 
+def test_csv_pipe_in_cell_is_escaped() -> None:
+    result = _convert_csv(b'name,description\nWidget,"cheap | fast"\n')
+
+    # The pipe must be escaped rather than emitted raw, or it splits the row.
+    assert "| Widget | cheap \\| fast |" in result
+
+
+def test_csv_pipe_preceded_by_backslash_is_still_escaped() -> None:
+    # `left\|right` must not become `left\\|right`: the doubled backslash is a
+    # literal backslash, which would leave the pipe acting as a delimiter and
+    # let a renderer drop `right`. The run of backslashes is doubled instead,
+    # so the escaping `\|` survives.
+    result = _convert_csv(b'name,description\nWidget,"left\\|right"\n')
+
+    assert r"| Widget | left\\\|right |" in result
+
+
+def test_csv_pipe_preceded_by_two_backslashes_is_still_escaped() -> None:
+    # An even-length run is just as dangerous once the naive `\|` is appended,
+    # so check a longer run as well.
+    result = _convert_csv(b'name,description\nWidget,"left\\\\|right"\n')
+
+    assert r"| Widget | left\\\\\|right |" in result
+
+
+def test_csv_newline_in_quoted_cell_does_not_split_the_row() -> None:
+    result = _convert_csv(b'name,notes\nWidget,"line one\nline two"\n')
+
+    # The table must stay on one line per record; the embedded break collapses
+    # to a space.
+    assert len(result.splitlines()) == 3
+    assert "| Widget | line one line two |" in result
+
+
+def test_csv_carriage_returns_in_quoted_cell_collapse_to_spaces() -> None:
+    result = _convert_csv(b'name,notes\nWidget,"line one\r\nline two\rline three"\n')
+
+    assert len(result.splitlines()) == 3
+    assert "| Widget | line one line two line three |" in result
+
+
+def test_csv_pipe_in_header_is_escaped() -> None:
+    result = _convert_csv(b'"a | b",c\n1,2\n')
+
+    assert "| a \\| b | c |" in result
+
+
+def test_csv_plain_values_are_unchanged() -> None:
+    # Guards against over-escaping ordinary content.
+    result = _convert_csv(b"name,description\nWidget,cheap and fast\n")
+
+    assert "| Widget | cheap and fast |" in result
+    assert "\\" not in result
+
+
+def test_csv_backslash_without_a_pipe_is_left_alone() -> None:
+    # Only backslashes that guard a pipe are doubled; a Windows path stays
+    # readable.
+    result = _convert_csv(b"name,path\nWidget,C:\\temp\\file.txt\n")
+
+    assert r"| Widget | C:\temp\file.txt |" in result
+
+
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     for test in [
@@ -818,6 +994,8 @@ if __name__ == "__main__":
         test_markitdown_exiftool,
         test_markitdown_llm_parameters,
         test_markitdown_llm,
+        test_ipynb_accepts_non_ascii,
+        test_epub_metadata_nodevalue,
     ]:
         print(f"Running {test.__name__}...", end="")
         test()
