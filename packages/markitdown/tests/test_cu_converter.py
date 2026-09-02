@@ -932,11 +932,11 @@ class TestCLIArgs:
             enable_plugins=False,
             cu_endpoint="https://fake-cu",
         )
-        markitdown_instance.convert_stream.assert_called_once_with(
-            input_buffer,
-            stream_info=None,
-            keep_data_uris=False,
-        )
+
+        assert markitdown_instance.convert_stream.call_count == 1
+        call_args, call_kwargs = markitdown_instance.convert_stream.call_args
+        assert call_args[0].read() == b"fake pdf"
+        assert call_kwargs == {"stream_info": None, "keep_data_uris": False}
         assert capsys.readouterr().out == "converted\n"
 
 
