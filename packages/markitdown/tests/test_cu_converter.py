@@ -5,6 +5,7 @@ Follows the same pattern as test_docintel_html.py.
 """
 
 import io
+import os
 import sys
 from unittest.mock import MagicMock, patch
 
@@ -801,6 +802,7 @@ class TestCLIArgs:
             [sys.executable, "-m", "markitdown", "--use-cu", "fake.pdf"],
             capture_output=True,
             text=True,
+            env={**os.environ, "MARKITDOWN_CU_ENDPOINT": ""},
         )
         assert result.returncode != 0
         assert (
@@ -902,6 +904,41 @@ class TestCLIArgs:
         )
         assert capsys.readouterr().out == "converted\n"
 
+    def test_use_cu_reads_from_stdin(self, capsys):
+        """--use-cu should preserve the CLI's filename-optional stdin mode."""
+        import markitdown.__main__ as markitdown_cli
+
+        input_buffer = io.BytesIO(b"fake pdf")
+        stdin = MagicMock(buffer=input_buffer)
+        markitdown_instance = MagicMock()
+        markitdown_instance.convert_stream.return_value.markdown = "converted"
+        markitdown_cls = MagicMock(return_value=markitdown_instance)
+
+        with patch.object(
+            sys,
+            "argv",
+            [
+                "markitdown",
+                "--use-cu",
+                "--cu-endpoint",
+                "https://fake-cu",
+            ],
+        ), patch.object(sys, "stdin", stdin), patch.object(
+            markitdown_cli, "MarkItDown", markitdown_cls
+        ):
+            markitdown_cli.main()
+
+        markitdown_cls.assert_called_once_with(
+            enable_plugins=False,
+            cu_endpoint="https://fake-cu",
+        )
+
+        assert markitdown_instance.convert_stream.call_count == 1
+        call_args, call_kwargs = markitdown_instance.convert_stream.call_args
+        assert call_args[0].read() == b"fake pdf"
+        assert call_kwargs == {"stream_info": None, "keep_data_uris": False}
+        assert capsys.readouterr().out == "converted\n"
+
 
 # ---------------------------------------------------------------------------
 # MissingDependencyException test
@@ -926,3 +963,73 @@ class TestMissingDependency:
 
         assert "az-content-understanding" in str(exc_info.value)
         assert exc_info.value.__cause__ is import_error
+
+
+# ---------------------------------------------------------------------------
+# Endpoint environment variables (issue #2326)
+# ---------------------------------------------------------------------------
+
+
+class TestEndpointEnvVars:
+    """Endpoint flags fall back to operator-configured environment variables."""
+
+    @pytest.mark.parametrize(
+        "env_var, argv, kwarg",
+        [
+            (
+                "MARKITDOWN_CU_ENDPOINT",
+                ["markitdown", "--use-cu", "fake.pdf"],
+                "cu_endpoint",
+            ),
+            (
+                "MARKITDOWN_DOCINTEL_ENDPOINT",
+                ["markitdown", "-d", "fake.pdf"],
+                "docintel_endpoint",
+            ),
+        ],
+    )
+    def test_endpoint_read_from_environment(self, monkeypatch, env_var, argv, kwarg):
+        """With the env var set, the endpoint flag can be omitted entirely."""
+        from markitdown.__main__ import main
+
+        monkeypatch.setenv(env_var, "https://from-env")
+        monkeypatch.setattr(sys, "argv", argv)
+
+        with patch("markitdown.__main__.MarkItDown") as mock_markitdown:
+            main()
+
+        assert mock_markitdown.call_args.kwargs[kwarg] == "https://from-env"
+
+    def test_flag_overrides_environment(self, monkeypatch):
+        """Fails if the env var is ever read after parsing instead of as an argparse default."""
+        from markitdown.__main__ import main
+
+        monkeypatch.setenv("MARKITDOWN_CU_ENDPOINT", "https://from-env")
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            [
+                "markitdown",
+                "--use-cu",
+                "--cu-endpoint",
+                "https://from-flag",
+                "fake.pdf",
+            ],
+        )
+
+        with patch("markitdown.__main__.MarkItDown") as mock_markitdown:
+            main()
+
+        assert mock_markitdown.call_args.kwargs["cu_endpoint"] == "https://from-flag"
+
+    def test_empty_environment_variable_is_treated_as_unset(self, monkeypatch, capsys):
+        """An empty env var must not pass as a valid endpoint."""
+        from markitdown.__main__ import main
+
+        monkeypatch.setenv("MARKITDOWN_CU_ENDPOINT", "")
+        monkeypatch.setattr(sys, "argv", ["markitdown", "--use-cu", "fake.pdf"])
+
+        with pytest.raises(SystemExit):
+            main()
+
+        assert "MARKITDOWN_CU_ENDPOINT" in capsys.readouterr().out
