@@ -268,6 +268,25 @@ def test_file_uris() -> None:
     assert netloc == "localhost"
     assert path == "/path/to/file.txt"
 
+    # URI schemes are case-insensitive
+    file_uri = "FILE:///path/to/file.txt"
+    netloc, path = file_uri_to_path(file_uri)
+    assert netloc is None
+    assert path == "/path/to/file.txt"
+
+
+def test_convert_case_insensitive_uri_schemes(tmp_path) -> None:
+    markitdown = MarkItDown()
+
+    data_result = markitdown.convert("DATA:text/plain;base64,SGVsbG8sIFdvcmxkIQ==")
+    assert data_result.markdown == "Hello, World!"
+
+    text_file = tmp_path / "hello.txt"
+    text_file.write_text("Hello from file", encoding="utf-8")
+
+    file_result = markitdown.convert(text_file.as_uri().replace("file:", "FILE:", 1))
+    assert file_result.markdown == "Hello from file"
+
     # Test file URI with query parameters
     file_uri = "file:///path/to/file.txt?param=value"
     netloc, path = file_uri_to_path(file_uri)
