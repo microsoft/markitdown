@@ -212,12 +212,14 @@ def test_convert_docx_with_style_missing_type(tmp_path):
                 content = zip_input.read(item.filename)
                 if item.filename == "word/styles.xml":
                     styles_xml = content.decode("utf-8")
-                    styles_xml = re.sub(
-                        r'<w:style\s+w:type="[^"]+"',
-                        "<w:style",
+                    styles_xml, count = re.subn(
+                        r'<w:style\s+w:type="[^"]+"(\s+w:styleId="1")',
+                        r"<w:style\1",
                         styles_xml,
-                        count=1,
                     )
+                    # Guard against a future fixture change silently
+                    # neutralizing this test.
+                    assert count == 1
                     content = styles_xml.encode("utf-8")
                 zip_output.writestr(item, content)
 
@@ -227,6 +229,7 @@ def test_convert_docx_with_style_missing_type(tmp_path):
         "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation"
         in result.markdown
     )
+    assert "# Abstract" in result.markdown
 
 
 if __name__ == "__main__":

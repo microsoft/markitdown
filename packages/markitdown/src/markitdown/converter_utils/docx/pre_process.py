@@ -117,19 +117,24 @@ def _pre_process_math(content: bytes) -> bytes:
 
 def _pre_process_styles(content: bytes) -> bytes:
     """
-    Removes malformed DOCX style definitions that are missing required attributes.
+    Repairs DOCX style definitions that Mammoth cannot read.
 
-    Mammoth expects every ``w:style`` element to include ``w:type`` and
-    ``w:styleId``. Some DOCX producers emit malformed style entries without
-    those attributes, which otherwise causes conversion to fail with a
-    ``KeyError`` before any document text can be extracted. Dropping only the
-    malformed style definition allows Mammoth to continue and preserves the
-    document body content.
+    Mammoth indexes ``w:type`` and ``w:styleId`` directly, so a ``w:style``
+    element missing either attribute causes conversion to fail with a
+    ``KeyError`` before any document text can be extracted.
+
+    ``w:type`` is optional in OOXML: when it is absent the style type defaults
+    to ``paragraph``, so the attribute is filled in rather than dropping the
+    style, which would discard its formatting (a heading would be emitted as
+    plain body text). A style with no ``w:styleId`` cannot be referenced by the
+    document body, so it is removed.
     """
     soup = BeautifulSoup(content.decode(), features="xml")
     for tag in soup.find_all("w:style"):
-        if not tag.has_attr("w:type") or not tag.has_attr("w:styleId"):
+        if not tag.has_attr("w:styleId"):
             tag.decompose()
+        elif not tag.has_attr("w:type"):
+            tag["w:type"] = "paragraph"
     return str(soup).encode()
 
 
