@@ -28,6 +28,8 @@ CANDIDATE_FILE_EXTENSIONS = [
     ".xml",
 ]
 
+XHTML_NAMESPACE = "http://www.w3.org/1999/xhtml"
+
 
 class RssConverter(DocumentConverter):
     """Convert RSS / Atom type to markdown"""
@@ -148,10 +150,26 @@ class RssConverter(DocumentConverter):
             return self._get_data_by_tag_name(entry, tag_name)
 
         return "".join(
-            child.toxml()
+            self._localize_xhtml_names(child.cloneNode(True)).toxml()
             for child in node.childNodes
             if child.nodeType == Node.ELEMENT_NODE
         )
+
+    def _localize_xhtml_names(self, node: Node) -> Node:
+        """Rewrite prefixed XHTML element names to their local HTML names.
+
+        Atom permits XHTML content to be namespace-prefixed (e.g. ``x:strong``).
+        The downstream HTML converter dispatches on HTML tag names, so the
+        prefix has to be dropped or the element is treated as an unknown tag
+        and its formatting is lost.
+        """
+        if node.nodeType == Node.ELEMENT_NODE:
+            if node.prefix and node.namespaceURI == XHTML_NAMESPACE:
+                node.tagName = node.nodeName = node.localName
+                node.prefix = None
+            for child in node.childNodes:
+                self._localize_xhtml_names(child)
+        return node
 
     def _parse_rss_type(
         self, doc: Document, *, strict: bool = False
