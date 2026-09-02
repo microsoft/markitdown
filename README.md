@@ -13,7 +13,7 @@ MarkItDown currently supports the conversion from:
 
 - PDF
 - PowerPoint
-- Word
+- Word (.docx, .doc)
 - Excel
 - Images (EXIF metadata and OCR)
 - Audio (EXIF metadata and speech transcription)
