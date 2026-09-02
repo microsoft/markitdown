@@ -96,6 +96,27 @@ def _replace_equations(tag: Tag):
         raise ValueError(f"Not supported tag: {tag.name}")
 
 
+def _pre_process_strike(content: bytes) -> bytes:
+    """
+    Pre-processes the strikethrough content in a DOCX -> XML file by normalizing double
+    strikethrough runs to single strikethrough runs.
+
+    Word marks double strikethrough with "w:dstrike", which downstream converters do not
+    recognize, causing those runs to lose their strikethrough entirely. Renaming the tag to
+    "w:strike" preserves the strikethrough semantics.
+
+    Args:
+        content (bytes): The XML content of the DOCX file as bytes.
+
+    Returns:
+        bytes: The processed content with "dstrike" elements renamed to "strike", encoded as bytes.
+    """
+    soup = BeautifulSoup(content.decode(), features="xml")
+    for tag in soup.find_all("dstrike"):
+        tag.name = "strike"
+    return str(soup).encode()
+
+
 def _pre_process_math(content: bytes) -> bytes:
     """
     Pre-processes the math content in a DOCX -> XML file by converting OMML (Office Math Markup Language) elements to LaTeX.
@@ -108,9 +129,6 @@ def _pre_process_math(content: bytes) -> bytes:
         bytes: The processed content with OMML elements replaced by their LaTeX equivalents, encoded as bytes.
     """
     soup = BeautifulSoup(content.decode(), features="xml")
-    # Normalize dstrike to strike to preserve strikethrough semantics
-    for tag in soup.find_all("dstrike"):
-        tag.name = "strike"
     for tag in soup.find_all("oMathPara"):
         _replace_equations(tag)
     for tag in soup.find_all("oMath"):
@@ -145,14 +163,16 @@ def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
             zip_output.comment = zip_input.comment
             for name, content in files.items():
                 if name in pre_process_enable_files:
+                    updated_content = content
                     try:
-                        # Pre-process the content
-                        updated_content = _pre_process_math(content)
-                        # In the future, if there are more pre-processing steps, they can be added here
-                        zip_output.writestr(name, updated_content)
+                        updated_content = _pre_process_strike(updated_content)
                     except Exception:
-                        # If there is an error in processing the content, write the original content
-                        zip_output.writestr(name, content)
+                        pass
+                    try:
+                        updated_content = _pre_process_math(updated_content)
+                    except Exception:
+                        pass
+                    zip_output.writestr(name, updated_content)
                 else:
                     zip_output.writestr(name, content)
     output_docx.seek(0)
