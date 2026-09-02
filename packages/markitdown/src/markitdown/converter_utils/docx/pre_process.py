@@ -7,6 +7,102 @@ from bs4 import BeautifulSoup, Tag
 
 from .math.omml import OMML_NS, oMath2Latex
 
+try:
+    from PIL import Image
+
+    HAS_PIL = True
+except ImportError:
+    HAS_PIL = False
+
+
+EMU_PER_INCH = 914400
+
+A_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
+R_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+
+
+def _emu_to_px(emu: int, dpi: float) -> int:
+    """Convert EMU (English Metric Unit) to pixels at the given DPI."""
+    return int(emu * dpi / EMU_PER_INCH)
+
+
+def _apply_image_cropping(files: dict[str, bytes]) -> None:
+    """Apply a:srcRect cropping to images in the DOCX archive.
+
+    When an image in a DOCX has cropping attributes (a:srcRect with l/r/t/b),
+    the image blob in word/media/ is cropped accordingly so downstream
+    converters (mammoth) pick up the cropped version.
+    """
+    if not HAS_PIL:
+        return
+
+    # Build relationship map: rId -> target path
+    rels_path = "word/_rels/document.xml.rels"
+    rel_map: dict[str, str] = {}
+    if rels_path in files:
+        rels_root = ET.fromstring(files[rels_path])
+        for rel_elem in rels_root:
+            rid = rel_elem.get("Id", "")
+            target = rel_elem.get("Target", "")
+            if rid and target:
+                rel_map[rid] = target
+
+    # Scan document XML files for a:srcRect
+    scan_paths = ["word/document.xml", "word/footnotes.xml", "word/endnotes.xml"]
+    for xml_path in scan_paths:
+        if xml_path not in files:
+            continue
+        try:
+            root = ET.fromstring(files[xml_path])
+        except ET.ParseError:
+            continue
+
+        # Find all a:blip elements that contain a:srcRect with non-zero crops
+        for blip in root.iter(f"{{{A_NS}}}blip"):
+            src_rect = blip.find(f"{{{A_NS}}}srcRect")
+            if src_rect is None:
+                continue
+
+            l_emu = int(src_rect.get("l", 0))
+            r_emu = int(src_rect.get("r", 0))
+            t_emu = int(src_rect.get("t", 0))
+            b_emu = int(src_rect.get("b", 0))
+
+            if l_emu == 0 and r_emu == 0 and t_emu == 0 and b_emu == 0:
+                continue
+
+            embed = blip.get(f"{{{R_NS}}}embed", "")
+            if embed not in rel_map:
+                continue
+
+            img_rel_target = rel_map[embed]
+            img_path = f"word/{img_rel_target}"
+            if img_path not in files:
+                continue
+
+            try:
+                img_stream = BytesIO(files[img_path])
+                img = Image.open(img_stream)
+                dpi = img.info.get("dpi", (96, 96))
+                dpi_x, dpi_y = dpi
+
+                left = _emu_to_px(l_emu, dpi_x)
+                right = _emu_to_px(r_emu, dpi_x)
+                top = _emu_to_px(t_emu, dpi_y)
+                bottom = _emu_to_px(b_emu, dpi_y)
+
+                w, h = img.size
+                crop_box = (left, top, w - right, h - bottom)
+                if crop_box[0] >= crop_box[2] or crop_box[1] >= crop_box[3]:
+                    continue
+
+                cropped = img.crop(crop_box)
+                buf = BytesIO()
+                cropped.save(buf, format=img.format or "PNG")
+                files[img_path] = buf.getvalue()
+            except Exception:
+                continue
+
 MATH_ROOT_TEMPLATE = "".join(
     (
         "<w:document ",
@@ -183,6 +279,7 @@ def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
     }
     with zipfile.ZipFile(input_docx, mode="r") as zip_input:
         files = {name: zip_input.read(name) for name in zip_input.namelist()}
+        _apply_image_cropping(files)
         with zipfile.ZipFile(output_docx, mode="w") as zip_output:
             zip_output.comment = zip_input.comment
             for name, content in files.items():
