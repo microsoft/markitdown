@@ -4,10 +4,54 @@ Provides LLM Vision-based image text extraction.
 """
 
 import base64
+import os
 from typing import Any, BinaryIO
 from dataclasses import dataclass
 
 from markitdown import StreamInfo
+
+
+def format_image_reference(
+    image_path: str,
+    width: int | None = None,
+    height: int | None = None,
+    size_bytes: int | None = None,
+) -> str:
+    """
+    Format an annotated markdown image reference for extract-only mode.
+
+    Args:
+        image_path: Filesystem path to the saved image.
+        width: Image width in pixels (optional).
+        height: Image height in pixels (optional).
+        size_bytes: Image file size in bytes (optional).
+
+    Returns:
+        Markdown string with metadata comment and image link.
+    """
+    parts: list[str] = []
+
+    # Build metadata comment
+    meta_parts: list[str] = []
+    if width is not None and height is not None:
+        meta_parts.append(f"{width}x{height}")
+    if size_bytes is not None:
+        size_kb = round(size_bytes / 1024, 1)
+        meta_parts.append(f"{size_kb}KB")
+
+    if meta_parts:
+        parts.append(f"<!-- image: {', '.join(meta_parts)} -->")
+    else:
+        # Fallback: try to get file size from disk
+        try:
+            file_size = os.path.getsize(image_path)
+            size_kb = round(file_size / 1024, 1)
+            parts.append(f"<!-- image: {size_kb}KB -->")
+        except Exception:
+            pass
+
+    parts.append(f"![image]({image_path})")
+    return "\n".join(parts)
 
 
 @dataclass

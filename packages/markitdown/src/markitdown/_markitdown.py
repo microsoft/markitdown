@@ -119,10 +119,13 @@ class MarkItDown:
         *,
         enable_builtins: Union[None, bool] = None,
         enable_plugins: Union[None, bool] = None,
+        extract_only: bool = False,
         **kwargs,
     ):
         self._builtins_enabled = False
         self._plugins_enabled = False
+        self._extract_only = extract_only
+        self._image_output_dir: Union[str | None] = kwargs.get("image_output_dir")
 
         requests_session = kwargs.get("requests_session")
         if requests_session is None:
@@ -619,6 +622,12 @@ class MarkItDown:
 
                 if "exiftool_path" not in _kwargs and self._exiftool_path is not None:
                     _kwargs["exiftool_path"] = self._exiftool_path
+
+                # Propagate extract-only mode settings
+                if "extract_only" not in _kwargs:
+                    _kwargs["extract_only"] = self._extract_only
+                if "image_output_dir" not in _kwargs and self._image_output_dir is not None:
+                    _kwargs["image_output_dir"] = self._image_output_dir
 
                 # Add the list of converters for nested processing
                 _kwargs["_parent_converters"] = self._converters

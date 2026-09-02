@@ -4,7 +4,9 @@ Already has LLM-based image description, this enhances it with traditional OCR f
 """
 
 import io
+import os
 import sys
+import tempfile
 from typing import Any, BinaryIO, Optional
 
 from typing import BinaryIO, Any, Optional
@@ -15,7 +17,7 @@ from markitdown._exceptions import (
     MissingDependencyException,
     MISSING_DEPENDENCY_MESSAGE,
 )
-from ._ocr_service import LLMVisionOCRService
+from ._ocr_service import LLMVisionOCRService, format_image_reference
 
 _dependency_exc_info = None
 try:
@@ -73,6 +75,16 @@ class PptxConverterWithOCR(DocumentConverter):
             kwargs.get("ocr_service") or self.ocr_service
         )
         llm_client = kwargs.get("llm_client")
+
+        # --- extract_only mode: skip OCR, emit image file references ---
+        if kwargs.get("extract_only", False):
+            image_output_dir = kwargs.get("image_output_dir") or tempfile.mkdtemp(
+                prefix="markitdown_ocr_"
+            )
+            os.makedirs(image_output_dir, exist_ok=True)
+            # Pop keys already consumed as positional args to avoid duplicate keyword
+            _eo_kwargs = {k: v for k, v in kwargs.items() if k not in ("image_output_dir",)}
+            return self._convert_extract_only(file_stream, image_output_dir, **_eo_kwargs)
 
         presentation = pptx.Presentation(file_stream)
         md_content = ""
@@ -178,6 +190,111 @@ class PptxConverterWithOCR(DocumentConverter):
 
             if slide.has_notes_slide:
                 md_content += "\\n\\n### Notes:\\n"
+                notes_frame = slide.notes_slide.notes_text_frame
+                if notes_frame is not None:
+                    md_content += notes_frame.text
+                md_content = md_content.strip()
+
+        return DocumentConverterResult(markdown=md_content.strip())
+
+    def _convert_extract_only(
+        self, file_stream: BinaryIO, image_output_dir: str, **kwargs: Any
+    ) -> DocumentConverterResult:
+        """
+        Extract-only mode: extract text and save embedded images to disk.
+        No OCR or LLM description is performed; images are referenced via file paths.
+        """
+        from PIL import Image
+
+        presentation = pptx.Presentation(file_stream)
+        md_content = ""
+        slide_num = 0
+        global_img_idx = 0
+
+        for slide in presentation.slides:
+            slide_num += 1
+            md_content += f"\n\n<!-- Slide number: {slide_num} -->\n"
+
+            title = slide.shapes.title
+
+            def get_shape_content_extract_only(shape, **kw):
+                nonlocal md_content, global_img_idx
+
+                # Pictures
+                if self._is_picture(shape):
+                    try:
+                        image_bytes = shape.image.blob
+
+                        ext = "png"
+                        width, height = None, None
+                        try:
+                            pil_img = Image.open(io.BytesIO(image_bytes))
+                            fmt = pil_img.format
+                            if fmt:
+                                ext = fmt.lower()
+                                if ext == "jpeg":
+                                    ext = "jpg"
+                            width, height = pil_img.size
+                        except Exception:
+                            pass
+
+                        filename = f"slide_{slide_num}_{global_img_idx}.{ext}"
+                        filepath = os.path.join(image_output_dir, filename)
+                        with open(filepath, "wb") as f:
+                            f.write(image_bytes)
+
+                        img_ref = format_image_reference(
+                            filepath,
+                            width=width,
+                            height=height,
+                            size_bytes=len(image_bytes),
+                        )
+                        md_content += f"\n{img_ref}\n"
+                        global_img_idx += 1
+                    except Exception:
+                        pass
+
+                # Tables
+                if self._is_table(shape):
+                    md_content += self._convert_table_to_markdown(shape.table, **kw)
+
+                # Charts
+                if shape.has_chart:
+                    md_content += self._convert_chart_to_markdown(shape.chart)
+
+                # Text areas
+                elif shape.has_text_frame:
+                    if shape == title:
+                        md_content += "# " + shape.text.lstrip() + "\n"
+                    else:
+                        md_content += shape.text + "\n"
+
+                # Group Shapes
+                if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.GROUP:
+                    sorted_shapes = sorted(
+                        shape.shapes,
+                        key=lambda x: (
+                            float("-inf") if not x.top else x.top,
+                            float("-inf") if not x.left else x.left,
+                        ),
+                    )
+                    for subshape in sorted_shapes:
+                        get_shape_content_extract_only(subshape, **kw)
+
+            sorted_shapes = sorted(
+                slide.shapes,
+                key=lambda x: (
+                    float("-inf") if not x.top else x.top,
+                    float("-inf") if not x.left else x.left,
+                ),
+            )
+            for shape in sorted_shapes:
+                get_shape_content_extract_only(shape, **kwargs)
+
+            md_content = md_content.strip()
+
+            if slide.has_notes_slide:
+                md_content += "\n\n### Notes:\n"
                 notes_frame = slide.notes_slide.notes_text_frame
                 if notes_frame is not None:
                     md_content += notes_frame.text

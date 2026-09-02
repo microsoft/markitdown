@@ -4,7 +4,9 @@ Extracts images from Excel spreadsheets and performs OCR while maintaining cell 
 """
 
 import io
+import os
 import sys
+import tempfile
 from typing import Any, BinaryIO, Optional
 
 from markitdown.converters import HtmlConverter
@@ -13,7 +15,7 @@ from markitdown._exceptions import (
     MissingDependencyException,
     MISSING_DEPENDENCY_MESSAGE,
 )
-from ._ocr_service import LLMVisionOCRService
+from ._ocr_service import LLMVisionOCRService, format_image_reference
 
 # Try loading dependencies
 _xlsx_dependency_exc_info = None
@@ -75,6 +77,15 @@ class XlsxConverterWithOCR(DocumentConverter):
         ocr_service: Optional[LLMVisionOCRService] = (
             kwargs.get("ocr_service") or self.ocr_service
         )
+
+        # --- extract_only mode: skip OCR, emit image file references ---
+        if kwargs.get("extract_only", False):
+            image_output_dir = kwargs.get("image_output_dir") or tempfile.mkdtemp(
+                prefix="markitdown_ocr_"
+            )
+            os.makedirs(image_output_dir, exist_ok=True)
+            _eo_kwargs = {k: v for k, v in kwargs.items() if k not in ("image_output_dir",)}
+            return self._convert_extract_only(file_stream, image_output_dir, **_eo_kwargs)
 
         if ocr_service:
             # Remove ocr_service from kwargs to avoid duplicate argument error
@@ -212,6 +223,108 @@ class XlsxConverterWithOCR(DocumentConverter):
             pass
 
         return results
+
+    def _convert_extract_only(
+        self, file_stream: BinaryIO, image_output_dir: str, **kwargs: Any
+    ) -> DocumentConverterResult:
+        """
+        Extract-only mode: extract table data and save embedded images to disk.
+        No OCR is performed; images are referenced via file paths.
+        """
+        from PIL import Image
+
+        file_stream.seek(0)
+        wb = load_workbook(file_stream)
+
+        # Filter out ocr_service / extract_only from kwargs passed to HTML converter
+        html_kwargs = {
+            k: v
+            for k, v in kwargs.items()
+            if k not in ("ocr_service", "extract_only", "image_output_dir")
+        }
+
+        md_content = ""
+
+        for sheet_name in wb.sheetnames:
+            sheet = wb[sheet_name]
+            md_content += f"## {sheet_name}\n\n"
+
+            # Convert sheet data to markdown table
+            file_stream.seek(0)
+            try:
+                df = pd.read_excel(
+                    file_stream, sheet_name=sheet_name, engine="openpyxl"
+                )
+                html_content = df.to_html(index=False)
+                md_content += (
+                    self._html_converter.convert_string(
+                        html_content, **html_kwargs
+                    ).markdown.strip()
+                    + "\n\n"
+                )
+            except Exception:
+                pass
+
+            # Extract images and save to disk
+            img_idx = 0
+            if hasattr(sheet, "_images"):
+                for img in sheet._images:
+                    try:
+                        # Get image data
+                        if hasattr(img, "_data"):
+                            image_data = img._data()
+                        elif hasattr(img, "image"):
+                            image_data = img.image
+                        else:
+                            continue
+
+                        # Determine extension and dimensions
+                        ext = "png"
+                        width, height = None, None
+                        try:
+                            pil_img = Image.open(io.BytesIO(image_data))
+                            fmt = pil_img.format
+                            if fmt:
+                                ext = fmt.lower()
+                                if ext == "jpeg":
+                                    ext = "jpg"
+                            width, height = pil_img.size
+                        except Exception:
+                            pass
+
+                        # Get cell reference for naming
+                        cell_ref = "unknown"
+                        if hasattr(img, "anchor"):
+                            anchor = img.anchor
+                            if hasattr(anchor, "_from"):
+                                from_cell = anchor._from
+                                if hasattr(from_cell, "col") and hasattr(
+                                    from_cell, "row"
+                                ):
+                                    col_letter = self._column_number_to_letter(
+                                        from_cell.col
+                                    )
+                                    cell_ref = f"{col_letter}{from_cell.row + 1}"
+
+                        filename = f"xlsx_{sheet_name}_{img_idx}.{ext}"
+                        # Sanitize filename (sheet names may have spaces/special chars)
+                        filename = filename.replace(" ", "_").replace("/", "_")
+                        filepath = os.path.join(image_output_dir, filename)
+                        with open(filepath, "wb") as f:
+                            f.write(image_data)
+
+                        img_ref = format_image_reference(
+                            filepath,
+                            width=width,
+                            height=height,
+                            size_bytes=len(image_data),
+                        )
+                        md_content += f"\n{img_ref}\n\n"
+                        img_idx += 1
+                    except Exception:
+                        continue
+
+        return DocumentConverterResult(markdown=md_content.strip())
 
     @staticmethod
     def _column_number_to_letter(n: int) -> str:

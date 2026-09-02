@@ -4,7 +4,9 @@ Extracts images from PDFs and performs OCR while maintaining document context.
 """
 
 import io
+import os
 import sys
+import tempfile
 from typing import Any, BinaryIO, Optional
 
 from markitdown import DocumentConverter, DocumentConverterResult, StreamInfo
@@ -12,7 +14,7 @@ from markitdown._exceptions import (
     MissingDependencyException,
     MISSING_DEPENDENCY_MESSAGE,
 )
-from ._ocr_service import LLMVisionOCRService
+from ._ocr_service import LLMVisionOCRService, format_image_reference
 
 # Import dependencies
 _dependency_exc_info = None
@@ -181,6 +183,15 @@ class PdfConverterWithOCR(DocumentConverter):
         file_stream.seek(0)
         pdf_bytes = io.BytesIO(file_stream.read())
 
+        # --- extract_only mode: skip OCR, emit image file references ---
+        extract_only = kwargs.get("extract_only", False)
+        if extract_only:
+            image_output_dir = kwargs.get("image_output_dir") or tempfile.mkdtemp(
+                prefix="markitdown_ocr_"
+            )
+            os.makedirs(image_output_dir, exist_ok=True)
+            return self._convert_extract_only(pdf_bytes, image_output_dir)
+
         markdown_content = []
 
         try:
@@ -307,6 +318,74 @@ class PdfConverterWithOCR(DocumentConverter):
         if ocr_service and (not markdown or not markdown.strip()):
             pdf_bytes.seek(0)
             markdown = self._ocr_full_pages(pdf_bytes, ocr_service)
+
+        return DocumentConverterResult(markdown=markdown)
+
+    def _convert_extract_only(
+        self, pdf_bytes: io.BytesIO, image_output_dir: str
+    ) -> DocumentConverterResult:
+        """
+        Extract-only mode: extract text skeleton and save embedded images to disk.
+        No OCR is performed; images are referenced via file paths.
+        """
+        markdown_content: list[str] = []
+
+        try:
+            with pdfplumber.open(pdf_bytes) as pdf:
+                for page_num, page in enumerate(pdf.pages, 1):
+                    markdown_content.append(f"\n## Page {page_num}\n")
+
+                    # Extract regular text
+                    text_content = page.extract_text() or ""
+                    if text_content.strip():
+                        markdown_content.append(text_content.strip())
+
+                    # Extract and save images
+                    images_on_page = self._extract_page_images(pdf_bytes, page_num)
+                    for idx, img_info in enumerate(images_on_page):
+                        img_stream: io.BytesIO = img_info["stream"]
+                        img_stream.seek(0)
+                        img_data = img_stream.read()
+
+                        # Determine extension from image data (default png)
+                        ext = "png"
+                        try:
+                            pil_img = Image.open(io.BytesIO(img_data))
+                            fmt = pil_img.format
+                            if fmt:
+                                ext = fmt.lower()
+                                if ext == "jpeg":
+                                    ext = "jpg"
+                            width, height = pil_img.size
+                        except Exception:
+                            width, height = None, None
+
+                        filename = f"page_{page_num}_{idx}.{ext}"
+                        filepath = os.path.join(image_output_dir, filename)
+                        with open(filepath, "wb") as f:
+                            f.write(img_data)
+
+                        img_ref = format_image_reference(
+                            filepath,
+                            width=width,
+                            height=height,
+                            size_bytes=len(img_data),
+                        )
+                        markdown_content.append(f"\n{img_ref}\n")
+
+            markdown = "\n\n".join(markdown_content).strip()
+
+            # Fallback to pdfminer if empty
+            if not markdown:
+                pdf_bytes.seek(0)
+                markdown = pdfminer.high_level.extract_text(pdf_bytes)
+
+        except Exception:
+            try:
+                pdf_bytes.seek(0)
+                markdown = pdfminer.high_level.extract_text(pdf_bytes)
+            except Exception:
+                markdown = ""
 
         return DocumentConverterResult(markdown=markdown)
 

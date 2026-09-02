@@ -1,6 +1,7 @@
 from typing import BinaryIO, Any, Union
 import base64
 import mimetypes
+import os
 from ._exiftool import exiftool_metadata
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
@@ -42,6 +43,12 @@ class ImageConverter(DocumentConverter):
         stream_info: StreamInfo,
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
+        extract_only = kwargs.get("extract_only", False)
+
+        # --- Extract-only mode: save image to disk, return path reference ---
+        if extract_only:
+            return self._extract_only(file_stream, stream_info, **kwargs)
+
         md_content = ""
 
         # Add metadata
@@ -83,6 +90,101 @@ class ImageConverter(DocumentConverter):
         return DocumentConverterResult(
             markdown=md_content,
         )
+
+    def _extract_only(
+        self,
+        file_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,
+    ) -> DocumentConverterResult:
+        """Extract image to disk and return a markdown reference with metadata."""
+        import tempfile
+        import uuid
+
+        # Determine output directory
+        image_output_dir = kwargs.get("image_output_dir")
+        if image_output_dir is None:
+            image_output_dir = tempfile.mkdtemp(prefix="markitdown_images_")
+
+        os.makedirs(image_output_dir, exist_ok=True)
+
+        # Determine file extension
+        extension = stream_info.extension or ""
+        if not extension:
+            ext = mimetypes.guess_extension(stream_info.mimetype or "") or ".png"
+        else:
+            ext = extension if extension.startswith(".") else "." + extension
+
+        # Generate unique filename
+        unique_id = uuid.uuid4().hex[:12]
+        filename = f"img_{unique_id}{ext}"
+        file_path = os.path.join(image_output_dir, filename)
+
+        # Read image data and collect metadata
+        cur_pos = file_stream.tell()
+        try:
+            image_data = file_stream.read()
+        finally:
+            file_stream.seek(cur_pos)
+
+        size_bytes = len(image_data)
+
+        # Get image dimensions if possible
+        width, height = self._get_image_dimensions(image_data, ext)
+
+        # Write image to disk
+        with open(file_path, "wb") as f:
+            f.write(image_data)
+
+        # Build markdown output with metadata comment
+        md_parts = []
+        if width and height:
+            md_parts.append(f"<!-- image: {width}x{height}, {size_bytes // 1024}KB -->")
+        else:
+            md_parts.append(f"<!-- image: {size_bytes // 1024}KB -->")
+        md_parts.append(f"![image]({file_path})")
+
+        return DocumentConverterResult(
+            markdown="\n".join(md_parts),
+        )
+
+    def _get_image_dimensions(
+        self, image_data: bytes, ext: str
+    ) -> tuple:
+        """Try to get image dimensions without external dependencies."""
+        try:
+            from PIL import Image
+            img = Image.open(__import__("io").BytesIO(image_data))
+            return img.size  # (width, height)
+        except ImportError:
+            pass
+
+        # Fallback: try to parse PNG/JPEG headers
+        if ext.lower() in (".png",) and len(image_data) >= 24:
+            import struct
+            try:
+                w, h = struct.unpack(">II", image_data[16:24])
+                return (w, h)
+            except Exception:
+                pass
+
+        if ext.lower() in (".jpg", ".jpeg") and len(image_data) > 10:
+            try:
+                import struct
+                idx = 2
+                while idx < len(image_data) - 9:
+                    if image_data[idx] != 0xFF:
+                        break
+                    marker = image_data[idx + 1]
+                    if marker in (0xC0, 0xC1, 0xC2):
+                        h, w = struct.unpack(">HH", image_data[idx + 5:idx + 9])
+                        return (w, h)
+                    length = struct.unpack(">H", image_data[idx + 2:idx + 4])[0]
+                    idx += 2 + length
+            except Exception:
+                pass
+
+        return (None, None)
 
     def _get_llm_description(
         self,
