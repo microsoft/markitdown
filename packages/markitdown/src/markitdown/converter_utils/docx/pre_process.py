@@ -96,6 +96,27 @@ def _replace_equations(tag: Tag):
         raise ValueError(f"Not supported tag: {tag.name}")
 
 
+def _pre_process_strike(content: bytes) -> bytes:
+    """
+    Pre-processes the strikethrough content in a DOCX -> XML file by normalizing double
+    strikethrough runs to single strikethrough runs.
+
+    Word marks double strikethrough with "w:dstrike", which downstream converters do not
+    recognize, causing those runs to lose their strikethrough entirely. Renaming the tag to
+    "w:strike" preserves the strikethrough semantics.
+
+    Args:
+        content (bytes): The XML content of the DOCX file as bytes.
+
+    Returns:
+        bytes: The processed content with "dstrike" elements renamed to "strike", encoded as bytes.
+    """
+    soup = BeautifulSoup(content.decode(), features="xml")
+    for tag in soup.find_all("dstrike"):
+        tag.name = "strike"
+    return str(soup).encode()
+
+
 def _pre_process_math(content: bytes) -> bytes:
     """
     Pre-processes the math content in a DOCX -> XML file by converting OMML (Office Math Markup Language) elements to LaTeX.
@@ -153,28 +174,26 @@ def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
         BinaryIO: A binary output stream representing the processed DOCX file.
     """
     output_docx = BytesIO()
-    # The files that need to be pre-processed from .docx
+    # The pre-processing steps to apply to each file in the .docx
     pre_process_enable_files = {
-        "word/document.xml": _pre_process_math,
-        "word/footnotes.xml": _pre_process_math,
-        "word/endnotes.xml": _pre_process_math,
-        "word/styles.xml": _pre_process_styles,
+        "word/document.xml": (_pre_process_strike, _pre_process_math),
+        "word/footnotes.xml": (_pre_process_strike, _pre_process_math),
+        "word/endnotes.xml": (_pre_process_strike, _pre_process_math),
+        "word/styles.xml": (_pre_process_strike, _pre_process_styles),
     }
     with zipfile.ZipFile(input_docx, mode="r") as zip_input:
         files = {name: zip_input.read(name) for name in zip_input.namelist()}
         with zipfile.ZipFile(output_docx, mode="w") as zip_output:
             zip_output.comment = zip_input.comment
             for name, content in files.items():
-                if name in pre_process_enable_files:
+                updated_content = content
+                # Each step is applied independently, so one failing step does
+                # not discard the results of the others.
+                for pre_process_step in pre_process_enable_files.get(name, ()):
                     try:
-                        # Pre-process the content
-                        updated_content = pre_process_enable_files[name](content)
-                        # In the future, if there are more pre-processing steps, they can be added here
-                        zip_output.writestr(name, updated_content)
+                        updated_content = pre_process_step(updated_content)
                     except Exception:
-                        # If there is an error in processing the content, write the original content
-                        zip_output.writestr(name, content)
-                else:
-                    zip_output.writestr(name, content)
+                        pass
+                zip_output.writestr(name, updated_content)
     output_docx.seek(0)
     return output_docx
