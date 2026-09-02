@@ -19,6 +19,7 @@ MarkItDown currently supports the conversion from:
 - Audio (EXIF metadata and speech transcription)
 - HTML
 - Text-based formats (CSV, JSON, XML)
+- Email messages (EML)
 - ZIP files (iterates over contents)
 - YouTube URLs
 - EPubs
