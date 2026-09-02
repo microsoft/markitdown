@@ -1,0 +1,1125 @@
+{
+  "repository_name": "snapshot-worktree",
+  "timestamp": "2026-04-29T08:04:44.764042+00:00",
+  "overall_score": 0.7789661319073083,
+  "check_summaries": [
+    {
+      "check_name": "function_size",
+      "description": "Checks that functions/methods do not exceed line count thresholds",
+      "check_type": "standard",
+      "total_entities_checked": 0,
+      "findings_count": 0,
+      "warning_count": 0,
+      "score": 1.0,
+      "finding_groups": []
+    },
+    {
+      "check_name": "fan_out",
+      "description": "Checks efferent coupling: how many other functions each function calls",
+      "check_type": "standard",
+      "total_entities_checked": 194,
+      "findings_count": 1,
+      "warning_count": 1,
+      "score": 0.9948453608247423,
+      "finding_groups": [
+        {
+          "severity": "warning",
+          "threshold": 10,
+          "description": "Functions calling more than 10.0 other functions",
+          "entities": [
+            {
+              "entity_name": "packages.markitdown.src.markitdown._markitdown.MarkItDown.enable_builtins",
+              "file_path": "packages/markitdown/src/markitdown/_markitdown.py",
+              "line_start": 121,
+              "line_end": 211,
+              "metric_value": 20
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "check_name": "fan_in",
+      "description": "Checks afferent coupling: how many other functions call each function",
+      "check_type": "standard",
+      "total_entities_checked": 194,
+      "findings_count": 0,
+      "warning_count": 0,
+      "score": 1.0,
+      "finding_groups": []
+    },
+    {
+      "check_name": "god_class",
+      "description": "Detects classes with too many methods, too much code, or too many outgoing dependencies",
+      "check_type": "standard",
+      "total_entities_checked": 32,
+      "findings_count": 2,
+      "warning_count": 2,
+      "score": 0.9375,
+      "finding_groups": [
+        {
+          "severity": "warning",
+          "threshold": 25,
+          "description": "Classes exceeding god class criteria (methods, LOC, or fan-out)",
+          "entities": [
+            {
+              "entity_name": "packages.markitdown.src.markitdown._markitdown.MarkItDown",
+              "file_path": "packages/markitdown/src/markitdown/_markitdown.py",
+              "metric_value": 686.0
+            },
+            {
+              "entity_name": "packages.markitdown.src.markitdown.converter_utils.docx.math.omml.oMath2Latex",
+              "file_path": "packages/markitdown/src/markitdown/converter_utils/docx/math/omml.py",
+              "metric_value": 30.0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "check_name": "circular_dependencies",
+      "description": "Detects circular dependencies between packages",
+      "check_type": "circular_dependencies",
+      "cycles": [
+        "packages.markitdown.src.markitdown -> packages.markitdown.src.markitdown.converters -> packages.markitdown.src.markitdown"
+      ],
+      "packages_checked": 8,
+      "packages_in_cycles": 2
+    },
+    {
+      "check_name": "package_instability",
+      "description": "Computes Martin's instability metric (I = Ce / (Ca + Ce)) per package",
+      "check_type": "standard",
+      "total_entities_checked": 4,
+      "findings_count": 0,
+      "warning_count": 0,
+      "score": 1.0,
+      "finding_groups": []
+    },
+    {
+      "check_name": "component_cohesion",
+      "description": "Measures internal vs external edge ratio per component/cluster",
+      "check_type": "standard",
+      "total_entities_checked": 16,
+      "findings_count": 0,
+      "warning_count": 0,
+      "score": 1.0,
+      "finding_groups": []
+    },
+    {
+      "check_name": "unused_code_diagnostics",
+      "description": "Detects unused imports, variables, functions, and dead code via LSP diagnostics",
+      "check_type": "standard",
+      "total_entities_checked": 121,
+      "findings_count": 121,
+      "warning_count": 10,
+      "score": 0.0,
+      "finding_groups": [
+        {
+          "severity": "info",
+          "threshold": 0,
+          "description": "Variables declared but never used",
+          "entities": [
+            {
+              "entity_name": "[unused_variable] \"file_stream\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/_base_converter.py",
+              "line_start": 47,
+              "line_end": 47,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"stream_info\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/_base_converter.py",
+              "line_start": 48,
+              "line_end": 48,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/_base_converter.py",
+              "line_start": 49,
+              "line_end": 49,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"file_stream\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/_base_converter.py",
+              "line_start": 86,
+              "line_end": 86,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"stream_info\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/_base_converter.py",
+              "line_start": 87,
+              "line_end": 87,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/_base_converter.py",
+              "line_start": 88,
+              "line_end": 88,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"entry_points\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/_markitdown.py",
+              "line_start": 9,
+              "line_end": 9,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"_plugins\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/_markitdown.py",
+              "line_start": 62,
+              "line_end": 62,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"file_stream\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_audio_converter.py",
+              "line_start": 30,
+              "line_end": 30,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_audio_converter.py",
+              "line_start": 32,
+              "line_end": 32,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"file_stream\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_bing_serp_converter.py",
+              "line_start": 31,
+              "line_end": 31,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_bing_serp_converter.py",
+              "line_start": 33,
+              "line_end": 33,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"file_stream\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_csv_converter.py",
+              "line_start": 25,
+              "line_end": 25,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_csv_converter.py",
+              "line_start": 27,
+              "line_end": 27,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_csv_converter.py",
+              "line_start": 42,
+              "line_end": 42,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"file_stream\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_doc_intel_converter.py",
+              "line_start": 191,
+              "line_end": 191,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_doc_intel_converter.py",
+              "line_start": 193,
+              "line_end": 193,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_doc_intel_converter.py",
+              "line_start": 241,
+              "line_end": 241,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"io\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_docx_converter.py",
+              "line_start": 2,
+              "line_end": 2,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"warn\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_docx_converter.py",
+              "line_start": 3,
+              "line_end": 3,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"file_stream\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_docx_converter.py",
+              "line_start": 42,
+              "line_end": 42,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_docx_converter.py",
+              "line_start": 44,
+              "line_end": 44,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"stream_info\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_docx_converter.py",
+              "line_start": 61,
+              "line_end": 61,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"file_stream\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_epub_converter.py",
+              "line_start": 37,
+              "line_end": 37,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_epub_converter.py",
+              "line_start": 39,
+              "line_end": 39,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"stream_info\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_epub_converter.py",
+              "line_start": 56,
+              "line_end": 56,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_epub_converter.py",
+              "line_start": 57,
+              "line_end": 57,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"file_stream\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_html_converter.py",
+              "line_start": 26,
+              "line_end": 26,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_html_converter.py",
+              "line_start": 28,
+              "line_end": 28,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"file_stream\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_image_converter.py",
+              "line_start": 23,
+              "line_end": 23,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_image_converter.py",
+              "line_start": 25,
+              "line_end": 25,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"e\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_image_converter.py",
+              "line_start": 112,
+              "line_end": 112,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_ipynb_converter.py",
+              "line_start": 22,
+              "line_end": 22,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_ipynb_converter.py",
+              "line_start": 50,
+              "line_end": 50,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_outlook_msg_converter.py",
+              "line_start": 36,
+              "line_end": 36,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"e\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_outlook_msg_converter.py",
+              "line_start": 66,
+              "line_end": 66,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"stream_info\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_outlook_msg_converter.py",
+              "line_start": 76,
+              "line_end": 76,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_outlook_msg_converter.py",
+              "line_start": 77,
+              "line_end": 77,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"_to_markdown_table\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_pdf_converter.py",
+              "line_start": 78,
+              "line_end": 78,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"_extract_tables_from_words\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_pdf_converter.py",
+              "line_start": 398,
+              "line_end": 398,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"file_stream\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_pdf_converter.py",
+              "line_start": 504,
+              "line_end": 504,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_pdf_converter.py",
+              "line_start": 506,
+              "line_end": 506,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"stream_info\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_pdf_converter.py",
+              "line_start": 523,
+              "line_end": 523,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_pdf_converter.py",
+              "line_start": 524,
+              "line_end": 524,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"_dependency_exc_info\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_plain_text_converter.py",
+              "line_start": 10,
+              "line_end": 10,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"_dependency_exc_info\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_plain_text_converter.py",
+              "line_start": 15,
+              "line_end": 15,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"mammoth\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_plain_text_converter.py",
+              "line_start": 12,
+              "line_end": 12,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"file_stream\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_plain_text_converter.py",
+              "line_start": 38,
+              "line_end": 38,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_plain_text_converter.py",
+              "line_start": 40,
+              "line_end": 40,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_plain_text_converter.py",
+              "line_start": 64,
+              "line_end": 64,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"attrgetter\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_pptx_converter.py",
+              "line_start": 9,
+              "line_end": 9,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"file_stream\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_pptx_converter.py",
+              "line_start": 45,
+              "line_end": 45,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_pptx_converter.py",
+              "line_start": 47,
+              "line_end": 47,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"stream_info\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_pptx_converter.py",
+              "line_start": 64,
+              "line_end": 64,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_rss_converter.py",
+              "line_start": 40,
+              "line_end": 40,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"stream_info\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_rss_converter.py",
+              "line_start": 87,
+              "line_end": 87,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"file_stream\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_wikipedia_converter.py",
+              "line_start": 25,
+              "line_end": 25,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_wikipedia_converter.py",
+              "line_start": 27,
+              "line_end": 27,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"openpyxl\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_xlsx_converter.py",
+              "line_start": 13,
+              "line_end": 13,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"xlrd\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_xlsx_converter.py",
+              "line_start": 20,
+              "line_end": 20,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"file_stream\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_xlsx_converter.py",
+              "line_start": 47,
+              "line_end": 47,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_xlsx_converter.py",
+              "line_start": 49,
+              "line_end": 49,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"stream_info\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_xlsx_converter.py",
+              "line_start": 66,
+              "line_end": 66,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"file_stream\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_xlsx_converter.py",
+              "line_start": 109,
+              "line_end": 109,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_xlsx_converter.py",
+              "line_start": 111,
+              "line_end": 111,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"stream_info\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_xlsx_converter.py",
+              "line_start": 128,
+              "line_end": 128,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"file_stream\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_youtube_converter.py",
+              "line_start": 42,
+              "line_end": 42,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_youtube_converter.py",
+              "line_start": 44,
+              "line_end": 44,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"file_stream\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_zip_converter.py",
+              "line_start": 71,
+              "line_end": 71,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_zip_converter.py",
+              "line_start": 73,
+              "line_end": 73,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_zip_converter.py",
+              "line_start": 91,
+              "line_end": 91,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"e\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converter_utils/docx/math/omml.py",
+              "line_start": 108,
+              "line_end": 108,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"stag\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converter_utils/docx/math/omml.py",
+              "line_start": 119,
+              "line_end": 119,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"elm\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converter_utils/docx/math/omml.py",
+              "line_start": 123,
+              "line_end": 123,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"elm\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converter_utils/docx/math/omml.py",
+              "line_start": 149,
+              "line_end": 149,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"elm\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converter_utils/docx/math/omml.py",
+              "line_start": 234,
+              "line_end": 234,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"e\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converter_utils/docx/math/omml.py",
+              "line_start": 270,
+              "line_end": 270,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"stag\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converter_utils/docx/math/omml.py",
+              "line_start": 308,
+              "line_end": 308,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"e\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converter_utils/docx/math/omml.py",
+              "line_start": 341,
+              "line_end": 341,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"stag\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converter_utils/docx/math/omml.py",
+              "line_start": 353,
+              "line_end": 353,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"e\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converter_utils/docx/math/omml.py",
+              "line_start": 362,
+              "line_end": 362,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"e\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_llm_caption.py",
+              "line_start": 24,
+              "line_end": 24,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"_CustomMarkdownify\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_markdownify.py",
+              "line_start": 8,
+              "line_end": 8,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_markdownify.py",
+              "line_start": 30,
+              "line_end": 30,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"convert_as_inline\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_markdownify.py",
+              "line_start": 43,
+              "line_end": 43,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_markdownify.py",
+              "line_start": 44,
+              "line_end": 44,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"text\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_markdownify.py",
+              "line_start": 88,
+              "line_end": 88,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_markdownify.py",
+              "line_start": 90,
+              "line_end": 90,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"text\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_markdownify.py",
+              "line_start": 115,
+              "line_end": 115,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"convert_as_inline\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_markdownify.py",
+              "line_start": 116,
+              "line_end": 116,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_markdownify.py",
+              "line_start": 117,
+              "line_end": 117,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"app\" is not accessed",
+              "file_path": "packages/markitdown-mcp/src/markitdown_mcp/__main__.py",
+              "line_start": 61,
+              "line_end": 61,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"file_stream\" is not accessed",
+              "file_path": "packages/markitdown-ocr/src/markitdown_ocr/_docx_converter_with_ocr.py",
+              "line_start": 46,
+              "line_end": 46,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown-ocr/src/markitdown_ocr/_docx_converter_with_ocr.py",
+              "line_start": 48,
+              "line_end": 48,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"stream_info\" is not accessed",
+              "file_path": "packages/markitdown-ocr/src/markitdown_ocr/_docx_converter_with_ocr.py",
+              "line_start": 66,
+              "line_end": 66,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"match\" is not accessed",
+              "file_path": "packages/markitdown-ocr/src/markitdown_ocr/_docx_converter_with_ocr.py",
+              "line_start": 175,
+              "line_end": 175,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown-ocr/src/markitdown_ocr/_ocr_service.py",
+              "line_start": 53,
+              "line_end": 53,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"file_stream\" is not accessed",
+              "file_path": "packages/markitdown-ocr/src/markitdown_ocr/_pdf_converter_with_ocr.py",
+              "line_start": 141,
+              "line_end": 141,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown-ocr/src/markitdown_ocr/_pdf_converter_with_ocr.py",
+              "line_start": 143,
+              "line_end": 143,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"stream_info\" is not accessed",
+              "file_path": "packages/markitdown-ocr/src/markitdown_ocr/_pdf_converter_with_ocr.py",
+              "line_start": 161,
+              "line_end": 161,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"file_stream\" is not accessed",
+              "file_path": "packages/markitdown-ocr/src/markitdown_ocr/_pptx_converter_with_ocr.py",
+              "line_start": 37,
+              "line_end": 37,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown-ocr/src/markitdown_ocr/_pptx_converter_with_ocr.py",
+              "line_start": 39,
+              "line_end": 39,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"stream_info\" is not accessed",
+              "file_path": "packages/markitdown-ocr/src/markitdown_ocr/_pptx_converter_with_ocr.py",
+              "line_start": 57,
+              "line_end": 57,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"file_stream\" is not accessed",
+              "file_path": "packages/markitdown-ocr/src/markitdown_ocr/_xlsx_converter_with_ocr.py",
+              "line_start": 40,
+              "line_end": 40,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown-ocr/src/markitdown_ocr/_xlsx_converter_with_ocr.py",
+              "line_start": 42,
+              "line_end": 42,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"stream_info\" is not accessed",
+              "file_path": "packages/markitdown-ocr/src/markitdown_ocr/_xlsx_converter_with_ocr.py",
+              "line_start": 60,
+              "line_end": 60,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown-sample-plugin/src/markitdown_sample_plugin/_plugin.py",
+              "line_start": 25,
+              "line_end": 25,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"file_stream\" is not accessed",
+              "file_path": "packages/markitdown-sample-plugin/src/markitdown_sample_plugin/_plugin.py",
+              "line_start": 41,
+              "line_end": 41,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown-sample-plugin/src/markitdown_sample_plugin/_plugin.py",
+              "line_start": 43,
+              "line_end": 43,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_variable] \"kwargs\" is not accessed",
+              "file_path": "packages/markitdown-sample-plugin/src/markitdown_sample_plugin/_plugin.py",
+              "line_start": 61,
+              "line_end": 61,
+              "metric_value": 0.0
+            }
+          ]
+        },
+        {
+          "severity": "warning",
+          "threshold": 0,
+          "description": "Unused import statements that should be removed",
+          "entities": [
+            {
+              "entity_name": "[unused_import] Import \"entry_points\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/_markitdown.py",
+              "line_start": 9,
+              "line_end": 9,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_import] Import \"io\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_docx_converter.py",
+              "line_start": 2,
+              "line_end": 2,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_import] Import \"warn\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_docx_converter.py",
+              "line_start": 3,
+              "line_end": 3,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_import] Import \"mammoth\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_plain_text_converter.py",
+              "line_start": 12,
+              "line_end": 12,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_import] Import \"attrgetter\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_pptx_converter.py",
+              "line_start": 9,
+              "line_end": 9,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_import] Import \"openpyxl\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_xlsx_converter.py",
+              "line_start": 13,
+              "line_end": 13,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_import] Import \"xlrd\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_xlsx_converter.py",
+              "line_start": 20,
+              "line_end": 20,
+              "metric_value": 0.0
+            }
+          ]
+        },
+        {
+          "severity": "warning",
+          "threshold": 0,
+          "description": "Functions/methods defined but never called",
+          "entities": [
+            {
+              "entity_name": "[unused_function] Function \"_to_markdown_table\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_pdf_converter.py",
+              "line_start": 78,
+              "line_end": 78,
+              "metric_value": 0.0
+            },
+            {
+              "entity_name": "[unused_function] Function \"_extract_tables_from_words\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_pdf_converter.py",
+              "line_start": 398,
+              "line_end": 398,
+              "metric_value": 0.0
+            }
+          ]
+        },
+        {
+          "severity": "warning",
+          "threshold": 0,
+          "description": "Classes defined but never instantiated",
+          "entities": [
+            {
+              "entity_name": "[unused_class] Class \"_CustomMarkdownify\" is not accessed",
+              "file_path": "packages/markitdown/src/markitdown/converters/_markdownify.py",
+              "line_start": 8,
+              "line_end": 8,
+              "metric_value": 0.0
+            }
+          ]
+        },
+        {
+          "severity": "info",
+          "threshold": 0,
+          "description": "Code that cannot be reached during execution",
+          "entities": [
+            {
+              "entity_name": "[unreachable_code] Type analysis indicates code is unreachable",
+              "file_path": "packages/markitdown-mcp/src/markitdown_mcp/__main__.py",
+              "line_start": 113,
+              "line_end": 113,
+              "metric_value": 0.0
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "file_summaries": [
+    {
+      "file_path": "packages/markitdown/src/markitdown/_markitdown.py",
+      "total_findings": 5,
+      "warning_findings": 3,
+      "composite_risk_score": 65.0
+    },
+    {
+      "file_path": "packages/markitdown/src/markitdown/converters/_docx_converter.py",
+      "total_findings": 7,
+      "warning_findings": 2,
+      "composite_risk_score": 60.0
+    },
+    {
+      "file_path": "packages/markitdown/src/markitdown/converters/_pdf_converter.py",
+      "total_findings": 8,
+      "warning_findings": 2,
+      "composite_risk_score": 60.0
+    },
+    {
+      "file_path": "packages/markitdown/src/markitdown/converters/_xlsx_converter.py",
+      "total_findings": 10,
+      "warning_findings": 2,
+      "composite_risk_score": 60.0
+    },
+    {
+      "file_path": "packages/markitdown/src/markitdown/converter_utils/docx/math/omml.py",
+      "total_findings": 11,
+      "warning_findings": 1,
+      "composite_risk_score": 55.0
+    },
+    {
+      "file_path": "packages/markitdown/src/markitdown/converters/_plain_text_converter.py",
+      "total_findings": 7,
+      "warning_findings": 1,
+      "composite_risk_score": 55.0
+    },
+    {
+      "file_path": "packages/markitdown/src/markitdown/converters/_pptx_converter.py",
+      "total_findings": 5,
+      "warning_findings": 1,
+      "composite_risk_score": 55.0
+    },
+    {
+      "file_path": "packages/markitdown/src/markitdown/converters/_markdownify.py",
+      "total_findings": 10,
+      "warning_findings": 1,
+      "composite_risk_score": 55.0
+    },
+    {
+      "file_path": "packages/markitdown/src/markitdown/_base_converter.py",
+      "total_findings": 6,
+      "warning_findings": 0,
+      "composite_risk_score": 50.0
+    },
+    {
+      "file_path": "packages/markitdown/src/markitdown/converters/_epub_converter.py",
+      "total_findings": 4,
+      "warning_findings": 0,
+      "composite_risk_score": 40.0
+    },
+    {
+      "file_path": "packages/markitdown/src/markitdown/converters/_outlook_msg_converter.py",
+      "total_findings": 4,
+      "warning_findings": 0,
+      "composite_risk_score": 40.0
+    },
+    {
+      "file_path": "packages/markitdown-ocr/src/markitdown_ocr/_docx_converter_with_ocr.py",
+      "total_findings": 4,
+      "warning_findings": 0,
+      "composite_risk_score": 40.0
+    },
+    {
+      "file_path": "packages/markitdown-sample-plugin/src/markitdown_sample_plugin/_plugin.py",
+      "total_findings": 4,
+      "warning_findings": 0,
+      "composite_risk_score": 40.0
+    },
+    {
+      "file_path": "packages/markitdown/src/markitdown/converters/_csv_converter.py",
+      "total_findings": 3,
+      "warning_findings": 0,
+      "composite_risk_score": 30.0
+    },
+    {
+      "file_path": "packages/markitdown/src/markitdown/converters/_doc_intel_converter.py",
+      "total_findings": 3,
+      "warning_findings": 0,
+      "composite_risk_score": 30.0
+    },
+    {
+      "file_path": "packages/markitdown/src/markitdown/converters/_image_converter.py",
+      "total_findings": 3,
+      "warning_findings": 0,
+      "composite_risk_score": 30.0
+    },
+    {
+      "file_path": "packages/markitdown/src/markitdown/converters/_zip_converter.py",
+      "total_findings": 3,
+      "warning_findings": 0,
+      "composite_risk_score": 30.0
+    },
+    {
+      "file_path": "packages/markitdown-ocr/src/markitdown_ocr/_pdf_converter_with_ocr.py",
+      "total_findings": 3,
+      "warning_findings": 0,
+      "composite_risk_score": 30.0
+    },
+    {
+      "file_path": "packages/markitdown-ocr/src/markitdown_ocr/_pptx_converter_with_ocr.py",
+      "total_findings": 3,
+      "warning_findings": 0,
+      "composite_risk_score": 30.0
+    },
+    {
+      "file_path": "packages/markitdown-ocr/src/markitdown_ocr/_xlsx_converter_with_ocr.py",
+      "total_findings": 3,
+      "warning_findings": 0,
+      "composite_risk_score": 30.0
+    }
+  ]
+}

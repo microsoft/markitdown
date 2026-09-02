@@ -1,0 +1,6 @@
+# Managed by codeboarding-pro — ephemeral paths only.
+snapshot-worktree/
+snapshots/
+snapshot-analyze.lock
+snapshot-analyze.lock.holder
+cache/

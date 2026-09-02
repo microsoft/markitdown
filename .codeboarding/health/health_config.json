@@ -1,0 +1,42 @@
+{
+    "function_size_max": {
+        "description": "Maximum lines of code allowed in a single function before it is flagged. Range: 50-500.",
+        "value": 150
+    },
+    "fan_out_max": {
+        "description": "Maximum number of outgoing calls from a function. High fan-out indicates a function depends on too many others. Range: 5-30.",
+        "value": 10
+    },
+    "fan_in_max": {
+        "description": "Maximum number of incoming calls to a function. High fan-in means many functions depend on this one, making changes risky. Range: 5-50.",
+        "value": 10
+    },
+    "god_class_method_count_max": {
+        "description": "Maximum number of methods a class can have before being flagged as a God Class. Range: 10-50.",
+        "value": 25
+    },
+    "god_class_loc_max": {
+        "description": "Maximum lines of code in a class before being flagged as a God Class. Range: 200-1000.",
+        "value": 400
+    },
+    "god_class_fan_out_max": {
+        "description": "Maximum outgoing dependencies from a class before being flagged as a God Class. Range: 10-60.",
+        "value": 30
+    },
+    "inheritance_depth_max": {
+        "description": "Maximum depth of class inheritance hierarchy. Deep hierarchies are harder to understand. Range: 3-10.",
+        "value": 5
+    },
+    "max_cycles_reported": {
+        "description": "Maximum number of circular dependency cycles to include in the report. Range: 10-200.",
+        "value": 50
+    },
+    "instability_high": {
+        "description": "Package instability threshold (0.0 = fully stable, 1.0 = fully unstable). Packages above this value are flagged. Range: 0.5-1.0.",
+        "value": 0.8
+    },
+    "cohesion_low": {
+        "description": "Low cohesion threshold for components. Components below this value are flagged as having poor internal cohesion. Range: 0.0-0.5.",
+        "value": 0.1
+    }
+}
