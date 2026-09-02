@@ -800,12 +800,10 @@ def test_zip_stream_no_filename_header() -> None:
     result = markitdown.convert_stream(
         buf, stream_info=StreamInfo(mimetype="application/zip")
     )
-    assert result.markdown.startswith(
-        "Content from the zip file `(unknown)`:\n\n"
-    )
+    assert result.markdown.startswith("Content from the zip file `(unknown)`:\n\n")
     assert "Hello world" in result.markdown
-    
-    
+
+
 def test_ipynb_accepts_non_ascii() -> None:
     """IpynbConverter.accepts() must not raise on non-ASCII binary content."""
     from markitdown.converters._ipynb_converter import IpynbConverter
