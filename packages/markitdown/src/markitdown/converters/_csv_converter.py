@@ -73,10 +73,14 @@ class CsvConverter(DocumentConverter):
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
         # Read the file content
+        data = file_stream.read()
         if stream_info.charset:
-            content = file_stream.read().decode(stream_info.charset)
+            try:
+                content = data.decode(stream_info.charset)
+            except UnicodeDecodeError:
+                content = str(from_bytes(data).best())
         else:
-            content = str(from_bytes(file_stream.read()).best())
+            content = str(from_bytes(data).best())
 
         # Excel and other tools prepend a UTF-8 BOM to CSV exports; strip it so
         # it does not end up inside the first header cell.

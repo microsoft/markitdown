@@ -226,6 +226,20 @@ def test_data_uris() -> None:
     assert data == b"Hello, World!"
 
 
+def test_csv_falls_back_when_charset_hint_fails() -> None:
+    content = ("x" * 4096 + ",café\n").encode("utf-8")
+    result = MarkItDown().convert(
+        io.BytesIO(content),
+        stream_info=StreamInfo(
+            extension=".csv",
+            mimetype="text/csv",
+            charset="ascii",
+        ),
+    )
+
+    assert "café" in result.markdown
+
+
 def test_file_uris() -> None:
     # Test file URI with an empty host
     file_uri = "file:///path/to/file.txt"
