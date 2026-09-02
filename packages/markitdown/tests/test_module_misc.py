@@ -812,8 +812,8 @@ def test_ipynb_accepts_non_ascii() -> None:
 
     result = converter.accepts(io.BytesIO(notebook_bytes), stream_info_json)
     assert result is True
-    
-    
+
+
 def test_epub_metadata_nodevalue():
     from defusedxml.minidom import parseString
     from markitdown.converters._epub_converter import EpubConverter
