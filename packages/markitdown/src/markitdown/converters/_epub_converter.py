@@ -141,6 +141,18 @@ class EpubConverter(HtmlConverter):
         """Helper function to extract all occurrences of a tag (e.g., multiple authors)."""
         texts: List[str] = []
         for node in dom.getElementsByTagName(tag_name):
-            if node.firstChild and hasattr(node.firstChild, "nodeValue"):
-                texts.append(node.firstChild.nodeValue.strip())
+            text_parts: List[str] = []
+            self._collect_node_text(node, text_parts)
+            text_val = "".join(text_parts).strip()
+            if text_val:
+                texts.append(text_val)
         return texts
+
+    def _collect_node_text(self, node: Any, text_parts: List[str]) -> None:
+        """Recursively collect text node values from a DOM node."""
+        for child in node.childNodes:
+            if child.nodeType in (child.TEXT_NODE, child.CDATA_SECTION_NODE):
+                if child.nodeValue:
+                    text_parts.append(child.nodeValue)
+            elif child.hasChildNodes():
+                self._collect_node_text(child, text_parts)

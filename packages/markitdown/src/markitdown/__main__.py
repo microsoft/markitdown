@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: MIT
 import argparse
+import os
+import sys
 import codecs
 import io
 import sys
@@ -99,13 +101,15 @@ def main():
         "-e",
         "--endpoint",
         type=str,
-        help="Document Intelligence Endpoint. Required if using Document Intelligence.",
+        default=os.environ.get("MARKITDOWN_DOCINTEL_ENDPOINT") or None,
+        help="Document Intelligence Endpoint. Required if using Document Intelligence. Defaults to the MARKITDOWN_DOCINTEL_ENDPOINT environment variable.",
     )
 
     parser.add_argument(
         "--cu-endpoint",
         type=str,
-        help="Content Understanding Endpoint. Required if using --use-cu.",
+        default=os.environ.get("MARKITDOWN_CU_ENDPOINT") or None,
+        help="Content Understanding Endpoint. Required if using --use-cu. Defaults to the MARKITDOWN_CU_ENDPOINT environment variable.",
     )
 
     parser.add_argument(
@@ -204,7 +208,8 @@ def main():
     if args.use_docintel:
         if args.endpoint is None:
             _exit_with_error(
-                "Document Intelligence Endpoint is required when using Document Intelligence."
+                "Document Intelligence Endpoint is required when using Document Intelligence. "
+                "Pass -e/--endpoint or set MARKITDOWN_DOCINTEL_ENDPOINT."
             )
         elif args.filename is None:
             _exit_with_error("Filename is required when using Document Intelligence.")
@@ -216,9 +221,8 @@ def main():
         if args.cu_endpoint is None:
             _exit_with_error(
                 "Content Understanding Endpoint (--cu-endpoint) is required when using --use-cu."
+                "Pass --cu-endpoint or set MARKITDOWN_CU_ENDPOINT."
             )
-        elif args.filename is None:
-            _exit_with_error("Filename is required when using Content Understanding.")
 
         cu_kwargs: Dict[str, Any] = {
             "cu_endpoint": args.cu_endpoint,
