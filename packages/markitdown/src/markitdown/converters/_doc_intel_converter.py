@@ -50,6 +50,7 @@ except ImportError:
 # TODO: currently, there is a bug in the document intelligence SDK with importing the "ContentFormat" enum.
 # This constant is a temporary fix until the bug is resolved.
 CONTENT_FORMAT = "markdown"
+DEFAULT_DOCUMENT_INTELLIGENCE_API_VERSION = "2024-11-30"
 
 
 class DocumentIntelligenceFileType(str, Enum):
@@ -134,7 +135,7 @@ class DocumentIntelligenceConverter(DocumentConverter):
         self,
         *,
         endpoint: str,
-        api_version: str = "2024-07-31-preview",
+        api_version: str = DEFAULT_DOCUMENT_INTELLIGENCE_API_VERSION,
         credential: AzureKeyCredential | TokenCredential | None = None,
         file_types: List[DocumentIntelligenceFileType] = [
             DocumentIntelligenceFileType.DOCX,
@@ -152,7 +153,7 @@ class DocumentIntelligenceConverter(DocumentConverter):
 
         Args:
             endpoint (str): The endpoint for the Document Intelligence service.
-            api_version (str): The API version to use. Defaults to "2024-07-31-preview".
+            api_version (str): The API version to use. Defaults to "2024-11-30".
             credential (AzureKeyCredential | TokenCredential | None): The credential to use for authentication.
             file_types (List[DocumentIntelligenceFileType]): The file types to accept. Defaults to all supported file types.
         """
