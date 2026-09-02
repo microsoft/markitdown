@@ -42,6 +42,7 @@ from .converters import (
     DocumentIntelligenceConverter,
     ContentUnderstandingConverter,
     CsvConverter,
+    UdfConverter,
 )
 
 from ._base_converter import DocumentConverter, DocumentConverterResult
@@ -222,6 +223,7 @@ class MarkItDown:
             self.register_converter(OutlookMsgConverter())
             self.register_converter(EpubConverter())
             self.register_converter(CsvConverter())
+            self.register_converter(UdfConverter())
 
             # Register Document Intelligence converter at the top of the stack if endpoint is provided
             docintel_endpoint = kwargs.get("docintel_endpoint")
