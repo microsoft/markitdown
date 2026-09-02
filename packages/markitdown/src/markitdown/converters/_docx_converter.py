@@ -8,7 +8,7 @@ from ._html_converter import HtmlConverter
 from ..converter_utils.docx.pre_process import pre_process_docx
 from .._base_converter import DocumentConverterResult
 from .._stream_info import StreamInfo
-from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+from .._exceptions import MissingDependencyException, FileConversionException, MISSING_DEPENDENCY_MESSAGE
 
 # Try loading optional (but in this case, required) dependencies
 # Save reporting of any exceptions for later
@@ -77,7 +77,13 @@ class DocxConverter(HtmlConverter):
 
         style_map = kwargs.get("style_map", None)
         pre_process_stream = pre_process_docx(file_stream)
+        try:
+            html = mammoth.convert_to_html(pre_process_stream, style_map=style_map).value
+        except AttributeError as ex:
+            raise FileConversionException(
+                f"Failed to convert DOCX to HTML. This may be caused by a table cell merging issue "
+                f"in the document. Error: {ex}") from ex
         return self._html_converter.convert_string(
-            mammoth.convert_to_html(pre_process_stream, style_map=style_map).value,
+            html,
             **kwargs,
         )
