@@ -492,6 +492,57 @@ def _extract_tables_from_words(page: Any) -> list[list[list[str]]]:
     return [table_rows]
 
 
+def _extract_text_with_pymupdf(pdf_bytes: io.BytesIO) -> str | None:
+    """
+    Extract PDF text with PyMuPDF when it is available.
+
+    PyMuPDF is intentionally not a hard dependency of the PDF converter. This
+    fallback is used only when callers have installed it themselves.
+    """
+    try:
+        import pymupdf
+    except ImportError:
+        try:
+            import fitz as pymupdf  # type: ignore[no-redef]
+        except ImportError:
+            return None
+
+    current_position = pdf_bytes.tell()
+    try:
+        pdf_bytes.seek(0)
+        with pymupdf.open(stream=pdf_bytes.read(), filetype="pdf") as doc:
+            return "\n".join(page.get_text("text") for page in doc)
+    except Exception:
+        return None
+    finally:
+        pdf_bytes.seek(current_position)
+
+
+def _prefer_pymupdf_text_if_substantially_better(
+    markdown: str,
+    pdf_bytes: io.BytesIO,
+) -> str:
+    """
+    Prefer PyMuPDF output when pdfminer/pdfplumber likely truncated a page.
+
+    Some inline-image streams can confuse pdfminer-family tokenizers so text
+    after the image is silently dropped. PyMuPDF is used only when it returns
+    substantially more text, which avoids replacing table/form formatting for
+    ordinary PDFs where both extractors saw the same content.
+    """
+    pymupdf_text = _extract_text_with_pymupdf(pdf_bytes)
+    if not pymupdf_text:
+        return markdown
+
+    existing_len = len(markdown.strip())
+    pymupdf_len = len(pymupdf_text.strip())
+
+    if pymupdf_len > existing_len * 1.3 + 500:
+        return pymupdf_text
+
+    return markdown
+
+
 class PdfConverter(DocumentConverter):
     """
     Converts PDFs to Markdown.
@@ -582,6 +633,8 @@ class PdfConverter(DocumentConverter):
         if not markdown:
             pdf_bytes.seek(0)
             markdown = pdfminer.high_level.extract_text(pdf_bytes)
+
+        markdown = _prefer_pymupdf_text_if_substantially_better(markdown, pdf_bytes)
 
         # Post-process to merge MasterFormat-style partial numbering with following text
         markdown = _merge_partial_numbering_lines(markdown)
