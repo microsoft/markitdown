@@ -785,6 +785,35 @@ def test_markitdown_llm() -> None:
     validate_strings(result, PPTX_TEST_STRINGS)
 
 
+def test_ipynb_accepts_non_ascii() -> None:
+    """IpynbConverter.accepts() must not raise on non-ASCII binary content."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    converter = IpynbConverter()
+
+    # Binary content that is not valid UTF-8 (simulates non-ASCII file)
+    binary_data = b"\x80\x81\x82\x83"
+    stream_info = StreamInfo(mimetype="application/json", charset="utf-8")
+
+    # Should return False without raising
+    result = converter.accepts(io.BytesIO(binary_data), stream_info)
+    assert result is False
+
+    # French PDF content (UTF-8 bytes that would crash if decoded as ASCII)
+    french_bytes = "lettre d'information sur l'événement".encode("utf-8")
+    stream_info_ascii = StreamInfo(mimetype="application/json", charset="ascii")
+
+    result = converter.accepts(io.BytesIO(french_bytes), stream_info_ascii)
+    assert result is False
+
+    # Valid notebook content should still be accepted
+    notebook_bytes = b'{"nbformat": 4, "nbformat_minor": 5, "cells": []}'
+    stream_info_json = StreamInfo(mimetype="application/json", charset="utf-8")
+
+    result = converter.accepts(io.BytesIO(notebook_bytes), stream_info_json)
+    assert result is True
+
+
 def test_epub_metadata_nodevalue():
     from defusedxml.minidom import parseString
     from markitdown.converters._epub_converter import EpubConverter
@@ -965,6 +994,7 @@ if __name__ == "__main__":
         test_markitdown_exiftool,
         test_markitdown_llm_parameters,
         test_markitdown_llm,
+        test_ipynb_accepts_non_ascii,
         test_epub_metadata_nodevalue,
     ]:
         print(f"Running {test.__name__}...", end="")
