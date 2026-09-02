@@ -19,7 +19,6 @@ from markitdown.converters._cu_converter import (
     _detect_file_type,
     _canonical_mime_type,
     _content_type_for,
-    _EXTENSION_MAP,
 )
 from markitdown._stream_info import StreamInfo
 
@@ -900,7 +899,12 @@ class TestCLIArgs:
             ],
         )
         markitdown_instance.convert.assert_called_once_with(
-            "fake.pdf", stream_info=None, keep_data_uris=False
+            "fake.pdf",
+            stream_info=None,
+            keep_data_uris=False,
+            list_sheets=False,
+            sheet_selection=None,
+            interactive=False,
         )
         assert capsys.readouterr().out == "converted\n"
 

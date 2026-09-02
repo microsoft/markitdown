@@ -142,6 +142,24 @@ def main():
         help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
     )
 
+    parser.add_argument(
+        "--list-sheets",
+        action="store_true",
+        help="List all available sub-sheets in the Excel file and exit.",
+    )
+
+    parser.add_argument(
+        "--sheet",
+        action="append",
+        help="Specify a sub-sheet to convert. Can be used multiple times.",
+    )
+
+    parser.add_argument(
+        "--interactive",
+        action="store_true",
+        help="Interactively select sub-sheets to convert.",
+    )
+
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
 
@@ -254,10 +272,18 @@ def main():
             io.BytesIO(sys.stdin.buffer.read()),
             stream_info=stream_info,
             keep_data_uris=args.keep_data_uris,
+            list_sheets=args.list_sheets,
+            sheet_selection=args.sheet,
+            interactive=args.interactive,
         )
     else:
         result = markitdown.convert(
-            args.filename, stream_info=stream_info, keep_data_uris=args.keep_data_uris
+            args.filename, 
+            stream_info=stream_info, 
+            keep_data_uris=args.keep_data_uris,
+            list_sheets=args.list_sheets,
+            sheet_selection=args.sheet,
+            interactive=args.interactive,
         )
 
     _handle_output(args, result)
