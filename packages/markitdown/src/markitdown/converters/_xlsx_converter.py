@@ -1,5 +1,6 @@
+import re
 import sys
-from typing import BinaryIO, Any
+from typing import BinaryIO, Any, Dict, List, Optional, Tuple
 from ._html_converter import HtmlConverter
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
@@ -10,7 +11,7 @@ from .._stream_info import StreamInfo
 _xlsx_dependency_exc_info = None
 try:
     import pandas as pd
-    import openpyxl  # noqa: F401
+    import openpyxl
 except ImportError:
     _xlsx_dependency_exc_info = sys.exc_info()
 
@@ -31,6 +32,34 @@ ACCEPTED_XLS_MIME_TYPE_PREFIXES = [
     "application/excel",
 ]
 ACCEPTED_XLS_FILE_EXTENSIONS = [".xls"]
+
+# Regex to detect the most common currency symbols in Excel number format strings.
+_CURRENCY_PATTERN = re.compile(r"^[\$€£¥]")
+
+
+def _get_currency_symbol(format_str: Optional[str]) -> Optional[str]:
+    """Return the currency symbol if *format_str* starts with one, else None."""
+    if not format_str or format_str == "General":
+        return None
+    m = _CURRENCY_PATTERN.match(format_str)
+    return m.group(0) if m else None
+
+
+def _apply_currency_formats(df: "pd.DataFrame", ws: Any) -> None:
+    """Mutate *df* in-place: prepend currency symbols to numeric cells that
+    have a currency-style number format in the worksheet."""
+    for row_idx, row in enumerate(ws.iter_rows(min_row=2)):
+        df_row = row_idx
+        if df_row >= len(df):
+            break
+        for cell in row:
+            symbol = _get_currency_symbol(cell.number_format)
+            if symbol is None:
+                continue
+            col_name = df.columns[cell.column - 1]
+            val = df.iloc[df_row, cell.column - 1]
+            if isinstance(val, (int, float)):
+                df.iloc[df_row, cell.column - 1] = f"{symbol}{val}"
 
 
 class XlsxConverter(DocumentConverter):
@@ -80,18 +109,23 @@ class XlsxConverter(DocumentConverter):
                 _xlsx_dependency_exc_info[2]
             )
 
+        file_stream.seek(0)
+        wb = openpyxl.load_workbook(file_stream, data_only=True)
+        file_stream.seek(0)
         sheets = pd.read_excel(file_stream, sheet_name=None, engine="openpyxl")
         md_content = ""
-        for s in sheets:
-            md_content += f"## {s}\n"
-            html_content = sheets[s].to_html(index=False)
+        for sheet_name in sheets:
+            ws = wb[sheet_name]
+            _apply_currency_formats(sheets[sheet_name], ws)
+            md_content += f"## {sheet_name}\n"
+            html_content = sheets[sheet_name].to_html(index=False)
             md_content += (
                 self._html_converter.convert_string(
                     html_content, **kwargs
                 ).markdown.strip()
                 + "\n\n"
             )
-
+        wb.close()
         return DocumentConverterResult(markdown=md_content.strip())
 
 
