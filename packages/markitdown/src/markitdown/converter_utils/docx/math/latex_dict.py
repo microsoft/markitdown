@@ -50,7 +50,7 @@ CHR = {
     "\u20e8": "\\threeunderdot{{{0}}}",
     "\u20ec": "\\underrightharpoondown{{{0}}}",
     "\u20ed": "\\underleftharpoondown{{{0}}}",
-    "\u20ee": "\\underledtarrow{{{0}}}",
+    "\u20ee": "\\underleftarrow{{{0}}}",
     "\u20ef": "\\underrightarrow{{{0}}}",
     # Over | group
     "\u23b4": "\\overbracket{{{0}}}",
@@ -180,6 +180,8 @@ T = {
     "\U0001d452": "e",
     "\U0001d453": "f",
     "\U0001d454": "g",
+    # U+1D455 is reserved: the math italic small h is unified with U+210E
+    "\u210e": "h",
     "\U0001d456": "i",
     "\U0001d457": "j",
     "\U0001d458": "k",
