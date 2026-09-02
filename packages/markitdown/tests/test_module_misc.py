@@ -785,6 +785,35 @@ def test_markitdown_llm() -> None:
     validate_strings(result, PPTX_TEST_STRINGS)
 
 
+def test_epub_metadata_nodevalue():
+    from defusedxml.minidom import parseString
+    from markitdown.converters._epub_converter import EpubConverter
+
+    xml_data = (
+        '<package xmlns:dc="http://purl.org/dc/elements/1.1/">'
+        "<dc:title><span>Structured</span> Title</dc:title>"
+        "<dc:creator><name>Author 1</name></dc:creator>"
+        "<dc:creator>Author 2</dc:creator>"
+        "<dc:publisher></dc:publisher>"
+        "<dc:description/>"
+        "</package>"
+    )
+    dom = parseString(xml_data)
+    converter = EpubConverter()
+
+    title = converter._get_text_from_node(dom, "dc:title")
+    assert title == "Structured Title"
+
+    creators = converter._get_all_texts_from_nodes(dom, "dc:creator")
+    assert creators == ["Author 1", "Author 2"]
+
+    publisher = converter._get_text_from_node(dom, "dc:publisher")
+    assert publisher is None
+
+    missing = converter._get_text_from_node(dom, "dc:date")
+    assert missing is None
+
+
 def test_json_with_late_non_ascii_character(tmp_path) -> None:
     payload = {
         "record": {
@@ -804,7 +833,7 @@ def test_json_with_late_non_ascii_character(tmp_path) -> None:
 
 
 ###############################################################################
-# CSV converter: BOM handling and blank-row handling
+# CSV converter.
 ###############################################################################
 
 
@@ -856,26 +885,6 @@ def test_csv_all_blank_input_returns_empty_markdown() -> None:
     result = _convert_csv(b"\n\n\n")
 
     assert result == ""
-
-
-###############################################################################
-# CSV converter: escaping values that would otherwise break the table
-#
-# The converter builds its table by joining cells with `" | "`. Two characters
-# that are perfectly legal inside a CSV field corrupt that structure if they
-# are passed through untouched:
-#
-#   * a pipe is read as a column separator, so the row gains columns the header
-#     never declared -- a renderer discards the surplus and the data is lost;
-#   * a newline inside a quoted field ends the row early, leaving the remainder
-#     as stray text after the table.
-#
-# Escaping the pipe is itself subtle: `\|` only escapes when the run of
-# backslashes in front of the pipe has odd length, so a value that already
-# contains a backslash before the pipe has to be handled explicitly.
-#
-# Neither case raises, so both fail silently.
-###############################################################################
 
 
 def test_csv_pipe_in_cell_is_escaped() -> None:
@@ -956,6 +965,7 @@ if __name__ == "__main__":
         test_markitdown_exiftool,
         test_markitdown_llm_parameters,
         test_markitdown_llm,
+        test_epub_metadata_nodevalue,
     ]:
         print(f"Running {test.__name__}...", end="")
         test()
