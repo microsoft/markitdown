@@ -1,8 +1,10 @@
+import io
 import sys
 from typing import Any, Union, BinaryIO
 from .._stream_info import StreamInfo
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+from ._html_converter import HtmlConverter
 
 # Try loading optional (but in this case, required) dependencies
 # Save reporting of any exceptions for later
@@ -19,6 +21,11 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 ]
 
 ACCEPTED_FILE_EXTENSIONS = [".msg"]
+HTML_BODY_BINARY_STREAM = "__substg1.0_10130102"
+HTML_BODY_TEXT_STREAMS = [
+    "__substg1.0_1013001F",
+    "__substg1.0_1013001E",
+]
 
 
 class OutlookMsgConverter(DocumentConverter):
@@ -28,6 +35,9 @@ class OutlookMsgConverter(DocumentConverter):
     - Email headers (From, To, Subject)
     - Email body content
     """
+
+    def __init__(self) -> None:
+        self._html_converter = HtmlConverter()
 
     def accepts(
         self,
@@ -112,8 +122,10 @@ class OutlookMsgConverter(DocumentConverter):
 
         md_content += "\n## Content\n\n"
 
-        # Get email body
-        body = self._get_stream_data(msg, "__substg1.0_1000001F")
+        # Prefer the HTML body when it is present so Outlook tables survive as tables.
+        body = self._get_html_body(msg, **kwargs)
+        if body is None:
+            body = self._get_stream_data(msg, "__substg1.0_1000001F")
         if body:
             md_content += body
 
@@ -124,8 +136,41 @@ class OutlookMsgConverter(DocumentConverter):
             title=headers.get("Subject"),
         )
 
-    def _get_stream_data(self, msg: Any, stream_path: str) -> Union[str, None]:
-        """Helper to safely extract and decode stream data from the MSG file."""
+    def _get_html_body(self, msg: Any, **kwargs: Any) -> Union[str, None]:
+        html_data = self._get_stream_bytes(msg, HTML_BODY_BINARY_STREAM)
+        if html_data:
+            try:
+                markdown = self._html_converter.convert(
+                    io.BytesIO(html_data),
+                    StreamInfo(mimetype="text/html", extension=".html"),
+                    **kwargs,
+                ).markdown.strip()
+            except Exception:
+                markdown = None
+
+            if markdown:
+                return markdown
+
+        for stream_path in HTML_BODY_TEXT_STREAMS:
+            html_text = self._get_stream_data(msg, stream_path)
+            if not html_text:
+                continue
+
+            try:
+                markdown = self._html_converter.convert_string(
+                    html_text,
+                    **kwargs,
+                ).markdown.strip()
+            except Exception:
+                markdown = None
+
+            if markdown:
+                return markdown
+
+        return None
+
+    def _get_stream_bytes(self, msg: Any, stream_path: str) -> Union[bytes, None]:
+        """Helper to safely extract raw stream data from the MSG file."""
         assert olefile is not None
         assert isinstance(
             msg, olefile.OleFileIO
@@ -133,17 +178,24 @@ class OutlookMsgConverter(DocumentConverter):
 
         try:
             if msg.exists(stream_path):
-                data = msg.openstream(stream_path).read()
-                # Try UTF-16 first (common for .msg files)
-                try:
-                    return data.decode("utf-16-le").strip()
-                except UnicodeDecodeError:
-                    # Fall back to UTF-8
-                    try:
-                        return data.decode("utf-8").strip()
-                    except UnicodeDecodeError:
-                        # Last resort - ignore errors
-                        return data.decode("utf-8", errors="ignore").strip()
+                return msg.openstream(stream_path).read()
         except Exception:
             pass
         return None
+
+    def _get_stream_data(self, msg: Any, stream_path: str) -> Union[str, None]:
+        """Helper to safely extract and decode stream data from the MSG file."""
+        data = self._get_stream_bytes(msg, stream_path)
+        if data is None:
+            return None
+
+        # Try UTF-16 first (common for .msg files)
+        try:
+            return data.decode("utf-16-le").strip()
+        except UnicodeDecodeError:
+            # Fall back to UTF-8
+            try:
+                return data.decode("utf-8").strip()
+            except UnicodeDecodeError:
+                # Last resort - ignore errors
+                return data.decode("utf-8", errors="ignore").strip()
