@@ -1,6 +1,6 @@
 import zipfile
 from io import BytesIO
-from typing import BinaryIO
+from typing import BinaryIO, Callable, Optional
 from xml.etree import ElementTree as ET
 
 from bs4 import BeautifulSoup, Tag
@@ -115,6 +115,138 @@ def _pre_process_math(content: bytes) -> bytes:
     return str(soup).encode()
 
 
+def _build_indent_lookup(
+    numbering_content: bytes,
+) -> Callable[[str, str], Optional[int]]:
+    """
+    Builds a lookup of list level indentation from a numbering.xml part.
+
+    Args:
+        numbering_content (bytes): The XML content of the numbering part.
+
+    Returns:
+        Callable: A function mapping (numId, ilvl) to the left indent of that
+        list level, or None when either the numbering definition or the level
+        is not defined.
+    """
+    soup = BeautifulSoup(numbering_content.decode(), features="xml")
+    num_to_abstract = {
+        num["w:numId"]: num.abstractNumId["w:val"] for num in soup.find_all("num")
+    }
+    level_indents: dict[tuple[str, str], int] = {}
+    for abstract in soup.find_all("abstractNum"):
+        for level in abstract.find_all("lvl"):
+            ind = level.find("ind")
+            if ind is not None:
+                indent = ind.get("w:left") or ind.get("w:start")
+                if indent is not None:
+                    level_indents[(abstract["w:abstractNumId"], level["w:ilvl"])] = int(
+                        indent
+                    )
+
+    def indent_of(num_id: str, ilvl: str) -> Optional[int]:
+        abstract = num_to_abstract.get(num_id)
+        if abstract is None:
+            return None
+        return level_indents.get((abstract, ilvl))
+
+    return indent_of
+
+
+def _set_numbering(p: Tag, num_id: str, ilvl: int) -> None:
+    """Rewrites the numbering reference (numId, ilvl) of a paragraph."""
+    num_id_tag = p.find("numId")
+    if num_id_tag is None:
+        return
+    num_id_tag["w:val"] = num_id
+    ilvl_tag = p.find("ilvl")
+    if ilvl_tag is None:
+        num_pr = p.find("numPr")
+        if num_pr is None:
+            return
+        ilvl_tag = Tag(name="ilvl")
+        num_pr.insert(0, ilvl_tag)
+    ilvl_tag["w:val"] = str(ilvl)
+
+
+def _pre_process_nested_lists(
+    content: bytes, numbering_content: Optional[bytes]
+) -> bytes:
+    """
+    Rewrites visually-nested lists that use a separate numbering definition.
+
+    Word frequently renders sub-lists (e.g. "a) ... b) ..." below a numbered
+    item) as an independent top-level numbering definition whose visual
+    nesting comes only from its indentation in numbering.xml. Conversion
+    libraries such as mammoth flatten such lists, because the paragraphs
+    reference their own numbering definition at ilvl 0. Rewriting those
+    paragraphs to continue the parent list at a deeper ilvl preserves the
+    nesting during conversion.
+
+    A run of paragraphs is rewritten when it starts at ilvl 0 with a numId
+    different from the immediately preceding numbered paragraph, and the
+    indent of the new list level is strictly greater than the indent of the
+    preceding one.
+
+    Args:
+        content (bytes): The XML content of the document part as bytes.
+        numbering_content (Optional[bytes]): The XML content of numbering.xml,
+        or None when the document has no numbering part (the content is
+        returned unchanged in that case).
+
+    Returns:
+        bytes: The processed XML content, encoded as bytes.
+    """
+    if numbering_content is None:
+        return content
+    indent_of = _build_indent_lookup(numbering_content)
+    soup = BeautifulSoup(content.decode(), features="xml")
+
+    parent: Optional[tuple[str, int]] = None  # (numId, ilvl) of previous list item
+    rewrite_num_id: Optional[str] = None  # numId of the run being rewritten
+    rewrite_target: tuple[str, int] = ("", 0)  # (numId, level shift) to apply
+
+    for p in soup.find_all("p"):
+        num_id_tag = p.find("numId")
+        if num_id_tag is None:
+            parent = None
+            rewrite_num_id = None
+            continue
+        num_id = num_id_tag["w:val"]
+        ilvl_tag = p.find("ilvl")
+        ilvl = int(ilvl_tag["w:val"]) if ilvl_tag is not None else 0
+
+        if rewrite_num_id is not None and num_id == rewrite_num_id:
+            # Continue the nested run, shifting all of its levels.
+            new_ilvl = ilvl + rewrite_target[1]
+            _set_numbering(p, rewrite_target[0], new_ilvl)
+            parent = (rewrite_target[0], new_ilvl)
+            continue
+
+        parent_indent = (
+            indent_of(parent[0], str(parent[1])) if parent is not None else None
+        )
+        run_indent = indent_of(num_id, "0")
+        if (
+            parent is not None
+            and parent[0] != num_id
+            and ilvl == 0
+            and parent_indent is not None
+            and run_indent is not None
+            and run_indent > parent_indent
+        ):
+            rewrite_num_id = num_id
+            rewrite_target = (parent[0], parent[1] + 1)
+            new_ilvl = ilvl + rewrite_target[1]
+            _set_numbering(p, rewrite_target[0], new_ilvl)
+            parent = (rewrite_target[0], new_ilvl)
+        else:
+            rewrite_num_id = None
+            parent = (num_id, ilvl)
+
+    return str(soup).encode()
+
+
 def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
     """
     Pre-processes a DOCX file with provided steps.
@@ -138,6 +270,7 @@ def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
     ]
     with zipfile.ZipFile(input_docx, mode="r") as zip_input:
         files = {name: zip_input.read(name) for name in zip_input.namelist()}
+        numbering_content = files.get("word/numbering.xml")
         with zipfile.ZipFile(output_docx, mode="w") as zip_output:
             zip_output.comment = zip_input.comment
             for name, content in files.items():
@@ -145,6 +278,9 @@ def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
                     try:
                         # Pre-process the content
                         updated_content = _pre_process_math(content)
+                        updated_content = _pre_process_nested_lists(
+                            updated_content, numbering_content
+                        )
                         # In the future, if there are more pre-processing steps, they can be added here
                         zip_output.writestr(name, updated_content)
                     except Exception:
