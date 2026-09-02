@@ -10,7 +10,7 @@ from operator import attrgetter
 
 from ._html_converter import HtmlConverter
 from ._llm_caption import llm_caption
-from .._base_converter import DocumentConverter, DocumentConverterResult
+from .._base_converter import DocumentConverter, DocumentConverterResult, ConversionProgress
 from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 
@@ -80,10 +80,19 @@ class PptxConverter(DocumentConverter):
 
         # Perform the conversion
         presentation = pptx.Presentation(file_stream)
+        progress_callback = kwargs.get("progress_callback")
         md_content = ""
         slide_num = 0
+        total_slides = len(presentation.slides)
         for slide in presentation.slides:
             slide_num += 1
+            if progress_callback is not None:
+                progress_callback(ConversionProgress(
+                    current=slide_num,
+                    total=total_slides,
+                    unit="slide",
+                    source="PptxConverter",
+                ))
 
             md_content += f"\n\n<!-- Slide number: {slide_num} -->\n"
 

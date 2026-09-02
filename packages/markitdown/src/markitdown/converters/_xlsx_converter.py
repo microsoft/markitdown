@@ -1,7 +1,7 @@
 import sys
 from typing import BinaryIO, Any
 from ._html_converter import HtmlConverter
-from .._base_converter import DocumentConverter, DocumentConverterResult
+from .._base_converter import DocumentConverter, DocumentConverterResult, ConversionProgress
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 from .._stream_info import StreamInfo
 
@@ -81,8 +81,18 @@ class XlsxConverter(DocumentConverter):
             )
 
         sheets = pd.read_excel(file_stream, sheet_name=None, engine="openpyxl")
+        progress_callback = kwargs.get("progress_callback")
+        sheet_names = list(sheets.keys())
+        total_sheets = len(sheet_names)
         md_content = ""
-        for s in sheets:
+        for sheet_idx, s in enumerate(sheet_names):
+            if progress_callback is not None:
+                progress_callback(ConversionProgress(
+                    current=sheet_idx + 1,
+                    total=total_sheets,
+                    unit="sheet",
+                    source="XlsxConverter",
+                ))
             md_content += f"## {s}\n"
             html_content = sheets[s].to_html(index=False)
             md_content += (
@@ -143,8 +153,18 @@ class XlsConverter(DocumentConverter):
             )
 
         sheets = pd.read_excel(file_stream, sheet_name=None, engine="xlrd")
+        progress_callback = kwargs.get("progress_callback")
+        sheet_names = list(sheets.keys())
+        total_sheets = len(sheet_names)
         md_content = ""
-        for s in sheets:
+        for sheet_idx, s in enumerate(sheet_names):
+            if progress_callback is not None:
+                progress_callback(ConversionProgress(
+                    current=sheet_idx + 1,
+                    total=total_sheets,
+                    unit="sheet",
+                    source="XlsConverter",
+                ))
             md_content += f"## {s}\n"
             html_content = sheets[s].to_html(index=False)
             md_content += (

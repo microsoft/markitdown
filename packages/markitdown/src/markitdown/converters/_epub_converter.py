@@ -6,7 +6,7 @@ from xml.dom.minidom import Document
 from typing import BinaryIO, Any, Dict, List
 
 from ._html_converter import HtmlConverter
-from .._base_converter import DocumentConverterResult
+from .._base_converter import DocumentConverterResult, ConversionProgress
 from .._stream_info import StreamInfo
 
 ACCEPTED_MIME_TYPE_PREFIXES = [
@@ -99,7 +99,16 @@ class EpubConverter(HtmlConverter):
 
             # Extract and convert the content
             markdown_content: List[str] = []
-            for file in spine:
+            progress_callback = kwargs.get("progress_callback")
+            total_chapters = len(spine)
+            for chapter_idx, file in enumerate(spine):
+                if progress_callback is not None:
+                    progress_callback(ConversionProgress(
+                        current=chapter_idx + 1,
+                        total=total_chapters,
+                        unit="chapter",
+                        source="EpubConverter",
+                    ))
                 if file in z.namelist():
                     with z.open(file) as f:
                         filename = os.path.basename(file)
