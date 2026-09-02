@@ -188,6 +188,13 @@ Content Understanding is ideal when you need capabilities beyond what built-in o
 markitdown path-to-file.pdf --use-cu --cu-endpoint "<content_understanding_endpoint>"
 ```
 
+The endpoint can also be set once in the environment, so callers only need `--use-cu`:
+
+```bash
+export MARKITDOWN_CU_ENDPOINT="<content_understanding_endpoint>"
+markitdown path-to-file.pdf --use-cu
+```
+
 **Python API:**
 
 ```python
@@ -242,6 +249,13 @@ To use Microsoft Document Intelligence for conversion:
 
 ```bash
 markitdown path-to-file.pdf -o document.md -d -e "<document_intelligence_endpoint>"
+```
+
+The endpoint can also be set once in the environment, so callers only need `-d`:
+
+```bash
+export MARKITDOWN_DOCINTEL_ENDPOINT="<document_intelligence_endpoint>"
+markitdown path-to-file.pdf -o document.md -d
 ```
 
 More information about how to set up an Azure Document Intelligence Resource can be found [here](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/how-to-guides/create-document-intelligence-resource?view=doc-intel-4.0.0)
