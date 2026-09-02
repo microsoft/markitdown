@@ -49,12 +49,14 @@ all = [
   "azure-ai-documentintelligence",
   "azure-ai-contentunderstanding>=1.2.0b1",
   "azure-identity",
+  "striprtf",
 ]
 pptx = ["python-pptx"]
 docx = ["mammoth~=1.11.0", "lxml"]
 xlsx = ["pandas", "openpyxl"]
 xls = ["pandas", "xlrd"]
 pdf = ["pdfminer.six>=20251230", "pdfplumber>=0.11.9"]
+rtf = ["striprtf"]
 outlook = ["olefile"]
 audio-transcription = ["pydub", "SpeechRecognition"]
 youtube-transcription = ["youtube-transcript-api"]
