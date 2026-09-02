@@ -301,6 +301,17 @@ docker build -t markitdown:latest .
 docker run --rm -i markitdown:latest < ~/your-file.pdf > output.md
 ```
 
+### Use with AI Agents
+
+To use MarkItDown from AI applications and agents:
+
+- **MCP server** — [`packages/markitdown-mcp`](packages/markitdown-mcp) provides an official Model Context Protocol server exposing MarkItDown as a tool (e.g., for Claude Desktop).
+- **Agent Skills (community)** — for CLI-based coding agents (Claude Code and other agents supporting the [Agent Skills](https://agentskills.io) format), community-maintained skills teach the agent to invoke the `markitdown` CLI when reading documents:
+  - [coroboros/agent-skills](https://github.com/coroboros/agent-skills) (see [#1810](https://github.com/microsoft/markitdown/issues/1810))
+  - [raccioly/markitdown-skill](https://github.com/raccioly/markitdown-skill)
+
+Community tools are not maintained or endorsed by the MarkItDown team.
+
 ## Contributing
 
 This project welcomes contributions and suggestions. Most contributions require you to agree to a
