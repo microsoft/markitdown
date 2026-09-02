@@ -1,4 +1,6 @@
 import sys
+import re
+from numbers import Real
 from typing import BinaryIO, Any
 from ._html_converter import HtmlConverter
 from .._base_converter import DocumentConverter, DocumentConverterResult
@@ -10,7 +12,7 @@ from .._stream_info import StreamInfo
 _xlsx_dependency_exc_info = None
 try:
     import pandas as pd
-    import openpyxl  # noqa: F401
+    from openpyxl import load_workbook
 except ImportError:
     _xlsx_dependency_exc_info = sys.exc_info()
 
@@ -31,6 +33,101 @@ ACCEPTED_XLS_MIME_TYPE_PREFIXES = [
     "application/excel",
 ]
 ACCEPTED_XLS_FILE_EXTENSIONS = [".xls"]
+
+_CURRENCY_FORMAT_PATTERN = re.compile(r"\[\$([^\]-]+)(?:-[0-9A-Fa-f]+)?\]")
+_CURRENCY_SYMBOLS = (
+    "$",
+    "€",
+    "£",
+    "¥",
+    "₹",
+    "₩",
+    "₽",
+    "₺",
+    "₪",
+    "₫",
+    "฿",
+    "₦",
+    "₱",
+)
+
+
+def _get_currency_symbol(number_format: str) -> str | None:
+    match = _CURRENCY_FORMAT_PATTERN.search(number_format)
+    if match is not None:
+        symbol = match.group(1).replace("\\", "").strip()
+        if symbol:
+            return symbol
+
+    for symbol in _CURRENCY_SYMBOLS:
+        if symbol in number_format:
+            return symbol
+
+    return None
+
+
+def _get_decimal_places(number_format: str) -> int:
+    positive_format = number_format.split(";")[0]
+    if "." not in positive_format:
+        return 0
+
+    decimal_part = positive_format.split(".", 1)[1]
+    return len([character for character in decimal_part if character in ("0", "#")])
+
+
+def _currency_is_suffix(number_format: str, currency_symbol: str) -> bool:
+    positive_format = _CURRENCY_FORMAT_PATTERN.sub(
+        currency_symbol, number_format.split(";")[0]
+    )
+    symbol_index = positive_format.find(currency_symbol)
+    placeholder_indexes = [
+        positive_format.find(character)
+        for character in ("0", "#")
+        if positive_format.find(character) >= 0
+    ]
+
+    if symbol_index < 0 or not placeholder_indexes:
+        return False
+
+    return symbol_index > min(placeholder_indexes)
+
+
+def _format_currency_value(value: Any, number_format: str) -> str | None:
+    currency_symbol = _get_currency_symbol(number_format)
+    if (
+        currency_symbol is None
+        or not isinstance(value, Real)
+        or isinstance(value, bool)
+    ):
+        return None
+
+    decimal_places = _get_decimal_places(number_format)
+    use_grouping = "," in number_format
+    absolute_value = abs(value)
+    number = (
+        f"{absolute_value:,.{decimal_places}f}"
+        if use_grouping
+        else f"{absolute_value:.{decimal_places}f}"
+    )
+    sign = "-" if value < 0 else ""
+
+    if _currency_is_suffix(number_format, currency_symbol):
+        return f"{sign}{number} {currency_symbol}"
+
+    return f"{sign}{currency_symbol}{number}"
+
+
+def _apply_xlsx_number_formats(df: "pd.DataFrame", worksheet: Any) -> "pd.DataFrame":
+    formatted_df = df.astype(object).copy()
+
+    for row_index in range(len(formatted_df.index)):
+        for column_index in range(len(formatted_df.columns)):
+            cell = worksheet.cell(row=row_index + 2, column=column_index + 1)
+            formatted_value = _format_currency_value(cell.value, cell.number_format)
+            if formatted_value is not None:
+                formatted_df.iat[row_index, column_index] = formatted_value
+
+    return formatted_df
 
 
 class XlsxConverter(DocumentConverter):
@@ -81,10 +178,15 @@ class XlsxConverter(DocumentConverter):
             )
 
         sheets = pd.read_excel(file_stream, sheet_name=None, engine="openpyxl")
+        file_stream.seek(0)
+        workbook = load_workbook(file_stream, data_only=True, read_only=True)
+
         md_content = ""
         for s in sheets:
             md_content += f"## {s}\n"
-            html_content = sheets[s].to_html(index=False)
+            sheet = workbook[s]
+            formatted_sheet = _apply_xlsx_number_formats(sheets[s], sheet)
+            html_content = formatted_sheet.to_html(index=False)
             md_content += (
                 self._html_converter.convert_string(
                     html_content, **kwargs
