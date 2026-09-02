@@ -17,6 +17,7 @@ from ._exceptions import (
     FileConversionException,
     UnsupportedFormatException,
 )
+from .converters._xlsx_converter import XlsxConfig
 
 __all__ = [
     "__version__",
@@ -29,6 +30,7 @@ __all__ = [
     "FileConversionException",
     "UnsupportedFormatException",
     "StreamInfo",
+    "XlsxConfig",
     "PRIORITY_SPECIFIC_FILE_FORMAT",
     "PRIORITY_GENERIC_FILE_FORMAT",
 ]
