@@ -24,6 +24,28 @@ The plugin uses whatever OpenAI-compatible client you already have. Install one 
 pip install openai
 ```
 
+### Optional: Malformed PDF fallback (PyMuPDF)
+
+`markitdown-ocr` includes a fallback for PDFs that `pdfplumber` cannot open (e.g. truncated or malformed files). This fallback uses [PyMuPDF](https://pymupdf.readthedocs.io/) (`fitz`), which is licensed under **AGPL-3.0**. PyMuPDF is **not installed by default** to avoid imposing AGPL requirements on users who do not need it.
+
+To enable the malformed-PDF fallback:
+
+```bash
+pip install 'markitdown-ocr[pymupdf]'
+```
+
+Or install everything at once:
+
+```bash
+pip install 'markitdown-ocr[all]'
+```
+
+> **License notice:** Including `PyMuPDF` (via the `[pymupdf]` or `[all]` extras) adds an AGPL-3.0
+> dependency to your project. If you distribute software that links PyMuPDF, you must comply with
+> the AGPL — typically by making your application's source code available. See the
+> [PyMuPDF license](https://github.com/pymupdf/PyMuPDF?tab=AGPL-3.0-1-ov-file) for details.
+> If AGPL is incompatible with your project's license, install `markitdown-ocr` without this extra.
+
 ## Usage
 
 ### Command Line
@@ -188,7 +210,9 @@ Contributions are welcome! See the [MarkItDown repository](https://github.com/mi
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+`markitdown-ocr` itself is MIT licensed — see [LICENSE](LICENSE).
+
+**Dependency notice:** The optional `[pymupdf]` extra installs [PyMuPDF](https://github.com/pymupdf/PyMuPDF), which is **AGPL-3.0** licensed. Installing this extra is opt-in. If you do not install it, `markitdown-ocr` operates entirely under MIT-compatible licenses.
 
 ## Changelog
 
