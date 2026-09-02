@@ -42,6 +42,8 @@ from .converters import (
     DocumentIntelligenceConverter,
     ContentUnderstandingConverter,
     CsvConverter,
+    ConfluenceConverter,
+    ConfluenceStorageConverter,
 )
 
 from ._base_converter import DocumentConverter, DocumentConverterResult
@@ -208,7 +210,9 @@ class MarkItDown:
                 HtmlConverter(), priority=PRIORITY_GENERIC_FILE_FORMAT
             )
             self.register_converter(RssConverter())
+            self.register_converter(ConfluenceStorageConverter())
             self.register_converter(WikipediaConverter())
+            self.register_converter(ConfluenceConverter())
             self.register_converter(YouTubeConverter())
             self.register_converter(BingSerpConverter())
             self.register_converter(DocxConverter())
