@@ -1,3 +1,4 @@
+import re
 import sys
 import io
 from warnings import warn
@@ -77,7 +78,18 @@ class DocxConverter(HtmlConverter):
 
         style_map = kwargs.get("style_map", None)
         pre_process_stream = pre_process_docx(file_stream)
+
+        # Stop ignorin empty paragraphs
+        mammoth_result = mammoth.convert_to_html(
+            pre_process_stream, style_map=style_map, ignore_empty_paragraphs=False
+        )
+        html_content = mammoth_result.value
+        
+        #Force the Markdown parser to break the lines
+        html_content = re.sub(r"</ol>\s*<ol>", "</ol>\n\n<ol>", html_content)
+        html_content = re.sub(r"</ul>\s*<ul>", "</ul>\n\n<ul>", html_content)
+
         return self._html_converter.convert_string(
-            mammoth.convert_to_html(pre_process_stream, style_map=style_map).value,
+            html_content,
             **kwargs,
         )
