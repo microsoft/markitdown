@@ -4,6 +4,7 @@ Extracts images from PDFs and performs OCR while maintaining document context.
 """
 
 import io
+import re
 import sys
 from typing import Any, BinaryIO, Optional
 
@@ -293,6 +294,13 @@ class PdfConverterWithOCR(DocumentConverter):
                 if not markdown:
                     pdf_bytes.seek(0)
                     markdown = pdfminer.high_level.extract_text(pdf_bytes)
+
+                # If markdown contains only page headers with no extracted text and OCR is available,
+                # treat as empty so the OCR fallback below runs on the full pages.
+                if ocr_service:
+                    lines = [l.strip() for l in markdown.split("\n") if l.strip()]
+                    if lines and all(re.match(r"^## Page \d+$", l) for l in lines):
+                        markdown = ""
 
         except Exception:
             # Fallback to pdfminer
