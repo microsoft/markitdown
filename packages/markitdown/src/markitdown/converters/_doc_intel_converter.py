@@ -140,6 +140,7 @@ class DocumentIntelligenceConverter(DocumentConverter):
             DocumentIntelligenceFileType.DOCX,
             DocumentIntelligenceFileType.PPTX,
             DocumentIntelligenceFileType.XLSX,
+            DocumentIntelligenceFileType.HTML,
             DocumentIntelligenceFileType.PDF,
             DocumentIntelligenceFileType.JPEG,
             DocumentIntelligenceFileType.PNG,
