@@ -13,6 +13,7 @@ from unittest.mock import MagicMock
 
 import markitdown._uri_utils as uri_utils
 from markitdown._uri_utils import parse_data_uri, file_uri_to_path
+from markitdown.converters._wikipedia_converter import WikipediaConverter
 from markitdown._markitdown import _get_content_disposition_filename
 from markitdown.converters import RssConverter
 
@@ -22,6 +23,7 @@ from markitdown import (
     FileConversionException,
     StreamInfo,
 )
+from markitdown.converters import YouTubeConverter
 
 # This file contains module tests that are not directly tested by the FileTestVectors.
 # This includes things like helper functions and runtime conversion options
@@ -102,6 +104,32 @@ PPTX_TEST_STRINGS = [
     "a3f6004b-6f4f-4ea8-bee3-3741f4dc385f",  # chart title
     "2003",  # chart value
 ]
+
+
+def test_wikipedia_converter_no_title() -> None:
+    """WikipediaConverter should not render '# None' when page has no title."""
+    converter = WikipediaConverter()
+    html = b"<html><body><div id='mw-content-text'><p>Hello</p></div></body></html>"
+    stream_info = StreamInfo(
+        mimetype="text/html", url="https://en.wikipedia.org/wiki/Test"
+    )
+    result = converter.convert(io.BytesIO(html), stream_info)
+    assert "# None" not in result.markdown
+    assert "Hello" in result.markdown
+    assert result.markdown.strip() == "Hello"
+
+
+def test_wikipedia_converter_blank_title() -> None:
+    """WikipediaConverter should not render an empty heading for a blank title."""
+    converter = WikipediaConverter()
+    html = b"<html><head><title>   </title></head><body><div id='mw-content-text'><p>Hello</p></div></body></html>"
+    stream_info = StreamInfo(
+        mimetype="text/html", url="https://en.wikipedia.org/wiki/Test"
+    )
+    result = converter.convert(io.BytesIO(html), stream_info)
+    assert not result.markdown.lstrip().startswith("#")
+    assert result.title is None
+    assert result.text_content.strip() == "Hello"
 
 
 # --- Helper Functions ---
@@ -185,6 +213,38 @@ def test_stream_info_operations() -> None:
     assert updated_stream_info.charset == "charset.7"
     assert updated_stream_info.local_path == "local_path.1"
     assert updated_stream_info.url == "url.1"
+
+
+@pytest.mark.parametrize(
+    ("url", "video_id"),
+    [
+        ("https://www.youtube.com/watch?v=V2qZ_lgxTzg", "V2qZ_lgxTzg"),
+        ("https://youtu.be/V2qZ_lgxTzg", "V2qZ_lgxTzg"),
+        ("https://www.youtube.com/shorts/V2qZ_lgxTzg", "V2qZ_lgxTzg"),
+        ("https://www.youtube.com/embed/V2qZ_lgxTzg", "V2qZ_lgxTzg"),
+    ],
+)
+def test_youtube_converter_extracts_supported_video_ids(
+    url: str, video_id: str
+) -> None:
+    converter = YouTubeConverter()
+    assert converter._get_video_id(url) == video_id
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://www.youtube.com/watch?v=V2qZ_lgxTzg",
+        "https://youtu.be/V2qZ_lgxTzg",
+        "https://www.youtube.com/shorts/V2qZ_lgxTzg",
+    ],
+)
+def test_youtube_converter_accepts_supported_url_formats(url: str) -> None:
+    converter = YouTubeConverter()
+    assert converter.accepts(
+        io.BytesIO(b"<html></html>"),
+        StreamInfo(url=url, extension=".html"),
+    )
 
 
 def test_data_uris() -> None:
@@ -450,6 +510,223 @@ def test_docx_equations() -> None:
     # Find block equations wrapped with double $$ and check if they are present
     block_equations = re.findall(r"\$\$(.+?)\$\$", result.text_content)
     assert block_equations, "No block equations found in the document."
+
+
+def test_docx_zip_filename_casing_mismatch() -> None:
+    """Test that DOCX files with inconsistent ZIP filename casing are handled.
+
+    Some document generators produce .docx files where the central directory
+    records one casing (e.g. 'word/document.xml') but the local file headers
+    record another (e.g. 'Word/Document.XML'). Python's zipfile module raises
+    BadZipFile when reading such files. This test verifies that MarkItDown
+    handles this gracefully.
+
+    See: https://github.com/microsoft/markitdown/issues/1812
+    """
+    import struct
+
+    markitdown = MarkItDown()
+    docx_file = os.path.join(TEST_FILES_DIR, "test.docx")
+
+    # Read the original docx and get its expected content
+    original_result = markitdown.convert(docx_file)
+    assert original_result.markdown.strip(), "Original DOCX should have content"
+
+    # Read raw bytes and corrupt the local file header filenames
+    with open(docx_file, "rb") as f:
+        raw = bytearray(f.read())
+
+    # Find all local file headers and uppercase their filenames
+    corrupted = bytearray(raw)
+    offset = 0
+    patched_count = 0
+    while offset + 30 <= len(corrupted):
+        if corrupted[offset : offset + 4] != b"PK\x03\x04":
+            break
+        fname_len = struct.unpack_from("<H", corrupted, offset + 26)[0]
+        extra_len = struct.unpack_from("<H", corrupted, offset + 28)[0]
+        if offset + 30 + fname_len > len(corrupted):
+            break
+        # Uppercase the filename in the local header
+        old_name = corrupted[offset + 30 : offset + 30 + fname_len]
+        new_name = old_name.upper()
+        if old_name != new_name:
+            corrupted[offset + 30 : offset + 30 + fname_len] = new_name
+            patched_count += 1
+        comp_size = struct.unpack_from("<I", corrupted, offset + 18)[0]
+        offset = offset + 30 + fname_len + extra_len + comp_size
+
+    assert patched_count > 0, "Should have patched at least one local file header"
+
+    # Verify the corrupted file would fail with plain zipfile
+    with pytest.raises(zipfile.BadZipFile):
+        with zipfile.ZipFile(io.BytesIO(bytes(corrupted)), "r") as zf:
+            for name in zf.namelist():
+                zf.read(name)
+
+    # Verify MarkItDown can still convert it
+    corrupted_result = markitdown.convert_stream(
+        io.BytesIO(bytes(corrupted)),
+        file_extension=".docx",
+    )
+    assert (
+        corrupted_result.markdown.strip()
+    ), "Corrupted DOCX should still produce content"
+    # Content should be equivalent to the original
+    assert (
+        original_result.markdown.strip() == corrupted_result.markdown.strip()
+    ), "Corrupted DOCX should produce the same output as original"
+
+
+def test_docx_zip_filename_non_casing_mismatch_still_rejected() -> None:
+    """Only case-only local/central filename disagreements are repaired.
+
+    Equal encoded length does not imply two names differ only in case, so the
+    repair must not be used to wave through archives whose local and central
+    directory names genuinely disagree -- zipfile rejects those for good
+    reason, and honouring that keeps the workaround scoped to issue #1812.
+    """
+    import struct
+
+    from markitdown.converter_utils.docx.pre_process import (
+        _fix_zip_filename_casing,
+    )
+
+    def build_zip(first_name: str) -> bytes:
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr(first_name, b"payload-a")
+            zf.writestr("word/document.xml", b"payload-b")
+        return buf.getvalue()
+
+    def replace_first_local_name(data: bytes, new_name: bytes) -> bytes:
+        """Rewrite only the first local file header's name, leaving the central
+        directory -- the authoritative copy -- untouched."""
+        raw = bytearray(data)
+        fname_len = struct.unpack_from("<H", raw, 26)[0]
+        assert len(new_name) == fname_len, "mutation must preserve the length"
+        raw[30 : 30 + fname_len] = new_name
+        return bytes(raw)
+
+    def reads_cleanly(data: bytes) -> bool:
+        try:
+            with zipfile.ZipFile(io.BytesIO(data), "r") as zf:
+                for name in zf.namelist():
+                    zf.read(name)
+        except zipfile.BadZipFile:
+            return False
+        return True
+
+    original = "[Content_Types].xml"
+
+    # A case-only mismatch is repaired ...
+    case_only = replace_first_local_name(build_zip(original), original.upper().encode())
+    assert not reads_cleanly(case_only)
+    repaired = _fix_zip_filename_casing(io.BytesIO(case_only))
+    assert reads_cleanly(repaired.read())
+
+    # ... but an equal-length mismatch that is not case-only is left alone,
+    # so zipfile still refuses the archive.
+    for mutated_name in (
+        b"ZBnoudou^Uxqdr\\/ylm",  # unrelated, same length
+        b"[Content_Types].xmy",  # a single differing character
+        b"[content_types]/xml",  # differs only outside the cased characters
+    ):
+        data = replace_first_local_name(build_zip(original), mutated_name)
+        assert not reads_cleanly(data), f"{mutated_name!r} should not be readable"
+        result = _fix_zip_filename_casing(io.BytesIO(data))
+        assert not reads_cleanly(
+            result.read()
+        ), f"{mutated_name!r} must not be silently repaired"
+
+
+def test_docx_malformed_equations() -> None:
+    """Malformed equations should not crash the converter (issue #1979)."""
+    import zipfile
+    from io import BytesIO
+
+    docx_xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"
+            xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+            mc:Ignorable="w14 wp14">
+  <w:body>
+    <w:p>
+      <w:r><w:t>Normal text</w:t></w:r>
+    </w:p>
+    <m:oMathPara>
+      <m:oMath>
+        <m:r><m:t>x+1</m:t></m:r>
+      </m:oMath>
+    </m:oMathPara>
+    <w:p>
+      <w:r><w:t>After good equation</w:t></w:r>
+    </w:p>
+    <m:oMathPara>
+      <!-- oMathPara with no oMath child -->
+    </m:oMathPara>
+    <w:p>
+      <w:r><w:t>After empty oMathPara</w:t></w:r>
+    </w:p>
+    <m:oMath>
+      <!-- empty inline oMath -->
+    </m:oMath>
+    <w:p>
+      <w:r><w:t>After empty inline oMath</w:t></w:r>
+    </w:p>
+    <oMathPara>
+      <!-- oMath outside the math namespace: BeautifulSoup matches it by local
+           name, but the namespaced lookup in _convert_omath_to_latex does not
+           find it, so the conversion has nothing to work with -->
+      <oMath><r><t>y+2</t></r></oMath>
+    </oMathPara>
+    <w:p>
+      <w:r><w:t>After unnamespaced oMathPara</w:t></w:r>
+    </w:p>
+    <oMath><r><t>z+3</t></r></oMath>
+    <w:p>
+      <w:r><w:t>After unnamespaced oMath</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"""
+
+    buf = BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("word/document.xml", docx_xml.encode("utf-8"))
+        z.writestr(
+            "[Content_Types].xml",
+            """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>""",
+        )
+        z.writestr(
+            "word/_rels/document.xml.rels",
+            """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+</Relationships>""",
+        )
+        z.writestr(
+            "_rels/.rels",
+            """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>""",
+        )
+
+    buf.seek(0)
+    markitdown = MarkItDown()
+    result = markitdown.convert(buf)
+    assert "Normal text" in result.markdown
+    # A malformed equation must not abort the math pre-processing step, which
+    # would silently drop the LaTeX conversion of every other equation too
+    assert "$x+1$" in result.markdown or "$$x+1$$" in result.markdown
+    assert "After empty oMathPara" in result.markdown
+    assert "After empty inline oMath" in result.markdown
+    assert "After unnamespaced oMathPara" in result.markdown
+    assert "After unnamespaced oMath" in result.markdown
 
 
 def test_xlsx_legacy_show_zeroes_sheetview(tmp_path) -> None:
@@ -1301,6 +1578,60 @@ def test_csv_backslash_without_a_pipe_is_left_alone() -> None:
     assert r"| Widget | C:\temp\file.txt |" in result
 
 
+# ---------------------------------------------------------------------------
+# Regression test for issue #1960:
+# exiftool_path pointing to a nonexistent binary used to leak a raw
+# FileNotFoundError. It should now be wrapped in RuntimeError with a
+# message that includes the path.
+# ---------------------------------------------------------------------------
+
+
+def test_exiftool_metadata_with_nonexistent_binary():
+    """#1960: nonexistent exiftool_path raises RuntimeError, not FileNotFoundError."""
+    from markitdown.converters._exiftool import exiftool_metadata
+
+    exiftool_path = "/this/does/not/exist/exiftool"
+    with pytest.raises(
+        RuntimeError,
+        match=re.escape(f"Failed to invoke exiftool at {exiftool_path}"),
+    ):
+        exiftool_metadata(io.BytesIO(b""), exiftool_path=exiftool_path)
+
+
+def test_exiftool_metadata_with_no_path():
+    """Sanity check: exiftool_path=None still returns {} (early return)."""
+    from markitdown.converters._exiftool import exiftool_metadata
+
+    assert exiftool_metadata(io.BytesIO(b""), exiftool_path=None) == {}
+
+
+def test_exiftool_metadata_invocation_oserror():
+    """#1960: an OSError while running exiftool is wrapped, and the stream is restored."""
+    from unittest.mock import patch
+
+    from markitdown.converters._exiftool import exiftool_metadata
+
+    def fake_run(args, **kwargs):
+        # The version check succeeds ...
+        if "-ver" in args:
+            return SimpleNamespace(stdout="12.24\n")
+        # ... but the actual metadata invocation fails.
+        raise OSError("exiftool vanished")
+
+    exiftool_path = "/usr/bin/exiftool"
+    file_stream = io.BytesIO(b"0123456789")
+    file_stream.seek(4)
+
+    with patch("markitdown.converters._exiftool.subprocess.run", side_effect=fake_run):
+        with pytest.raises(
+            RuntimeError,
+            match=re.escape(f"Failed to invoke exiftool at {exiftool_path}"),
+        ):
+            exiftool_metadata(file_stream, exiftool_path=exiftool_path)
+
+    assert file_stream.tell() == 4
+
+
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     for test in [
@@ -1308,6 +1639,8 @@ if __name__ == "__main__":
         test_data_uris,
         test_file_uris,
         test_docx_comments,
+        test_docx_zip_filename_casing_mismatch,
+        test_docx_zip_filename_non_casing_mismatch_still_rejected,
         test_input_as_strings,
         test_markitdown_remote,
         test_speech_transcription,
@@ -1319,6 +1652,9 @@ if __name__ == "__main__":
         test_pptx_chart_no_title_text_frame,
         test_ipynb_accepts_non_ascii,
         test_epub_metadata_nodevalue,
+        test_exiftool_metadata_with_nonexistent_binary,
+        test_exiftool_metadata_with_no_path,
+        test_exiftool_metadata_invocation_oserror,
     ]:
         print(f"Running {test.__name__}...", end="")
         test()
