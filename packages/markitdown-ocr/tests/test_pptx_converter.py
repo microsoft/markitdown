@@ -9,13 +9,12 @@ OCR block format used by the converter:
     MOCK_OCR_TEXT_12345
     [End OCR]*
 
-Note: PPTX slide text uses literal backslash-n (\\n) sequences from the
-underlying PPTX converter template; OCR blocks use real newlines.
 """
 
 import sys
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 
@@ -66,8 +65,8 @@ def _convert(filename: str, ocr_service: MockOCRService) -> str:
 def test_pptx_image_start(svc: MockOCRService) -> None:
     # Slide 1: title "Welcome" followed by an image
     expected = (
-        "\\n\\n<!-- Slide number: 1 -->\\n# Welcome\\n\\n"
-        "\n*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*"
+        "<!-- Slide number: 1 -->\n# Welcome\n\n\n"
+        "*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*"
     )
     assert _convert("pptx_image_start.pptx", svc) == expected
 
@@ -80,10 +79,10 @@ def test_pptx_image_start(svc: MockOCRService) -> None:
 def test_pptx_image_middle(svc: MockOCRService) -> None:
     # Slide 1: Introduction | Slide 2: Architecture + image | Slide 3: Conclusion  # noqa: E501
     expected = (
-        "\\n\\n<!-- Slide number: 1 -->\\n# Introduction"
-        "\\n\\n\\n\\n<!-- Slide number: 2 -->\\n# Architecture\\n\\n"
-        "\n*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*"
-        "\\n\\n<!-- Slide number: 3 -->\\n# Conclusion\\n\\n"
+        "<!-- Slide number: 1 -->\n# Introduction"
+        "\n\n<!-- Slide number: 2 -->\n# Architecture\n\n\n"
+        "*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*"
+        "\n\n<!-- Slide number: 3 -->\n# Conclusion"
     )
     assert _convert("pptx_image_middle.pptx", svc) == expected
 
@@ -96,9 +95,9 @@ def test_pptx_image_middle(svc: MockOCRService) -> None:
 def test_pptx_image_end(svc: MockOCRService) -> None:
     # Slide 1: Presentation | Slide 2: Thank You + image
     expected = (
-        "\\n\\n<!-- Slide number: 1 -->\\n# Presentation"
-        "\\n\\n\\n\\n<!-- Slide number: 2 -->\\n# Thank You\\n\\n"
-        "\n*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*"
+        "<!-- Slide number: 1 -->\n# Presentation"
+        "\n\n<!-- Slide number: 2 -->\n# Thank You\n\n\n"
+        "*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*"
     )
     assert _convert("pptx_image_end.pptx", svc) == expected
 
@@ -111,8 +110,8 @@ def test_pptx_image_end(svc: MockOCRService) -> None:
 def test_pptx_multiple_images(svc: MockOCRService) -> None:
     # Slide 1: two images, no title text
     expected = (
-        "\\n\\n<!-- Slide number: 1 -->\\n# \\n"
-        "\n*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*"
+        "<!-- Slide number: 1 -->\n# \n\n"
+        "*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*"
         "\n\n*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*"
     )
     assert _convert("pptx_multiple_images.pptx", svc) == expected
@@ -125,9 +124,9 @@ def test_pptx_multiple_images(svc: MockOCRService) -> None:
 
 def test_pptx_complex_layout(svc: MockOCRService) -> None:
     expected = (
-        "\\n\\n<!-- Slide number: 1 -->\\n# Product Comparison"
-        "\\n\\nOur products lead the market\\n"
-        "\n*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*"
+        "<!-- Slide number: 1 -->\n# Product Comparison"
+        "\n\nOur products lead the market\n\n"
+        "*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*"
     )
     assert _convert("pptx_complex_layout.pptx", svc) == expected
 
@@ -146,3 +145,29 @@ def test_pptx_no_ocr_service_no_tags() -> None:
         md = converter.convert(f, StreamInfo(extension=".pptx")).text_content
     assert "*[Image OCR]" not in md
     assert "[End OCR]*" not in md
+
+
+def test_pptx_output_does_not_contain_literal_newlines(svc: MockOCRService) -> None:
+    md = _convert("pptx_image_start.pptx", svc)
+    assert "\\n" not in md
+
+
+def test_pptx_uses_core_llm_caption() -> None:
+    path = TEST_DATA_DIR / "pptx_image_start.pptx"
+    if not path.exists():
+        pytest.skip(f"Test file not found: {path}")
+
+    converter = PptxConverterWithOCR()
+    with patch(
+        "markitdown.converters._llm_caption.llm_caption", return_value="MOCK_CAPTION"
+    ) as mock_caption:
+        with open(path, "rb") as f:
+            md = converter.convert(
+                f,
+                StreamInfo(extension=".pptx"),
+                llm_client=object(),
+                llm_model="test-model",
+            ).text_content
+
+    assert "MOCK_CAPTION" in md
+    mock_caption.assert_called_once()
