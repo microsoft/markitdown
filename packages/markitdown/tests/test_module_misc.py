@@ -1024,8 +1024,8 @@ def test_pptx_chart_no_title_text_frame() -> None:
     assert "Cat 1" in result
     assert "Series 1" in result
     assert ":" not in result
-    
-    
+
+
 def test_youtube_converter_missing_title_metadata() -> None:
     """Test that YouTubeConverter converts streams with and without title metadata without raising AssertionError."""
     from unittest.mock import patch
