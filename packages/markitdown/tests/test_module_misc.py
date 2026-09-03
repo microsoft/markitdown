@@ -115,7 +115,7 @@ def test_wikipedia_converter_no_title() -> None:
     result = converter.convert(io.BytesIO(html), stream_info)
     assert "# None" not in result.markdown
     assert "Hello" in result.markdown
-    assert result.text_content.strip() == "Hello"
+    assert result.markdown.strip() == "Hello"
 
 
 def test_wikipedia_converter_blank_title() -> None:
