@@ -33,6 +33,7 @@ _UNDERLINE_STYLE_MAP = "u => u"
 def _read_embedded_style_map(file_stream: BinaryIO) -> Optional[str]:
     """Read the style map embedded in a .docx, if it has one."""
     position = file_stream.tell()
+    file_stream.seek(0)
     try:
         return mammoth.read_embedded_style_map(file_stream)
     finally:
@@ -87,15 +88,20 @@ class DocxConverter(HtmlConverter):
             )
 
         pre_process_stream = pre_process_docx(file_stream)
+
+        caller_style_map = kwargs.get("style_map")
+        embedded_style_map = _read_embedded_style_map(pre_process_stream)
+
         style_map = "\n".join(
             part
             for part in (
-                style_map,
-                _read_embedded_style_map(pre_process_stream),
+                caller_style_map,
+                embedded_style_map,
                 _UNDERLINE_STYLE_MAP,
             )
             if part
         )
+
         html_result = mammoth.convert_to_html(
             pre_process_stream,
             style_map=style_map,
