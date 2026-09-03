@@ -1,5 +1,4 @@
 import json
-import locale
 import subprocess
 from typing import Any, BinaryIO, Union
 
@@ -48,7 +47,9 @@ def exiftool_metadata(
         ).stdout
 
         return json.loads(
-            output.decode(locale.getpreferredencoding(False)),
+            output.decode(
+                "utf-8"
+            ),  # ExifTool always outputs UTF-8 encoded JSON, even if the input file is not UTF-8 encoded
         )[0]
     except OSError as e:
         raise RuntimeError(f"Failed to invoke exiftool at {exiftool_path}: {e}") from e
