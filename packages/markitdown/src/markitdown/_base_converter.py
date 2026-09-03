@@ -1,4 +1,4 @@
-from typing import Any, BinaryIO, Optional
+from typing import Any, BinaryIO, Optional, Awaitable
 from ._stream_info import StreamInfo
 
 
@@ -38,6 +38,14 @@ class DocumentConverterResult:
         """Return the converted Markdown text."""
         return self.markdown
 
+class AsyncDocumentConverterResult:
+    """The result of converting a document to Markdown."""
+
+    def __init__(
+        self,
+        text_content: Awaitable[str],
+    ):
+        self.text_content = text_content
 
 class DocumentConverter:
     """Abstract superclass of all DocumentConverters."""
