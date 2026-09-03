@@ -182,6 +182,7 @@ class PdfConverterWithOCR(DocumentConverter):
         pdf_bytes = io.BytesIO(file_stream.read())
 
         markdown_content = []
+        has_extracted_content = False
 
         try:
             with pdfplumber.open(pdf_bytes) as pdf:
@@ -269,42 +270,52 @@ class PdfConverterWithOCR(DocumentConverter):
                             for item in content_items:
                                 if item["type"] == "text":
                                     markdown_content.append(item["text"])
+                                    has_extracted_content = True
                                 else:  # image
                                     ocr_text = item["ocr_text"]
                                     img_marker = (
                                         f"\n\n*[Image OCR]\n{ocr_text}\n[End OCR]*\n"
                                     )
                                     markdown_content.append(img_marker)
+                                    has_extracted_content = True
                         else:
                             # No images detected - just extract regular text
                             text_content = page.extract_text() or ""
                             if text_content.strip():
                                 markdown_content.append(text_content.strip())
+                                has_extracted_content = True
                     else:
                         # No OCR, just extract text
                         text_content = page.extract_text() or ""
                         if text_content.strip():
                             markdown_content.append(text_content.strip())
+                            has_extracted_content = True
 
                 # Build final markdown
                 markdown = "\n\n".join(markdown_content).strip()
 
-                # Fallback to pdfminer if empty
-                if not markdown:
+                # Fallback to pdfminer if page headers are the only content.
+                if not has_extracted_content:
                     pdf_bytes.seek(0)
-                    markdown = pdfminer.high_level.extract_text(pdf_bytes)
+                    pdfminer_markdown = (
+                        pdfminer.high_level.extract_text(pdf_bytes) or ""
+                    )
+                    if pdfminer_markdown.strip():
+                        markdown = pdfminer_markdown
+                        has_extracted_content = True
 
         except Exception:
             # Fallback to pdfminer
             try:
                 pdf_bytes.seek(0)
-                markdown = pdfminer.high_level.extract_text(pdf_bytes)
+                markdown = pdfminer.high_level.extract_text(pdf_bytes) or ""
+                has_extracted_content = bool(markdown.strip())
             except Exception:
                 markdown = ""
 
         # Final fallback: If still empty/whitespace and OCR is available,
         # treat as scanned PDF and OCR full pages
-        if ocr_service and (not markdown or not markdown.strip()):
+        if ocr_service and not has_extracted_content:
             pdf_bytes.seek(0)
             markdown = self._ocr_full_pages(pdf_bytes, ocr_service)
 
