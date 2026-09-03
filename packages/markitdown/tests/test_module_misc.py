@@ -513,6 +513,19 @@ def test_docx_malformed_equations() -> None:
     <w:p>
       <w:r><w:t>After empty inline oMath</w:t></w:r>
     </w:p>
+    <oMathPara>
+      <!-- oMath outside the math namespace: BeautifulSoup matches it by local
+           name, but the namespaced lookup in _convert_omath_to_latex does not
+           find it, so the conversion has nothing to work with -->
+      <oMath><r><t>y+2</t></r></oMath>
+    </oMathPara>
+    <w:p>
+      <w:r><w:t>After unnamespaced oMathPara</w:t></w:r>
+    </w:p>
+    <oMath><r><t>z+3</t></r></oMath>
+    <w:p>
+      <w:r><w:t>After unnamespaced oMath</w:t></w:r>
+    </w:p>
   </w:body>
 </w:document>"""
 
@@ -546,9 +559,13 @@ def test_docx_malformed_equations() -> None:
     markitdown = MarkItDown()
     result = markitdown.convert(buf)
     assert "Normal text" in result.text_content
+    # A malformed equation must not abort the math pre-processing step, which
+    # would silently drop the LaTeX conversion of every other equation too
     assert "$x+1$" in result.text_content or "$$x+1$$" in result.text_content
     assert "After empty oMathPara" in result.text_content
     assert "After empty inline oMath" in result.text_content
+    assert "After unnamespaced oMathPara" in result.text_content
+    assert "After unnamespaced oMath" in result.text_content
 
 
 def test_xlsx_legacy_show_zeroes_sheetview(tmp_path) -> None:
