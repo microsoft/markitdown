@@ -1544,6 +1544,7 @@ if __name__ == "__main__":
         test_data_uris,
         test_file_uris,
         test_docx_comments,
+        test_docx_zip_filename_casing_mismatch,
         test_input_as_strings,
         test_markitdown_remote,
         test_speech_transcription,
