@@ -303,6 +303,8 @@ docker run --rm -i markitdown:latest < ~/your-file.pdf > output.md
 
 ## Contributing
 
+Before starting significant work, please read [What to Contribute](#what-to-contribute), which describes what is in and out of scope for this repository.
+
 This project welcomes contributions and suggestions. Most contributions require you to agree to a
 Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
 the rights to use your contribution. For details, visit https://cla.opensource.microsoft.com.
@@ -315,9 +317,42 @@ This project has adopted the [Microsoft Open Source Code of Conduct](https://ope
 For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
 contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
 
+### What to Contribute
+
+MarkItDown is a Python utility for converting files to Markdown for use with LLMs and related text analysis pipelines. This repository is intended to provide Python libraries that can be incorporated into other systems — not the end-user applications built on top of them.
+
+#### In scope
+
+- Improvements to the fidelity of existing converters (New formats are added sparingly -- especially if they incur new dependencies. In most cases, new formats can be better supported via [3rd-party plugins](#extending-markitdown-without-changing-this-repository).)
+- Bug fixes, performance improvements, and security fixes
+- The `markitdown` command-line interface
+- The `markitdown-mcp` package
+- Tests, documentation, and developer tooling
+
+#### Out of scope
+
+We cannot accept additional applications, services, or servers. This includes:
+
+- Web servers, REST or HTTP APIs, and hosted conversion services
+- Web frontends and browser-based user interfaces
+- Desktop and mobile applications (PyQt, PySide, Tkinter, Electron, Flutter, and similar)
+
+Projects like these are genuinely useful, and we would rather see them thrive than be turned away. If you are interested in providing a web service, API, or graphical application for MarkItDown, please maintain it as a separate package or project that depends on [`markitdown` from PyPI](https://pypi.org/project/markitdown/).
+
+### Extending MarkItDown Without Changing This Repository
+
+MarkItDown supports 3rd-party plugins, so support for a new format can be published and installed independently of this repository:
+
+```sh
+markitdown --list-plugins
+markitdown --use-plugins path-to-file.pdf
+```
+
+See `packages/markitdown-sample-plugin` to get started, and tag your repository `#markitdown-plugin` so that others can find it.
+
 ### How to Contribute
 
-You can help by looking at issues or helping review PRs. Any issue or PR is welcome, but we have also marked some as 'open for contribution' and 'open for reviewing' to help facilitate community contributions. These are of course just suggestions and you are welcome to contribute in any way you like.
+You can help by looking at issues or helping review PRs. We have also marked some issues as 'open for contribution' and PRs as 'open for reviewing' to help facilitate community contributions. These labels are suggestions; contributions within the scope described above are welcome.
 
 <div align="center">
 
@@ -360,10 +395,6 @@ MarkItDown performs I/O with the privileges of the current process. Like `open()
 **Sanitize your inputs:** Do not pass untrusted input directly to MarkItDown. If any part of the input may be controlled by an untrusted user or system, such as in hosted or server-side applications, it must be validated and restricted before calling MarkItDown. Depending on your environment, this may include restricting file paths, limiting URI schemes and network destinations, and blocking access to private, loopback, link-local, or metadata-service addresses.
 
 **Call only the conversion method you need:** Prefer the narrowest conversion API that fits your use case. MarkItDown's `convert()` method is intentionally permissive and can handle local files, remote URIs, and byte streams. If your application only needs to read local files, call `convert_local()` instead. If you need more control over URI fetching, call `requests.get()` yourself and pass the response object to `convert_response()`. For maximum control, open a stream to the input you want converted and call `convert_stream()`.
-
-### Contributing 3rd-party Plugins
-
-You can also contribute by creating and sharing 3rd party plugins. See `packages/markitdown-sample-plugin` for more details.
 
 ## Trademarks
 
