@@ -1301,31 +1301,6 @@ def test_csv_backslash_without_a_pipe_is_left_alone() -> None:
     assert r"| Widget | C:\temp\file.txt |" in result
 
 
-if __name__ == "__main__":
-    """Runs this file's tests from the command line."""
-    for test in [
-        test_stream_info_operations,
-        test_data_uris,
-        test_file_uris,
-        test_docx_comments,
-        test_input_as_strings,
-        test_markitdown_remote,
-        test_speech_transcription,
-        test_exceptions,
-        test_doc_rlink,
-        test_markitdown_exiftool,
-        test_markitdown_llm_parameters,
-        test_markitdown_llm,
-        test_pptx_chart_no_title_text_frame,
-        test_ipynb_accepts_non_ascii,
-        test_epub_metadata_nodevalue,
-    ]:
-        print(f"Running {test.__name__}...", end="")
-        test()
-        print("OK")
-    print("All tests passed!")
-
-
 # ---------------------------------------------------------------------------
 # Regression test for issue #1960:
 # exiftool_path pointing to a nonexistent binary used to leak a raw
@@ -1378,3 +1353,31 @@ def test_exiftool_metadata_invocation_oserror():
             exiftool_metadata(file_stream, exiftool_path=exiftool_path)
 
     assert file_stream.tell() == 4
+
+
+if __name__ == "__main__":
+    """Runs this file's tests from the command line."""
+    for test in [
+        test_stream_info_operations,
+        test_data_uris,
+        test_file_uris,
+        test_docx_comments,
+        test_input_as_strings,
+        test_markitdown_remote,
+        test_speech_transcription,
+        test_exceptions,
+        test_doc_rlink,
+        test_markitdown_exiftool,
+        test_markitdown_llm_parameters,
+        test_markitdown_llm,
+        test_pptx_chart_no_title_text_frame,
+        test_ipynb_accepts_non_ascii,
+        test_epub_metadata_nodevalue,
+        test_exiftool_metadata_with_nonexistent_binary,
+        test_exiftool_metadata_with_no_path,
+        test_exiftool_metadata_invocation_oserror,
+    ]:
+        print(f"Running {test.__name__}...", end="")
+        test()
+        print("OK")
+    print("All tests passed!")
