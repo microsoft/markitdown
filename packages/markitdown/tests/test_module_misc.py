@@ -545,6 +545,68 @@ def test_docx_zip_filename_casing_mismatch() -> None:
     ), "Corrupted DOCX should produce the same output as original"
 
 
+def test_docx_zip_filename_non_casing_mismatch_still_rejected() -> None:
+    """Only case-only local/central filename disagreements are repaired.
+
+    Equal encoded length does not imply two names differ only in case, so the
+    repair must not be used to wave through archives whose local and central
+    directory names genuinely disagree -- zipfile rejects those for good
+    reason, and honouring that keeps the workaround scoped to issue #1812.
+    """
+    import struct
+
+    from markitdown.converter_utils.docx.pre_process import (
+        _fix_zip_filename_casing,
+    )
+
+    def build_zip(first_name: str) -> bytes:
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr(first_name, b"payload-a")
+            zf.writestr("word/document.xml", b"payload-b")
+        return buf.getvalue()
+
+    def replace_first_local_name(data: bytes, new_name: bytes) -> bytes:
+        """Rewrite only the first local file header's name, leaving the central
+        directory -- the authoritative copy -- untouched."""
+        raw = bytearray(data)
+        fname_len = struct.unpack_from("<H", raw, 26)[0]
+        assert len(new_name) == fname_len, "mutation must preserve the length"
+        raw[30 : 30 + fname_len] = new_name
+        return bytes(raw)
+
+    def reads_cleanly(data: bytes) -> bool:
+        try:
+            with zipfile.ZipFile(io.BytesIO(data), "r") as zf:
+                for name in zf.namelist():
+                    zf.read(name)
+        except zipfile.BadZipFile:
+            return False
+        return True
+
+    original = "[Content_Types].xml"
+
+    # A case-only mismatch is repaired ...
+    case_only = replace_first_local_name(build_zip(original), original.upper().encode())
+    assert not reads_cleanly(case_only)
+    repaired = _fix_zip_filename_casing(io.BytesIO(case_only))
+    assert reads_cleanly(repaired.read())
+
+    # ... but an equal-length mismatch that is not case-only is left alone,
+    # so zipfile still refuses the archive.
+    for mutated_name in (
+        b"ZBnoudou^Uxqdr\\/ylm",  # unrelated, same length
+        b"[Content_Types].xmy",  # a single differing character
+        b"[content_types]/xml",  # differs only outside the cased characters
+    ):
+        data = replace_first_local_name(build_zip(original), mutated_name)
+        assert not reads_cleanly(data), f"{mutated_name!r} should not be readable"
+        result = _fix_zip_filename_casing(io.BytesIO(data))
+        assert not reads_cleanly(
+            result.read()
+        ), f"{mutated_name!r} must not be silently repaired"
+
+
 def test_docx_malformed_equations() -> None:
     """Malformed equations should not crash the converter (issue #1979)."""
     import zipfile
@@ -1545,6 +1607,7 @@ if __name__ == "__main__":
         test_file_uris,
         test_docx_comments,
         test_docx_zip_filename_casing_mismatch,
+        test_docx_zip_filename_non_casing_mismatch_still_rejected,
         test_input_as_strings,
         test_markitdown_remote,
         test_speech_transcription,
