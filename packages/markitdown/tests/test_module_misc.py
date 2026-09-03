@@ -898,6 +898,46 @@ def test_markitdown_llm() -> None:
     validate_strings(result, PPTX_TEST_STRINGS)
 
 
+def test_youtube_converter_missing_title_metadata() -> None:
+    """Test that YouTubeConverter converts streams with and without title metadata without raising AssertionError."""
+    from unittest.mock import patch
+    from markitdown.converters._youtube_converter import YouTubeConverter
+
+    converter = YouTubeConverter()
+    stream_info = StreamInfo(
+        mimetype="text/html",
+        extension=".html",
+        url="https://www.youtube.com/watch?v=12345",
+    )
+
+    with patch(
+        "markitdown.converters._youtube_converter.IS_YOUTUBE_TRANSCRIPT_CAPABLE",
+        False,
+    ):
+        # Case 1: Stream with no title metadata or title tag
+        html_content_no_title = b"<html><head></head><body>Video Content</body></html>"
+        stream_no_title = io.BytesIO(html_content_no_title)
+        result_no_title = converter.convert(stream_no_title, stream_info)
+        assert result_no_title.title == ""
+        assert "# YouTube" in result_no_title.markdown
+
+        # Case 2: Stream with an empty <title> tag
+        html_content_empty_title = (
+            b"<html><head><title></title></head><body>Video Content</body></html>"
+        )
+        stream_empty_title = io.BytesIO(html_content_empty_title)
+        result_empty_title = converter.convert(stream_empty_title, stream_info)
+        assert result_empty_title.title == ""
+        assert "# YouTube" in result_empty_title.markdown
+
+        # Case 3: Stream whose title is only available from the <title> tag
+        html_content_title_tag = b"<html><head><title>Fallback Title</title></head><body>Video Content</body></html>"
+        stream_title_tag = io.BytesIO(html_content_title_tag)
+        result_title_tag = converter.convert(stream_title_tag, stream_info)
+        assert result_title_tag.title == "Fallback Title"
+        assert "# YouTube" in result_title_tag.markdown
+
+
 def test_zip_stream_no_filename_header() -> None:
     """Regression test: ZipConverter must not render the literal string 'None'
     in the output header when the stream has no associated URL, local path, or
