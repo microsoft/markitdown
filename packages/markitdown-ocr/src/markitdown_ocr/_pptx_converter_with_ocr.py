@@ -5,9 +5,8 @@ Already has LLM-based image description, this enhances it with traditional OCR f
 
 import io
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, BinaryIO, Optional
-
-from typing import BinaryIO, Any, Optional
 
 from markitdown.converters import HtmlConverter
 from markitdown import DocumentConverter, DocumentConverterResult, StreamInfo
@@ -73,73 +72,123 @@ class PptxConverterWithOCR(DocumentConverter):
             kwargs.get("ocr_service") or self.ocr_service
         )
         llm_client = kwargs.get("llm_client")
+        llm_model = kwargs.get("llm_model")
+        llm_prompt = kwargs.get("llm_prompt")
 
         presentation = pptx.Presentation(file_stream)
+
+        # ── Pre-scan: collect all image shapes across all slides ──
+        # Each entry: (image_stream, content_type, filename)
+        image_entries: list[tuple[BinaryIO, str | None, str | None]] = []
+
+        for slide in presentation.slides:
+            sorted_shapes = sorted(
+                slide.shapes,
+                key=lambda x: (
+                    float("-inf") if not x.top else x.top,
+                    float("-inf") if not x.left else x.left,
+                ),
+            )
+            self._collect_image_shapes(sorted_shapes, image_entries)
+
+        # ── Parallel image processing ──
+        # image_results[i] = final text for the i-th image shape
+        image_results: list[str] = [""] * len(image_entries)
+
+        if image_entries:
+            # Round 1: Parallel LLM caption for all images
+            if llm_client and llm_model:
+                from markitdown.converters._llm_caption import llm_caption
+                import os
+
+                def _caption_one(
+                    idx: int,
+                    img_stream: BinaryIO,
+                    content_type: str | None,
+                    filename: str | None,
+                ) -> tuple[int, str]:
+                    try:
+                        image_extension = None
+                        if filename:
+                            image_extension = os.path.splitext(filename)[1]
+                        s_info = StreamInfo(
+                            mimetype=content_type,
+                            extension=image_extension,
+                            filename=filename,
+                        )
+                        result = llm_caption(
+                            img_stream,
+                            s_info,
+                            client=llm_client,
+                            model=llm_model,
+                            prompt=llm_prompt,
+                        )
+                        return idx, result or ""
+                    except Exception:
+                        return idx, ""
+
+                max_w = ocr_service.max_workers if ocr_service else 5
+                with ThreadPoolExecutor(max_workers=max_w) as executor:
+                    futures = {
+                        executor.submit(
+                            _caption_one, i, stream, ct, fn
+                        ): i
+                        for i, (stream, ct, fn) in enumerate(image_entries)
+                    }
+                    for future in as_completed(futures):
+                        idx, text = future.result()
+                        image_results[idx] = text
+
+            # Round 2: Parallel OCR for images where LLM caption failed
+            if ocr_service:
+                ocr_indices: list[int] = []
+                ocr_streams: list[tuple[BinaryIO, StreamInfo | None]] = []
+                for i in range(len(image_entries)):
+                    if not image_results[i].strip():
+                        ocr_indices.append(i)
+                        stream, _ct, _fn = image_entries[i]
+                        stream.seek(0)
+                        ocr_streams.append((stream, None))
+
+                if ocr_streams:
+                    ocr_results = ocr_service.extract_text_batch(ocr_streams)
+                    for j, result in enumerate(ocr_results):
+                        if result.text.strip():
+                            image_results[ocr_indices[j]] = result.text.strip()
+
+        # ── Render slides with cached image results ──
         md_content = ""
         slide_num = 0
+        img_cursor = [0]  # mutable counter for consuming image_results
 
         for slide in presentation.slides:
             slide_num += 1
-            md_content += f"\\n\\n<!-- Slide number: {slide_num} -->\\n"
+            md_content += f"\n\n<!-- Slide number: {slide_num} -->\n"
 
             title = slide.shapes.title
 
             def get_shape_content(shape, **kwargs):
                 nonlocal md_content
 
-                # Pictures
+                # Pictures — use pre-computed result
                 if self._is_picture(shape):
-                    # Get image data
-                    image_stream = io.BytesIO(shape.image.blob)
-
-                    # Try LLM description first if available
-                    llm_description = ""
-                    if llm_client and kwargs.get("llm_model"):
-                        try:
-                            from ._llm_caption import llm_caption
-
-                            image_filename = shape.image.filename
-                            image_extension = None
-                            if image_filename:
-                                import os
-
-                                image_extension = os.path.splitext(image_filename)[1]
-
-                            image_stream_info = StreamInfo(
-                                mimetype=shape.image.content_type,
-                                extension=image_extension,
-                                filename=image_filename,
-                            )
-
-                            llm_description = llm_caption(
-                                image_stream,
-                                image_stream_info,
-                                client=llm_client,
-                                model=kwargs.get("llm_model"),
-                                prompt=kwargs.get("llm_prompt"),
-                            )
-                        except Exception:
-                            pass
-
-                    # Try OCR if LLM failed or not available
-                    ocr_text = ""
-                    if not llm_description and ocr_service:
-                        try:
-                            image_stream.seek(0)
-                            ocr_result = ocr_service.extract_text(image_stream)
-                            if ocr_result.text.strip():
-                                ocr_text = ocr_result.text.strip()
-                        except Exception:
-                            pass
-
-                    # Format extracted content using unified OCR block format
-                    content = (llm_description or ocr_text or "").strip()
+                    idx = img_cursor[0]
+                    img_cursor[0] += 1
+                    content = (
+                        image_results[idx].strip()
+                        if idx < len(image_results)
+                        else ""
+                    )
                     if content:
-                        md_content += f"\n*[Image OCR]\n{content}\n[End OCR]*\n"
+                        md_content += (
+                            f"\n*[Image OCR]\n{content}\n[End OCR]*\n"
+                        )
 
                 # Tables
                 if self._is_table(shape):
-                    md_content += self._convert_table_to_markdown(shape.table, **kwargs)
+                    md_content += self._convert_table_to_markdown(
+                        shape.table, **kwargs
+                    )
 
                 # Charts
                 if shape.has_chart:
@@ -148,9 +197,9 @@ class PptxConverterWithOCR(DocumentConverter):
                 # Text areas
                 elif shape.has_text_frame:
                     if shape == title:
-                        md_content += "# " + shape.text.lstrip() + "\\n"
+                        md_content += "# " + shape.text.lstrip() + "\n"
                     else:
-                        md_content += shape.text + "\\n"
+                        md_content += shape.text + "\n"
 
                 # Group Shapes
                 if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.GROUP:
@@ -177,13 +226,42 @@ class PptxConverterWithOCR(DocumentConverter):
             md_content = md_content.strip()
 
             if slide.has_notes_slide:
-                md_content += "\\n\\n### Notes:\\n"
+                md_content += "\n\n### Notes:\n"
                 notes_frame = slide.notes_slide.notes_text_frame
                 if notes_frame is not None:
                     md_content += notes_frame.text
                 md_content = md_content.strip()
 
         return DocumentConverterResult(markdown=md_content.strip())
+
+    def _collect_image_shapes(
+        self,
+        shapes: Any,
+        images: list[tuple[BinaryIO, str | None, str | None]],
+    ) -> None:
+        """Recursively walk shapes and collect image data into the images list.
+        The traversal order MUST match the rendering order so that image_results
+        indices align between the pre-scan and render phases.
+        """
+        for shape in shapes:
+            if self._is_picture(shape):
+                image_stream = io.BytesIO(shape.image.blob)
+                images.append(
+                    (
+                        image_stream,
+                        shape.image.content_type,
+                        shape.image.filename,
+                    )
+                )
+            if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.GROUP:
+                sorted_sub = sorted(
+                    shape.shapes,
+                    key=lambda x: (
+                        float("-inf") if not x.top else x.top,
+                        float("-inf") if not x.left else x.left,
+                    ),
+                )
+                self._collect_image_shapes(sorted_sub, images)
 
     def _is_picture(self, shape):
         if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.PICTURE:
@@ -216,15 +294,15 @@ class PptxConverterWithOCR(DocumentConverter):
 
         return (
             self._html_converter.convert_string(html_table, **kwargs).markdown.strip()
-            + "\\n"
+            + "\n"
         )
 
     def _convert_chart_to_markdown(self, chart):
         try:
-            md = "\\n\\n### Chart"
+            md = "\n\n### Chart"
             if chart.has_title:
                 md += f": {chart.chart_title.text_frame.text}"
-            md += "\\n\\n"
+            md += "\n\n"
             data = []
             category_names = [c.label for c in chart.plots[0].categories]
             series_names = [s.name for s in chart.series]
@@ -241,9 +319,9 @@ class PptxConverterWithOCR(DocumentConverter):
                 markdown_table.append("| " + " | ".join(map(str, row)) + " |")
             header = markdown_table[0]
             separator = "|" + "|".join(["---"] * len(data[0])) + "|"
-            return md + "\\n".join([header, separator] + markdown_table[1:])
+            return md + "\n".join([header, separator] + markdown_table[1:])
         except ValueError as e:
             if "unsupported plot type" in str(e):
-                return "\\n\\n[unsupported chart]\\n\\n"
+                return "\n\n[unsupported chart]\n\n"
         except Exception:
-            return "\\n\\n[unsupported chart]\\n\\n"
+            return "\n\n[unsupported chart]\n\n"

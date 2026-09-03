@@ -4,6 +4,7 @@ Provides LLM Vision-based image text extraction.
 """
 
 import base64
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, BinaryIO
 from dataclasses import dataclass
 
@@ -28,6 +29,7 @@ class LLMVisionOCRService:
         client: Any,
         model: str,
         default_prompt: str | None = None,
+        max_workers: int = 5,
     ) -> None:
         """
         Initialize LLM Vision OCR service.
@@ -36,9 +38,11 @@ class LLMVisionOCRService:
             client: OpenAI-compatible client
             model: Model name (e.g., 'gpt-4o', 'gemini-2.0-flash')
             default_prompt: Default prompt for OCR extraction
+            max_workers: Maximum number of parallel OCR workers (default 5)
         """
         self.client = client
         self.model = model
+        self.max_workers = max_workers
         self.default_prompt = default_prompt or (
             "Extract all text from this image. "
             "Return ONLY the extracted text, maintaining the original "
@@ -108,3 +112,59 @@ class LLMVisionOCRService:
             return OCRResult(text="", backend_used="llm_vision", error=str(e))
         finally:
             image_stream.seek(0)
+
+    def extract_text_batch(
+        self,
+        images: list[tuple[BinaryIO, StreamInfo | None]],
+        prompt: str | None = None,
+        **kwargs: Any,
+    ) -> list[OCRResult]:
+        """
+        Extract text from multiple images in parallel using a thread pool.
+
+        Args:
+            images: List of (image_stream, stream_info) tuples
+            prompt: Optional prompt override (shared across all images)
+            **kwargs: Additional arguments (max_workers override, etc.)
+
+        Returns:
+            List of OCRResult, one per input image (same order as input).
+            Individual failures are captured in the OCRResult's error field
+            rather than raising an exception.
+        """
+        if not images:
+            return []
+
+        max_workers = kwargs.get("max_workers", self.max_workers)
+
+        def _process_one(
+            idx: int, img_stream: BinaryIO, stream_info: StreamInfo | None
+        ) -> tuple[int, OCRResult]:
+            """Wrapper that catches all exceptions so one failure doesn't
+            kill the entire batch."""
+            try:
+                result = self.extract_text(
+                    img_stream, prompt=prompt, stream_info=stream_info
+                )
+            except Exception as e:
+                result = OCRResult(
+                    text="", backend_used="llm_vision", error=str(e)
+                )
+            return idx, result
+
+        results: list[OCRResult | None] = [None] * len(images)
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {
+                executor.submit(_process_one, i, img, info): i
+                for i, (img, info) in enumerate(images)
+            }
+            for future in as_completed(futures):
+                idx, result = future.result()
+                results[idx] = result
+
+        # Defensive: any slot still None → empty result
+        return [
+            r if r is not None else OCRResult(text="", backend_used="llm_vision")
+            for r in results
+        ]

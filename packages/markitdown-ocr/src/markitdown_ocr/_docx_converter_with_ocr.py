@@ -127,30 +127,38 @@ class DocxConverterWithOCR(HtmlConverter):
         self, file_stream: BinaryIO, ocr_service: LLMVisionOCRService
     ) -> dict[str, str]:
         """
-        Extract images from DOCX and OCR them.
+        Extract images from DOCX and OCR them in parallel.
 
         Returns:
             Dict mapping image relationship IDs to raw OCR text (no markers).
         """
-        ocr_map = {}
+        ocr_map: dict[str, str] = {}
 
         try:
             file_stream.seek(0)
             doc = Document(file_stream)
 
+            # Phase 1: Collect all image streams with their rIds
+            image_specs: list[tuple[str, BinaryIO]] = []  # (rId, stream)
             for rel in doc.part.rels.values():
                 if "image" in rel.target_ref.lower():
                     try:
                         image_bytes = rel.target_part.blob
                         image_stream = io.BytesIO(image_bytes)
-                        ocr_result = ocr_service.extract_text(image_stream)
-
-                        if ocr_result.text.strip():
-                            # Store raw text only — markers added later
-                            ocr_map[rel.rId] = ocr_result.text.strip()
-
+                        image_specs.append((rel.rId, image_stream))
                     except Exception:
                         continue
+
+            # Phase 2: Batch OCR all images in parallel
+            if image_specs:
+                rids = [spec[0] for spec in image_specs]
+                streams = [spec[1] for spec in image_specs]
+                results = ocr_service.extract_text_batch(
+                    [(s, None) for s in streams]
+                )
+                for rId, result in zip(rids, results):
+                    if result.text.strip():
+                        ocr_map[rId] = result.text.strip()
 
         except Exception:
             pass
