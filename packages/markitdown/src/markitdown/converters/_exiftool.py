@@ -32,8 +32,10 @@ def exiftool_metadata(
                 f"ExifTool version {version_output} is vulnerable to CVE-2021-22204. "
                 "Please upgrade to version 12.24 or later."
             )
-    except (subprocess.CalledProcessError, ValueError, OSError) as e:
+    except OSError as e:
         raise RuntimeError(f"Failed to invoke exiftool at {exiftool_path}: {e}") from e
+    except (subprocess.CalledProcessError, ValueError) as e:
+        raise RuntimeError("Failed to verify ExifTool version.") from e
 
     # Run exiftool
     cur_pos = file_stream.tell()
