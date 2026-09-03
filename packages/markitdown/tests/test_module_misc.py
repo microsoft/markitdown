@@ -895,7 +895,10 @@ def test_pptx_converter_treats_none_llm_caption_as_empty(monkeypatch) -> None:
     )
 
     assert calls > 0
-    assert result.text_content is not None
+    assert (
+        "![This phrase of the caption is Human-written.](Picture4.jpg)"
+        in result.markdown
+    )
 
 
 @pytest.mark.skipif(
