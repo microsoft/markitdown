@@ -545,10 +545,10 @@ def test_docx_malformed_equations() -> None:
     buf.seek(0)
     markitdown = MarkItDown()
     result = markitdown.convert(buf)
-    assert "Normal text" in result.text_content
-    assert "$x+1$" in result.text_content or "$$x+1$$" in result.text_content
-    assert "After empty oMathPara" in result.text_content
-    assert "After empty inline oMath" in result.text_content
+    assert "Normal text" in result.markdown
+    assert "$x+1$" in result.markdown or "$$x+1$$" in result.markdown
+    assert "After empty oMathPara" in result.markdown
+    assert "After empty inline oMath" in result.markdown
 
 
 def test_xlsx_legacy_show_zeroes_sheetview(tmp_path) -> None:
