@@ -876,6 +876,31 @@ def test_exceptions() -> None:
     assert type(exc_info.value.attempts[0].converter).__name__ == "PptxConverter"
 
 
+def test_pptx_converter_treats_none_llm_caption_as_empty(monkeypatch) -> None:
+    from markitdown.converters import _pptx_converter
+
+    calls = 0
+
+    def none_caption(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return None
+
+    monkeypatch.setattr(_pptx_converter, "llm_caption", none_caption)
+
+    result = MarkItDown().convert(
+        os.path.join(TEST_FILES_DIR, "test.pptx"),
+        llm_client=MagicMock(),
+        llm_model="test-model",
+    )
+
+    assert calls > 0
+    assert (
+        "![This phrase of the caption is Human-written.](Picture4.jpg)"
+        in result.markdown
+    )
+
+
 @pytest.mark.skipif(
     skip_exiftool,
     reason="do not run if exiftool is not installed",
