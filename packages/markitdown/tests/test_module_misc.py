@@ -558,14 +558,14 @@ def test_docx_malformed_equations() -> None:
     buf.seek(0)
     markitdown = MarkItDown()
     result = markitdown.convert(buf)
-    assert "Normal text" in result.text_content
+    assert "Normal text" in result.markdown
     # A malformed equation must not abort the math pre-processing step, which
     # would silently drop the LaTeX conversion of every other equation too
-    assert "$x+1$" in result.text_content or "$$x+1$$" in result.text_content
-    assert "After empty oMathPara" in result.text_content
-    assert "After empty inline oMath" in result.text_content
-    assert "After unnamespaced oMathPara" in result.text_content
-    assert "After unnamespaced oMath" in result.text_content
+    assert "$x+1$" in result.markdown or "$$x+1$$" in result.markdown
+    assert "After empty oMathPara" in result.markdown
+    assert "After empty inline oMath" in result.markdown
+    assert "After unnamespaced oMathPara" in result.markdown
+    assert "After unnamespaced oMath" in result.markdown
 
 
 def test_xlsx_legacy_show_zeroes_sheetview(tmp_path) -> None:
