@@ -118,6 +118,19 @@ def test_wikipedia_converter_no_title() -> None:
     assert result.text_content.strip() == "Hello"
 
 
+def test_wikipedia_converter_blank_title() -> None:
+    """WikipediaConverter should not render an empty heading for a blank title."""
+    converter = WikipediaConverter()
+    html = b"<html><head><title>   </title></head><body><div id='mw-content-text'><p>Hello</p></div></body></html>"
+    stream_info = StreamInfo(
+        mimetype="text/html", url="https://en.wikipedia.org/wiki/Test"
+    )
+    result = converter.convert(io.BytesIO(html), stream_info)
+    assert not result.markdown.lstrip().startswith("#")
+    assert result.title is None
+    assert result.text_content.strip() == "Hello"
+
+
 # --- Helper Functions ---
 def validate_strings(result, expected_strings, exclude_strings=None):
     """Validate presence or absence of specific strings."""
