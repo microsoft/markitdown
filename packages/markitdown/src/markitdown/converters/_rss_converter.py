@@ -1,6 +1,6 @@
+import html
 import warnings
 
-from html import escape
 from defusedxml import minidom
 from xml.dom import Node
 from xml.dom.minidom import Document, Element
@@ -160,7 +160,7 @@ class RssConverter(DocumentConverter):
             return text
 
         # Plain text is not markup, so re-escape it before the HTML parser sees it.
-        return escape(text, quote=False)
+        return html.escape(text, quote=False)
 
     def _localize_xhtml_names(self, node: Node) -> Node:
         """Rewrite prefixed XHTML element names to their local HTML names.
