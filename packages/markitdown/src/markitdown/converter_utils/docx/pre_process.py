@@ -160,14 +160,17 @@ def _fix_zip_filename_casing(input_docx: BinaryIO) -> BinaryIO:
     # Read the central directory to get authoritative filenames
     try:
         with zipfile.ZipFile(BytesIO(raw), "r") as zf:
-            cd_entries = {zi.header_offset: zi.orig_filename for zi in zf.infolist()}
+            cd_entries = {
+                zi.header_offset: (zi.orig_filename, zi.flag_bits)
+                for zi in zf.infolist()
+            }
     except zipfile.BadZipFile:
         # Can't even read central directory — return as-is, let it fail later
         input_docx.seek(0)
         return input_docx
 
     patched = False
-    for offset, cd_name in cd_entries.items():
+    for offset, (cd_name, flag_bits) in cd_entries.items():
         # Verify local file header signature
         if offset + 30 > len(raw) or raw[offset : offset + 4] != b"PK\x03\x04":
             continue
@@ -177,7 +180,9 @@ def _fix_zip_filename_casing(input_docx: BinaryIO) -> BinaryIO:
             continue
 
         local_name = bytes(raw[offset + 30 : offset + 30 + local_fname_len])
-        central_name = cd_name.encode("utf-8")
+        # ZIP filenames are cp437 unless flag bit 11 marks them as UTF-8, which is
+        # how zipfile decoded orig_filename in the first place.
+        central_name = cd_name.encode("utf-8" if flag_bits & 0x800 else "cp437")
 
         # Only patch if lengths match but content differs (casing mismatch)
         if local_name != central_name and len(local_name) == len(central_name):
