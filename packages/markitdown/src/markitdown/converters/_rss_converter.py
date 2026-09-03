@@ -32,6 +32,35 @@ CANDIDATE_FILE_EXTENSIONS = [
 XHTML_NAMESPACE = "http://www.w3.org/1999/xhtml"
 
 
+def _atom_content_kind(content_type: str, *, allow_media_types: bool) -> str:
+    """Classify an Atom ``type`` attribute as text, html, xhtml or binary.
+
+    Text constructs (title, summary, rights) admit only the ``text``/``html``/
+    ``xhtml`` keywords, while atom:content additionally admits a MIME media
+    type -- ``text/html`` is markup, any other ``text/*`` is plain text, inline
+    XML is markup, and everything else is base64-encoded binary.
+    See RFC 4287 sections 3.1 and 4.1.3.1.
+    """
+    content_type = content_type.strip().lower()
+    if content_type in ("", "text"):
+        return "text"
+    if content_type in ("html", "xhtml"):
+        return content_type
+    if not allow_media_types:
+        # An out-of-spec type on a text construct; the safe reading is text.
+        return "text"
+
+    media_type = content_type.split(";", 1)[0].strip()
+    if media_type == "text/html":
+        return "html"
+    if media_type.endswith(("+xml", "/xml")):
+        # Inline XML, carried as child elements just like xhtml content.
+        return "xhtml"
+    if media_type.startswith("text/"):
+        return "text"
+    return "binary"
+
+
 class RssConverter(DocumentConverter):
     """Convert RSS / Atom type to markdown"""
 
@@ -147,16 +176,21 @@ class RssConverter(DocumentConverter):
             return None
 
         node = nodes[0]
-        content_type = node.getAttribute("type").lower()
-        if content_type == "xhtml":
+        kind = _atom_content_kind(
+            node.getAttribute("type"), allow_media_types=tag_name == "content"
+        )
+        if kind == "xhtml":
             return "".join(
                 self._localize_xhtml_names(child.cloneNode(True)).toxml()
                 for child in node.childNodes
                 if child.nodeType == Node.ELEMENT_NODE
             )
+        if kind == "binary":
+            # A base64-encoded payload; there is no text to render.
+            return None
 
         text = self._get_data_by_tag_name(entry, tag_name)
-        if text is None or content_type not in ("", "text"):
+        if text is None or kind == "html":
             return text
 
         # Plain text is not markup, so re-escape it before the HTML parser sees it.
