@@ -152,7 +152,7 @@ md = MarkItDown(
     llm_model="gpt-4o",
 )
 result = md.convert("document_with_images.pdf")
-print(result.text_content)
+print(result.markdown)
 ```
 
 If no `llm_client` is provided the plugin still loads, but OCR is silently skipped and the standard built-in converter is used instead.
@@ -186,6 +186,13 @@ Content Understanding is ideal when you need capabilities beyond what built-in o
 
 ```bash
 markitdown path-to-file.pdf --use-cu --cu-endpoint "<content_understanding_endpoint>"
+```
+
+The endpoint can also be set once in the environment, so callers only need `--use-cu`:
+
+```bash
+export MARKITDOWN_CU_ENDPOINT="<content_understanding_endpoint>"
+markitdown path-to-file.pdf --use-cu
 ```
 
 **Python API:**
@@ -244,6 +251,13 @@ To use Microsoft Document Intelligence for conversion:
 markitdown path-to-file.pdf -o document.md -d -e "<document_intelligence_endpoint>"
 ```
 
+The endpoint can also be set once in the environment, so callers only need `-d`:
+
+```bash
+export MARKITDOWN_DOCINTEL_ENDPOINT="<document_intelligence_endpoint>"
+markitdown path-to-file.pdf -o document.md -d
+```
+
 More information about how to set up an Azure Document Intelligence Resource can be found [here](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/how-to-guides/create-document-intelligence-resource?view=doc-intel-4.0.0)
 
 ### Python API
@@ -255,7 +269,7 @@ from markitdown import MarkItDown
 
 md = MarkItDown(enable_plugins=False) # Set to True to enable plugins
 result = md.convert("test.xlsx")
-print(result.text_content)
+print(result.markdown)
 ```
 
 Document Intelligence conversion in Python:
@@ -265,7 +279,7 @@ from markitdown import MarkItDown
 
 md = MarkItDown(docintel_endpoint="<document_intelligence_endpoint>")
 result = md.convert("test.pdf")
-print(result.text_content)
+print(result.markdown)
 ```
 
 To use Large Language Models for image descriptions (currently only for pptx and image files), provide `llm_client` and `llm_model`:
@@ -277,7 +291,7 @@ from openai import OpenAI
 client = OpenAI()
 md = MarkItDown(llm_client=client, llm_model="gpt-4o", llm_prompt="optional custom prompt")
 result = md.convert("example.jpg")
-print(result.text_content)
+print(result.markdown)
 ```
 
 ### Docker

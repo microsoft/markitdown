@@ -147,7 +147,14 @@ class PptxConverter(DocumentConverter):
                         pass
 
                     # Prepare the alt, escaping any special characters
-                    alt_text = "\n".join([llm_description, alt_text]) or shape.name
+                    alt_text = (
+                        "\n".join(
+                            text
+                            for text in [llm_description, alt_text]
+                            if text and text.strip()
+                        )
+                        or shape.name
+                    )
                     alt_text = re.sub(r"[\r\n\[\]]", " ", alt_text)
                     alt_text = re.sub(r"\s+", " ", alt_text).strip()
 
@@ -171,10 +178,11 @@ class PptxConverter(DocumentConverter):
 
                 # Text areas
                 elif shape.has_text_frame:
+                    text = shape.text or ""
                     if shape == title:
-                        md_content += "# " + shape.text.lstrip() + "\n"
+                        md_content += "# " + text.lstrip() + "\n"
                     else:
-                        md_content += shape.text + "\n"
+                        md_content += text + "\n"
 
                 # Group Shapes
                 if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.GROUP:
@@ -204,7 +212,7 @@ class PptxConverter(DocumentConverter):
                 md_content += "\n\n### Notes:\n"
                 notes_frame = slide.notes_slide.notes_text_frame
                 if notes_frame is not None:
-                    md_content += notes_frame.text
+                    md_content += notes_frame.text or ""
                 md_content = md_content.strip()
 
         return DocumentConverterResult(markdown=md_content.strip())
@@ -302,7 +310,7 @@ class PptxConverter(DocumentConverter):
     def _convert_chart_to_markdown(self, chart):
         try:
             md = "\n\n### Chart"
-            if chart.has_title:
+            if chart.has_title and chart.chart_title.text_frame is not None:
                 md += f": {chart.chart_title.text_frame.text}"
             md += "\n\n"
             data = []

@@ -55,4 +55,3 @@ def test_docintel_api_version_custom():
         mock_client.assert_called_once()
         _, kwargs = mock_client.call_args
         assert kwargs.get("api_version") == "2024-07-31-preview"
-
