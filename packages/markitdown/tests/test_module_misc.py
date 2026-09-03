@@ -1,12 +1,19 @@
 #!/usr/bin/env python3 -m pytest
 import io
+import json
+import ntpath
 import os
 import re
 import shutil
+import zipfile
 import pytest
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import markitdown._uri_utils as uri_utils
 from markitdown._uri_utils import parse_data_uri, file_uri_to_path
+from markitdown._markitdown import _get_content_disposition_filename
+from markitdown.converters import RssConverter
 
 from markitdown import (
     MarkItDown,
@@ -200,6 +207,13 @@ def test_data_uris() -> None:
     assert attributes["charset"] == "utf-8"
     assert data == b"Hello, World!"
 
+    data_uri = "data:text/plain;CHARSET=utf-8;BASE64,SGVsbG8sIFdvcmxkIQ=="
+    mime_type, attributes, data = parse_data_uri(data_uri)
+    assert mime_type == "text/plain"
+    assert len(attributes) == 1
+    assert attributes["charset"] == "utf-8"
+    assert data == b"Hello, World!"
+
     data_uri = "data:,Hello%2C%20World%21"
     mime_type, attributes, data = parse_data_uri(data_uri)
     assert mime_type is None
@@ -218,6 +232,21 @@ def test_data_uris() -> None:
     assert len(attributes) == 1
     assert attributes["charset"] == "utf-8"
     assert data == b"Hello, World!"
+
+
+def test_uppercase_data_image_uri_is_truncated_by_default() -> None:
+    markitdown = MarkItDown()
+    html = b'<html><body><img alt="dot" src="DATA:image/png;base64,AAAA"></body></html>'
+    stream_info = StreamInfo(mimetype="text/html", extension=".html")
+
+    result = markitdown.convert_stream(io.BytesIO(html), stream_info=stream_info)
+    assert result.markdown == "![dot](DATA:image/png;base64...)"
+    assert "AAAA" not in result.markdown
+
+    result = markitdown.convert_stream(
+        io.BytesIO(html), stream_info=stream_info, keep_data_uris=True
+    )
+    assert result.markdown == "![dot](DATA:image/png;base64,AAAA)"
 
 
 def test_file_uris() -> None:
@@ -239,6 +268,25 @@ def test_file_uris() -> None:
     assert netloc == "localhost"
     assert path == "/path/to/file.txt"
 
+    # URI schemes are case-insensitive
+    file_uri = "FILE:///path/to/file.txt"
+    netloc, path = file_uri_to_path(file_uri)
+    assert netloc is None
+    assert path == "/path/to/file.txt"
+
+
+def test_convert_case_insensitive_uri_schemes(tmp_path) -> None:
+    markitdown = MarkItDown()
+
+    data_result = markitdown.convert("DATA:text/plain;base64,SGVsbG8sIFdvcmxkIQ==")
+    assert data_result.markdown == "Hello, World!"
+
+    text_file = tmp_path / "hello.txt"
+    text_file.write_text("Hello from file", encoding="utf-8")
+
+    file_result = markitdown.convert(text_file.as_uri().replace("file:", "FILE:", 1))
+    assert file_result.markdown == "Hello from file"
+
     # Test file URI with query parameters
     file_uri = "file:///path/to/file.txt?param=value"
     netloc, path = file_uri_to_path(file_uri)
@@ -252,6 +300,20 @@ def test_file_uris() -> None:
     assert path == "/path/to/file.txt"
 
 
+def test_file_uri_with_percent_encoded_windows_drive(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from nturl2path import url2pathname as windows_url2pathname
+
+    monkeypatch.setattr(uri_utils, "os", SimpleNamespace(name="nt", path=ntpath))
+    monkeypatch.setattr(uri_utils, "url2pathname", windows_url2pathname)
+
+    netloc, path = uri_utils.file_uri_to_path("file:///C%3A/Temp/example.md")
+
+    assert netloc is None
+    assert path == r"C:\Temp\example.md"
+
+
 def test_docx_comments() -> None:
     # Test DOCX processing, with comments and setting style_map on init
     markitdown_with_style_map = MarkItDown(style_map="comment-reference => ")
@@ -259,6 +321,44 @@ def test_docx_comments() -> None:
         os.path.join(TEST_FILES_DIR, "test_with_comment.docx")
     )
     validate_strings(result, DOCX_COMMENT_TEST_STRINGS)
+
+
+def test_html_strikethrough_variants(tmp_path) -> None:
+    html = """<!doctype html>
+<html><body>
+<p>Plain <s>s element</s> after.</p>
+<p>Plain <del>del element</del> after.</p>
+<p>Plain <strike>strike element</strike> after.</p>
+<p>Spaces A<strike> B </strike>C.</p>
+<p>Runs D<strike>  E  </strike>F.</p>
+<p>Empty G<strike></strike>H.</p>
+<p>Newline I<strike>J
+K</strike>L.</p>
+<p>Break M<strike>N<br>O</strike>P.</p>
+</body></html>
+"""
+    path = tmp_path / "strike.html"
+    path.write_text(html, encoding="utf-8")
+    markdown = MarkItDown().convert(str(path)).markdown
+
+    assert markdown == "\n\n".join(
+        [
+            # <s>, <del> and the obsolete <strike> all mean strikethrough
+            "Plain ~~s element~~ after.",
+            "Plain ~~del element~~ after.",
+            "Plain ~~strike element~~ after.",
+            # Surrounding whitespace stays outside of the markup ...
+            "Spaces A ~~B~~ C.",
+            # ... and runs of it collapse to a single space
+            "Runs D ~~E~~ F.",
+            # An empty element contributes nothing
+            "Empty GH.",
+            # A line break inside the element is kept, and the markup
+            # survives it because strikethrough may span a single newline
+            "Newline I~~J\nK~~L.",
+            "Break M~~N\nO~~P.",
+        ]
+    )
 
 
 def test_docx_equations() -> None:
@@ -274,6 +374,77 @@ def test_docx_equations() -> None:
     assert block_equations, "No block equations found in the document."
 
 
+def test_xlsx_legacy_show_zeroes_sheetview(tmp_path) -> None:
+    from openpyxl import Workbook
+
+    base_path = tmp_path / "base.xlsx"
+    xlsx_path = tmp_path / "legacy_show_zeroes.xlsx"
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Data"
+    sheet["A1"] = "hello"
+    sheet["B1"] = "world"
+    # A cell whose text is byte-identical to the malformed attribute. openpyxl stores it
+    # as an inline string, so it lands in the very worksheet part that gets repaired.
+    sheet["A2"] = ' showZeroes="0" '
+    workbook.save(base_path)
+
+    with zipfile.ZipFile(base_path) as source:
+        with zipfile.ZipFile(xlsx_path, "w", zipfile.ZIP_DEFLATED) as target:
+            for item in source.infolist():
+                data = source.read(item.filename)
+                if item.filename == "xl/worksheets/sheet1.xml":
+                    data = data.replace(
+                        b"<sheetView ", b'<sheetView showZeroes="0" ', 1
+                    )
+                    # Guard the fixture: the sheet view attribute and the cell text must
+                    # both live here, or this test stops exercising the repair.
+                    assert data.count(b'showZeroes="0"') == 2
+                target.writestr(item, data)
+
+    result = MarkItDown().convert(str(xlsx_path))
+
+    assert "## Data" in result.markdown
+    assert "hello" in result.markdown
+    assert "world" in result.markdown
+
+    # The repair must not reach into the worksheet's data: the cell keeps its text ...
+    assert 'showZeroes="0"' in result.markdown
+    # ... and no part of the document was silently renamed on the way through.
+    assert "showZeros" not in result.markdown
+
+
+def test_xlsx_show_zeroes_rename_is_scoped_to_sheet_view_tags() -> None:
+    from markitdown.converters._xlsx_converter import _rename_show_zeroes_attribute
+
+    worksheet_xml = (
+        b"<worksheet><sheetViews>"
+        b'<sheetView showZeroes="0" workbookViewId="0"/>'
+        b'<sheetView\n\tshowZeroes="1"\ttabSelected="1"/>'
+        b"</sheetViews>"
+        # openpyxl ignores custom sheet views entirely, so they need no repair
+        b'<customSheetViews><customSheetView showZeroes="0"/></customSheetViews>'
+        b'<sheetData><row r="1">'
+        b'<c r="A1" t="inlineStr"><is><t xml:space="preserve"> showZeroes="0" '
+        b"</t></is></c>"
+        b'<c r="B1"><f>IF(A1=" showZeroes=","x","y")</f><v>y</v></c>'
+        b"</row></sheetData></worksheet>"
+    )
+
+    repaired = _rename_show_zeroes_attribute(worksheet_xml)
+
+    # Every <sheetView> start tag is repaired, whatever separates its attributes ...
+    assert repaired.count(b"showZeros=") == 2
+    assert b'<sheetView showZeros="0" workbookViewId="0"/>' in repaired
+    assert b'<sheetView\n\tshowZeros="1"\ttabSelected="1"/>' in repaired
+
+    # ... and nothing outside those start tags is rewritten.
+    assert b'<t xml:space="preserve"> showZeroes="0" </t>' in repaired
+    assert b'<f>IF(A1=" showZeroes=","x","y")</f>' in repaired
+    assert b'<customSheetView showZeroes="0"/>' in repaired
+
+
 def test_input_as_strings() -> None:
     markitdown = MarkItDown()
 
@@ -286,6 +457,55 @@ def test_input_as_strings() -> None:
     input_data = b"   \n\n\n<html><body><h1>Test</h1></body></html>"
     result = markitdown.convert_stream(io.BytesIO(input_data))
     assert "# Test" in result.text_content
+
+
+def _mock_response(content_disposition: str) -> MagicMock:
+    response = MagicMock()
+    response.headers = {"content-disposition": content_disposition}
+    response.url = "https://example.com/download"
+    response.iter_content.return_value = [b"name,value\nalpha,beta\n"]
+    response.raise_for_status.return_value = None
+    return response
+
+
+def test_convert_response_uses_rfc5987_content_disposition_filename() -> None:
+    markitdown = MarkItDown()
+    result = markitdown.convert_response(
+        _mock_response("attachment; filename*=UTF-8''data.csv")
+    )
+
+    assert result.markdown == "\n".join(
+        [
+            "| name | value |",
+            "| --- | --- |",
+            "| alpha | beta |",
+        ]
+    )
+
+
+def test_convert_response_prefers_extended_content_disposition_filename() -> None:
+    markitdown = MarkItDown()
+    result = markitdown.convert_response(
+        _mock_response("attachment; filename=fallback.txt; filename*=UTF-8''data.csv")
+    )
+
+    assert result.markdown == "\n".join(
+        [
+            "| name | value |",
+            "| --- | --- |",
+            "| alpha | beta |",
+        ]
+    )
+
+
+def test_get_content_disposition_filename_decodes_rfc5987() -> None:
+    assert (
+        _get_content_disposition_filename(
+            "attachment; filename=fallback.txt; "
+            "filename*=UTF-8''d%C3%A1t%C3%A1%2Ecsv"
+        )
+        == "d\u00e1t\u00e1.csv"
+    )
 
 
 def test_pptx_chart_multi_series_conversion() -> None:
@@ -383,11 +603,102 @@ def test_deeply_nested_html_fallback() -> None:
             # Should have emitted a warning about the fallback
             recursion_warnings = [x for x in w if "deeply nested" in str(x.message)]
             assert len(recursion_warnings) > 0
+
     finally:
         sys.setrecursionlimit(original_limit)
 
     # The output should contain the text content, not raw HTML
     assert "Deep content" in result.markdown
+    assert "bold text" in result.markdown
+    assert "<div" not in result.markdown
+    assert "<p>" not in result.markdown
+
+
+def test_deeply_nested_rss_item_fallback() -> None:
+    """Deeply nested HTML inside an RSS item should fall back to plain-text
+    extraction instead of silently embedding raw unconverted HTML in the
+    markdown output (same failure class as the HTML converter fix in #1644).
+
+    Note: This test uses sys.setrecursionlimit to guarantee a RecursionError
+    regardless of the host environment's default limit, making it deterministic
+    across different platforms and CI configurations.
+    """
+    import sys
+    import warnings
+
+    markitdown = MarkItDown()
+
+    # Use a small recursion limit so the test is environment-independent.
+    # We restore the original limit in a finally block to avoid side-effects.
+    original_limit = sys.getrecursionlimit()
+    low_limit = 200  # well below markdownify's traversal depth for depth=500
+
+    # Build an RSS item whose content is deeply nested HTML
+    depth = 500
+    item_html = ""
+    for _ in range(depth):
+        item_html += '<div style="margin-left:10px">'
+    item_html += "<p>Deep feed content with <b>bold text</b></p>"
+    for _ in range(depth):
+        item_html += "</div>"
+
+    rss = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<rss version="2.0" '
+        'xmlns:content="http://purl.org/rss/1.0/modules/content/">'
+        "<channel>"
+        "<title>Test Feed</title>"
+        "<description>A test feed</description>"
+        "<item>"
+        "<title>Deep Item</title>"
+        f"<content:encoded><![CDATA[{item_html}]]></content:encoded>"
+        "</item>"
+        "</channel>"
+        "</rss>"
+    )
+    atom = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<feed xmlns="http://www.w3.org/2005/Atom">'
+        "<title>Test Feed</title>"
+        "<entry>"
+        "<title>Deep Entry</title>"
+        f'<content type="html"><![CDATA[{item_html}]]></content>'
+        "</entry>"
+        "</feed>"
+    )
+
+    try:
+        sys.setrecursionlimit(low_limit)
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = markitdown.convert_stream(
+                io.BytesIO(rss.encode("utf-8")),
+                file_extension=".rss",
+            )
+
+            # Should have emitted a warning about the fallback
+            recursion_warnings = [x for x in w if "deeply nested" in str(x.message)]
+            assert len(recursion_warnings) > 0
+
+        # strict=True should expose the conversion failure rather than applying
+        # the plain-text fallback.
+        with pytest.raises(RecursionError):
+            RssConverter().convert(
+                io.BytesIO(rss.encode("utf-8")),
+                StreamInfo(extension=".rss"),
+                strict=True,
+            )
+        with pytest.raises(RecursionError):
+            RssConverter().convert(
+                io.BytesIO(atom.encode("utf-8")),
+                StreamInfo(extension=".atom"),
+                strict=True,
+            )
+    finally:
+        sys.setrecursionlimit(original_limit)
+
+    # The output should contain the text content, not raw HTML
+    assert "Deep feed content" in result.markdown
     assert "bold text" in result.markdown
     assert "<div" not in result.markdown
     assert "<p>" not in result.markdown
@@ -587,6 +898,258 @@ def test_markitdown_llm() -> None:
     validate_strings(result, PPTX_TEST_STRINGS)
 
 
+def test_youtube_converter_missing_title_metadata() -> None:
+    """Test that YouTubeConverter converts streams with and without title metadata without raising AssertionError."""
+    from unittest.mock import patch
+    from markitdown.converters._youtube_converter import YouTubeConverter
+
+    converter = YouTubeConverter()
+    stream_info = StreamInfo(
+        mimetype="text/html",
+        extension=".html",
+        url="https://www.youtube.com/watch?v=12345",
+    )
+
+    with patch(
+        "markitdown.converters._youtube_converter.IS_YOUTUBE_TRANSCRIPT_CAPABLE",
+        False,
+    ):
+        # Case 1: Stream with no title metadata or title tag
+        html_content_no_title = b"<html><head></head><body>Video Content</body></html>"
+        stream_no_title = io.BytesIO(html_content_no_title)
+        result_no_title = converter.convert(stream_no_title, stream_info)
+        assert result_no_title.title == ""
+        assert "# YouTube" in result_no_title.markdown
+
+        # Case 2: Stream with an empty <title> tag
+        html_content_empty_title = (
+            b"<html><head><title></title></head><body>Video Content</body></html>"
+        )
+        stream_empty_title = io.BytesIO(html_content_empty_title)
+        result_empty_title = converter.convert(stream_empty_title, stream_info)
+        assert result_empty_title.title == ""
+        assert "# YouTube" in result_empty_title.markdown
+
+        # Case 3: Stream whose title is only available from the <title> tag
+        html_content_title_tag = b"<html><head><title>Fallback Title</title></head><body>Video Content</body></html>"
+        stream_title_tag = io.BytesIO(html_content_title_tag)
+        result_title_tag = converter.convert(stream_title_tag, stream_info)
+        assert result_title_tag.title == "Fallback Title"
+        assert "# YouTube" in result_title_tag.markdown
+
+
+def test_zip_stream_no_filename_header() -> None:
+    """Regression test: ZipConverter must not render the literal string 'None'
+    in the output header when the stream has no associated URL, local path, or
+    filename (e.g. when called via convert_stream() without stream_info)."""
+    markitdown = MarkItDown()
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("hello.txt", "Hello world")
+    buf.seek(0)
+
+    result = markitdown.convert_stream(
+        buf, stream_info=StreamInfo(mimetype="application/zip")
+    )
+    assert result.markdown.startswith("Content from the zip file `(unknown)`:\n\n")
+    assert "Hello world" in result.markdown
+
+
+def test_ipynb_accepts_non_ascii() -> None:
+    """IpynbConverter.accepts() must not raise on non-ASCII binary content."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    converter = IpynbConverter()
+
+    # Binary content that is not valid UTF-8 (simulates non-ASCII file)
+    binary_data = b"\x80\x81\x82\x83"
+    stream_info = StreamInfo(mimetype="application/json", charset="utf-8")
+
+    # Should return False without raising
+    result = converter.accepts(io.BytesIO(binary_data), stream_info)
+    assert result is False
+
+    # French PDF content (UTF-8 bytes that would crash if decoded as ASCII)
+    french_bytes = "lettre d'information sur l'événement".encode("utf-8")
+    stream_info_ascii = StreamInfo(mimetype="application/json", charset="ascii")
+
+    result = converter.accepts(io.BytesIO(french_bytes), stream_info_ascii)
+    assert result is False
+
+    # Valid notebook content should still be accepted
+    notebook_bytes = b'{"nbformat": 4, "nbformat_minor": 5, "cells": []}'
+    stream_info_json = StreamInfo(mimetype="application/json", charset="utf-8")
+
+    result = converter.accepts(io.BytesIO(notebook_bytes), stream_info_json)
+    assert result is True
+
+
+def test_epub_metadata_nodevalue():
+    from defusedxml.minidom import parseString
+    from markitdown.converters._epub_converter import EpubConverter
+
+    xml_data = (
+        '<package xmlns:dc="http://purl.org/dc/elements/1.1/">'
+        "<dc:title><span>Structured</span> Title</dc:title>"
+        "<dc:creator><name>Author 1</name></dc:creator>"
+        "<dc:creator>Author 2</dc:creator>"
+        "<dc:publisher></dc:publisher>"
+        "<dc:description/>"
+        "</package>"
+    )
+    dom = parseString(xml_data)
+    converter = EpubConverter()
+
+    title = converter._get_text_from_node(dom, "dc:title")
+    assert title == "Structured Title"
+
+    creators = converter._get_all_texts_from_nodes(dom, "dc:creator")
+    assert creators == ["Author 1", "Author 2"]
+
+    publisher = converter._get_text_from_node(dom, "dc:publisher")
+    assert publisher is None
+
+    missing = converter._get_text_from_node(dom, "dc:date")
+    assert missing is None
+
+
+def test_json_with_late_non_ascii_character(tmp_path) -> None:
+    payload = {
+        "record": {
+            "title": "Example record",
+            "abstract": "This is sample test. " * 500,
+        },
+        "notes": "non-ASCII character: Ã¨",
+    }
+    json_path = tmp_path / "input.json"
+    json_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+    result = MarkItDown().convert(str(json_path))
+
+    assert "non-ASCII character: Ã¨" in result.text_content
+
+
+###############################################################################
+# CSV converter.
+###############################################################################
+
+
+def _convert_csv(data: bytes, charset: str | None = None) -> str:
+    stream_info = StreamInfo(extension=".csv", charset=charset)
+    return (
+        MarkItDown()
+        .convert_stream(io.BytesIO(data), stream_info=stream_info)
+        .text_content
+    )
+
+
+def test_csv_utf8_bom_is_stripped_from_the_header() -> None:
+    result = _convert_csv(b"\xef\xbb\xbfname,age\nAlice,30\n")
+
+    assert "\ufeff" not in result
+    assert result.startswith("| name | age |")
+    assert "| Alice | 30 |" in result
+
+
+def test_csv_utf8_bom_is_stripped_when_charset_is_known() -> None:
+    result = _convert_csv(b"\xef\xbb\xbfname,age\nAlice,30\n", charset="utf-8")
+
+    assert "\ufeff" not in result
+    assert result.startswith("| name | age |")
+
+
+def test_csv_leading_blank_line_does_not_destroy_the_table() -> None:
+    result = _convert_csv(b"\nname,age\nAlice,30\n")
+
+    assert result == "| name | age |\n| --- | --- |\n| Alice | 30 |"
+
+
+def test_csv_trailing_blank_lines_are_skipped() -> None:
+    result = _convert_csv(b"name,age\nAlice,30\n\n\n")
+
+    assert result == "| name | age |\n| --- | --- |\n| Alice | 30 |"
+
+
+def test_csv_blank_lines_between_rows_are_kept() -> None:
+    result = _convert_csv(b"name,age\n\nAlice,30\n\nBob,40\n")
+
+    assert (
+        result == "| name | age |\n| --- | --- |\n| Alice | 30 |\n|  |  |\n| Bob | 40 |"
+    )
+
+
+def test_csv_all_blank_input_returns_empty_markdown() -> None:
+    result = _convert_csv(b"\n\n\n")
+
+    assert result == ""
+
+
+def test_csv_pipe_in_cell_is_escaped() -> None:
+    result = _convert_csv(b'name,description\nWidget,"cheap | fast"\n')
+
+    # The pipe must be escaped rather than emitted raw, or it splits the row.
+    assert "| Widget | cheap \\| fast |" in result
+
+
+def test_csv_pipe_preceded_by_backslash_is_still_escaped() -> None:
+    # `left\|right` must not become `left\\|right`: the doubled backslash is a
+    # literal backslash, which would leave the pipe acting as a delimiter and
+    # let a renderer drop `right`. The run of backslashes is doubled instead,
+    # so the escaping `\|` survives.
+    result = _convert_csv(b'name,description\nWidget,"left\\|right"\n')
+
+    assert r"| Widget | left\\\|right |" in result
+
+
+def test_csv_pipe_preceded_by_two_backslashes_is_still_escaped() -> None:
+    # An even-length run is just as dangerous once the naive `\|` is appended,
+    # so check a longer run as well.
+    result = _convert_csv(b'name,description\nWidget,"left\\\\|right"\n')
+
+    assert r"| Widget | left\\\\\|right |" in result
+
+
+def test_csv_newline_in_quoted_cell_does_not_split_the_row() -> None:
+    result = _convert_csv(b'name,notes\nWidget,"line one\nline two"\n')
+
+    # The table must stay on one line per record; the embedded break collapses
+    # to a space.
+    assert len(result.splitlines()) == 3
+    assert "| Widget | line one line two |" in result
+
+
+def test_csv_carriage_returns_in_quoted_cell_collapse_to_spaces() -> None:
+    result = _convert_csv(b'name,notes\nWidget,"line one\r\nline two\rline three"\n')
+
+    assert len(result.splitlines()) == 3
+    assert "| Widget | line one line two line three |" in result
+
+
+def test_csv_pipe_in_header_is_escaped() -> None:
+    result = _convert_csv(b'"a | b",c\n1,2\n')
+
+    assert "| a \\| b | c |" in result
+
+
+def test_csv_plain_values_are_unchanged() -> None:
+    # Guards against over-escaping ordinary content.
+    result = _convert_csv(b"name,description\nWidget,cheap and fast\n")
+
+    assert "| Widget | cheap and fast |" in result
+    assert "\\" not in result
+
+
+def test_csv_backslash_without_a_pipe_is_left_alone() -> None:
+    # Only backslashes that guard a pipe are doubled; a Windows path stays
+    # readable.
+    result = _convert_csv(b"name,path\nWidget,C:\\temp\\file.txt\n")
+
+    assert r"| Widget | C:\temp\file.txt |" in result
+
+
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     for test in [
@@ -602,6 +1165,8 @@ if __name__ == "__main__":
         test_markitdown_exiftool,
         test_markitdown_llm_parameters,
         test_markitdown_llm,
+        test_ipynb_accepts_non_ascii,
+        test_epub_metadata_nodevalue,
     ]:
         print(f"Running {test.__name__}...", end="")
         test()
