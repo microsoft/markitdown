@@ -295,7 +295,7 @@ def test_docx_underlined_text_is_preserved(tmp_path) -> None:
 
     result = MarkItDown().convert(str(docx_file))
 
-    assert "plain <u>underlined</u>" in result.text_content
+    assert "plain <u>underlined</u>" in result.markdown
 
 
 def test_docx_equations() -> None:
