@@ -89,8 +89,7 @@ def test_atom_plain_text_content_is_not_parsed_as_html() -> None:
         io.BytesIO(feed), StreamInfo(mimetype="application/atom+xml")
     )
 
-    assert "job" in result.markdown
-    assert "&lt;literal&gt;" in result.markdown
+    assert "Run <job\\_id> with &lt;literal&gt;." in result.markdown
 
 
 def test_atom_untyped_summary_is_not_parsed_as_html() -> None:
@@ -108,7 +107,7 @@ def test_atom_untyped_summary_is_not_parsed_as_html() -> None:
         io.BytesIO(feed), StreamInfo(mimetype="application/atom+xml")
     )
 
-    assert "placeholder" in result.markdown
+    assert "A <placeholder> summary." in result.markdown
 
 
 def test_atom_html_content_is_still_converted() -> None:
