@@ -1,5 +1,6 @@
 import warnings
 
+from html import escape
 from defusedxml import minidom
 from xml.dom import Node
 from xml.dom.minidom import Document, Element
@@ -146,14 +147,20 @@ class RssConverter(DocumentConverter):
             return None
 
         node = nodes[0]
-        if node.getAttribute("type").lower() != "xhtml":
-            return self._get_data_by_tag_name(entry, tag_name)
+        content_type = node.getAttribute("type").lower()
+        if content_type == "xhtml":
+            return "".join(
+                self._localize_xhtml_names(child.cloneNode(True)).toxml()
+                for child in node.childNodes
+                if child.nodeType == Node.ELEMENT_NODE
+            )
 
-        return "".join(
-            self._localize_xhtml_names(child.cloneNode(True)).toxml()
-            for child in node.childNodes
-            if child.nodeType == Node.ELEMENT_NODE
-        )
+        text = self._get_data_by_tag_name(entry, tag_name)
+        if text is None or content_type not in ("", "text"):
+            return text
+
+        # Plain text is not markup, so re-escape it before the HTML parser sees it.
+        return escape(text, quote=False)
 
     def _localize_xhtml_names(self, node: Node) -> Node:
         """Rewrite prefixed XHTML element names to their local HTML names.

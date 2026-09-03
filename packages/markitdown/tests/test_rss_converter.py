@@ -72,3 +72,58 @@ def test_atom_prefixed_xhtml_content_is_preserved() -> None:
 
     assert "Hello **bold** and *italic*." in result.markdown
     assert "[link](https://example.com)" in result.markdown
+
+
+def test_atom_plain_text_content_is_not_parsed_as_html() -> None:
+    feed = b"""<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Example feed</title>
+  <entry>
+    <title>Example entry</title>
+    <content type="text">Run &lt;job_id&gt; with &amp;lt;literal&amp;gt;.</content>
+  </entry>
+</feed>
+"""
+
+    result = RssConverter().convert(
+        io.BytesIO(feed), StreamInfo(mimetype="application/atom+xml")
+    )
+
+    assert "job" in result.markdown
+    assert "&lt;literal&gt;" in result.markdown
+
+
+def test_atom_untyped_summary_is_not_parsed_as_html() -> None:
+    feed = b"""<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Example feed</title>
+  <entry>
+    <title>Example entry</title>
+    <summary>A &lt;placeholder&gt; summary.</summary>
+  </entry>
+</feed>
+"""
+
+    result = RssConverter().convert(
+        io.BytesIO(feed), StreamInfo(mimetype="application/atom+xml")
+    )
+
+    assert "placeholder" in result.markdown
+
+
+def test_atom_html_content_is_still_converted() -> None:
+    feed = b"""<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Example feed</title>
+  <entry>
+    <title>Example entry</title>
+    <content type="html">&lt;p&gt;Read the &lt;strong&gt;important details&lt;/strong&gt;.&lt;/p&gt;</content>
+  </entry>
+</feed>
+"""
+
+    result = RssConverter().convert(
+        io.BytesIO(feed), StreamInfo(mimetype="application/atom+xml")
+    )
+
+    assert "Read the **important details**." in result.markdown
