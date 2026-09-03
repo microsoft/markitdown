@@ -20,7 +20,7 @@ MarkItDown currently supports the conversion from:
 - HTML
 - Text-based formats (CSV, JSON, XML)
 - ZIP files (iterates over contents)
-- Youtube URLs
+- YouTube URLs
 - EPubs
 - ... and more!
 
@@ -152,7 +152,7 @@ md = MarkItDown(
     llm_model="gpt-4o",
 )
 result = md.convert("document_with_images.pdf")
-print(result.text_content)
+print(result.markdown)
 ```
 
 If no `llm_client` is provided the plugin still loads, but OCR is silently skipped and the standard built-in converter is used instead.
@@ -186,6 +186,13 @@ Content Understanding is ideal when you need capabilities beyond what built-in o
 
 ```bash
 markitdown path-to-file.pdf --use-cu --cu-endpoint "<content_understanding_endpoint>"
+```
+
+The endpoint can also be set once in the environment, so callers only need `--use-cu`:
+
+```bash
+export MARKITDOWN_CU_ENDPOINT="<content_understanding_endpoint>"
+markitdown path-to-file.pdf --use-cu
 ```
 
 **Python API:**
@@ -244,6 +251,13 @@ To use Microsoft Document Intelligence for conversion:
 markitdown path-to-file.pdf -o document.md -d -e "<document_intelligence_endpoint>"
 ```
 
+The endpoint can also be set once in the environment, so callers only need `-d`:
+
+```bash
+export MARKITDOWN_DOCINTEL_ENDPOINT="<document_intelligence_endpoint>"
+markitdown path-to-file.pdf -o document.md -d
+```
+
 More information about how to set up an Azure Document Intelligence Resource can be found [here](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/how-to-guides/create-document-intelligence-resource?view=doc-intel-4.0.0)
 
 ### Python API
@@ -255,7 +269,7 @@ from markitdown import MarkItDown
 
 md = MarkItDown(enable_plugins=False) # Set to True to enable plugins
 result = md.convert("test.xlsx")
-print(result.text_content)
+print(result.markdown)
 ```
 
 Document Intelligence conversion in Python:
@@ -265,7 +279,7 @@ from markitdown import MarkItDown
 
 md = MarkItDown(docintel_endpoint="<document_intelligence_endpoint>")
 result = md.convert("test.pdf")
-print(result.text_content)
+print(result.markdown)
 ```
 
 To use Large Language Models for image descriptions (currently only for pptx and image files), provide `llm_client` and `llm_model`:
@@ -277,7 +291,7 @@ from openai import OpenAI
 client = OpenAI()
 md = MarkItDown(llm_client=client, llm_model="gpt-4o", llm_prompt="optional custom prompt")
 result = md.convert("example.jpg")
-print(result.text_content)
+print(result.markdown)
 ```
 
 ### Docker
@@ -341,9 +355,9 @@ You can help by looking at issues or helping review PRs. Any issue or PR is welc
 
 ### Security Considerations
 
-MarkItDown performs I/O with the privileges of the current process. Like `open()` or `requests.get()`, it will access resources that the process itself can access. 
+MarkItDown performs I/O with the privileges of the current process. Like `open()` or `requests.get()`, it will access resources that the process itself can access.
 
-**Sanitize your inputs:** Do not pass untrusted input directly to MarkItDown. If any part of the input may be controlled by an untrusted user or system, such as in hosted or server-side applications, it must be validated and restricted before calling MarkItDown. Depending on your environment, this may include restricting file paths, limiting URI schemes and network destinations, and blocking access to private, loopback, link-local, or metadata-service addresses. 
+**Sanitize your inputs:** Do not pass untrusted input directly to MarkItDown. If any part of the input may be controlled by an untrusted user or system, such as in hosted or server-side applications, it must be validated and restricted before calling MarkItDown. Depending on your environment, this may include restricting file paths, limiting URI schemes and network destinations, and blocking access to private, loopback, link-local, or metadata-service addresses.
 
 **Call only the conversion method you need:** Prefer the narrowest conversion API that fits your use case. MarkItDown's `convert()` method is intentionally permissive and can handle local files, remote URIs, and byte streams. If your application only needs to read local files, call `convert_local()` instead. If you need more control over URI fetching, call `requests.get()` yourself and pass the response object to `convert_response()`. For maximum control, open a stream to the input you want converted and call `convert_stream()`.
 

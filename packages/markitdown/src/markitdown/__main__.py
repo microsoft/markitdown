@@ -2,8 +2,10 @@
 #
 # SPDX-License-Identifier: MIT
 import argparse
+import os
 import sys
 import codecs
+import io
 from typing import Any, Dict
 from textwrap import dedent
 from importlib.metadata import entry_points
@@ -75,7 +77,7 @@ def main():
     parser.add_argument(
         "-c",
         "--charset",
-        help="Provide a hint about the file's charset (e.g, UTF-8).",
+        help="Provide a hint about the file's charset (e.g., UTF-8).",
     )
 
     cloud_group = parser.add_mutually_exclusive_group()
@@ -98,13 +100,15 @@ def main():
         "-e",
         "--endpoint",
         type=str,
-        help="Document Intelligence Endpoint. Required if using Document Intelligence.",
+        default=os.environ.get("MARKITDOWN_DOCINTEL_ENDPOINT") or None,
+        help="Document Intelligence Endpoint. Required if using Document Intelligence. Defaults to the MARKITDOWN_DOCINTEL_ENDPOINT environment variable.",
     )
 
     parser.add_argument(
         "--cu-endpoint",
         type=str,
-        help="Content Understanding Endpoint. Required if using --use-cu.",
+        default=os.environ.get("MARKITDOWN_CU_ENDPOINT") or None,
+        help="Content Understanding Endpoint. Required if using --use-cu. Defaults to the MARKITDOWN_CU_ENDPOINT environment variable.",
     )
 
     parser.add_argument(
@@ -203,7 +207,8 @@ def main():
     if args.use_docintel:
         if args.endpoint is None:
             _exit_with_error(
-                "Document Intelligence Endpoint is required when using Document Intelligence."
+                "Document Intelligence Endpoint is required when using Document Intelligence. "
+                "Pass -e/--endpoint or set MARKITDOWN_DOCINTEL_ENDPOINT."
             )
         elif args.filename is None:
             _exit_with_error("Filename is required when using Document Intelligence.")
@@ -215,9 +220,8 @@ def main():
         if args.cu_endpoint is None:
             _exit_with_error(
                 "Content Understanding Endpoint (--cu-endpoint) is required when using --use-cu."
+                "Pass --cu-endpoint or set MARKITDOWN_CU_ENDPOINT."
             )
-        elif args.filename is None:
-            _exit_with_error("Filename is required when using Content Understanding.")
 
         cu_kwargs: Dict[str, Any] = {
             "cu_endpoint": args.cu_endpoint,
@@ -245,8 +249,9 @@ def main():
         markitdown = MarkItDown(enable_plugins=args.use_plugins)
 
     if args.filename is None:
+        # Windows pipe-backed stdin can report seekable() even though it cannot rewind.
         result = markitdown.convert_stream(
-            sys.stdin.buffer,
+            io.BytesIO(sys.stdin.buffer.read()),
             stream_info=stream_info,
             keep_data_uris=args.keep_data_uris,
         )
