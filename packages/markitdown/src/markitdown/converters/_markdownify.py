@@ -145,6 +145,18 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
             return "[x] " if el.has_attr("checked") else "[ ] "
         return ""
 
+    def convert_u(
+        self,
+        el: Any,
+        text: str,
+        convert_as_inline: Optional[bool] = False,
+        **kwargs,
+    ) -> str:
+        prefix, suffix, text = markdownify.chomp(text)  # type: ignore
+        if not text:
+            return ""
+        return f"{prefix}<u>{text}</u>{suffix}"
+
     def convert_strike(self, el: Any, text: str, *args, **kwargs) -> str:
         """Obsolete <strike> is still in the wild; treat it like <s>/<del>."""
         return self.convert_s(el, text, *args, **kwargs)  # type: ignore

@@ -8,6 +8,7 @@ import shutil
 import zipfile
 import pytest
 from types import SimpleNamespace
+from typing import Optional
 from unittest.mock import MagicMock
 
 import markitdown._uri_utils as uri_utils
@@ -321,6 +322,83 @@ def test_docx_comments() -> None:
         os.path.join(TEST_FILES_DIR, "test_with_comment.docx")
     )
     validate_strings(result, DOCX_COMMENT_TEST_STRINGS)
+
+
+def _write_underlined_docx(path, embedded_style_map: Optional[str] = None) -> str:
+    """Write a minimal .docx holding one underlined run, and return its path."""
+    document_xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:t>plain </w:t></w:r>
+      <w:r><w:rPr><w:u w:val="single"/></w:rPr><w:t>underlined</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"""
+
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr(
+            "[Content_Types].xml",
+            """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>""",
+        )
+        archive.writestr(
+            "_rels/.rels",
+            """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>""",
+        )
+        archive.writestr(
+            "word/_rels/document.xml.rels",
+            """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>""",
+        )
+        archive.writestr("word/document.xml", document_xml)
+
+    if embedded_style_map is not None:
+        import mammoth
+
+        with open(path, "r+b") as f:
+            mammoth.embed_style_map(f, embedded_style_map)
+
+    return str(path)
+
+
+def test_docx_underlined_text_is_preserved(tmp_path) -> None:
+    docx_file = _write_underlined_docx(tmp_path / "underlined.docx")
+
+    result = MarkItDown().convert(docx_file)
+
+    assert "plain <u>underlined</u>" in result.markdown
+
+
+def test_docx_embedded_style_map_overrides_underline_default(tmp_path) -> None:
+    # A style map embedded in the document takes precedence over the default
+    # "u => u" mapping that preserves underlines.
+    docx_file = _write_underlined_docx(
+        tmp_path / "embedded.docx", embedded_style_map="u => em"
+    )
+
+    result = MarkItDown().convert(docx_file)
+
+    assert "plain *underlined*" in result.markdown
+    assert "<u>" not in result.markdown
+
+
+def test_docx_caller_style_map_overrides_embedded_style_map(tmp_path) -> None:
+    # ... and a caller-supplied style map still outranks the embedded one.
+    docx_file = _write_underlined_docx(
+        tmp_path / "embedded.docx", embedded_style_map="u => em"
+    )
+
+    result = MarkItDown(style_map="u => strong").convert(docx_file)
+
+    assert "plain **underlined**" in result.markdown
 
 
 def test_html_strikethrough_variants(tmp_path) -> None:
