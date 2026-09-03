@@ -185,7 +185,11 @@ def _fix_zip_filename_casing(input_docx: BinaryIO) -> BinaryIO:
         central_name = cd_name.encode("utf-8" if flag_bits & 0x800 else "cp437")
 
         # Only patch if lengths match but content differs (casing mismatch)
-        if local_name != central_name and len(local_name) == len(central_name):
+        if (
+            local_name != central_name
+            and len(local_name) == len(central_name)
+            and local_name.lower() == central_name.lower()
+        ):
             raw[offset + 30 : offset + 30 + local_fname_len] = central_name
             patched = True
 
