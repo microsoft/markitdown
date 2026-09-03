@@ -13,7 +13,7 @@ RTF_TEST_STRINGS = {
 
 
 def test_converter() -> None:
-    """Tests the RTF converter dirctly."""
+    """Tests the RTF converter directly."""
     with open(os.path.join(TEST_FILES_DIR, "test.rtf"), "rb") as file_stream:
         converter = RtfConverter()
         result = converter.convert(

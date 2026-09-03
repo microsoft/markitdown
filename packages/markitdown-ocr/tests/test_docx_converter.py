@@ -11,6 +11,7 @@ OCR block format used by the converter:
 """
 
 import sys
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -221,3 +222,60 @@ def test_docx_no_ocr_service_no_tags() -> None:
         md = converter.convert(f, StreamInfo(extension=".docx")).text_content
     assert "*[Image OCR]" not in md
     assert "[End OCR]*" not in md
+
+
+# ---------------------------------------------------------------------------
+# Underlined runs survive both the OCR and the non-OCR mammoth paths
+# ---------------------------------------------------------------------------
+
+
+def _underlined_docx(tmp_path: Path) -> Path:
+    docx_file = tmp_path / "underlined.docx"
+    document_xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:t>plain </w:t></w:r>
+      <w:r><w:rPr><w:u w:val="single"/></w:rPr><w:t>underlined</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"""
+
+    with zipfile.ZipFile(docx_file, "w") as archive:
+        archive.writestr(
+            "[Content_Types].xml",
+            """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>""",
+        )
+        archive.writestr(
+            "_rels/.rels",
+            """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>""",
+        )
+        archive.writestr("word/document.xml", document_xml)
+
+    return docx_file
+
+
+def test_docx_underlined_text_is_preserved_without_ocr(tmp_path: Path) -> None:
+    converter = DocxConverterWithOCR()
+    with open(_underlined_docx(tmp_path), "rb") as f:
+        md = converter.convert(f, StreamInfo(extension=".docx")).markdown
+    assert "plain <u>underlined</u>" in md
+
+
+def test_docx_underlined_text_is_preserved_with_ocr(
+    tmp_path: Path, svc: MockOCRService
+) -> None:
+    converter = DocxConverterWithOCR()
+    with open(_underlined_docx(tmp_path), "rb") as f:
+        md = converter.convert(
+            f, StreamInfo(extension=".docx"), ocr_service=svc
+        ).markdown
+    assert "plain <u>underlined</u>" in md
