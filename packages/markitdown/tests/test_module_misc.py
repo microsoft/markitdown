@@ -1301,6 +1301,60 @@ def test_csv_backslash_without_a_pipe_is_left_alone() -> None:
     assert r"| Widget | C:\temp\file.txt |" in result
 
 
+# ---------------------------------------------------------------------------
+# Regression test for issue #1960:
+# exiftool_path pointing to a nonexistent binary used to leak a raw
+# FileNotFoundError. It should now be wrapped in RuntimeError with a
+# message that includes the path.
+# ---------------------------------------------------------------------------
+
+
+def test_exiftool_metadata_with_nonexistent_binary():
+    """#1960: nonexistent exiftool_path raises RuntimeError, not FileNotFoundError."""
+    from markitdown.converters._exiftool import exiftool_metadata
+
+    exiftool_path = "/this/does/not/exist/exiftool"
+    with pytest.raises(
+        RuntimeError,
+        match=re.escape(f"Failed to invoke exiftool at {exiftool_path}"),
+    ):
+        exiftool_metadata(io.BytesIO(b""), exiftool_path=exiftool_path)
+
+
+def test_exiftool_metadata_with_no_path():
+    """Sanity check: exiftool_path=None still returns {} (early return)."""
+    from markitdown.converters._exiftool import exiftool_metadata
+
+    assert exiftool_metadata(io.BytesIO(b""), exiftool_path=None) == {}
+
+
+def test_exiftool_metadata_invocation_oserror():
+    """#1960: an OSError while running exiftool is wrapped, and the stream is restored."""
+    from unittest.mock import patch
+
+    from markitdown.converters._exiftool import exiftool_metadata
+
+    def fake_run(args, **kwargs):
+        # The version check succeeds ...
+        if "-ver" in args:
+            return SimpleNamespace(stdout="12.24\n")
+        # ... but the actual metadata invocation fails.
+        raise OSError("exiftool vanished")
+
+    exiftool_path = "/usr/bin/exiftool"
+    file_stream = io.BytesIO(b"0123456789")
+    file_stream.seek(4)
+
+    with patch("markitdown.converters._exiftool.subprocess.run", side_effect=fake_run):
+        with pytest.raises(
+            RuntimeError,
+            match=re.escape(f"Failed to invoke exiftool at {exiftool_path}"),
+        ):
+            exiftool_metadata(file_stream, exiftool_path=exiftool_path)
+
+    assert file_stream.tell() == 4
+
+
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     for test in [
@@ -1319,6 +1373,9 @@ if __name__ == "__main__":
         test_pptx_chart_no_title_text_frame,
         test_ipynb_accepts_non_ascii,
         test_epub_metadata_nodevalue,
+        test_exiftool_metadata_with_nonexistent_binary,
+        test_exiftool_metadata_with_no_path,
+        test_exiftool_metadata_invocation_oserror,
     ]:
         print(f"Running {test.__name__}...", end="")
         test()
