@@ -1338,10 +1338,12 @@ def test_exiftool_metadata_with_nonexistent_binary():
     """#1960: nonexistent exiftool_path raises RuntimeError, not FileNotFoundError."""
     from markitdown.converters._exiftool import exiftool_metadata
 
-    with pytest.raises(RuntimeError, match="Failed to invoke exiftool"):
-        exiftool_metadata(
-            io.BytesIO(b""), exiftool_path="/this/does/not/exist/exiftool"
-        )
+    exiftool_path = "/this/does/not/exist/exiftool"
+    with pytest.raises(
+        RuntimeError,
+        match=re.escape(f"Failed to invoke exiftool at {exiftool_path}"),
+    ):
+        exiftool_metadata(io.BytesIO(b""), exiftool_path=exiftool_path)
 
 
 def test_exiftool_metadata_with_no_path():
@@ -1349,3 +1351,30 @@ def test_exiftool_metadata_with_no_path():
     from markitdown.converters._exiftool import exiftool_metadata
 
     assert exiftool_metadata(io.BytesIO(b""), exiftool_path=None) == {}
+
+
+def test_exiftool_metadata_invocation_oserror():
+    """#1960: an OSError while running exiftool is wrapped, and the stream is restored."""
+    from unittest.mock import patch
+
+    from markitdown.converters._exiftool import exiftool_metadata
+
+    def fake_run(args, **kwargs):
+        # The version check succeeds ...
+        if "-ver" in args:
+            return SimpleNamespace(stdout="12.24\n")
+        # ... but the actual metadata invocation fails.
+        raise OSError("exiftool vanished")
+
+    exiftool_path = "/usr/bin/exiftool"
+    file_stream = io.BytesIO(b"0123456789")
+    file_stream.seek(4)
+
+    with patch("markitdown.converters._exiftool.subprocess.run", side_effect=fake_run):
+        with pytest.raises(
+            RuntimeError,
+            match=re.escape(f"Failed to invoke exiftool at {exiftool_path}"),
+        ):
+            exiftool_metadata(file_stream, exiftool_path=exiftool_path)
+
+    assert file_stream.tell() == 4
