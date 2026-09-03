@@ -272,14 +272,24 @@ class oMath2Latex(Tag2Method):
         the func name
         """
         latex_chars = []
+        # Word may split a single function name over several runs (e.g. on a
+        # formatting boundary), so join adjacent runs before looking it up.
+        name_parts = []
+
+        def flush_name():
+            if not name_parts:
+                return
+            name = BLANK.join(name_parts)
+            del name_parts[:]
+            latex_chars.append(FUNC.get(name) or r"\operatorname{%s}({fe})" % name)
+
         for stag, t, e in self.process_children_list(elm):
             if stag == "r":
-                if FUNC.get(t):
-                    latex_chars.append(FUNC[t])
-                else:
-                    latex_chars.append(r"\operatorname{%s}({fe})" % t)
+                name_parts.append(t)
             else:
+                flush_name()
                 latex_chars.append(t)
+        flush_name()
         t = BLANK.join(latex_chars)
         return t if FUNC_PLACE in t else t + FUNC_PLACE  # do_func will replace this
 
