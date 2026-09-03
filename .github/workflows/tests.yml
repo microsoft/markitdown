@@ -16,3 +16,24 @@ jobs:
         run: pipx install hatch
       - name: Run tests
         run: cd packages/markitdown; hatch test
+
+  mcp-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install packages
+        run: pip install "./packages/markitdown[all]" ./packages/markitdown-mcp pytest
+
+      - name: Run tests
+        working-directory: packages/markitdown-mcp
+        run: pytest

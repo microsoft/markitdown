@@ -1,20 +1,14 @@
 import contextlib
-import sys
 import os
+import sys
 from collections.abc import AsyncIterator
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from starlette.applications import Starlette
-from mcp.server.sse import SseServerTransport
-from starlette.requests import Request
-from starlette.routing import Mount, Route
-from starlette.types import Receive, Scope, Send
-from mcp.server import Server
-from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from markitdown import MarkItDown
 import uvicorn
 
-# Initialize FastMCP server for MarkItDown (SSE)
-mcp = FastMCP("markitdown")
+# Initialize the MCP server for MarkItDown
+mcp = MCPServer("markitdown")
 
 
 @mcp.tool()
@@ -31,49 +25,32 @@ def check_plugins_enabled() -> bool:
     )
 
 
-def create_starlette_app(mcp_server: Server, *, debug: bool = False) -> Starlette:
-    sse = SseServerTransport("/messages/")
-    session_manager = StreamableHTTPSessionManager(
-        app=mcp_server,
-        event_store=None,
+def create_starlette_app(
+    mcp_server: MCPServer, *, host: str = "127.0.0.1", debug: bool = False
+) -> Starlette:
+    # Two sub-apps supply the routes: /sse + /messages/ from the SSE transport,
+    # and /mcp from Streamable HTTP. Their routes are merged into one app so the
+    # published URL surface is unchanged.
+    # The host must match what uvicorn binds to: the SDK derives its
+    # Host/Origin allowlist from it, and a localhost default would reject
+    # remote requests with 421 when serving on another interface.
+    sse_app = mcp_server.sse_app(host=host)
+    http_app = mcp_server.streamable_http_app(
         json_response=True,
-        stateless=True,
+        stateless_http=True,
+        host=host,
     )
-
-    async def handle_sse(request: Request) -> None:
-        async with sse.connect_sse(
-            request.scope,
-            request.receive,
-            request._send,
-        ) as (read_stream, write_stream):
-            await mcp_server.run(
-                read_stream,
-                write_stream,
-                mcp_server.create_initialization_options(),
-            )
-
-    async def handle_streamable_http(
-        scope: Scope, receive: Receive, send: Send
-    ) -> None:
-        await session_manager.handle_request(scope, receive, send)
 
     @contextlib.asynccontextmanager
     async def lifespan(app: Starlette) -> AsyncIterator[None]:
-        """Context manager for session manager."""
-        async with session_manager.run():
-            print("Application started with StreamableHTTP session manager!")
-            try:
+        """Run both sub-apps' lifespans (the Streamable HTTP session manager)."""
+        async with sse_app.router.lifespan_context(app):
+            async with http_app.router.lifespan_context(app):
                 yield
-            finally:
-                print("Application shutting down...")
 
     return Starlette(
         debug=debug,
-        routes=[
-            Route("/sse", endpoint=handle_sse),
-            Mount("/mcp", app=handle_streamable_http),
-            Mount("/messages/", app=sse.handle_post_message),
-        ],
+        routes=[*sse_app.routes, *http_app.routes],
         lifespan=lifespan,
     )
 
@@ -81,8 +58,6 @@ def create_starlette_app(mcp_server: Server, *, debug: bool = False) -> Starlett
 # Main entry point
 def main():
     import argparse
-
-    mcp_server = mcp._mcp_server
 
     parser = argparse.ArgumentParser(description="Run a MarkItDown MCP server")
 
@@ -126,7 +101,7 @@ def main():
                 "Only proceed if you understand the security implications.\n",
                 file=sys.stderr,
             )
-        starlette_app = create_starlette_app(mcp_server, debug=True)
+        starlette_app = create_starlette_app(mcp, host=host, debug=True)
         uvicorn.run(
             starlette_app,
             host=host,
