@@ -1,3 +1,4 @@
+import struct
 import zipfile
 from io import BytesIO
 from typing import BinaryIO
@@ -138,6 +139,66 @@ def _pre_process_math(content: bytes) -> bytes:
     return str(soup).encode()
 
 
+def _fix_zip_filename_casing(input_docx: BinaryIO) -> BinaryIO:
+    """
+    Fix ZIP files where local file header filenames differ in casing
+    from the central directory filenames.
+
+    Some document generators (e.g. certain Microsoft Word versions,
+    legal document systems) produce .docx/.pptx files where the central
+    directory records one casing (e.g. 'customXml/item2.xml') but
+    the local file headers record another (e.g. 'customXML/item2.xml').
+    Python's zipfile module raises BadZipFile when reading such files.
+
+    This function patches local file header filenames to match the
+    central directory, which is the authoritative source used by
+    zipfile.ZipFile.
+    """
+    input_docx.seek(0)
+    raw = bytearray(input_docx.read())
+
+    # Read the central directory to get authoritative filenames
+    try:
+        with zipfile.ZipFile(BytesIO(raw), "r") as zf:
+            cd_entries = {
+                zi.header_offset: (zi.orig_filename, zi.flag_bits)
+                for zi in zf.infolist()
+            }
+    except zipfile.BadZipFile:
+        # Can't even read central directory — return as-is, let it fail later
+        input_docx.seek(0)
+        return input_docx
+
+    patched = False
+    for offset, (cd_name, flag_bits) in cd_entries.items():
+        # Verify local file header signature
+        if offset + 30 > len(raw) or raw[offset : offset + 4] != b"PK\x03\x04":
+            continue
+
+        local_fname_len = struct.unpack_from("<H", raw, offset + 26)[0]
+        if offset + 30 + local_fname_len > len(raw):
+            continue
+
+        local_name = bytes(raw[offset + 30 : offset + 30 + local_fname_len])
+        # ZIP filenames are cp437 unless flag bit 11 marks them as UTF-8, which is
+        # how zipfile decoded orig_filename in the first place.
+        central_name = cd_name.encode("utf-8" if flag_bits & 0x800 else "cp437")
+
+        # Only patch if lengths match but content differs (casing mismatch)
+        if (
+            local_name != central_name
+            and len(local_name) == len(central_name)
+            and local_name.lower() == central_name.lower()
+        ):
+            raw[offset + 30 : offset + 30 + local_fname_len] = central_name
+            patched = True
+
+    if patched:
+        return BytesIO(bytes(raw))
+    input_docx.seek(0)
+    return input_docx
+
+
 def _pre_process_styles(content: bytes) -> bytes:
     """
     Repairs DOCX style definitions that Mammoth cannot read.
@@ -175,6 +236,9 @@ def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
     Returns:
         BinaryIO: A binary output stream representing the processed DOCX file.
     """
+    # Fix ZIP filename casing mismatch before any processing
+    input_docx = _fix_zip_filename_casing(input_docx)
+
     output_docx = BytesIO()
     # The pre-processing steps to apply to each file in the .docx
     pre_process_enable_files = {

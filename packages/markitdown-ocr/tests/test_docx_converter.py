@@ -10,6 +10,8 @@ OCR block format used by the converter:
     [End OCR]*
 """
 
+import io
+import struct
 import sys
 import zipfile
 from pathlib import Path
@@ -279,3 +281,59 @@ def test_docx_underlined_text_is_preserved_with_ocr(
             f, StreamInfo(extension=".docx"), ocr_service=svc
         ).markdown
     assert "plain <u>underlined</u>" in md
+
+
+# ---------------------------------------------------------------------------
+# ZIP local file header casing mismatch
+# ---------------------------------------------------------------------------
+
+
+def _uppercase_local_header_names(docx_bytes: bytes) -> bytes:
+    """Uppercase every local file header filename, leaving the central directory
+    untouched, to mimic generators that disagree with themselves about casing."""
+    raw = bytearray(docx_bytes)
+    offset = patched = 0
+    while offset + 30 <= len(raw) and raw[offset : offset + 4] == b"PK\x03\x04":
+        fname_len = struct.unpack_from("<H", raw, offset + 26)[0]
+        extra_len = struct.unpack_from("<H", raw, offset + 28)[0]
+        comp_size = struct.unpack_from("<I", raw, offset + 18)[0]
+        name = raw[offset + 30 : offset + 30 + fname_len]
+        if name.upper() != name:
+            raw[offset + 30 : offset + 30 + fname_len] = name.upper()
+            patched += 1
+        offset += 30 + fname_len + extra_len + comp_size
+    assert patched, "fixture produced no mismatched local file headers"
+    return bytes(raw)
+
+
+def test_docx_zip_filename_casing_mismatch_preserves_ocr(svc: MockOCRService) -> None:
+    """OCR output survives a .docx whose local file headers disagree with the
+    central directory on casing.
+
+    The image extraction swallows every exception, so an unrepaired stream used
+    to yield an empty OCR map and silently drop the OCR blocks rather than fail.
+    """
+    path = TEST_DATA_DIR / "docx_image_middle.docx"
+    if not path.exists():
+        pytest.skip(f"Test file not found: {path}")
+
+    original = path.read_bytes()
+    mismatched = _uppercase_local_header_names(original)
+
+    # Plain zipfile cannot read the mismatched archive ...
+    with pytest.raises(zipfile.BadZipFile):
+        with zipfile.ZipFile(io.BytesIO(mismatched), "r") as zf:
+            for name in zf.namelist():
+                zf.read(name)
+
+    # ... but the converter produces the same output it does for the original.
+    converter = DocxConverterWithOCR()
+    expected = converter.convert(
+        io.BytesIO(original), StreamInfo(extension=".docx"), ocr_service=svc
+    ).markdown
+    actual = converter.convert(
+        io.BytesIO(mismatched), StreamInfo(extension=".docx"), ocr_service=svc
+    ).markdown
+
+    assert _MOCK_TEXT in actual
+    assert actual == expected
