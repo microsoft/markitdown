@@ -519,19 +519,28 @@ def test_docx_malformed_equations() -> None:
     buf = BytesIO()
     with zipfile.ZipFile(buf, "w") as z:
         z.writestr("word/document.xml", docx_xml.encode("utf-8"))
-        z.writestr("[Content_Types].xml", """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        z.writestr(
+            "[Content_Types].xml",
+            """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
   <Default Extension="xml" ContentType="application/xml"/>
   <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
-</Types>""")
-        z.writestr("word/_rels/document.xml.rels", """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+</Types>""",
+        )
+        z.writestr(
+            "word/_rels/document.xml.rels",
+            """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-</Relationships>""")
-        z.writestr("_rels/.rels", """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+</Relationships>""",
+        )
+        z.writestr(
+            "_rels/.rels",
+            """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
-</Relationships>""")
+</Relationships>""",
+        )
 
     buf.seek(0)
     markitdown = MarkItDown()
@@ -540,8 +549,8 @@ def test_docx_malformed_equations() -> None:
     assert "$x+1$" in result.text_content or "$$x+1$$" in result.text_content
     assert "After empty oMathPara" in result.text_content
     assert "After empty inline oMath" in result.text_content
-    
-    
+
+
 def test_xlsx_legacy_show_zeroes_sheetview(tmp_path) -> None:
     from openpyxl import Workbook
 
