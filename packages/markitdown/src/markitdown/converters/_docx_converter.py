@@ -30,15 +30,43 @@ ACCEPTED_FILE_EXTENSIONS = [".docx"]
 _UNDERLINE_STYLE_MAP = "u => u"
 
 
-def with_underline_style_map(style_map: Optional[str]) -> str:
-    """Append the underline mapping so mammoth emits <u> for underlined runs.
+def _read_embedded_style_map(file_stream: BinaryIO) -> Optional[str]:
+    """Read the style map embedded in a .docx, if it has one."""
+    position = file_stream.tell()
+    try:
+        return mammoth.read_embedded_style_map(file_stream)
+    finally:
+        file_stream.seek(position)
 
-    Exposed so that converters replacing this one (e.g., plugins) can apply the
-    same default without duplicating it.
+
+def convert_docx_to_html(file_stream: BinaryIO, style_map: Optional[str] = None) -> str:
+    """Convert a .docx stream to HTML, preserving underlined runs.
+
+    Mammoth resolves style mappings in order and the first match wins, so the
+    ``u => u`` default -- which exists because mammoth otherwise drops
+    underlines -- is composed last, after the caller's mappings and after any
+    style map embedded in the document. The embedded map is read and ordered
+    here rather than left to mammoth, since mammoth would place it *after* the
+    mappings passed in and our default would silently override it.
+
+    Shared so that converters replacing this one (e.g., plugins) get the same
+    behavior without duplicating it.
     """
-    if style_map:
-        return f"{style_map}\n{_UNDERLINE_STYLE_MAP}"
-    return _UNDERLINE_STYLE_MAP
+    pre_process_stream = pre_process_docx(file_stream)
+    style_map = "\n".join(
+        part
+        for part in (
+            style_map,
+            _read_embedded_style_map(pre_process_stream),
+            _UNDERLINE_STYLE_MAP,
+        )
+        if part
+    )
+    return mammoth.convert_to_html(
+        pre_process_stream,
+        style_map=style_map,
+        include_embedded_style_map=False,
+    ).value
 
 
 class DocxConverter(HtmlConverter):
@@ -88,9 +116,7 @@ class DocxConverter(HtmlConverter):
                 _dependency_exc_info[2]
             )
 
-        style_map = with_underline_style_map(kwargs.get("style_map", None))
-        pre_process_stream = pre_process_docx(file_stream)
         return self._html_converter.convert_string(
-            mammoth.convert_to_html(pre_process_stream, style_map=style_map).value,
+            convert_docx_to_html(file_stream, kwargs.get("style_map", None)),
             **kwargs,
         )

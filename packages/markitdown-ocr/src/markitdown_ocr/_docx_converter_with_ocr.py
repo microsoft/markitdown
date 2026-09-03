@@ -9,8 +9,7 @@ import sys
 from typing import Any, BinaryIO, Optional
 
 from markitdown.converters import HtmlConverter
-from markitdown.converter_utils.docx.pre_process import pre_process_docx
-from markitdown.converters._docx_converter import with_underline_style_map
+from markitdown.converters._docx_converter import convert_docx_to_html
 from markitdown import DocumentConverterResult, StreamInfo
 from markitdown._exceptions import (
     MissingDependencyException,
@@ -21,7 +20,7 @@ from ._ocr_service import LLMVisionOCRService
 # Try loading dependencies
 _dependency_exc_info = None
 try:
-    import mammoth
+    import mammoth  # noqa: F401  # required by convert_docx_to_html
     from docx import Document
 except ImportError:
     _dependency_exc_info = sys.exc_info()
@@ -90,11 +89,7 @@ class DocxConverterWithOCR(HtmlConverter):
 
             # 2. Convert DOCX → HTML via mammoth
             file_stream.seek(0)
-            pre_process_stream = pre_process_docx(file_stream)
-            html_result = mammoth.convert_to_html(
-                pre_process_stream,
-                style_map=with_underline_style_map(kwargs.get("style_map")),
-            ).value
+            html_result = convert_docx_to_html(file_stream, kwargs.get("style_map"))
 
             # 3. Replace <img> tags with plain placeholder tokens so that
             #    mammoth's HTML→markdown step never escapes our OCR markers.
@@ -118,10 +113,8 @@ class DocxConverterWithOCR(HtmlConverter):
             return DocumentConverterResult(markdown=md)
         else:
             # Standard conversion without OCR
-            style_map = with_underline_style_map(kwargs.get("style_map", None))
-            pre_process_stream = pre_process_docx(file_stream)
             return self._html_converter.convert_string(
-                mammoth.convert_to_html(pre_process_stream, style_map=style_map).value,
+                convert_docx_to_html(file_stream, kwargs.get("style_map", None)),
                 **kwargs,
             )
 
