@@ -352,7 +352,7 @@ See `packages/markitdown-sample-plugin` to get started, and tag your repository 
 
 ### How to Contribute
 
-You can help by looking at issues or helping review PRs. Any issue or PR is welcome, but we have also marked some as 'open for contribution' and 'open for reviewing' to help facilitate community contributions. These are of course just suggestions and you are welcome to contribute in any way you like.
+You can help by looking at issues or helping review PRs. We have also marked some issues as 'open for contribution' and PRs as 'open for reviewing' to help facilitate community contributions. These labels are suggestions; contributions within the scope described above are welcome.
 
 <div align="center">
 
