@@ -148,7 +148,9 @@ class PptxConverter(DocumentConverter):
 
                     # Prepare the alt, escaping any special characters
                     alt_text = "\n".join(
-                        text for text in [llm_description, alt_text] if text
+                        text
+                        for text in [llm_description, alt_text]
+                        if text and text.strip()
                     ) or shape.name
                     alt_text = re.sub(r"[\r\n\[\]]", " ", alt_text)
                     alt_text = re.sub(r"\s+", " ", alt_text).strip()
