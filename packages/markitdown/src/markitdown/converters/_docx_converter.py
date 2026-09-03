@@ -2,7 +2,7 @@ import sys
 import io
 from warnings import warn
 
-from typing import BinaryIO, Any
+from typing import BinaryIO, Any, Optional
 
 from ._html_converter import HtmlConverter
 from ..converter_utils.docx.pre_process import pre_process_docx
@@ -28,6 +28,17 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 ACCEPTED_FILE_EXTENSIONS = [".docx"]
 
 _UNDERLINE_STYLE_MAP = "u => u"
+
+
+def with_underline_style_map(style_map: Optional[str]) -> str:
+    """Append the underline mapping so mammoth emits <u> for underlined runs.
+
+    Exposed so that converters replacing this one (e.g., plugins) can apply the
+    same default without duplicating it.
+    """
+    if style_map:
+        return f"{style_map}\n{_UNDERLINE_STYLE_MAP}"
+    return _UNDERLINE_STYLE_MAP
 
 
 class DocxConverter(HtmlConverter):
@@ -77,11 +88,7 @@ class DocxConverter(HtmlConverter):
                 _dependency_exc_info[2]
             )
 
-        style_map = kwargs.get("style_map", None)
-        if style_map:
-            style_map = f"{style_map}\n{_UNDERLINE_STYLE_MAP}"
-        else:
-            style_map = _UNDERLINE_STYLE_MAP
+        style_map = with_underline_style_map(kwargs.get("style_map", None))
         pre_process_stream = pre_process_docx(file_stream)
         return self._html_converter.convert_string(
             mammoth.convert_to_html(pre_process_stream, style_map=style_map).value,

@@ -10,6 +10,7 @@ from typing import Any, BinaryIO, Optional
 
 from markitdown.converters import HtmlConverter
 from markitdown.converter_utils.docx.pre_process import pre_process_docx
+from markitdown.converters._docx_converter import with_underline_style_map
 from markitdown import DocumentConverterResult, StreamInfo
 from markitdown._exceptions import (
     MissingDependencyException,
@@ -91,7 +92,8 @@ class DocxConverterWithOCR(HtmlConverter):
             file_stream.seek(0)
             pre_process_stream = pre_process_docx(file_stream)
             html_result = mammoth.convert_to_html(
-                pre_process_stream, style_map=kwargs.get("style_map")
+                pre_process_stream,
+                style_map=with_underline_style_map(kwargs.get("style_map")),
             ).value
 
             # 3. Replace <img> tags with plain placeholder tokens so that
@@ -116,7 +118,7 @@ class DocxConverterWithOCR(HtmlConverter):
             return DocumentConverterResult(markdown=md)
         else:
             # Standard conversion without OCR
-            style_map = kwargs.get("style_map", None)
+            style_map = with_underline_style_map(kwargs.get("style_map", None))
             pre_process_stream = pre_process_docx(file_stream)
             return self._html_converter.convert_string(
                 mammoth.convert_to_html(pre_process_stream, style_map=style_map).value,
