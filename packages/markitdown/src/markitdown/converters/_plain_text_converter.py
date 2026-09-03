@@ -63,9 +63,13 @@ class PlainTextConverter(DocumentConverter):
         stream_info: StreamInfo,
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
+        raw = file_stream.read()
         if stream_info.charset:
-            text_content = file_stream.read().decode(stream_info.charset)
+            try:
+                text_content = raw.decode(stream_info.charset)
+            except UnicodeDecodeError:
+                text_content = str(from_bytes(raw).best())
         else:
-            text_content = str(from_bytes(file_stream.read()).best())
+            text_content = str(from_bytes(raw).best())
 
         return DocumentConverterResult(markdown=text_content)
