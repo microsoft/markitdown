@@ -94,9 +94,16 @@ class DocxConverterWithOCR(HtmlConverter):
             kwargs.get("ocr_service") or self.ocr_service
         )
 
+        # Pre-process once, up front, so that every subsequent read sees the
+        # repaired archive. pre_process_docx() also fixes .docx files whose ZIP
+        # local file headers disagree with the central directory; reading the
+        # original stream first would make those raise, or silently yield no
+        # images and drop the OCR output.
+        pre_process_stream = pre_process_docx(file_stream)
+
         # Read the embedded style map and combine with any provided style map
         caller_style_map = kwargs.get("style_map")
-        embedded_style_map = _read_embedded_style_map(file_stream)
+        embedded_style_map = _read_embedded_style_map(pre_process_stream)
 
         style_map = "\n".join(
             part
@@ -110,12 +117,13 @@ class DocxConverterWithOCR(HtmlConverter):
 
         if ocr_service:
             # 1. Extract and OCR images — returns raw text per image
-            file_stream.seek(0)
-            image_ocr_map = self._extract_and_ocr_images(file_stream, ocr_service)
+            pre_process_stream.seek(0)
+            image_ocr_map = self._extract_and_ocr_images(
+                pre_process_stream, ocr_service
+            )
 
             # 2. Convert DOCX → HTML via mammoth
-            file_stream.seek(0)
-            pre_process_stream = pre_process_docx(file_stream)
+            pre_process_stream.seek(0)
             html_result = mammoth.convert_to_html(
                 pre_process_stream,
                 style_map=style_map,
@@ -144,7 +152,7 @@ class DocxConverterWithOCR(HtmlConverter):
             return DocumentConverterResult(markdown=md)
         else:
             # Standard conversion without OCR
-            pre_process_stream = pre_process_docx(file_stream)
+            pre_process_stream.seek(0)
             return self._html_converter.convert_string(
                 mammoth.convert_to_html(
                     pre_process_stream,
