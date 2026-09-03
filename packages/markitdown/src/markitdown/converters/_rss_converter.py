@@ -1,3 +1,4 @@
+import html
 import warnings
 
 from defusedxml import minidom
@@ -175,14 +176,19 @@ class RssConverter(DocumentConverter):
     ) -> str:
         """Render an Atom text construct, HTML-parsing it only when it is markup.
 
-        Plain text is emitted as-is: running it through the HTML parser drops
-        tag-shaped literals such as ``<job_id>`` and decodes entities a second
-        time, so ``&amp;lt;x&amp;gt;`` would surface as ``<x>``.
+        Plain text is escaped rather than parsed. Feeding it to the HTML parser
+        drops tag-shaped literals such as ``<job_id>`` and decodes entities a
+        second time; emitting it raw would instead let them be swallowed when
+        the Markdown is rendered. Escaping round-trips back to the original text.
         """
         value, is_markup = content
         if is_markup:
             return self._parse_content(value, strict=strict)
-        return f"{value.strip()}\n"
+
+        # Convert as a text node so the converter applies its own Markdown
+        # escaping, then re-escape markup characters it leaves alone.
+        rendered = self._parse_content(html.escape(value), strict=strict)
+        return f"{html.escape(rendered.strip(), quote=False)}\n"
 
     def _localize_xhtml_names(self, node: Node) -> Node:
         """Rewrite prefixed XHTML element names to their local HTML names.

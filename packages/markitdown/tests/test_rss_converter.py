@@ -75,7 +75,12 @@ def test_atom_prefixed_xhtml_content_is_preserved() -> None:
 
 
 def test_atom_plain_text_content_keeps_tag_shaped_literals() -> None:
-    """``type="text"`` is not markup, so it must not reach the HTML parser."""
+    """``type="text"`` is not markup, so it must not reach the HTML parser.
+
+    The value is escaped rather than emitted raw so it survives rendering:
+    ``Run &lt;job\\_id&gt; with &amp;lt;literal&amp;gt;.`` renders back to the
+    original ``Run <job_id> with &lt;literal&gt;.``
+    """
     feed = b"""<?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
   <title>Example feed</title>
@@ -90,7 +95,8 @@ def test_atom_plain_text_content_keeps_tag_shaped_literals() -> None:
         io.BytesIO(feed), StreamInfo(mimetype="application/atom+xml")
     )
 
-    assert "Run <job_id> with &lt;literal&gt;." in result.markdown
+    assert "job" in result.markdown
+    assert "Run &lt;job\\_id&gt; with &amp;lt;literal&amp;gt;." in result.markdown
 
 
 def test_atom_plain_text_summary_keeps_tag_shaped_literals() -> None:
@@ -108,7 +114,7 @@ def test_atom_plain_text_summary_keeps_tag_shaped_literals() -> None:
         io.BytesIO(feed), StreamInfo(mimetype="application/atom+xml")
     )
 
-    assert "Pass <placeholder> verbatim." in result.markdown
+    assert "Pass &lt;placeholder&gt; verbatim." in result.markdown
 
 
 def test_atom_omitted_type_defaults_to_plain_text() -> None:
@@ -127,7 +133,26 @@ def test_atom_omitted_type_defaults_to_plain_text() -> None:
         io.BytesIO(feed), StreamInfo(mimetype="application/atom+xml")
     )
 
-    assert "Keep <job_id> intact." in result.markdown
+    assert "Keep &lt;job\\_id&gt; intact." in result.markdown
+
+
+def test_atom_plain_text_escapes_markdown_syntax() -> None:
+    """Markdown syntax in plain text must not become live formatting."""
+    feed = b"""<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Example feed</title>
+  <entry>
+    <title>Example entry</title>
+    <content type="text">Use *literal* and _under_.</content>
+  </entry>
+</feed>
+"""
+
+    result = RssConverter().convert(
+        io.BytesIO(feed), StreamInfo(mimetype="application/atom+xml")
+    )
+
+    assert "Use \\*literal\\* and \\_under\\_." in result.markdown
 
 
 def test_atom_html_content_is_still_converted() -> None:
