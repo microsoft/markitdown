@@ -109,7 +109,9 @@ def test_wikipedia_converter_no_title() -> None:
     """WikipediaConverter should not render '# None' when page has no title."""
     converter = WikipediaConverter()
     html = b"<html><body><div id='mw-content-text'><p>Hello</p></div></body></html>"
-    stream_info = StreamInfo(mimetype="text/html", url="https://en.wikipedia.org/wiki/Test")
+    stream_info = StreamInfo(
+        mimetype="text/html", url="https://en.wikipedia.org/wiki/Test"
+    )
     result = converter.convert(io.BytesIO(html), stream_info)
     assert "# None" not in result.markdown
     assert "Hello" in result.markdown
