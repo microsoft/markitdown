@@ -1,0 +1,601 @@
+MC_LESION_ID,ACEMID_ID,Lesion ID,PT_AGE,PT_SEX,ANATOMICAL_LOCATION_SIMPLE,ANATOMICAL_LOCATION_FULL,DERMOSCOPIC_IMAGE_NAME_DCM,DERMOSCOPIC_IMAGE_NAME_JPG,MORPHOLOGICAL_DESCRIPTION,CLINICAL_VALIDATION_MORP_DESC,CALCULATED_UGLY_DUCKLING_SCORE,CLINCIAL_CROP_IMAGEFILE_DCM,CLINICAL_CROP_IMAGEFILE_JPG,HISTOPATHOLOGY_DX,CLINICAL_VALIDATION_ISIC_DX,description
+Unique for dataset,,,Age at time of excision,,Location_simple from Lesion Analsis JSON Measurements,Anatomic Location (Full) from Lesion Analsis JSON Measurements NB adds extremities in upper and lower and Torso in thirds,"Link to loose files.
+Name convention:","Link to loose files
+Name convention:",DLIP generated text,Morphological description validated by a dermatologist: Yes/No,,"Link to loose files
+Naming convention:","Link to loose files
+Naming convention:",ISIC_DX ,"Diagnosis validated by dermatologist:
+Yes/No",
+7767-26-10,7767-26,10,65,Male,,,,,,,,,,,,"On
+
+Vie
+
+EXAMINA
+
+ATION
+
+CRAT
+
+ann
+
+oO
+VUOUUFLLU
+
+nr
+
+~|G&
+
+n
+
+O
+
+WGed
+
+x
+
+e
+co)
+a
+
+o
+O
+
+(
+1
+)
+
+x
+X
+
+:
+
+4
+$
+~
+
+©
+4
+
+=
+ i
+a
+ &G
+
+l
+
+.T
+
+JMMARY
+
+\
+
+o0
+
+4o
+
+UOn
+
+T
+
+Ss
+No)
+
+OC1laTea
+
+r
+
+4&
+G
+S
+
+ME
+
+R
+
+LANOMA
+pareGRE
+
+SS
+
+TANT
+
+tUIN
+
+a
+
+aknb  rn
+
+H
+iSPR
+DBohnNi
+
+BN"
+7767-26-44,7767-26,44,66,Male,,,,,,,,,,,,"| CLINICAL     | NOTES       |     |     |     |
+| ------------ | ----------- | --- | --- | --- |
+| Shave  bxs   | skin,  all  | ?MM |     |     |
+| MACROSCOPIC  | EXAMINATION |     |     |     |
+1.  Labelled  left  hand  #1  (request  form  states  left  hand  dorsum  lesion
+1):  A  shave  of  skin  measuring  6  x  3  x  1mm  bearing  a  light  tan  macule
+| measuring  | 4  x  2mm.  | Blocked  in  toto.  1A. |     |     |
+| ---------- | ----------- | ----------------------- | --- | --- |
+2.  Labelled  left  hand  #2  (request  form  states  left  hand  dorsum  lesion
+2):  A  shave  of  skin measuring  5  x  3  x  1mm  bearing  a  grey  tan  macule
+| measuring  | 2  x  1lmm.  | Blocked  in  toto.  2A. |     |     |
+| ---------- | ------------ | ----------------------- | --- | --- |
+3.  Labelled  back:  A  shave  of  skin  measuring  8  x  6  x  1mm  bearing  a
+cream  to  grey macule  measuring  6  x  5mm.  Bisected  blocked  in  toto.  3A.
+| MICROSCOPIC  | EXAMINATION |     |     |     |
+| ------------ | ----------- | --- | --- | --- |
+1.  Labelled  left  hand  #1  (request  form  states  left  hand  dorsum  lesion
+1),  shave:  Sections  show  MELANOMA  IN-SITU  (LEVEL  1)  characterised  by
+proliferation of  atypical  melanocytes  arranged  as  confluent  solitary
+units  and  nests  at  the  junctional  zone  with  pagetoid  scatter.  Some  of
+the  nests  bulge  into  the  papillary  dermis,  but  definite  stromal
+invasion  is  not  seen  in  this  biopsy.  Parts  of  the  biopsy  are  quite
+superficial  not  including  the  basal  epidermis.  Melanoma  in-situ  is
+transected  at  peripheral  and  deep  edges.  No  changes  of  regression  are
+seen.
+2.  Labelled  left  hand  #2  (request  form  states  left  hand  dorsum  lesion
+2),  shave:  Sections  of  the  biopsy  show  changes  of  PIGMENTED  SOLAR
+KERATOSIS  with  a  moderate  lichenoid  lymphocytic  infiltrate.  Focally
+there  is  possibly  an  increase  the  number  of  basal  melanocytes  within
+the  epidermis.  Special  stains  are  being  performed  to  further  assess
+the  melanocytic  proliferation  and  a  FURTHER  REPORT  WILL  BE  ISSUED.
+3.  Labelled  back,  shave:  Sections  of  the  shave  specimen  show  SOLAR
+LENTIGO  with  a  patchy  lichenoid  lymphocytic  infiltrate.  No  atypical
+| melanocytic  | proliferation  | is  seen. |     |     |
+| ------------ | -------------- | --------- | --- | --- |
+SUMMARY
+| 1.  LEFT  | HAND  DORSUM  | #1,  SHAVE  -  MELANOMA  | IN-SITU  (LEVEL  | 1). |
+| --------- | ------------- | ------------------------ | ---------------- | --- |
+2.  LEFT  HAND  DORSUM  #2,  SHAVE  -  PIGMENTED  SOLAR  KERATOSIS.  FURTHER
+REPORT  PENDING.
+3.  BACK,  SHAVE  -  SOLAR  LENTIGO  WITH  LICHENOID  LYMPHOCYTIC  REACTION.
+
+| CLINICAL     | NOTES       |      |     |     |     |     |     |     |     |     |
+| ------------ | ----------- | ---- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Shave  bxs   | skin,       | all  | ?MM |     |     |     |     |     |     |     |
+| MACROSCOPIC  | EXAMINATION |      |     |     |     |     |     |     |     |     |
+1.  Labelled  left  hand  #1  (request  form  states  left  hand  dorsum  lesion
+1):  A  shave  of  skin  measuring  6  x  3  x  1mm  bearing  a  light  tan  macule
+measuring
+|                | 4  x  | 2mm.   | Blocked    | in  toto.  | 1A.           |          |       |               |             |        |
+| -------------- | ----- | ------ | ---------- | ---------- | ------------- | -------- | ----- | ------------- | ----------- | ------ |
+| 2.  Labelled   | left  | hand   | #2         | (request   |               |          |       |               |             |        |
+|                |       |        |            |            | form          | states   | left  | hand  dorsum  |             | lesion |
+| 2):  A  shave  | of    | skin   | measuring  | 5          | x  3  x  1mm  | bearing  |       |               |             |        |
+|                |       |        |            |            |               |          |       | a  grey       | tan  macule |        |
+| measuring      | 2  x  | 1lmm.  | Blocked    | in  toto.  | 2A.           |          |       |               |             |        |
+3.  Labelled  back:  A  shave  of  skin  measuring  8  x  6  x  1mm  bearing  a
+cream  to  grey macule  measuring  6  x  5mm.  Bisected  blocked  in  toto.  3A.
+| MICROSCOPIC  | EXAMINATION |     |     |     |     |     |     |     |     |     |
+| ------------ | ----------- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+1.  Labelled
+|                   | left      | hand      | #1    | (request     | form      | states  | left  | hand  dorsum       |          | lesion |
+| ----------------- | --------- | --------- | ----- | ------------ | --------- | ------- | ----- | ------------------ | -------- | ------ |
+| 1),  shave:       | Sections  |           | show  |              |           |         |       |                    |          |        |
+|                   |           |           |       | MELANOMA     | IN-SITU   | (LEVEL  |       | 1)  characterised  |          | by     |
+| proliferation of  |           | atypical  |       | melanocytes  |           |         |       |                    |          |        |
+|                   |           |           |       |              | arranged  |         | as    | confluent          | solitary |        |
+units  and  nests  at  the  junctional  zone  with  pagetoid  scatter.
+Some  of
+the  nests  bulge  into  the  papillary  dermis,  but  definite  stromal
+invasion  is  not  seen  in  this  biopsy.  Parts  of  the  biopsy  are  quite
+superficial  not  including  the  basal  epidermis.  Melanoma  in-situ  is
+transected  at  peripheral  and  deep  edges.  No  changes  of  regression  are
+seen.
+| 2.  Labelled  | left      |              |          |            |              |          |              |               |         |        |
+| ------------- | --------- | ------------ | -------- | ---------- | ------------ | -------- | ------------ | ------------- | ------- | ------ |
+|               |           | hand         | #2       | (request   | form         | states   | left         | hand  dorsum  |         | lesion |
+| 2),  shave:   | Sections  |              | of  the  | biopsy     |              |          |              |               |         |        |
+|               |           |              |          |            | show         | changes  | of           | PIGMENTED     | SOLAR   |        |
+| KERATOSIS     | with      | a  moderate  |          | lichenoid  | lymphocytic  |          |              |               |         |        |
+|               |           |              |          |            |              |          | infiltrate.  |               | Focally |        |
+there  is  possibly  an  increase  the  number  of  basal  melanocytes  within
+the  epidermis.  Special  stains  are  being  performed  to  further  assess
+the  melanocytic  proliferation  and  a  FURTHER  REPORT  WILL  BE  ISSUED.
+3.  Labelled  back,  shave:  Sections  of  the  shave  specimen  show  SOLAR
+LENTIGO  with  a  patchy  lichenoid  lymphocytic  infiltrate.  No  atypical
+| melanocytic  | proliferation  |     |     | is  seen. |     |     |     |     |     |     |
+| ------------ | -------------- | --- | --- | --------- | --- | --- | --- | --- | --- | --- |
+SUMMARY
+| 1.  LEFT  | HAND  DORSUM  |     | #1,  | SHAVE  -  | MELANOMA  |          |     |             |     |     |
+| --------- | ------------- | --- | ---- | --------- | --------- | -------- | --- | ----------- | --- | --- |
+|           |               |     |      |           |           | IN-SITU  |     | (LEVEL  1). |     |     |
+2.  LEFT  HAND  DORSUM  #2,  SHAVE  -  PIGMENTED  SOLAR  KERATOSIS.  FURTHER
+REPORT  PENDING.
+
+LT YVMMDPUHRCOYCMYmTTILCF RPEAAOCMTITOANA."
+7767-26-47,7767-26,47,66,Male,,,,,,,,,,,,"CLINICAL NOTES
+
+Exc  MM  +  FTG
+
+MACROSCOPIC EXAMINATION
+
+Labelled left hand, nick 12 o'clock: An  ovoid excision of skin  measuring  32  x  25  x  Smm  bearing  a  light tan  patch  measuring
+20 x  15mm. Towards one short  margin  of the specimen there is  an  orientation  nick  present. This  is  placed towards 12  o'clock.
+The  3  oclock margin  is  inked  in  black.  Starting from the 12  o'clock margin  and  moving  towards the  6  o'clock margin,  2LS and
+2TS,  1A.  37S,  1B.  2TS,  1C.  1TS  and  2LS5,  1D.
+
+MICROSCOPIC EXAMINATION
+
+Labelled left hand, nick 12 o'clock: Sections of skin with severe solar  elastosis shows a  central and  peripheral cellular scar
+and  residual IN  SITU  MELANOMA,  CLARK LEVEL 1. There is  no evidence of established  regression or  invasive malignancy.
+This lesion  is  6  mm from the  3  and 9 o'clock margins, at least  8  mm from the 6  ocloc< margin and  >  10  mm from the 12
+o'clock margin. There is  a  background of moderately dysplastic pigmented  solar keratosis,  pigmented seborrhoeic keratosis
+and  solar lentigo. Central cellular scar appears clear of the  peripheral and  deep  margins. Peripheral cellular scar extends to
+
+the  9  o'clock margin.
+
+SUMMARY
+
+LEFT HAND - IN SITU MELANOMA. CLARK LEVEL 1. PTIS (AJCC 8). NO ESTABLISHED REGRESSION. 6  MM FROM CLOSEST
+
+PERIPHERAL MARGINS."
+7767-38-2,7767-38,2,51,Female,,,,,,,,,,,,"DIAGNOSTIC SUMMARY:
+
+LEFT DORSAL WRIST, EXCISION - JUNCTIONAL LENTIGINOUS NAEVUS,  COMPLETELY EXCISED.
+
+Clinical  Notes:  Vectra  lesion  2  left dorsal wrist ?dysplastic 2melanoma marker at  12 o'clock
+
+Macroscopic:
+
+Labelled  'Vectra  lesion 2  left dorsal wrist’.  A 11  x  5  x  2mm skin ellipse. A suture marks one tip at 12  o'clock (3
+
+o'clock green,  9 o'clock black).  There  is a variegated  brown macuke  1  x  1mm.  1A  1TS  1LS  12 o'clock;  1B  1LS 6
+
+o'clock
+
+Microscopic:
+
+Vectra  lesion  2  Left dorsal wrist,  excision:  Sections show a small junctional  lentiginous naevus.  There are no
+
+dysplastic or malignant features.  Excision margins are free of the  lesion."
+7767-46-34,7767-46,34,75,Male,,,,,,,,,,,,"DIAGNO NstaTwic SUMMA xs
+1. LEFT CHEST SU ERIOR LATERAL, EXCISION - LOW GRADE DYSPLASTIC
+JUNCTIONAL NAEVU , CLEAR OF THIf MARGIN,
+2. RIGHT NECK FO TERIOR LATERAi, BASE 2, EXCISION - LOW GRADE DYSPLASTIC
+LENTIGINOUS JUNC IONAL NAEVUS, CLEAR OF THE MARGIN.
+3. RIGHT CHEST M D LATERAL, BIDPSY - SCAR, NO EVIDENCE OF MALIGNANCY.
+Clinical Notes: ] ) L chest sup lat; e/o PSL next to old M scar,
+dermatologist warits lesion removed for HD, ?LGDN - 12 nick; 2) R neck
+post lat base puyich excision, hidden in creases, duration unknown,
+atypical, exclude M- 12 nicks|; 3) R chest mid lat pbx, ésymptomatic,
+?BCC.
+Macroscopic:
+1. Labelled 'L chrest sup lat'. A 16x 5 x 4mm skin ellipse. A nick
+marks one transv4rse edge, oriPntated 12 o'cleck (12 o'clock green, 6
+o'clock black). 1here is a tan lesion, 2 x 2mm. 1A 1TS 1L8 3 o'clock;
+1B 1TS 1LS 9 o'c]ock.
+2. Labelled 'R neck post lat bAse 2', A 10x 7 x 3mm skin ellipse. A
+suture marks one tip, orientatBd 12 o'clock
+(3 o'clock green, 9 oO’ clock, bLAcK). There is a tan crusted and raised
+lesion, 5 “x 5mm, 2A 1TS 1LSo 12 o'clock; 2B 1TS 1LS 6 o'clock.
+3. Labelled ""R chest mid lat ~ 2 A 4 x 6mm skin punch with a tan
+surface. JA bisedted in total.
+Microsscccopic:
+Sections show a low grade dysplastic junctional naevus with
+regression, clear of the margifh.
+2. Sections show a low grade dVWsplastic leantiginous junctional naevus
+
+| with  focal  | regression,  |     |     |
+| ------------ | ------------ | --- | --- |
+clear bf  the margin.
+| 3.  Sections  | show  a  scar,  | I  can  see  | no  evidence  of malicnancy. |
+| ------------- | --------------- | ------------ | ---------------------------- |"
+7767-57-4,7767-57,4,38,Female,,,,,,,,,,,,"|     |     | CLINICAL  |     |     |     |     |     | NOTES |       |     |     |     |        |     |     |          |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |
+| --- | --- | --------- | --- | --- | --- | --- | --- | ----- | ----- | --- | --- | --- | ------ | --- | --- | -------- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+|     |     |           |     |     |     |     |     |       |       |     |     |     | ?D/N,  |     |     | exclude  |     |     |     |     | MM  |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |
+|     |     | Shave     |     |     |     | bx  |     | -     | both  |     |     |     |        |     |     |          |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |
+EXAMINATION
+MACROSCOPIC
+|     |     |          |       |           |     |     |     |     |      |        |      |     |     |              |     |     |     |            |     |     |        |     |       |     |     |         |       |     |     |            |        |     |     |     |         |      |     |          |          | x   | 1mm |     |     |
+| --- | --- | -------- | ----- | --------- | --- | --- | --- | --- | ---- | ------ | ---- | --- | --- | ------------ | --- | --- | --- | ---------- | --- | --- | ------ | --- | ----- | --- | --- | ------- | ----- | --- | --- | ---------- | ------ | --- | --- | --- | ------- | ---- | --- | -------- | -------- | --- | --- | --- | --- |
+|     |     |          |       |           |     |     |     |     |      |        |      |     |     |              |     |     |     |            |     |     |        |     |       |     |     |         | skin  |     |     | measuring  |        |     |     |     |         | 7    | x   |          | 5        |     |     |     |     |
+|     |     |          |       |           |     |     |     |     |      |        |      |     |     | shoulderA:   |     |     |     |            |     |     | shave  |     |       |     | of  |         |       |     |     |            |        |     |     |     |         |      |     |          |          |     |     |     |     |
+|     |     |          |       | Labelled  |     |     |     |     |      | right  |      |     |     |              |     |     |     |            |     |     |        |     |       |     |     |         |       |     |     |            |        |     |     |     |         |      |     |          |          |     |     |     |     |
+|     |     | ps       |       |           |     |     |     |     |      |        |      |     |     |              |     |     |     |            |     |     |        |     |       |     |     |         |       |     |     |            |        |     |     |     |         |      |     | blocked  |          |     |     |     | in  |
+|     |     |          |       |           |     |     |     |     |      |        |      |     |     |              |     |     |     |            |     |     |        |     |       |     |     |         | 3mm.  |     |     | Bisected   |        |     |     |     |         | and  |     |          |          |     |     |     |     |
+|     |     |          |       |           |     |     |     |     |      |        |      |     |     | macule       |     |     |     | measuring  |     |     |        |     |       | 4   |     | x       |       |     |     |            |        |     |     |     |         |      |     |          |          |     |     |     |     |
+|     |     | bearing  |       |           |     |     |     | a   | mid  |        | tan  |     |     |              |     |     |     |            |     |     |        |     |       |     |     |         |       |     |     |            |        |     |     |     |         |      |     |          |          |     |     |     |     |
+|     |     |          | toto  |           | 1A. |     |     |     |      |        |      |     |     |              |     |     |     |            |     |     |        |     |       |     |     |         |       |     |     |            |        |     |     |     |         |      |     |          |          |     |     |     |     |
+|     |     |          |       |           |     |     |     |     |      |        |      |     |     |              |     |     |     |            |     |     |        |     |       |     |     |         |       |     |     |            |        |     |     |     | medial  |      |     |          | thigh):  |     |     |     | A   |
+|     |     |          |       |           |     |     |     |     |      |        |      |     |     |              |     |     |     |            |     |     |        |     | form  |     |     | states  |       |     |     |            | right  |     |     |     |         |      |     |          |          |     |     |     |     |
+|     |     |          |       | Labelled  |     |     |     |     |      | right  |      |     |     | thigh        |     |     |     | (request   |     |     |        |     |       |     |     |         |       |     |     |            |        |     |     |     |         |      |     |          |          |     |     |     |     |
+2.
+|     |     |        |     |       |     |     |     |           |     |     |            |     |     |      |     |          |     |     |     |     |     |      |       |     |          |     |     |     |     |     |      |     |     | tan  |     | macule  |     |     |     | measuring |     |     |     |
+| --- | --- | ------ | --- | ----- | --- | --- | --- | --------- | --- | --- | ---------- | --- | --- | ---- | --- | -------- | --- | --- | --- | --- | --- | ---- | ----- | --- | -------- | --- | --- | --- | --- | --- | ---- | --- | --- | ---- | --- | ------- | --- | --- | --- | --------- | --- | --- | --- |
+|     |     |        |     |       |     |     |     |           |     |     |            |     |     |      |     |          | 5   | x   | 4   |     | x   | 1mm  |       |     | bearing  |     |     |     |     | a   | mid  |     |     |      |     |         |     |     |     |           |     |     |     |
+|     |     | shave  |     |       |     | of  |     | skin      |     |     | measuring  |     |     |      |     |          |     |     |     |     |     |      |       |     |          |     |     |     |     |     |      |     |     |      |     |         |     |     |     |           |     |     |     |
+|     |     |        |     |       |     |     |     |           |     |     |            |     |     |      |     | blocked  |     |     |     |     | in  |      | toto  |     |          | 2A. |     |     |     |     |      |     |     |      |     |         |     |     |     |           |     |     |     |
+|     |     | >      | x   | 2mm.  |     |     |     | Bisected  |     |     |            |     |     | and  |     |          |     |     |     |     |     |      |       |     |          |     |     |     |     |     |      |     |     |      |     |         |     |     |     |           |     |     |     |
+EXAMINATION
+MICROSCOPIC
+lentiginous
+|     |     |     |     |           |     |     |     |     |     |        |     |     |     | shoulder:  |     |     |     |     | Sections  |     |     |     |     |     | show  |     |     |     | a   | benign  |     |     |     |     |     |     |     |     |     |     |     |     |     |
+| --- | --- | --- | --- | --------- | --- | --- | --- | --- | --- | ------ | --- | --- | --- | ---------- | --- | --- | --- | --- | --------- | --- | --- | --- | --- | --- | ----- | --- | --- | --- | --- | ------- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+|     |     |     |     | Labelled  |     |     |     |     |     | right  |     |     |     |            |     |     |     |     |           |     |     |     |     |     |       |     |     |     |     |         |     |     |     |     |     |     |     |     |     |     |     |     |     |
+1.
+component
+|     |     |           |           |     |     |     |          |         |        |        |     |     |        |              |     |          |           |     |     |     | congenital  |     |       |        |             |         |     |     | type.  |        |             | The  |     |         | dermal  |     |     |        |          |     |     |        |     |
+| --- | --- | --------- | --------- | --- | --- | --- | -------- | ------- | ------ | ------ | --- | --- | ------ | ------------ | --- | -------- | --------- | --- | --- | --- | ----------- | --- | ----- | ------ | ----------- | ------- | --- | --- | ------ | ------ | ----------- | ---- | --- | ------- | ------- | --- | --- | ------ | -------- | --- | --- | ------ | --- |
+|     |     | COMPOUND  |           |     |     |     |          | NAEVUS  |        |        |     | of  |        | superficial  |     |          |           |     |     |     |             |     |       |        |             |         |     |     |        |        |             |      |     |         |         |     |     |        |          |     |     |        |     |
+|     |     |           |           |     |     |     |          |         |        |        |     |     |        |              |     |          |           |     |     |     |             |     |       |        |             |         |     |     |        |        |             |      |     |         |         |     |     | edges  |          |     |     | appear |     |
+|     |     |           |           |     |     |     |          |         |        |        |     |     |        |              |     |          |           |     |     |     | deep        |     |       | edge.  |             |         |     |     | The    |        | peripheral  |      |     |         |         |     |     |        |          |     |     |        |     |
+|     |     | extends   |           |     |     |     | focally  |         |        |        |     | to  |        | the          |     |          | central   |     |     |     |             |     |       |        |             |         |     |     |        |        |             |      |     |         |         |     |     |        |          |     |     |        |     |
+|     |     |           |           |     |     |     |          |         |        |        |     |     |        |              |     |          |           |     |     |     | (shave      |     |       |        | specimen.)  |         |     |     |        |        |             |      |     |         |         |     |     |        |          |     |     |        |     |
+|     |     |           |           |     |     |     |          | the     |        | plane  |     |     |        | of           |     | section  |           |     |     |     |             |     |       |        |             |         |     |     |        |        |             |      |     |         |         |     |     |        |          |     |     |        |     |
+|     |     | clear     |           |     | in  |     |          |         |        |        |     |     |        |              |     |          |           |     |     |     |             |     |       |        |             |         |     |     |        |        |             |      |     |         |         |     |     |        |          |     |     |        |     |
+|     |     |           |           |     |     |     |          |         |        |        |     |     |        |              |     |          |           |     |     |     |             |     |       |        |             |         |     |     |        | right  |             |      |     | medial  |         |     |     |        | thigh:)  |     |     |        |     |
+|     |     |           |           |     |     |     |          |         |        |        |     |     |        |              |     |          | (request  |     |     |     |             |     | form  |        |             | states  |     |     |        |        |             |      |     |         |         |     |     |        |          |     |     |        |     |
+|     |     |           | Labelled  |     |     |     |          |         | right  |        |     |     | thigh  |              |     |          |           |     |     |     |             |     |       |        |             |         |     |     |        |        |             |      |     |         |         |     |     |        |          |     |     |        |     |
+2.
+|     |             |        |     |     |              |     |     |        |          |     |           |     |      |      |     |              |        |        |     |         |     |           |            |     |     |        |     | IN-SITU  |        |         |     |              | (Level  |           |               |     | 1)  |     | with  |     |        | a   |     |
+| --- | ----------- | ------ | --- | --- | ------------ | --- | --- | ------ | -------- | --- | --------- | --- | ---- | ---- | --- | ------------ | ------ | ------ | --- | ------- | --- | --------- | ---------- | --- | --- | ------ | --- | -------- | ------ | ------- | --- | ------------ | ------- | --------- | ------------- | --- | --- | --- | ----- | --- | ------ | --- | --- |
+|     |             |        |     |     |              |     |     |        |          |     |           |     |      |      |     |              |        | small  |     |         |     | MELANOMA  |            |     |     |        |     |          |        |         |     |              |         |           |               |     |     |     |       |     |        |     |     |
+|     |             | shave  |     |     | specimen     |     |     |        |          |     | confirms  |     |      |      |     |              | a      |        |     |         |     |           |            |     |     |        |     |          |        |         |     |              |         |           |               |     |     |     |       |     |        |     |     |
+|     |             |        |     |     |              |     |     |        |          |     |           |     |      |      |     |              |        |        |     |         |     |           |            |     |     |        |     |          |        | growth  |     |              |         | pattern.  |               |     |     |     | No    |     | dermal |     |     |
+|     |             |        |     |     |              |     |     |        |          |     |           |     |      |      |     | superficial  |        |        |     |         |     |           | spreading  |     |     |        |     |          |        |         |     |              |         |           |               |     |     |     |       |     |        |     |     |
+|     | mixed       |        |     |     | lentiginous  |     |     |        |          |     |           |     | and  |      |     |              |        |        |     |         |     |           |            |     |     |        |     |          |        |         |     |              |         |           |               |     |     |     |       |     |        |     |     |
+|     |             |        |     |     |              |     |     |        |          |     |           |     |      |      |     |              |        |        |     |         |     |           |            |     |     |        |     |          |        | The     |     | longitudinal |         |           |               |     |     |     |       |     |        |     |     |
+|     |             |        |     |     |              |     |     |        |          |     |           |     |      | of   |     | regression   |        |        |     |         |     |           | are        |     |     | seen.  |     |          |        |         |     |              |         |           |               |     |     |     |       |     |        |     |     |
+|     | invasion    |        |     |     |              |     | or  |        | changes  |     |           |     |      |      |     |              |        |        |     |         |     |           |            |     |     |        |     |          |        |         |     |              |         |           |               |     |     |     |       |     |        |     |     |
+|     |             |        |     |     |              |     |     |        |          |     |           |     |      |      |     |              |        |        |     |         |     |           |            |     |     |        |     |          |        |         |     |              |         |           | pproximately  |     |     |     |       |     |        |     | 1mm |
+|     |             |        |     |     |              |     |     |        |          |     |           |     |      |      |     |              |        |        |     |         |     |           |            |     |     |        | be  |          | clear  |         |     |              | bya     |           |               |     |     |     |       |     |        |     |     |
+|     |             |        |     |     |              |     |     |        |          |     |           |     |      | the  |     |              | shave  |        |     | appear  |     |           |            |     | to  |        |     |          |        |         |     |              |         |           |               |     |     |     |       |     |        |     |     |
+|     | peripheral  |        |     |     |              |     |     | edges  |          |     |           | of  |      |      |     |              |        |        |     |         |     |           |            |     |     |        |     |          |        |         |     |              |         |           |               |     |     |     |       |     |        |     |     |
+section.
+|     | in  |     | the  |     | plane  |     |     |     |     | of  |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |
+| --- | --- | --- | ---- | --- | ------ | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+SUMMARY
+|     |     |     |        |     |     |     |        |     |     |     |           |     |     |     |     |     |     |           |     |     |     |     |         |     |     |     |     |            |     |     |     |     |     |     | FOCALLY  |     |     |     | TO  |     | DEEP |     |     |
+| --- | --- | --- | ------ | --- | --- | --- | ------ | --- | --- | --- | --------- | --- | --- | --- | --- | --- | --- | --------- | --- | --- | --- | --- | ------- | --- | --- | --- | --- | ---------- | --- | --- | --- | --- | --- | --- | -------- | --- | --- | --- | --- | --- | ---- | --- | --- |
+|     |     |     |        |     |     |     |        |     |     |     |           |     |     |     |     |     |     |           |     |     |     |     | NAEVUS  |     |     |     |     | EXTENDING  |     |     |     |     |     |     |          |     |     |     |     |     |      |     |     |
+|     |     |     |        |     |     |     |        |     |     |     | SHOULDER  |     |     |     |     |     | -   | COMPOUND  |     |     |     |     |         |     |     |     |     |            |     |     |     |     |     |     |          |     |     |     |     |     |      |     |     |
+|     | 1.  |     | SHAVE  |     |     |     | RIGHT  |     |     |     |           |     |     |     |     |     |     |           |     |     |     |     |         |     |     |     |     |            |     |     |     |     |     |     |          |     |     |     |     |     |      |     |     |
+EDGE.
+|     |     |     |        |     |     |        |     |     |     |         |     |     |     |     |        |     |     |     |     |           |     |     |     |     |     |           |     |     |     |     |     |        |     |     |                | LEVEL  |     |     | 1,  |     |     |     |     |
+| --- | --- | --- | ------ | --- | --- | ------ | --- | --- | --- | ------- | --- | --- | --- | --- | ------ | --- | --- | --- | --- | --------- | --- | --- | --- | --- | --- | --------- | --- | --- | --- | --- | --- | ------ | --- | --- | -------------- | ------ | --- | --- | --- | --- | --- | --- | --- |
+|     |     |     |        |     |     |        |     |     |     |         |     |     |     |     |        |     |     |     |     |           |     |     |     |     |     | IN-SITU,  |     |     |     |     |     | CLARK  |     |     |                |        |     |     |     |     |     |     |     |
+|     |     |     |        |     |     |        |     |     |     |         |     |     |     |     | THIGH  |     |     | -   |     | MELANOMA  |     |     |     |     |     |           |     |     |     |     |     |        |     |     |                |        |     |     |     |     |     |     |     |
+|     |     |     |        |     |     | RIGHT  |     |     |     | MEDIAL  |     |     |     |     |        |     |     |     |     |           |     |     |     |     |     |           |     |     |     |     |     |        |     |     |                |        |     |     |     |     |     |     |     |
+| >   |     |     | SHAVE  |     |     |        |     |     |     |         |     |     |     |     |        |     |     |     |     |           |     |     |     |     |     |           |     |     |     |     |     |        |     |     |                |        |     |     |     |     |     |     |     |
+|     |     |     |        |     |     |        |     |     |     |         |     |     |     |     |        |     |     |     |     |           |     |     |     |     |     |           |     |     |     |     |     |        |     |     | APPROXIMATELY  |        |     |     |     |     |     |     | 1MM |
+CLEARANCE
+|     |     |     |     |     |     |     |     |        |     |     |     |       |     |     |        |     |     | 8).  |     |     | PERIPHERAL  |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |
+| --- | --- | --- | --- | --- | --- | --- | --- | ------ | --- | --- | --- | ----- | --- | --- | ------ | --- | --- | ---- | --- | --- | ----------- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+|     |     |     |     |     |     |     |     | STAGE  |     |     |     | PTIS  |     |     | (AJCC  |     |     |      |     |     |             |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |
+PATHOLOGIC
+SECTION.
+| IN  |     |     | PLANE  |     |     | OF  |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |
+| --- | --- | --- | ------ | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"
+7767-57-25,7767-57,25,38,Female,,,,,,,,,,,,"|     |     | CLINICAL  |     |     |     |     |     | NOTES |       |     |     |     |        |     |     |          |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |
+| --- | --- | --------- | --- | --- | --- | --- | --- | ----- | ----- | --- | --- | --- | ------ | --- | --- | -------- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+|     |     |           |     |     |     |     |     |       |       |     |     |     | ?D/N,  |     |     | exclude  |     |     |     |     | MM  |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |
+|     |     | Shave     |     |     |     | bx  |     | -     | both  |     |     |     |        |     |     |          |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |
+EXAMINATION
+MACROSCOPIC
+|     |     |          |       |           |     |     |     |     |      |        |      |     |     |              |     |     |     |            |     |     |        |     |       |     |     |         |       |     |     |            |        |     |     |     |         |      |     | 5        |     | x   | 1mm |     |     |
+| --- | --- | -------- | ----- | --------- | --- | --- | --- | --- | ---- | ------ | ---- | --- | --- | ------------ | --- | --- | --- | ---------- | --- | --- | ------ | --- | ----- | --- | --- | ------- | ----- | --- | --- | ---------- | ------ | --- | --- | --- | ------- | ---- | --- | -------- | --- | --- | --- | --- | --- |
+|     |     |          |       |           |     |     |     |     |      |        |      |     |     |              |     |     |     |            |     |     |        |     |       |     | of  |         | skin  |     |     | measuring  |        |     |     |     |         | 7    | x   |          |     |     |     |     |     |
+|     |     |          |       |           |     |     |     |     |      | right  |      |     |     | shoulderA:   |     |     |     |            |     |     | shave  |     |       |     |     |         |       |     |     |            |        |     |     |     |         |      |     |          |     |     |     |     |     |
+|     |     | 1.       |       | Labelled  |     |     |     |     |      |        |      |     |     |              |     |     |     |            |     |     |        |     |       |     |     |         |       |     |     |            |        |     |     |     |         |      |     |          |     |     |     |     |     |
+|     |     |          |       |           |     |     |     |     |      |        |      |     |     |              |     |     |     |            |     |     |        |     |       |     |     |         |       |     |     |            |        |     |     |     |         |      |     | blocked  |     |     |     |     | in  |
+|     |     |          |       |           |     |     |     |     |      |        |      |     |     |              |     |     |     |            |     |     |        |     |       |     |     |         | 3mm.  |     |     | Bisected   |        |     |     |     |         | and  |     |          |     |     |     |     |     |
+|     |     |          |       |           |     |     |     |     |      |        |      |     |     | macule       |     |     |     | measuring  |     |     |        |     |       | 4   |     | x       |       |     |     |            |        |     |     |     |         |      |     |          |     |     |     |     |     |
+|     |     | bearing  |       |           |     |     |     | a   | mid  |        | tan  |     |     |              |     |     |     |            |     |     |        |     |       |     |     |         |       |     |     |            |        |     |     |     |         |      |     |          |     |     |     |     |     |
+|     |     |          | toto  |           | 1A. |     |     |     |      |        |      |     |     |              |     |     |     |            |     |     |        |     |       |     |     |         |       |     |     |            |        |     |     |     |         |      |     |          |     |     |     |     |     |
+|     |     |          |       |           |     |     |     |     |      |        |      |     |     |              |     |     |     |            |     |     |        |     |       |     |     |         |       |     |     |            |        |     |     |     | medial  |      |     | thigh):  |     |     |     |     | A   |
+|     |     |          |       |           |     |     |     |     |      |        |      |     |     |              |     |     |     |            |     |     |        |     | form  |     |     | states  |       |     |     |            | right  |     |     |     |         |      |     |          |     |     |     |     |     |
+|     |     |          |       | Labelled  |     |     |     |     |      | right  |      |     |     | thigh        |     |     |     | (request   |     |     |        |     |       |     |     |         |       |     |     |            |        |     |     |     |         |      |     |          |     |     |     |     |     |
+2.
+|     |     |        |     |       |     |     |     |           |     |     |            |     |     |      |     |          |     |     |     |     |     |      |       |     |          |     |     |     |     |     |      |     |     | tan  |     | macule  |     |     |     | measuring |     |     |     |
+| --- | --- | ------ | --- | ----- | --- | --- | --- | --------- | --- | --- | ---------- | --- | --- | ---- | --- | -------- | --- | --- | --- | --- | --- | ---- | ----- | --- | -------- | --- | --- | --- | --- | --- | ---- | --- | --- | ---- | --- | ------- | --- | --- | --- | --------- | --- | --- | --- |
+|     |     |        |     |       |     |     |     |           |     |     |            |     |     |      |     |          | 5   | x   | 4   |     | x   | 1mm  |       |     | bearing  |     |     |     |     | a   | mid  |     |     |      |     |         |     |     |     |           |     |     |     |
+|     |     | shave  |     |       |     | of  |     | skin      |     |     | measuring  |     |     |      |     |          |     |     |     |     |     |      |       |     |          |     |     |     |     |     |      |     |     |      |     |         |     |     |     |           |     |     |     |
+|     |     |        |     |       |     |     |     |           |     |     |            |     |     |      |     | blocked  |     |     |     |     | in  |      | toto  |     |          | 2A. |     |     |     |     |      |     |     |      |     |         |     |     |     |           |     |     |     |
+|     |     | >      | x   | 2mm.  |     |     |     | Bisected  |     |     |            |     |     | and  |     |          |     |     |     |     |     |      |       |     |          |     |     |     |     |     |      |     |     |      |     |         |     |     |     |           |     |     |     |
+EXAMINATION
+MICROSCOPIC
+lentiginous
+|     |     |     |     |           |     |     |     |     |     |        |     |     |     | shoulder:  |     |     |     |     | Sections  |     |     |     |     |     | show  |     |     |     | a   | benign  |     |     |     |     |     |     |     |     |     |     |     |     |     |
+| --- | --- | --- | --- | --------- | --- | --- | --- | --- | --- | ------ | --- | --- | --- | ---------- | --- | --- | --- | --- | --------- | --- | --- | --- | --- | --- | ----- | --- | --- | --- | --- | ------- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+|     |     | 1.  |     | Labelled  |     |     |     |     |     | right  |     |     |     |            |     |     |     |     |           |     |     |     |     |     |       |     |     |     |     |         |     |     |     |     |     |     |     |     |     |     |     |     |     |
+component
+|     |     |           |           |     |     |     |          |         |        |        |     |     |        |              |     |          |           |     |     |     | congenital  |     |       |        |             |         |     |     | type.  |        |             | The  |     |         | dermal  |     |     |          |     |     |     |        |     |
+| --- | --- | --------- | --------- | --- | --- | --- | -------- | ------- | ------ | ------ | --- | --- | ------ | ------------ | --- | -------- | --------- | --- | --- | --- | ----------- | --- | ----- | ------ | ----------- | ------- | --- | --- | ------ | ------ | ----------- | ---- | --- | ------- | ------- | --- | --- | -------- | --- | --- | --- | ------ | --- |
+|     |     | COMPOUND  |           |     |     |     |          | NAEVUS  |        |        |     | of  |        | superficial  |     |          |           |     |     |     |             |     |       |        |             |         |     |     |        |        |             |      |     |         |         |     |     |          |     |     |     |        |     |
+|     |     |           |           |     |     |     |          |         |        |        |     |     |        |              |     |          |           |     |     |     |             |     |       |        |             |         |     |     |        |        |             |      |     |         |         |     |     | edges    |     |     |     | appear |     |
+|     |     |           |           |     |     |     |          |         |        |        |     |     |        |              |     |          |           |     |     |     | deep        |     |       | edge.  |             |         |     |     | The    |        | peripheral  |      |     |         |         |     |     |          |     |     |     |        |     |
+|     |     | extends   |           |     |     |     | focally  |         |        |        |     | to  |        | the          |     |          | central   |     |     |     |             |     |       |        |             |         |     |     |        |        |             |      |     |         |         |     |     |          |     |     |     |        |     |
+|     |     |           |           |     |     |     |          |         |        |        |     |     |        |              |     |          |           |     |     |     | (shave      |     |       |        | specimen.)  |         |     |     |        |        |             |      |     |         |         |     |     |          |     |     |     |        |     |
+|     |     |           |           |     |     |     |          | the     |        | plane  |     |     |        | of           |     | section  |           |     |     |     |             |     |       |        |             |         |     |     |        |        |             |      |     |         |         |     |     |          |     |     |     |        |     |
+|     |     | clear     |           |     | in  |     |          |         |        |        |     |     |        |              |     |          |           |     |     |     |             |     |       |        |             |         |     |     |        |        |             |      |     |         |         |     |     |          |     |     |     |        |     |
+|     |     |           |           |     |     |     |          |         |        |        |     |     |        |              |     |          |           |     |     |     |             |     |       |        |             |         |     |     |        | right  |             |      |     | medial  |         |     |     | thigh:)  |     |     |     |        |     |
+|     |     |           |           |     |     |     |          |         |        |        |     |     |        |              |     |          | (request  |     |     |     |             |     | form  |        |             | states  |     |     |        |        |             |      |     |         |         |     |     |          |     |     |     |        |     |
+|     |     |           | Labelled  |     |     |     |          |         | right  |        |     |     | thigh  |              |     |          |           |     |     |     |             |     |       |        |             |         |     |     |        |        |             |      |     |         |         |     |     |          |     |     |     |        |     |
+2.
+|     |             |        |     |     |              |     |     |        |          |     |           |     |      |      |     |              |        |        |     |         |     |           |            |     |     |        |     | IN-SITU  |        |         |     |              | (Level  |           |                |     | 1)  |     | with  |     |        | a   |     |
+| --- | ----------- | ------ | --- | --- | ------------ | --- | --- | ------ | -------- | --- | --------- | --- | ---- | ---- | --- | ------------ | ------ | ------ | --- | ------- | --- | --------- | ---------- | --- | --- | ------ | --- | -------- | ------ | ------- | --- | ------------ | ------- | --------- | -------------- | --- | --- | --- | ----- | --- | ------ | --- | --- |
+|     |             |        |     |     |              |     |     |        |          |     |           |     |      |      |     |              |        | small  |     |         |     | MELANOMA  |            |     |     |        |     |          |        |         |     |              |         |           |                |     |     |     |       |     |        |     |     |
+|     |             | shave  |     |     | specimen     |     |     |        |          |     | confirms  |     |      |      |     |              | a      |        |     |         |     |           |            |     |     |        |     |          |        |         |     |              |         |           |                |     |     |     |       |     |        |     |     |
+|     |             |        |     |     |              |     |     |        |          |     |           |     |      |      |     |              |        |        |     |         |     |           |            |     |     |        |     |          |        | growth  |     |              |         | pattern.  |                |     |     |     | No    |     | dermal |     |     |
+|     |             |        |     |     |              |     |     |        |          |     |           |     |      |      |     | superficial  |        |        |     |         |     |           | spreading  |     |     |        |     |          |        |         |     |              |         |           |                |     |     |     |       |     |        |     |     |
+|     | mixed       |        |     |     | lentiginous  |     |     |        |          |     |           |     | and  |      |     |              |        |        |     |         |     |           |            |     |     |        |     |          |        |         |     |              |         |           |                |     |     |     |       |     |        |     |     |
+|     |             |        |     |     |              |     |     |        |          |     |           |     |      |      |     |              |        |        |     |         |     |           |            |     |     |        |     |          |        | The     |     | longitudinal |         |           |                |     |     |     |       |     |        |     |     |
+|     |             |        |     |     |              |     |     |        |          |     |           |     |      | of   |     | regression   |        |        |     |         |     |           | are        |     |     | seen.  |     |          |        |         |     |              |         |           |                |     |     |     |       |     |        |     |     |
+|     | invasion    |        |     |     |              |     | or  |        | changes  |     |           |     |      |      |     |              |        |        |     |         |     |           |            |     |     |        |     |          |        |         |     |              |         |           |                |     |     |     |       |     |        |     |     |
+|     |             |        |     |     |              |     |     |        |          |     |           |     |      |      |     |              |        |        |     |         |     |           |            |     |     |        |     |          |        |         |     |              |         |           | approximately  |     |     |     |       |     |        |     | 1mm |
+|     |             |        |     |     |              |     |     |        |          |     |           |     |      |      |     |              |        |        |     |         |     |           |            |     |     |        | be  |          | clear  |         |     |              | by      |           |                |     |     |     |       |     |        |     |     |
+|     |             |        |     |     |              |     |     |        |          |     |           |     |      | the  |     |              | shave  |        |     | appear  |     |           |            |     | to  |        |     |          |        |         |     |              |         |           |                |     |     |     |       |     |        |     |     |
+|     | peripheral  |        |     |     |              |     |     | edges  |          |     |           | of  |      |      |     |              |        |        |     |         |     |           |            |     |     |        |     |          |        |         |     |              |         |           |                |     |     |     |       |     |        |     |     |
+section.
+|     | in  |     | the  |     | plane  |     |     |     |     | of  |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |
+| --- | --- | --- | ---- | --- | ------ | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+SUMMARY
+|     |     |     |        |     |     |     |        |     |     |     |           |     |     |     |     |     |     |           |     |     |     |     |         |     |     |     |     |            |     |     |     |     |     |     | FOCALLY  |     |     |     | TO  |     | DEEP |     |     |
+| --- | --- | --- | ------ | --- | --- | --- | ------ | --- | --- | --- | --------- | --- | --- | --- | --- | --- | --- | --------- | --- | --- | --- | --- | ------- | --- | --- | --- | --- | ---------- | --- | --- | --- | --- | --- | --- | -------- | --- | --- | --- | --- | --- | ---- | --- | --- |
+|     |     |     |        |     |     |     |        |     |     |     |           |     |     |     |     |     |     |           |     |     |     |     | NAEVUS  |     |     |     |     | EXTENDING  |     |     |     |     |     |     |          |     |     |     |     |     |      |     |     |
+|     |     |     |        |     |     |     |        |     |     |     | SHOULDER  |     |     |     |     |     | -   | COMPOUND  |     |     |     |     |         |     |     |     |     |            |     |     |     |     |     |     |          |     |     |     |     |     |      |     |     |
+|     | 1.  |     | SHAVE  |     |     |     | RIGHT  |     |     |     |           |     |     |     |     |     |     |           |     |     |     |     |         |     |     |     |     |            |     |     |     |     |     |     |          |     |     |     |     |     |      |     |     |
+EDGE.
+|     |     |     |        |     |     |        |     |     |     |         |     |     |     |     |        |     |     |     |     |           |     |     |     |     |     |           |     |     |     |     |     |        |     |     |                | LEVEL  |     |     | 1,  |     |     |     |     |
+| --- | --- | --- | ------ | --- | --- | ------ | --- | --- | --- | ------- | --- | --- | --- | --- | ------ | --- | --- | --- | --- | --------- | --- | --- | --- | --- | --- | --------- | --- | --- | --- | --- | --- | ------ | --- | --- | -------------- | ------ | --- | --- | --- | --- | --- | --- | --- |
+|     |     |     |        |     |     |        |     |     |     |         |     |     |     |     |        |     |     |     |     |           |     |     |     |     |     | IN-SITU,  |     |     |     |     |     | CLARK  |     |     |                |        |     |     |     |     |     |     |     |
+|     |     |     |        |     |     |        |     |     |     |         |     |     |     |     | THIGH  |     |     | -   |     | MELANOMA  |     |     |     |     |     |           |     |     |     |     |     |        |     |     |                |        |     |     |     |     |     |     |     |
+|     |     |     |        |     |     | RIGHT  |     |     |     | MEDIAL  |     |     |     |     |        |     |     |     |     |           |     |     |     |     |     |           |     |     |     |     |     |        |     |     |                |        |     |     |     |     |     |     |     |
+| >   |     |     | SHAVE  |     |     |        |     |     |     |         |     |     |     |     |        |     |     |     |     |           |     |     |     |     |     |           |     |     |     |     |     |        |     |     |                |        |     |     |     |     |     |     |     |
+|     |     |     |        |     |     |        |     |     |     |         |     |     |     |     |        |     |     |     |     |           |     |     |     |     |     |           |     |     |     |     |     |        |     |     | APPROXIMATELY  |        |     |     |     |     |     |     | 1MM |
+CLEARANCE
+|     |     |     |     |     |     |     |     |        |     |     |     |       |     |     |        |     |     | 8).  |     |     | PERIPHERAL  |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |
+| --- | --- | --- | --- | --- | --- | --- | --- | ------ | --- | --- | --- | ----- | --- | --- | ------ | --- | --- | ---- | --- | --- | ----------- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+|     |     |     |     |     |     |     |     | STAGE  |     |     |     | PTIS  |     |     | (AJCC  |     |     |      |     |     |             |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |
+PATHOLOGIC
+SECTION.
+| IN  |     |     | PLANE  |     |     | OF  |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |
+| --- | --- | --- | ------ | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"
+7767-78-22,7767-78,22,54,Female,,,,,,,,,,,,"DIAGNOSTIC SUMMARY:
+
+LEFT POST THIGH,  SHAVE: DYSPLASTIC COMPOUND  MELANOCYTIC  NEVUS,  LOW GRADE.  MARGINS  CLEAR,
+
+Cilnical  Notes:  L  post  thigh  ?dysplastic / melanoma  shave.
+
+Macroscoplc:
+
+Labelled  'L  post thigh’.  A  10  x  10  x  1mm  shaved  skin  specimen with  a  variegated  tan coloured  macule  6 x  8mm.  1A
+quadrisected  in  total.
+
+Microscopic:
+
+Left  post thigh: Sectlons  show a  mildly  dysplastic  compound  melanocytic  naevus  (low grade,  WHO classification  2018).
+There is  no  evidence of malignancy.  The  lesion  ls  completely  excised."
+7767-115-29,7767-115,29,52,Female,,,,,,,,,,,,"DIAGNOSTIC SUMMARY:
+
+RIGHT HIP, EXCISION:
+ - COMPOUND NAEVUS WITH HIGH GRADE DYSPLASIA, CLOSELY APPROACHING AN EDGE MARGIN (0.5mm
+peripheral clearance).
+
+Reported by Dr Sarah Wallace (Enquiries (07) 3377 8491 sarah_wallace@snp.com.au)     02/08/2022
+
+Clinical Notes: Histopathology. Right hip - ?DN ?mm changing naevus - ex bx.
+
+Macroscopic:
+
+Labelled 'Rt hip'. A 15 x 7 x 7mm skin ellipse with a tan area 5 x 5mm. 1A 2TS.
+
+Microscopic:
+
+Sections show a compound naevus with moderate to severe cytoarchitectural atypia (WHO Classification: High grade
+dysplasia). There is no confluence or pagetoid spread to indicate malignancy. The lesion closely approaches an edge
+margin with 0.5mm peripheral clearance.
+
+Page 1 of 1
+
+ ELLIOTT29/09/1969 (52 Yrs FEMALE)These results have been generated by Sonic Dx and may be an incomplete extract of the full pathology report.Document created09/07/2025 12:35:18Accredited for compliance withNPAAC standards and ISO 15189  Page  01  of  03"
+7767-176-1,7767-176,1,59,Female,,,,,,,,,,,,
+7767-176-16,7767-176,16,59,Female,,,,,,,,,,,,"MACROSCOPIC
+|     | Two  |     | specimens  |     |     | received. |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |
+| --- | ---- | --- | ---------- | --- | --- | --------- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+1  ee Melanoma  left  mid  back  nick  superior:  An  orientated  skin  ellipse
+measuring  /70x35xlm15m .  The  skin  surface  reveals  a  tan  centrally  located  macule
+measuring  16x10  mm.  There  is  a  nick  superior  which  is  orientated  to  12  o'clock.  The  3
+o'clock  margin  is  inked  blue,  the  9  o'clock  margin  is  inked  black.  Sectioned  from  12
+OJCLOCKHEO)  07  OUCLOCKe  GUA  TEATS  per  cblockw.),  Entvare  Lesiton:  submitted.  Refer  to
+| photographic  |     |     |     |     | diagram. |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |
+| ------------- | --- | --- | --- | --- | -------- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+Dit  Right  postauricular  lesion:  An  unorientated  skin  ellipse  measuring
+22x8x3  mm.  The  skin  surface  reveals  a  tan  macule  measuring  10x3  mm.  2A  2TS;  2B  1TS.
+| Entire  |     |     |     | lesion  |     | submitted.  |     |     | (L  | Whitham/jmtl14). |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |     |
+| ------- | --- | --- | --- | ------- | --- | ----------- | --- | --- | --- | ---------------- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+MICROSCOPIC
+1.  Melanoma  left  mid  back  nick  superior:  Sections  show  a  MELANOMINA   SITU  of
+superficial  spreading  type  which  arises  in  mildly  sun  damaged  skin.  The  lesion  is  broad
+and  shows  some  architectural  features  of  dysplastic  naevus  but  single  cells  predominate
+over  nests,  there  are  zones  of  confluent  lentiginous  growth  and  scattered  pagetoid
+areas.  The  lesion  arises  in  association  with  a  benign  INTRADERMAL  NAEVUS.  A  malignant
+dermal  component  is  not  seen.  There  is  a  zone  of  established  regression  up  to  5  mm
+diameter.  A  separate  intradermal  naevus  is  also  seen.  In  situ  melanoma  is  well  clear  of
+all
+|     |     | margins  |     |     | with  |     | peripheral  |     |     |             |     |     |     |     |     |     |        |     |     |     |     |     |     |     |     |     |
+| --- | --- | -------- | --- | --- | ----- | --- | ----------- | --- | --- | ----------- | --- | --- | --- | --- | --- | --- | ------ | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+|     |     |          |     |     |       |     |             |     |     | clearances  |     |     |     | of  | at  |     | least  | 10  |     |     |     |     |     |     |     |     |
+mm.
+2.  Right  postauricular  lesion:  Sections  show  finely  granular  pigment  which  ranges
+from  dusky  yellow  to  brown  to  black  encrusting  elastotic  fibres  within  the  dermis  and
+| Superficial  |     |     |     |     | subcutis.  |     |     | The  |          |     |     |     |      |     |             |     |     |       |     |     |           |     |     |                |     |     |
+| ------------ | --- | --- | --- | --- | ---------- | --- | --- | ---- | -------- | --- | --- | --- | ---- | --- | ----------- | --- | --- | ----- | --- | --- | --------- | --- | --- | -------------- | --- | --- |
+|              |     |     |     |     |            |     |     |      | pigment  |     |     | is  | not  |     | associated  |     |     | with  |     |     |           |     |     |                |     |     |
+|              |     |     |     |     |            |     |     |      |          |     |     |     |      |     |             |     |     |       |     | a   | cellular  |     |     | proliferation  |     | and |
+‘i most
+|     |     |     |     | likely  |     | exogenous.  |     |     |        |     |     |     |               |     |     |     |     |     |             |     |     |     |          |     |     |     |
+| --- | --- | --- | --- | ------- | --- | ----------- | --- | --- | ------ | --- | --- | --- | ------------- | --- | --- | --- | --- | --- | ----------- | --- | --- | --- | -------- | --- | --- | --- |
+|     |     |     |     |         |     |             |     |     | There  |     | is  | no  | pigmentation  |     |     |     |     |     |             |     |     |     |          |     |     |     |
+|     |     |     |     |         |     |             |     |     |        |     |     |     |               |     |     |     |     | is  | completely  |     |     |     | excised. |     |     |     |
+SUMMARY
+1;
+|     |     | Melanoma  |     |     | left  |     | mid  |       |       |     |            |     |     |     |     |           |     |     |       |     |     |              |     |     |           |     |
+| --- | --- | --------- | --- | --- | ----- | --- | ---- | ----- | ----- | --- | ---------- | --- | --- | --- | --- | --------- | --- | --- | ----- | --- | --- | ------------ | --- | --- | --------- | --- |
+|     |     |           |     |     |       |     |      | back  | nick  |     | superior:  |     |     |     |     |           |     |     |       |     |     |              |     |     |           |     |
+|     |     |           |     |     |       |     |      |       |       |     |            |     |     |     |     | MELANOMA  |     | IN  | SITU  |     |     |              |     |     |           |     |
+|     |     |           |     |     |       |     |      |       |       |     |            |     |     |     |     |           |     |     |       |     | OF  | SUPERFICIAL  |     |     | SPREADING |     |
+
+|     |     |     |     |     |     | INTRADERMAL  |     | NAEVUS.  |     | EXCISION |     |
+| --- | --- | --- | --- | --- | --- | ------------ | --- | -------- | --- | -------- | --- |
+WITH  AN
+|         |        |     | ARISING  | IN  | ASSOCIATION  |     |     |     |     |     |     |
+| ------- | ------ | --- | -------- | --- | ------------ | --- | --- | --- | --- | --- | --- |
+| (CLARK  | LEVEL  | 1)  |          |     |              |     |     |     |     |     |     |
+TYPE
+COMPLETE.
+DERM
+|     |     |     |     |     |     |     | FIBRES  |     | WITHIN  |     | THE  |
+| --- | --- | --- | --- | --- | --- | --- | ------- | --- | ------- | --- | ---- |
+ENCRUSTING  ELASTIC
+PIGMENT
+postauricular  lesion:
+Right
+2.
+COMPLETE.
+EXCISION
+SUBCUTIS.
+AND"
+7767-231-23,7767-231,23,67,Male,,,,,,,,,,,,"| CLINICAL     | NOTES       |     |     |
+| ------------ | ----------- | --- | --- |
+| Dysplastic   | naevus.     |     |     |
+| MACROSCOPIC  | EXAMINATION |     |     |
+Left  shoulder  posterior:  The  specimen  consists  of  a  punch  biopsy
+measuring  8  mm  in  diameter  to  a  depth  of  6  mm.  On  the  skin  surface  is
+| a  pigmented  | macule  measuring  | 4  x  4  mm.  | Trisected 1A. |
+| ------------- | ------------------ | ------------- | ------------- |
+| MICROSCOPIC   | EXAMINATION        |               |               |
+Left  shoulder  posterior:  Section  shows  skin  in  which  there  is  a
+lentiginous  junctional  naevus.  This  is  associated with  regression
+change  and  marked melanin  incontinence  within  the  superficial
+papillary  dermis.  There  is  no  evidence  of  significant  dysplasia  or
+deep  dermal  regression.  Excision margins  appear  clear  of  the  lesion.
+DIAGNOSIS:
+LEFT  SHOULDER  POSTERIOR  —-  HEAVILY PIGMENTED  LENTIGINOUS  JUNCTIONAL
+NAEVUS  WITH  REGRESSION.  CLEAR  OF  MARGIN  (PUNCH  SPECIMEN)."
+7767-235-1,7767-235,1,63,Male,,,,,,,,,,,,"FINAL DIAGNOSTIC SUMMARY:1. VECTRA 1 RIGHT UPPER BACK, SHAVE: MELANOMA IN-SITU OF LENTIGINOUS TYPE; CLARK LEVEL 1; THEPOSSIBILITY OF EARLY MICROINVASION TO A DEPTH OF 0.15mm CANNOT ABSOLUTELY BE EXCLUDED. SEESUPPLEMENTARY REPORT BELOW.2. VECTRA 20 MEDIAL LEFT FOREHEAD, SHAVE:  BENIGN STEATOCYSTOMA SIMPLEX.                                                                                                                                                                                    INTERIM DIAGNOSTIC SUMMARY: 1. VECTRA 1 RIGHT UPPER BACK, SHAVE:  MELANOMA IN-SITU OF PROBABLE LENTIGINOUS TYPE; CLARKLEVEL 1, ARISING IN ASSOCIATION WITH A DYSPLASTIC COMPOUND NAEVUS; CONFIRMATORYIMMUNOHISTOCHEMISTRY TO FOLLOW.  CLEARANCE 1MM AT TRANSVERSE; 0.25MM AT DEEP EDGE.2. VECTRA 20 MEDIAL LEFT FOREHEAD, SHAVE:  BENIGN STEATOCYSTOMA SIMPLEX.                                                                                                                                                                                       Clinical Notes: Vectra 1 R upper back shave Bx dys/MM check margins; Vectra 20 Med L forehead Cyst Bx sebhyperplasia/OMacroscopic:1. Labelled 'Vectra 1 R upper back'. A 10 x 9 x 1mm shaved skin specimen with a variegated brown grey lesion 7 x 6mm.1A 4TS in total.2. Labelled 'Vectra 20 Med L forehead'. A 5 x 3 x 1mm shaved skin specimen with a grey roughened surface. Furtherfragments also present. 2A 2TS in total with associated fragments. Microscopic:1. Vectra 1 Right upper back, shave:  Sections show changes favouring melanoma in-situ of lentiginous type; Clark level 1,arising over a pre-existing severely dysplastic compound naevus. No definite dermal invasion is identified. Only occasionalcells are seen in the dermis which appear to mature with descent. The junctional component is nested and lentiginous andalso exhibits focal pagetoid scatter. The changes have a 1mm clearance at the transverse margins and a 0.25mmclearance at the deep edge. Confirmatory immunohistochemistry will follow.2. Vectra 20 Medial left forehead, shave:  Sections show the top of a cystic structure with features favouring a solitarybenign steatocystoma. The cyst is lined by attenuated bland appearing epithelium with an undulating eosinophilic cuticle.The lesion extends through the base of the specimen.  3
+
+3
+
+These results have been generated by Sonic Dx and may be an incomplete extract of the full pathology report.Document created19/11/2021 15:15:49 AESTAccredited for compliance withNPAAC standards and ISO 15189  Page  01  of  03"
+7767-264-21,7767-264,21,34,Male,,,,,,,,,,,,"| CLINICAL  | NOTES |     |     |     |
+| --------- | ----- | --- | --- | --- |
+Excision biopsy  -  vectra  screening  programme  decided  it  looked
+| suspicious   | ?MM            |              |                     |     |
+| ------------ | -------------- | ------------ | ------------------- | --- |
+| MACROSCOPIC  | EXAMINATION    |              |                     |     |
+| Labelled     | right  groin:  | An  ellipse  | of  skin measuring  |     |
+15  x  5  x  4mm
+| bearing      | a  dark  tan  | papule  measuring  |             |      |
+| ------------ | ------------- | ------------------ | ----------- | ---- |
+|              |               |                    | 9  x  5mm.  | 3TS. |
+| MICROSCOPIC  | EXAMINATION   |                    |             |      |
+Labelled  right  groin:  Sections  show  a  predominantly  intradermal  benign
+lentiginous  COMPOUND  NAEVUS  of  superficial  congenital  type.  There  is
+patchy melanin  incontinence  in  the  superficial  dermis  in  addition  to  a
+zone  of  old  fibrosis  consistent  with previous  trauma  or  regression.
+Minor  lymphocytic  inflammation  is present.  There  is  no  evidence  of
+| dysplasia  | or  malignancy.  | The  excision appears  |     | complete. |
+| ---------- | ---------------- | ---------------------- | --- | --------- |"

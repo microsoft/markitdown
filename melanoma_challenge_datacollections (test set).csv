@@ -1,0 +1,21 @@
+MC_LESION_ID,ACEMID_ID,Lesion ID,PT_AGE,PT_SEX,ANATOMICAL_LOCATION_SIMPLE,ANATOMICAL_LOCATION_FULL,DERMOSCOPIC_IMAGE_NAME_DCM,DERMOSCOPIC_IMAGE_NAME_JPG,MORPHOLOGICAL_DESCRIPTION,CLINICAL_VALIDATION_MORP_DESC,CALCULATED_UGLY_DUCKLING_SCORE,CLINCIAL_CROP_IMAGEFILE_DCM,CLINICAL_CROP_IMAGEFILE_JPG,HISTOPATHOLOGY_DX,CLINICAL_VALIDATION_ISIC_DX
+Unique for dataset,,,Age at time of excision,,Location_simple from Lesion Analsis JSON Measurements,Anatomic Location (Full) from Lesion Analsis JSON Measurements NB adds extremities in upper and lower and Torso in thirds,"Link to loose files.
+Name convention:","Link to loose files
+Name convention:",DLIP generated text,Morphological description validated by a dermatologist: Yes/No,,"Link to loose files
+Naming convention:","Link to loose files
+Naming convention:",ISIC_DX ,"Diagnosis validated by dermatologist:
+Yes/No"
+7767-26-10,7767-26,10,65,Male,,,,,,,,,,,
+7767-26-44,7767-26,44,66,Male,,,,,,,,,,,
+7767-26-47,7767-26,47,66,Male,,,,,,,,,,,
+7767-38-2,7767-38,2,51,Female,,,,,,,,,,,
+7767-46-34,7767-46,34,75,Male,,,,,,,,,,,
+7767-57-4,7767-57,4,38,Female,,,,,,,,,,,
+7767-57-25,7767-57,25,38,Female,,,,,,,,,,,
+7767-78-22,7767-78,22,54,Female,,,,,,,,,,,
+7767-115-29,7767-115,29,52,Female,,,,,,,,,,,
+7767-176-1,7767-176,1,59,Female,,,,,,,,,,,
+7767-176-16,7767-176,16,59,Female,,,,,,,,,,,
+7767-231-23,7767-231,23,67,Male,,,,,,,,,,,
+7767-235-1,7767-235,1,63,Male,,,,,,,,,,,
+7767-264-21,7767-264,21,34,Male,,,,,,,,,,,

@@ -1,0 +1,8 @@
+Dermatology Data Test
+
+Patient ID: 001
+Age: 45
+Lesion Type: Melanocytic
+Body Site: Back
+
+This is a test document for MarkItDown.
