@@ -2,7 +2,24 @@ import re
 import markdownify
 
 from typing import Any, Optional
-from urllib.parse import quote, unquote, urlparse, urlunparse
+from urllib.parse import quote, urlparse, urlunparse
+
+
+_PERCENT_ENCODED_OCTET = re.compile(r"%[0-9A-Fa-f]{2}")
+
+
+def _quote_path_preserving_percent_encoded_octets(path: str) -> str:
+    """Quote a URL path while preserving existing %HH byte encodings."""
+    parts: list[str] = []
+    last_end = 0
+
+    for match in _PERCENT_ENCODED_OCTET.finditer(path):
+        parts.append(quote(path[last_end : match.start()]))
+        parts.append(match.group(0))
+        last_end = match.end()
+
+    parts.append(quote(path[last_end:]))
+    return "".join(parts)
 
 
 class _CustomMarkdownify(markdownify.MarkdownConverter):
@@ -43,7 +60,7 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         convert_as_inline: Optional[bool] = False,
         **kwargs,
     ):
-        """Same as usual converter, but removes Javascript links and escapes URIs."""
+        """Same as usual converter, but removes JavaScript links and escapes URIs."""
         prefix, suffix, text = markdownify.chomp(text)  # type: ignore
         if not text:
             return ""
@@ -60,7 +77,13 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
                 parsed_url = urlparse(href)  # type: ignore
                 if parsed_url.scheme and parsed_url.scheme.lower() not in ["http", "https", "file"]:  # type: ignore
                     return "%s%s%s" % (prefix, text, suffix)
-                href = urlunparse(parsed_url._replace(path=quote(unquote(parsed_url.path))))  # type: ignore
+                href = urlunparse(
+                    parsed_url._replace(
+                        path=_quote_path_preserving_percent_encoded_octets(
+                            parsed_url.path
+                        )
+                    )
+                )  # type: ignore
             except ValueError:  # It's not clear if this ever gets thrown
                 return "%s%s%s" % (prefix, text, suffix)
 
@@ -104,7 +127,7 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
             return alt
 
         # Remove dataURIs
-        if src.startswith("data:") and not self.options["keep_data_uris"]:
+        if src[:5].lower() == "data:" and not self.options["keep_data_uris"]:
             src = src.split(",")[0] + "..."
 
         return "![%s](%s%s)" % (alt, src, title_part)
@@ -121,6 +144,22 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         if el.get("type") == "checkbox":
             return "[x] " if el.has_attr("checked") else "[ ] "
         return ""
+
+    def convert_u(
+        self,
+        el: Any,
+        text: str,
+        convert_as_inline: Optional[bool] = False,
+        **kwargs,
+    ) -> str:
+        prefix, suffix, text = markdownify.chomp(text)  # type: ignore
+        if not text:
+            return ""
+        return f"{prefix}<u>{text}</u>{suffix}"
+
+    def convert_strike(self, el: Any, text: str, *args, **kwargs) -> str:
+        """Obsolete <strike> is still in the wild; treat it like <s>/<del>."""
+        return self.convert_s(el, text, *args, **kwargs)  # type: ignore
 
     def convert_soup(self, soup: Any) -> str:
         return super().convert_soup(soup)  # type: ignore

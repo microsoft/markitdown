@@ -38,6 +38,8 @@ class IpynbConverter(DocumentConverter):
                         "nbformat" in notebook_content
                         and "nbformat_minor" in notebook_content
                     )
+                except (ValueError, LookupError):
+                    return False
                 finally:
                     file_stream.seek(cur_pos)
 
@@ -71,7 +73,7 @@ class IpynbConverter(DocumentConverter):
                     if title is None:
                         for line in source_lines:
                             if line.startswith("# "):
-                                title = line.lstrip("# ").strip()
+                                title = line.removeprefix("# ").strip()
                                 break
 
                 elif cell_type == "code":
