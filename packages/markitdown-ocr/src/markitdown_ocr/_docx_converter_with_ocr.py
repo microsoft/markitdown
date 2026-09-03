@@ -96,7 +96,7 @@ class DocxConverterWithOCR(HtmlConverter):
 
         # Read the embedded style map and combine with any provided style map
         caller_style_map = kwargs.get("style_map")
-        embedded_style_map = _read_embedded_style_map(pre_process_stream)
+        embedded_style_map = _read_embedded_style_map(file_stream)
 
         style_map = "\n".join(
             part
