@@ -957,7 +957,7 @@ def test_zip_stream_no_filename_header() -> None:
 
 
 def test_ipynb_heading_title_preserves_leading_hash() -> None:
-    """Heading marker strip must not eat '#' or spaces from the title text.
+    """Heading marker removal must not eat a leading '#' from the title text.
 
     Regression for https://github.com/microsoft/markitdown/issues/2367
     """
