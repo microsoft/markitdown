@@ -73,7 +73,7 @@ class IpynbConverter(DocumentConverter):
                     if title is None:
                         for line in source_lines:
                             if line.startswith("# "):
-                                title = line.lstrip("# ").strip()
+                                title = line.removeprefix("# ").strip()
                                 break
 
                 elif cell_type == "code":

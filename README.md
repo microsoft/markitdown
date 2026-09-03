@@ -152,7 +152,7 @@ md = MarkItDown(
     llm_model="gpt-4o",
 )
 result = md.convert("document_with_images.pdf")
-print(result.text_content)
+print(result.markdown)
 ```
 
 If no `llm_client` is provided the plugin still loads, but OCR is silently skipped and the standard built-in converter is used instead.
@@ -269,7 +269,7 @@ from markitdown import MarkItDown
 
 md = MarkItDown(enable_plugins=False) # Set to True to enable plugins
 result = md.convert("test.xlsx")
-print(result.text_content)
+print(result.markdown)
 ```
 
 Document Intelligence conversion in Python:
@@ -279,7 +279,7 @@ from markitdown import MarkItDown
 
 md = MarkItDown(docintel_endpoint="<document_intelligence_endpoint>")
 result = md.convert("test.pdf")
-print(result.text_content)
+print(result.markdown)
 ```
 
 To use Large Language Models for image descriptions (currently only for pptx and image files), provide `llm_client` and `llm_model`:
@@ -291,7 +291,7 @@ from openai import OpenAI
 client = OpenAI()
 md = MarkItDown(llm_client=client, llm_model="gpt-4o", llm_prompt="optional custom prompt")
 result = md.convert("example.jpg")
-print(result.text_content)
+print(result.markdown)
 ```
 
 ### Docker
