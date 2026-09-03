@@ -160,9 +160,7 @@ def _fix_zip_filename_casing(input_docx: BinaryIO) -> BinaryIO:
     # Read the central directory to get authoritative filenames
     try:
         with zipfile.ZipFile(BytesIO(raw), "r") as zf:
-            cd_entries = {
-                zi.header_offset: zi.orig_filename for zi in zf.infolist()
-            }
+            cd_entries = {zi.header_offset: zi.orig_filename for zi in zf.infolist()}
     except zipfile.BadZipFile:
         # Can't even read central directory — return as-is, let it fail later
         input_docx.seek(0)
@@ -190,6 +188,7 @@ def _fix_zip_filename_casing(input_docx: BinaryIO) -> BinaryIO:
         return BytesIO(bytes(raw))
     input_docx.seek(0)
     return input_docx
+
 
 def _pre_process_styles(content: bytes) -> bytes:
     """
