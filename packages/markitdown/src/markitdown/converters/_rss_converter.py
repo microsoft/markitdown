@@ -131,29 +131,58 @@ class RssConverter(DocumentConverter):
             if entry_updated:
                 md_text += f"Updated on: {entry_updated}\n"
             if entry_summary:
-                md_text += self._parse_content(entry_summary, strict=strict)
+                md_text += self._parse_atom_text(entry_summary, strict=strict)
             if entry_content:
-                md_text += self._parse_content(entry_content, strict=strict)
+                md_text += self._parse_atom_text(entry_content, strict=strict)
 
         return DocumentConverterResult(
             markdown=md_text,
             title=title,
         )
 
-    def _get_atom_content(self, entry: Element, tag_name: str) -> Union[str, None]:
+    def _get_atom_content(
+        self, entry: Element, tag_name: str
+    ) -> tuple[str, bool] | None:
+        """Return ``(value, is_markup)`` for an Atom text construct.
+
+        RFC 4287 section 4.1.3.1 defines ``type`` as ``text`` when omitted, and
+        only ``html`` and ``xhtml`` carry markup. ``is_markup`` tells the caller
+        whether the value may be handed to the HTML parser.
+        """
         nodes = entry.getElementsByTagName(tag_name)
         if not nodes:
             return None
 
         node = nodes[0]
-        if node.getAttribute("type").lower() != "xhtml":
-            return self._get_data_by_tag_name(entry, tag_name)
+        content_type = (node.getAttribute("type") or "text").lower()
+        if content_type != "xhtml":
+            value = self._get_data_by_tag_name(entry, tag_name)
+            if value is None:
+                return None
+            return value, content_type == "html"
 
-        return "".join(
-            self._localize_xhtml_names(child.cloneNode(True)).toxml()
-            for child in node.childNodes
-            if child.nodeType == Node.ELEMENT_NODE
+        return (
+            "".join(
+                self._localize_xhtml_names(child.cloneNode(True)).toxml()
+                for child in node.childNodes
+                if child.nodeType == Node.ELEMENT_NODE
+            ),
+            True,
         )
+
+    def _parse_atom_text(
+        self, content: tuple[str, bool], *, strict: bool = False
+    ) -> str:
+        """Render an Atom text construct, HTML-parsing it only when it is markup.
+
+        Plain text is emitted as-is: running it through the HTML parser drops
+        tag-shaped literals such as ``<job_id>`` and decodes entities a second
+        time, so ``&amp;lt;x&amp;gt;`` would surface as ``<x>``.
+        """
+        value, is_markup = content
+        if is_markup:
+            return self._parse_content(value, strict=strict)
+        return f"{value.strip()}\n"
 
     def _localize_xhtml_names(self, node: Node) -> Node:
         """Rewrite prefixed XHTML element names to their local HTML names.
