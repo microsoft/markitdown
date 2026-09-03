@@ -39,36 +39,6 @@ def _read_embedded_style_map(file_stream: BinaryIO) -> Optional[str]:
         file_stream.seek(position)
 
 
-def convert_docx_to_html(file_stream: BinaryIO, style_map: Optional[str] = None) -> str:
-    """Convert a .docx stream to HTML, preserving underlined runs.
-
-    Mammoth resolves style mappings in order and the first match wins, so the
-    ``u => u`` default -- which exists because mammoth otherwise drops
-    underlines -- is composed last, after the caller's mappings and after any
-    style map embedded in the document. The embedded map is read and ordered
-    here rather than left to mammoth, since mammoth would place it *after* the
-    mappings passed in and our default would silently override it.
-
-    Shared so that converters replacing this one (e.g., plugins) get the same
-    behavior without duplicating it.
-    """
-    pre_process_stream = pre_process_docx(file_stream)
-    style_map = "\n".join(
-        part
-        for part in (
-            style_map,
-            _read_embedded_style_map(pre_process_stream),
-            _UNDERLINE_STYLE_MAP,
-        )
-        if part
-    )
-    return mammoth.convert_to_html(
-        pre_process_stream,
-        style_map=style_map,
-        include_embedded_style_map=False,
-    ).value
-
-
 class DocxConverter(HtmlConverter):
     """
     Converts DOCX files to Markdown. Style information (e.g., headings) and tables are preserved where possible.
@@ -116,7 +86,20 @@ class DocxConverter(HtmlConverter):
                 _dependency_exc_info[2]
             )
 
-        return self._html_converter.convert_string(
-            convert_docx_to_html(file_stream, kwargs.get("style_map", None)),
-            **kwargs,
+        pre_process_stream = pre_process_docx(file_stream)
+        style_map = "\n".join(
+            part
+            for part in (
+                style_map,
+                _read_embedded_style_map(pre_process_stream),
+                _UNDERLINE_STYLE_MAP,
+            )
+            if part
         )
+        html_result = mammoth.convert_to_html(
+            pre_process_stream,
+            style_map=style_map,
+            include_embedded_style_map=False,
+        ).value
+
+        return self._html_converter.convert_string(html_result, **kwargs)
