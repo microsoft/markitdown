@@ -12,12 +12,15 @@ def file_uri_to_path(file_uri: str) -> Tuple[str | None, str]:
         raise ValueError(f"Not a file URL: {file_uri}")
 
     netloc = parsed.netloc if parsed.netloc else None
-    path = os.path.abspath(url2pathname(parsed.path))
+    path = url2pathname(parsed.path)
+    if os.name == "nt" and path[:1] in "/\\" and path[2:3] == ":":
+        path = path[1:]
+    path = os.path.abspath(path)
     return netloc, path
 
 
 def parse_data_uri(uri: str) -> Tuple[str | None, Dict[str, str], bytes]:
-    if not uri.startswith("data:"):
+    if uri[:5].lower() != "data:":
         raise ValueError("Not a data URI")
 
     header, _, data = uri.partition(",")
@@ -29,7 +32,7 @@ def parse_data_uri(uri: str) -> Tuple[str | None, Dict[str, str], bytes]:
 
     is_base64 = False
     # Ends with base64?
-    if parts[-1] == "base64":
+    if parts[-1].lower() == "base64":
         parts.pop()
         is_base64 = True
 
@@ -43,9 +46,9 @@ def parse_data_uri(uri: str) -> Tuple[str | None, Dict[str, str], bytes]:
         # Handle key=value pairs in the middle
         if "=" in part:
             key, value = part.split("=", 1)
-            attributes[key] = value
+            attributes[key.lower()] = value
         elif len(part) > 0:
-            attributes[part] = ""
+            attributes[part.lower()] = ""
 
     content = base64.b64decode(data) if is_base64 else unquote_to_bytes(data)
 

@@ -113,10 +113,23 @@ def main():
         sys.exit(1)
 
     if use_http:
+        host = args.host if args.host else "127.0.0.1"
+        if args.host and args.host not in ("127.0.0.1", "localhost"):
+            print(
+                "\n"
+                "WARNING: The server is being bound to a non-localhost interface "
+                f"({host}).\n"
+                "This exposes the server to other machines on the network or Internet.\n"
+                "The server has NO authentication and runs with your user's privileges.\n"
+                "Any process or user that can reach this interface can read files and\n"
+                "fetch network resources accessible to this user.\n"
+                "Only proceed if you understand the security implications.\n",
+                file=sys.stderr,
+            )
         starlette_app = create_starlette_app(mcp_server, debug=True)
         uvicorn.run(
             starlette_app,
-            host=args.host if args.host else "127.0.0.1",
+            host=host,
             port=args.port if args.port else 3001,
         )
     else:
