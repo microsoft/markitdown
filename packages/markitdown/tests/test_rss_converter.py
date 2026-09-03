@@ -89,7 +89,7 @@ def test_atom_plain_text_content_is_not_parsed_as_html() -> None:
         io.BytesIO(feed), StreamInfo(mimetype="application/atom+xml")
     )
 
-    assert "Run <job\\_id> with &lt;literal&gt;." in result.markdown
+    assert "Run <job_id> with &lt;literal&gt;." in result.markdown
 
 
 def test_atom_untyped_summary_is_not_parsed_as_html() -> None:
@@ -143,7 +143,7 @@ def test_atom_text_media_type_content_is_not_parsed_as_html() -> None:
         io.BytesIO(feed), StreamInfo(mimetype="application/atom+xml")
     )
 
-    assert "Run <job\\_id> to start." in result.markdown
+    assert "Run <job_id> to start." in result.markdown
 
 
 def test_atom_html_media_type_content_is_still_converted() -> None:
@@ -221,3 +221,30 @@ def test_atom_summary_media_type_is_treated_as_text() -> None:
     )
 
     assert "A <placeholder> summary." in result.markdown
+
+
+def test_atom_plain_text_layout_whitespace_is_removed() -> None:
+    """Feed indentation must not survive as a Markdown code block."""
+    feed = b"""<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Example feed</title>
+  <entry>
+    <title>Example entry</title>
+    <content type="text">
+      Run the job with &lt;job_id&gt;.
+
+      Then check status.
+    </content>
+  </entry>
+</feed>
+"""
+
+    result = RssConverter().convert(
+        io.BytesIO(feed), StreamInfo(mimetype="application/atom+xml")
+    )
+
+    assert result.markdown.splitlines()[-3:] == [
+        "Run the job with <job_id>.",
+        "",
+        "Then check status.",
+    ]
