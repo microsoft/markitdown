@@ -1339,7 +1339,9 @@ def test_exiftool_metadata_with_nonexistent_binary():
     from markitdown.converters._exiftool import exiftool_metadata
 
     with pytest.raises(RuntimeError, match="Failed to invoke exiftool"):
-        exiftool_metadata(io.BytesIO(b""), exiftool_path="/this/does/not/exist/exiftool")
+        exiftool_metadata(
+            io.BytesIO(b""), exiftool_path="/this/does/not/exist/exiftool"
+        )
 
 
 def test_exiftool_metadata_with_no_path():
