@@ -919,16 +919,25 @@ def test_youtube_converter_missing_title_metadata() -> None:
         stream_no_title = io.BytesIO(html_content_no_title)
         result_no_title = converter.convert(stream_no_title, stream_info)
         assert result_no_title.title == ""
-        assert "# YouTube" in result_no_title.text_content
+        assert "# YouTube" in result_no_title.markdown
 
-        # Case 2: Stream with fallback <title> tag
-        html_content_fallback = b"<html><head><title>Fallback Title</title></head><body>Video Content</body></html>"
-        stream_fallback = io.BytesIO(html_content_fallback)
-        result_fallback = converter.convert(stream_fallback, stream_info)
-        assert result_fallback.title == "Fallback Title"
-        assert "# YouTube" in result_fallback.text_content
-        
-        
+        # Case 2: Stream with an empty <title> tag
+        html_content_empty_title = (
+            b"<html><head><title></title></head><body>Video Content</body></html>"
+        )
+        stream_empty_title = io.BytesIO(html_content_empty_title)
+        result_empty_title = converter.convert(stream_empty_title, stream_info)
+        assert result_empty_title.title == ""
+        assert "# YouTube" in result_empty_title.markdown
+
+        # Case 3: Stream whose title is only available from the <title> tag
+        html_content_title_tag = b"<html><head><title>Fallback Title</title></head><body>Video Content</body></html>"
+        stream_title_tag = io.BytesIO(html_content_title_tag)
+        result_title_tag = converter.convert(stream_title_tag, stream_info)
+        assert result_title_tag.title == "Fallback Title"
+        assert "# YouTube" in result_title_tag.markdown
+
+
 def test_zip_stream_no_filename_header() -> None:
     """Regression test: ZipConverter must not render the literal string 'None'
     in the output header when the stream has no associated URL, local path, or
