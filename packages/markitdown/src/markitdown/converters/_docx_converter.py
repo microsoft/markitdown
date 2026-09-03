@@ -32,7 +32,7 @@ _UNDERLINE_STYLE_MAP = "u => u"
 
 class DocxConverter(HtmlConverter):
     """
-    Converts DOCX files to Markdown. Style information (e.g.m headings) and tables are preserved where possible.
+    Converts DOCX files to Markdown. Style information (e.g., headings) and tables are preserved where possible.
     """
 
     def __init__(self):
