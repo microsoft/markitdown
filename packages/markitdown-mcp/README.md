@@ -10,7 +10,7 @@
 
 The `markitdown-mcp` package provides a lightweight STDIO, Streamable HTTP, and SSE MCP server for calling MarkItDown.
 
-It exposes one tool: `convert_to_markdown(uri)`, where uri can be any `http:`, `https:`, `file:`, or `data:` URI.
+It exposes one tool: `convert_to_markdown(uri)`, where uri can be any `http:`, `https:`, or `data:` URI. `file:` URIs are disabled by default and require the `--allow-local-files` flag to enable.
 
 ## Installation
 
@@ -131,7 +131,11 @@ Finally:
 
 ## Security Considerations
 
-The server does not support authentication, and runs with the privileges of the user running it. For this reason, when running in SSE or Streamable HTTP mode, the server binds by default to `localhost`. Even still, it is important to recognize that the server can be accessed by any process or users on the same local machine, and that the `convert_to_markdown` tool can be used to read any file that the server's user has access to, or any data from the network. If you require additional security, consider running the server in a sandboxed environment, such as a virtual machine or container, and ensure that the user permissions are properly configured to limit access to sensitive files and network segments. Above all, DO NOT bind the server to other interfaces (non-localhost) unless you understand the security implications of doing so.
+The server does not support authentication, and runs with the privileges of the user running it. For this reason, when running in SSE or Streamable HTTP mode, the server binds by default to `localhost`. Even still, it is important to recognize that the server can be accessed by any process or user on the same local machine.
+
+`file://` URI support is disabled by default to prevent unauthorized local file access. To enable it, start the server with the `--allow-local-files` flag. Only do this in trusted environments where you understand that any process on the machine could instruct the server to read local files on your behalf.
+
+If you require additional security, consider running the server in a sandboxed environment, such as a virtual machine or container, and ensure that the user permissions are properly configured to limit access to sensitive files and network segments. Above all, DO NOT bind the server to other interfaces (non-localhost) unless you understand the security implications of doing so.
 
 ## Trademarks
 
