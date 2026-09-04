@@ -1,5 +1,7 @@
 name: tests
 on: [pull_request]
+permissions:
+  contents: read
 
 jobs:
   tests:
