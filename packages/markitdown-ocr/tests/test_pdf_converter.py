@@ -231,6 +231,60 @@ def test_pdf_scanned_fallback_format(svc: MockOCRService) -> None:
     ), f"_ocr_full_pages must produce:\n{expected!r}\nActual:\n{md!r}"
 
 
+def test_scanned_page_uses_full_page_ocr(svc: MockOCRService) -> None:
+    """An empty-text page is rendered instead of OCRing embedded decorations."""
+    converter = PdfConverterWithOCR()
+    page = MagicMock()
+    page.extract_text.return_value = ""
+    page.to_image.return_value.original = MagicMock()
+
+    pdf = MagicMock()
+    pdf.pages = [page]
+    pdf.__enter__.return_value = pdf
+
+    with (
+        patch("pdfplumber.open", return_value=pdf) as open_pdf,
+        patch.object(converter, "_extract_page_images") as extract_images,
+    ):
+        result = converter.convert(
+            io.BytesIO(b"pdf"),
+            StreamInfo(extension=".pdf"),
+            ocr_service=svc,
+        )
+
+    assert _OCR_BLOCK in result.text_content
+    page.to_image.assert_called_once_with(resolution=300)
+    extract_images.assert_not_called()
+    open_pdf.assert_called_once()
+
+
+def test_convert_reuses_open_page_for_image_extraction(svc: MockOCRService) -> None:
+    """Embedded-image extraction must not reopen and reparse the PDF."""
+    converter = PdfConverterWithOCR()
+    page = MagicMock()
+    page.extract_text.return_value = "body"
+    page.chars = []
+
+    pdf = MagicMock()
+    pdf.pages = [page]
+    pdf.__enter__.return_value = pdf
+
+    with (
+        patch("pdfplumber.open", return_value=pdf) as open_pdf,
+        patch.object(
+            converter, "_extract_page_images", return_value=[]
+        ) as extract_images,
+    ):
+        converter.convert(
+            io.BytesIO(b"pdf"),
+            StreamInfo(extension=".pdf"),
+            ocr_service=svc,
+        )
+
+    extract_images.assert_called_once_with(page)
+    open_pdf.assert_called_once()
+
+
 # ---------------------------------------------------------------------------
 # No OCR service — no OCR tags emitted
 # ---------------------------------------------------------------------------
