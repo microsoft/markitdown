@@ -76,7 +76,16 @@ class CsvConverter(DocumentConverter):
         if stream_info.charset:
             content = file_stream.read().decode(stream_info.charset)
         else:
-            content = str(from_bytes(file_stream.read()).best())
+            data = file_stream.read()
+            detected = from_bytes(data).best()
+            if detected is None:
+                # Detection can fail outright, in which case best() is None and
+                # str() would render it as the literal text "None" - a one-cell
+                # table of content that was never in the file. Decode lossily
+                # instead, matching OutlookMsgConverter.
+                content = data.decode("utf-8", errors="ignore")
+            else:
+                content = str(detected)
 
         # Excel and other tools prepend a UTF-8 BOM to CSV exports; strip it so
         # it does not end up inside the first header cell.

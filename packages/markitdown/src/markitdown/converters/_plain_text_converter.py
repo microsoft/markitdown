@@ -55,6 +55,14 @@ class PlainTextConverter(DocumentConverter):
         if stream_info.charset:
             text_content = file_stream.read().decode(stream_info.charset)
         else:
-            text_content = str(from_bytes(file_stream.read()).best())
+            data = file_stream.read()
+            detected = from_bytes(data).best()
+            if detected is None:
+                # Detection can fail outright, in which case best() is None and
+                # str() would render it as the literal text "None". Decode
+                # lossily instead, matching OutlookMsgConverter.
+                text_content = data.decode("utf-8", errors="ignore")
+            else:
+                text_content = str(detected)
 
         return DocumentConverterResult(markdown=text_content)
