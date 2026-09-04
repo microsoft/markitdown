@@ -51,8 +51,11 @@ def register_converters(markitdown: MarkItDown, **kwargs: Any) -> None:
     # Pass the OCR service to each converter's constructor
     PRIORITY_OCR_ENHANCED = -1.0
 
+    semantic_pdf_ocr = kwargs.get("semantic_pdf_ocr", False)
+
     markitdown.register_converter(
-        PdfConverterWithOCR(ocr_service=ocr_service), priority=PRIORITY_OCR_ENHANCED
+        PdfConverterWithOCR(ocr_service=ocr_service, semantic_pdf_ocr=semantic_pdf_ocr),
+        priority=PRIORITY_OCR_ENHANCED,
     )
 
     markitdown.register_converter(

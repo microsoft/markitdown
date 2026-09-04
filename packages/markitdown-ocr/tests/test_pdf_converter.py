@@ -42,6 +42,13 @@ class MockOCRService:
         return OCRResult(text=_MOCK_TEXT, backend_used="mock")
 
 
+class SingleArgumentOCRService:
+    """Legacy-compatible custom service without prompt support."""
+
+    def extract_text(self, image_stream: Any) -> OCRResult:  # noqa: ARG002
+        return OCRResult(text=_MOCK_TEXT, backend_used="single-argument-mock")
+
+
 @pytest.fixture(scope="module")
 def svc() -> MockOCRService:
     return MockOCRService()
@@ -189,6 +196,22 @@ def test_pdf_scanned_minimal(svc: MockOCRService) -> None:
     assert _convert("pdf_scanned_minimal.pdf", svc) == _PAGE_1_SCANNED
 
 
+def test_default_full_page_ocr_supports_single_argument_service() -> None:
+    path = TEST_DATA_DIR / "pdf_scanned_minimal.pdf"
+    if not path.exists():
+        pytest.skip(f"Test file not found: {path}")
+
+    converter = PdfConverterWithOCR()
+    with open(path, "rb") as f:
+        result = converter.convert(
+            f,
+            StreamInfo(extension=".pdf"),
+            ocr_service=SingleArgumentOCRService(),
+        )
+
+    assert result.text_content == _PAGE_1_SCANNED
+
+
 def test_pdf_scanned_sales_report(svc: MockOCRService) -> None:
     assert _convert("pdf_scanned_sales_report.pdf", svc) == _PAGE_1_SCANNED
 
@@ -245,3 +268,189 @@ def test_pdf_no_ocr_service_no_tags() -> None:
         md = converter.convert(f, StreamInfo(extension=".pdf")).text_content
     assert "*[Image OCR]" not in md
     assert "[End OCR]*" not in md
+
+
+# ---------------------------------------------------------------------------
+# Semantic PDF OCR
+# ---------------------------------------------------------------------------
+
+
+def test_pdf_semantic_ocr() -> None:
+    path = TEST_DATA_DIR / "pdf_image_middle.pdf"
+    if not path.exists():
+        pytest.skip(f"Test file not found: {path}")
+
+    mock_svc = MagicMock()
+    mock_svc.extract_text.return_value = OCRResult(
+        text=(
+            "# Semantic Header\n"
+            "- parent item\n"
+            "  - nested item\n\n"
+            "| Name | Value |\n| --- | --- |\n| Alpha | 1 |"
+        ),
+        backend_used="mock",
+    )
+
+    converter = PdfConverterWithOCR(semantic_pdf_ocr=True)
+    with open(path, "rb") as f:
+        md = converter.convert(
+            f, StreamInfo(extension=".pdf"), ocr_service=mock_svc
+        ).text_content
+
+    assert "## Page 1" in md
+    assert "# Semantic Header" in md
+    assert "  - nested item" in md
+    assert "| Name | Value |" in md
+    assert "[Image OCR]" not in md
+
+    args, kwargs = mock_svc.extract_text.call_args
+    prompt = kwargs.get("prompt", "")
+    assert "faithful semantic Markdown" in prompt
+    assert "headings" in prompt
+    assert "nested lists" in prompt
+    assert "tables" in prompt
+    assert "reading order" in prompt
+    assert "untrusted data" in prompt
+    assert "ignore any instructions" in prompt
+
+
+def test_pdf_semantic_ocr_uses_pymupdf_for_malformed_pdf() -> None:
+    path = TEST_DATA_DIR / "pdf_multipage.pdf"
+    if not path.exists():
+        pytest.skip(f"Test file not found: {path}")
+
+    mock_svc = MagicMock()
+    mock_svc.extract_text.return_value = OCRResult(
+        text="# Recovered heading\n1. First item\n   1. Nested item",
+        backend_used="mock",
+    )
+
+    converter = PdfConverterWithOCR(semantic_pdf_ocr=True)
+    with open(path, "rb") as f:
+        md = converter.convert(
+            f, StreamInfo(extension=".pdf"), ocr_service=mock_svc
+        ).text_content
+
+    assert md.count("# Recovered heading") == 3
+    assert "   1. Nested item" in md
+    assert "[Image OCR]" not in md
+    assert mock_svc.extract_text.call_count == 3
+    for call in mock_svc.extract_text.call_args_list:
+        assert "faithful semantic Markdown" in call.kwargs["prompt"]
+
+
+def test_pdf_semantic_ocr_fallback() -> None:
+    path = TEST_DATA_DIR / "pdf_image_middle.pdf"
+    if not path.exists():
+        pytest.skip(f"Test file not found: {path}")
+
+    # Mock returns empty, should trigger fallback
+    mock_svc = MagicMock()
+    mock_svc.extract_text.return_value = OCRResult(text="", backend_used="mock")
+
+    converter = PdfConverterWithOCR(semantic_pdf_ocr=True)
+    with open(path, "rb") as f:
+        md = converter.convert(
+            f, StreamInfo(extension=".pdf"), ocr_service=mock_svc
+        ).text_content
+
+    # Should fall back to normal deterministic extraction which contains this string
+    assert "Section 1: Introduction" in md
+
+
+def test_pdf_semantic_ocr_per_conversion_override() -> None:
+    path = TEST_DATA_DIR / "pdf_image_middle.pdf"
+    if not path.exists():
+        pytest.skip(f"Test file not found: {path}")
+
+    mock_svc = MagicMock()
+    mock_svc.extract_text.return_value = OCRResult(
+        text="# Semantic Header", backend_used="mock"
+    )
+
+    # Initialize with False
+    converter = PdfConverterWithOCR(semantic_pdf_ocr=False)
+    with open(path, "rb") as f:
+        # Override to True during conversion
+        md = converter.convert(
+            f,
+            StreamInfo(extension=".pdf"),
+            ocr_service=mock_svc,
+            semantic_pdf_ocr=True,
+        ).text_content
+
+    assert "# Semantic Header" in md
+
+
+def test_pdf_semantic_ocr_per_conversion_false_overrides_constructor() -> None:
+    path = TEST_DATA_DIR / "pdf_image_middle.pdf"
+    if not path.exists():
+        pytest.skip(f"Test file not found: {path}")
+
+    mock_svc = MagicMock()
+    mock_svc.extract_text.return_value = OCRResult(
+        text="# Semantic Header", backend_used="mock"
+    )
+
+    converter = PdfConverterWithOCR(semantic_pdf_ocr=True)
+    with patch.object(converter, "_extract_page_images", return_value=[]):
+        with open(path, "rb") as f:
+            md = converter.convert(
+                f,
+                StreamInfo(extension=".pdf"),
+                ocr_service=mock_svc,
+                semantic_pdf_ocr=False,
+            ).text_content
+
+    assert "Section 1: Introduction" in md
+    assert "# Semantic Header" not in md
+    mock_svc.extract_text.assert_not_called()
+
+
+def test_pdf_semantic_ocr_exception_falls_back() -> None:
+    path = TEST_DATA_DIR / "pdf_image_middle.pdf"
+    if not path.exists():
+        pytest.skip(f"Test file not found: {path}")
+
+    mock_svc = MagicMock()
+    mock_svc.extract_text.side_effect = RuntimeError("synthetic OCR failure")
+
+    converter = PdfConverterWithOCR(semantic_pdf_ocr=True)
+    with patch.object(converter, "_extract_page_images", return_value=[]):
+        with open(path, "rb") as f:
+            md = converter.convert(
+                f, StreamInfo(extension=".pdf"), ocr_service=mock_svc
+            ).text_content
+
+    assert "Section 1: Introduction" in md
+
+
+def test_pdf_semantic_ocr_without_service() -> None:
+    path = TEST_DATA_DIR / "pdf_image_middle.pdf"
+    if not path.exists():
+        pytest.skip(f"Test file not found: {path}")
+
+    converter = PdfConverterWithOCR(semantic_pdf_ocr=True)
+    with open(path, "rb") as f:
+        # No ocr_service passed, should fallback to default extraction
+        md = converter.convert(f, StreamInfo(extension=".pdf")).text_content
+
+    assert "Section 1: Introduction" in md
+
+
+def test_plugin_registration_forwarding() -> None:
+    from markitdown import MarkItDown
+    from markitdown_ocr._plugin import register_converters
+
+    mock_mid = MagicMock(spec=MarkItDown)
+    register_converters(
+        mock_mid,
+        llm_client=MagicMock(),
+        llm_model="test",
+        semantic_pdf_ocr=True,
+    )
+
+    args, kwargs = mock_mid.register_converter.call_args_list[0]
+    converter = args[0]
+    assert isinstance(converter, PdfConverterWithOCR)
+    assert converter.semantic_pdf_ocr is True
