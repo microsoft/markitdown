@@ -1252,6 +1252,42 @@ def test_markitdown_llm_parameters() -> None:
     assert messages[0]["content"][0]["text"] == test_prompt
 
 
+@pytest.mark.parametrize(
+    ("llm_prompt", "has_default_heading"),
+    [
+        (None, True),
+        ("", True),
+        ("   ", True),
+        ("Beschreibe das Bild auf Deutsch ohne Titel.", False),
+    ],
+)
+def test_markitdown_llm_prompt_controls_default_heading(
+    llm_prompt: str | None, has_default_heading: bool
+) -> None:
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    custom_caption = "Ein roter Kreis und ein blaues Quadrat."
+    mock_response.choices = [MagicMock(message=MagicMock(content=custom_caption))]
+    mock_client.chat.completions.create.return_value = mock_response
+
+    result = MarkItDown(
+        llm_client=mock_client,
+        llm_model="gpt-4o",
+        llm_prompt=llm_prompt,
+    ).convert(os.path.join(TEST_FILES_DIR, "test_llm.jpg"))
+
+    assert custom_caption in result.markdown
+    assert ("# Description:" in result.markdown) is has_default_heading
+
+    sent_prompt = mock_client.chat.completions.create.call_args.kwargs["messages"][0][
+        "content"
+    ][0]["text"]
+    if llm_prompt is None or llm_prompt.strip() == "":
+        assert sent_prompt == "Write a detailed caption for this image."
+    else:
+        assert sent_prompt == llm_prompt
+
+
 @pytest.mark.skipif(
     skip_llm,
     reason="do not run llm tests without a key",
