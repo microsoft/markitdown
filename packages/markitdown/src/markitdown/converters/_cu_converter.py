@@ -10,12 +10,15 @@ Install dependencies: ``pip install 'markitdown[az-content-understanding]'``
 
 import sys
 import os
+import logging
 from typing import BinaryIO, Any, List, Optional, Dict
 from enum import Enum
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException
+
+logger = logging.getLogger(__name__)
 
 # Try loading optional dependencies — save error for later
 _dependency_exc_info = None
@@ -559,12 +562,22 @@ class ContentUnderstandingConverter(DocumentConverter):
             binary_input=file_bytes,
             content_type=content_type,
         )
+        operation_id = poller.operation_id
 
-        # 4. Block on result
-        result = poller.result()
+        try:
+            # 4. Block on result
+            result = poller.result()
 
-        # 5. Format output using to_llm_input()
-        text = to_llm_input(result)
+            # 5. Format output using to_llm_input()
+            text = to_llm_input(result)
 
-        # 6. Return
-        return DocumentConverterResult(markdown=text)
+            # 6. Return
+            return DocumentConverterResult(markdown=text)
+        finally:
+            try:
+                self._client.delete_result(operation_id)
+            except Exception:
+                logger.warning(
+                    "Could not delete Content Understanding result; "
+                    "Azure will expire it automatically."
+                )
