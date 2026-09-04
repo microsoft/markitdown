@@ -1,18 +1,45 @@
 name: tests
 on: [pull_request]
+permissions:
+  contents: read
 
 jobs:
   tests:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
-          python-version: |
-            3.10
-            3.11
-            3.12
+          python-version: ${{ matrix.python-version }}
+
       - name: Install Hatch
         run: pipx install hatch
       - name: Run tests
         run: cd packages/markitdown; hatch test
+
+  ocr-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # Install markitdown from the local checkout rather than PyPI, so the
+      # plugin is tested against the sibling package it ships alongside.
+      - name: Install packages
+        run: pip install ./packages/markitdown ./packages/markitdown-ocr pytest
+
+      - name: Run tests
+        working-directory: packages/markitdown-ocr
+        run: pytest
