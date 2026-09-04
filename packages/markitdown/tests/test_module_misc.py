@@ -1281,9 +1281,14 @@ def test_markitdown_llm() -> None:
 def test_pptx_chart_no_title_text_frame() -> None:
     from markitdown.converters._pptx_converter import PptxConverter
 
+    # python-pptx's ChartTitle.text_frame is destructive -- it creates a text
+    # frame if one isn't already present, so it never returns None.
+    # has_text_frame is the property that actually reflects presence/absence,
+    # which is what the has_title=True-but-no-text-frame case looks like
+    # against the real library.
     mock_chart = MagicMock()
     mock_chart.has_title = True
-    mock_chart.chart_title.text_frame = None
+    mock_chart.chart_title.has_text_frame = False
 
     mock_category = MagicMock()
     mock_category.label = "Cat 1"
@@ -1301,6 +1306,29 @@ def test_pptx_chart_no_title_text_frame() -> None:
     assert "Cat 1" in result
     assert "Series 1" in result
     assert ":" not in result
+
+
+def test_pptx_chart_with_title_text_frame() -> None:
+    from markitdown.converters._pptx_converter import PptxConverter
+
+    mock_chart = MagicMock()
+    mock_chart.has_title = True
+    mock_chart.chart_title.has_text_frame = True
+    mock_chart.chart_title.text_frame.text = "Revenue"
+
+    mock_category = MagicMock()
+    mock_category.label = "Cat 1"
+    mock_chart.plots = [MagicMock(categories=[mock_category])]
+
+    mock_series = MagicMock()
+    mock_series.name = "Series 1"
+    mock_series.values = [10.0]
+    mock_chart.series = [mock_series]
+
+    converter = PptxConverter()
+    result = converter._convert_chart_to_markdown(mock_chart)
+
+    assert "### Chart: Revenue" in result
 
 
 def test_youtube_converter_missing_title_metadata() -> None:
@@ -1650,6 +1678,7 @@ if __name__ == "__main__":
         test_markitdown_llm_parameters,
         test_markitdown_llm,
         test_pptx_chart_no_title_text_frame,
+        test_pptx_chart_with_title_text_frame,
         test_ipynb_accepts_non_ascii,
         test_epub_metadata_nodevalue,
         test_exiftool_metadata_with_nonexistent_binary,
