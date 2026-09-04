@@ -106,6 +106,7 @@ At the moment, the following optional dependencies are available:
 * `[xls]` Installs dependencies for older Excel files
 * `[pdf]` Installs dependencies for PDF files
 * `[outlook]` Installs dependencies for Outlook messages
+* `[hwp]` Installs dependencies for HWP and HWPX files
 * `[az-doc-intel]` Installs dependencies for Azure Document Intelligence
 * `[az-content-understanding]` Installs dependencies for Azure Content Understanding
 * `[audio-transcription]` Installs dependencies for audio transcription of wav and mp3 files
