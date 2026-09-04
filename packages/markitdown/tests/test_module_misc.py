@@ -814,6 +814,23 @@ def test_input_as_strings() -> None:
     assert "# Test" in result.text_content
 
 
+def test_undetectable_charset_does_not_become_none() -> None:
+    """When charset_normalizer cannot classify the bytes (best() returns None),
+    the converters must not stringify None and present the literal "None" as
+    the converted document content."""
+    markitdown = MarkItDown()
+
+    # A corrupt/truncated UTF-16-looking byte sequence that charset_normalizer
+    # cannot classify: from_bytes(...).best() returns None for these bytes.
+    undetectable = b"\xff\xfe\xff\xff\x00"
+
+    result = markitdown.convert_stream(io.BytesIO(undetectable), file_extension=".txt")
+    assert result.markdown != "None"
+
+    result = markitdown.convert_stream(io.BytesIO(undetectable), file_extension=".csv")
+    assert "None" not in result.markdown
+    
+    
 def _mock_response(content_disposition: str) -> MagicMock:
     response = MagicMock()
     response.headers = {"content-disposition": content_disposition}
