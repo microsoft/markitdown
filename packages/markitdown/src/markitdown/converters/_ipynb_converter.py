@@ -1,6 +1,7 @@
 from typing import BinaryIO, Any
 import json
 
+from .._charset_utils import decode_bytes
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._exceptions import FileConversionException
 from .._stream_info import StreamInfo
@@ -32,8 +33,9 @@ class IpynbConverter(DocumentConverter):
                 # Read further to see if it's a notebook
                 cur_pos = file_stream.tell()
                 try:
-                    encoding = stream_info.charset or "utf-8"
-                    notebook_content = file_stream.read().decode(encoding)
+                    notebook_content = decode_bytes(
+                        file_stream.read(), stream_info.charset
+                    )
                     return (
                         "nbformat" in notebook_content
                         and "nbformat_minor" in notebook_content
@@ -52,8 +54,7 @@ class IpynbConverter(DocumentConverter):
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
         # Parse and convert the notebook
-        encoding = stream_info.charset or "utf-8"
-        notebook_content = file_stream.read().decode(encoding=encoding)
+        notebook_content = decode_bytes(file_stream.read(), stream_info.charset)
         return self._convert(json.loads(notebook_content))
 
     def _convert(self, notebook_content: dict) -> DocumentConverterResult:

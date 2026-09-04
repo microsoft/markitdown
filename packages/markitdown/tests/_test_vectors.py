@@ -155,7 +155,7 @@ GENERAL_TEST_VECTORS = [
     FileTestVector(
         filename="test.json",
         mimetype="application/json",
-        charset="ascii",
+        charset="utf-8",
         url=None,
         must_include=[
             "5b64c88c-b3c3-4510-bcb8-da0b200602d8",
@@ -178,7 +178,7 @@ GENERAL_TEST_VECTORS = [
     FileTestVector(
         filename="test_notebook.ipynb",
         mimetype="application/json",
-        charset="ascii",
+        charset="utf-8",
         url=None,
         must_include=[
             "# Test Notebook",
