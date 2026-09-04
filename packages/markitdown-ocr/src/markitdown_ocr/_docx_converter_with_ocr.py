@@ -144,9 +144,15 @@ class DocxConverterWithOCR(HtmlConverter):
 
             # 5. Swap placeholders for the actual OCR blocks (post-conversion
             #    so * and _ are never escaped by the markdown converter).
-            for i, raw_text in enumerate(ocr_texts):
-                placeholder = _PLACEHOLDER.format(i)
-                ocr_block = f"*[Image OCR]\n{raw_text}\n[End OCR]*"
+            # Sort by descending placeholder length so that e.g. "MARKITDOWNOCRBLOCK10"
+            # is replaced before "MARKITDOWNOCRBLOCK1", preventing prefix-collision corruption
+            # when a document has 10 or more images.
+            replacements = [
+                (_PLACEHOLDER.format(i), f"*[Image OCR]\n{raw_text}\n[End OCR]*")
+                for i, raw_text in enumerate(ocr_texts)
+            ]
+            replacements.sort(key=lambda pair: len(pair[0]), reverse=True)
+            for placeholder, ocr_block in replacements:
                 md = md.replace(placeholder, ocr_block)
 
             return DocumentConverterResult(markdown=md)
