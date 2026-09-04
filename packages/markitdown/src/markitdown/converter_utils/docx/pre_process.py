@@ -114,6 +114,11 @@ def _pre_process_strike(content: bytes) -> bytes:
     Returns:
         bytes: The processed content with "dstrike" elements renamed to "strike", encoded as bytes.
     """
+    # Double strikethrough is rare, and parsing/reserializing the XML is expensive
+    # on large documents, so skip the round-trip when there is nothing to rename.
+    if b"dstrike" not in content:
+        return content
+
     soup = BeautifulSoup(content.decode(), features="xml")
     for tag in soup.find_all("dstrike"):
         tag.name = "strike"
