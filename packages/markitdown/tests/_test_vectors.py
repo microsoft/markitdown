@@ -32,6 +32,20 @@ GENERAL_TEST_VECTORS = [
         ],
     ),
     FileTestVector(
+        filename="test.doc",
+        mimetype="application/msword",
+        charset=None,
+        url=None,
+        must_include=[
+            "# Concert du soir",
+            "# Ceci est le titre",
+            "## Sous titre",
+            "### Sous sous titre",
+            "je mange du chocolat",
+        ],
+        must_not_include=[],
+    ),
+    FileTestVector(
         filename="test.xlsx",
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         charset=None,
