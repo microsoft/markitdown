@@ -814,6 +814,16 @@ def test_input_as_strings() -> None:
     assert "# Test" in result.text_content
 
 
+def test_plain_text_charset_guessed_from_prefix() -> None:
+    # Charset is guessed from only the first 4096 bytes of the stream. If
+    # that prefix happens to be pure ASCII but a multi-byte UTF-8 character
+    # (e.g. an em dash) appears later, the charset would previously be
+    # mis-detected as "ascii" and decoding the full content would raise
+    # UnicodeDecodeError. See PlainTextConverter.convert.
+    markitdown = MarkItDown()
+    input_data = ("a" * 4096 + "em dash — end").encode("utf-8")
+    result = markitdown.convert_stream(io.BytesIO(input_data), file_extension=".txt")
+    assert "em dash — end" in result.text_content
 def _mock_response(content_disposition: str) -> MagicMock:
     response = MagicMock()
     response.headers = {"content-disposition": content_disposition}
