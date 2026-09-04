@@ -110,6 +110,7 @@ At the moment, the following optional dependencies are available:
 * `[az-content-understanding]` Installs dependencies for Azure Content Understanding
 * `[audio-transcription]` Installs dependencies for audio transcription of wav and mp3 files
 * `[youtube-transcription]` Installs dependencies for fetching YouTube video transcription
+* `[readability]` Installs dependencies for reader mode (article content extraction from web pages)
 
 ### Plugins
 
