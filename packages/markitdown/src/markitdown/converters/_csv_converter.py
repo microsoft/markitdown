@@ -2,9 +2,9 @@ import csv
 import io
 import re
 from typing import BinaryIO, Any
-from charset_normalizer import from_bytes
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
+from ..converter_utils.charset import decode_text
 
 ACCEPTED_MIME_TYPE_PREFIXES = [
     "text/csv",
@@ -73,10 +73,7 @@ class CsvConverter(DocumentConverter):
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
         # Read the file content
-        if stream_info.charset:
-            content = file_stream.read().decode(stream_info.charset)
-        else:
-            content = str(from_bytes(file_stream.read()).best())
+        content = decode_text(file_stream.read(), stream_info.charset)
 
         # Excel and other tools prepend a UTF-8 BOM to CSV exports; strip it so
         # it does not end up inside the first header cell.
