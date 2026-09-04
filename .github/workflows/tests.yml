@@ -20,7 +20,8 @@ jobs:
       - name: Install Hatch
         run: pipx install hatch
       - name: Run tests
-        run: cd packages/markitdown; hatch test
+        run: cd packages/markitdown; hatch test -py=${{ matrix.python-version }}
+
 
   ocr-tests:
     runs-on: ubuntu-latest
