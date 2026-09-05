@@ -24,6 +24,9 @@ MarkItDown currently supports the conversion from:
 - EPubs
 - ... and more!
 
+> [!NOTE]
+> The built-in PDF converter extracts text and attempts to preserve tables when they can be detected. Because PDF files encode visual layout rather than semantic structure, it may not infer headings, lists, or other Markdown structure, and the result may be mostly plain text. For layout-aware extraction, use [Azure Content Understanding](#azure-content-understanding) or [Azure Document Intelligence](#azure-document-intelligence).
+
 ## Why Markdown?
 
 Markdown is extremely close to plain text, with minimal markup or formatting, but still
