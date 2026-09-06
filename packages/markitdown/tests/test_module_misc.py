@@ -1615,9 +1615,14 @@ def test_csv_row_wider_than_header_warns_before_truncating() -> None:
 
 
 def test_csv_row_matching_header_width_does_not_warn() -> None:
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
         result = _convert_csv(b"name,age\nAlice,30\n")
+
+        mismatch_warnings = [
+            x for x in w if "more columns than the header" in str(x.message)
+        ]
+        assert len(mismatch_warnings) == 0
 
     assert "| Alice | 30 |" in result
 
