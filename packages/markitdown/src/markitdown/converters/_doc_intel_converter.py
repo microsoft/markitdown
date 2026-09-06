@@ -233,7 +233,6 @@ class DocumentIntelligenceConverter(DocumentConverter):
                 return []
 
         return [
-            DocumentAnalysisFeature.FORMULAS,  # enable formula extraction
             DocumentAnalysisFeature.OCR_HIGH_RESOLUTION,  # enable high resolution OCR
             DocumentAnalysisFeature.STYLE_FONT,  # enable font style extraction
         ]
