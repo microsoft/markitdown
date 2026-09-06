@@ -153,6 +153,19 @@ GENERAL_TEST_VECTORS = [
         must_not_include=[],
     ),
     FileTestVector(
+    filename="test_sample.tsv",
+    mimetype="text/tab-separated-values",
+    charset="utf-8",
+    url=None,
+    must_include=[
+        "| Name | Age | City |",
+        "| --- | --- | --- |",
+        "| Rahul | 20 | Delhi |",
+        "| Priya | 21 | Noida |",
+    ],
+    must_not_include=[],
+    ),
+    FileTestVector(
         filename="test.json",
         mimetype="application/json",
         charset="ascii",

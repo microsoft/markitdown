@@ -9,8 +9,9 @@ from .._stream_info import StreamInfo
 ACCEPTED_MIME_TYPE_PREFIXES = [
     "text/csv",
     "application/csv",
+    "text/tab-separated-values",
 ]
-ACCEPTED_FILE_EXTENSIONS = [".csv"]
+ACCEPTED_FILE_EXTENSIONS = [".csv", ".tsv"]
 
 
 # Matches a pipe together with the (possibly empty) run of backslashes in front
@@ -83,7 +84,20 @@ class CsvConverter(DocumentConverter):
         content = content.lstrip("\ufeff")
 
         # Parse CSV content
-        reader = csv.reader(io.StringIO(content))
+        extension = (stream_info.extension or "").lower()
+        mimetype = (stream_info.mimetype or "").lower()
+
+        is_tsv = (
+            extension == ".tsv"
+            or mimetype.startswith("text/tab-separated-values")
+        )
+
+        delimiter = "\t" if is_tsv else ","
+
+        reader = csv.reader(
+            io.StringIO(content),
+            delimiter=delimiter
+        )
         rows = list(reader)
         _trim_outer_blank_rows(rows)
 
