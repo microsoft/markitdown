@@ -1,6 +1,7 @@
 import csv
 import io
 import re
+import warnings
 from typing import BinaryIO, Any
 from charset_normalizer import from_bytes
 from .._base_converter import DocumentConverter, DocumentConverterResult
@@ -101,14 +102,26 @@ class CsvConverter(DocumentConverter):
         markdown_table.append("| " + " | ".join(["---"] * len(rows[0])) + " |")
 
         # Add data rows
+        truncated_rows = 0
         for row in rows[1:]:
             # Make sure row has the same number of columns as header
             while len(row) < len(rows[0]):
                 row.append("")
             # Truncate if row has more columns than header
+            if len(row) > len(rows[0]):
+                truncated_rows += 1
             row = row[: len(rows[0])]
             markdown_table.append(
                 "| " + " | ".join(_escape_table_cell(cell) for cell in row) + " |"
+            )
+
+        if truncated_rows:
+            # Silently dropping fields hides real data loss (e.g. a preamble
+            # line mistaken for the header), so surface it instead.
+            warnings.warn(
+                f"{truncated_rows} CSV row(s) have more columns than the header "
+                "row; extra fields were dropped.",
+                stacklevel=2,
             )
 
         result = "\n".join(markdown_table)

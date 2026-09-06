@@ -5,6 +5,7 @@ import ntpath
 import os
 import re
 import shutil
+import warnings
 import zipfile
 import pytest
 from types import SimpleNamespace
@@ -1604,6 +1605,21 @@ def test_csv_backslash_without_a_pipe_is_left_alone() -> None:
     result = _convert_csv(b"name,path\nWidget,C:\\temp\\file.txt\n")
 
     assert r"| Widget | C:\temp\file.txt |" in result
+
+
+def test_csv_row_wider_than_header_warns_before_truncating() -> None:
+    with pytest.warns(UserWarning, match="more columns than the header"):
+        result = _convert_csv(b"name,age\nAlice,30,extra\n")
+
+    assert "| Alice | 30 |" in result
+
+
+def test_csv_row_matching_header_width_does_not_warn() -> None:
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        result = _convert_csv(b"name,age\nAlice,30\n")
+
+    assert "| Alice | 30 |" in result
 
 
 # ---------------------------------------------------------------------------
