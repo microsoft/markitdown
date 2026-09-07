@@ -73,6 +73,7 @@ uv venv --python=3.12 .venv
 ```bash
 source .venv/Scripts/activate
 ```
+
 ## Installation
 
 To install MarkItDown, use pip: `pip install 'markitdown[all]'`. Alternatively, you can install it from the source:
