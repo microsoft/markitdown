@@ -255,46 +255,53 @@ def test_xlsx_no_ocr_service_no_tags() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _write_legacy_show_zeroes_xlsx(tmp_path: Path) -> Path:
-    from openpyxl import Workbook
+def _write_legacy_show_zeroes_xlsx(filename: str, tmp_path: Path) -> Path:
+    """Copy a test workbook, writing the legacy showZeroes attribute on its sheet views."""
+    source_path = TEST_DATA_DIR / filename
+    if not source_path.exists():
+        pytest.skip(f"Test file not found: {source_path}")
 
-    base_path = tmp_path / "base.xlsx"
-    xlsx_path = tmp_path / "legacy_show_zeroes.xlsx"
+    target_path = tmp_path / "legacy_show_zeroes.xlsx"
+    patched = False
 
-    workbook = Workbook()
-    sheet = workbook.active
-    sheet.title = "Data"
-    sheet["A1"] = "hello"
-    sheet["B1"] = "world"
-    workbook.save(base_path)
-
-    with zipfile.ZipFile(base_path) as source:
-        with zipfile.ZipFile(xlsx_path, "w", zipfile.ZIP_DEFLATED) as target:
+    with zipfile.ZipFile(source_path) as source:
+        with zipfile.ZipFile(target_path, "w", zipfile.ZIP_DEFLATED) as target:
             for item in source.infolist():
                 data = source.read(item.filename)
-                if item.filename == "xl/worksheets/sheet1.xml":
-                    data = data.replace(
-                        b"<sheetView ", b'<sheetView showZeroes="0" ', 1
+                if item.filename.startswith(
+                    "xl/worksheets/"
+                ) and item.filename.endswith(".xml"):
+                    updated = data.replace(
+                        b"<sheetView ", b'<sheetView showZeroes="0" '
                     )
-                    assert b'showZeroes="0"' in data
+                    patched = patched or updated != data
+                    data = updated
                 target.writestr(item, data)
 
-    return xlsx_path
+    # Guard the fixture: without the legacy attribute these tests stop exercising
+    # the repair and pass against unfixed code.
+    assert patched
+
+    return target_path
 
 
 def test_xlsx_legacy_show_zeroes_sheetview(svc: MockOCRService, tmp_path: Path) -> None:
-    xlsx_path = _write_legacy_show_zeroes_xlsx(tmp_path)
+    xlsx_path = _write_legacy_show_zeroes_xlsx("xlsx_image_start.xlsx", tmp_path)
     converter = XlsxConverterWithOCR()
     with open(xlsx_path, "rb") as f:
         md = converter.convert(
             f, StreamInfo(extension=".xlsx"), ocr_service=svc
         ).text_content
-    assert md == "## Data\n\n| hello | world |\n| --- | --- |"
+    # The repair keeps the sheet tables and the embedded images, so the output
+    # matches the untouched workbook.
+    assert _IMG_SECTION in md
+    assert md == _convert("xlsx_image_start.xlsx", svc)
 
 
 def test_xlsx_legacy_show_zeroes_sheetview_no_ocr_service(tmp_path: Path) -> None:
-    xlsx_path = _write_legacy_show_zeroes_xlsx(tmp_path)
+    xlsx_path = _write_legacy_show_zeroes_xlsx("xlsx_image_start.xlsx", tmp_path)
     converter = XlsxConverterWithOCR()
     with open(xlsx_path, "rb") as f:
         md = converter.convert(f, StreamInfo(extension=".xlsx")).text_content
-    assert md == "## Data\n| hello | world |\n| --- | --- |"
+    assert "| Widget A | 100 |" in md
+    assert "*[Image OCR]" not in md
