@@ -62,6 +62,17 @@ def _convert(filename: str, ocr_service: MockOCRService) -> str:
         ).text_content
 
 
+def _build_pptx_with_notes() -> io.BytesIO:
+    # A one-slide deck whose only content is a speaker note.
+    prs = pptx.Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    slide.notes_slide.notes_text_frame.text = "some notes"
+    buf = io.BytesIO()
+    prs.save(buf)
+    buf.seek(0)
+    return buf
+
+
 # ---------------------------------------------------------------------------
 # pptx_image_start.pptx
 # ---------------------------------------------------------------------------
@@ -217,16 +228,13 @@ def test_pptx_ocr_none_shape_text(
         raising=True,
     )
 
-    assert _convert("pptx_complex_layout.pptx", svc) is not None
+    assert "<!-- Slide number: 1 -->" in _convert("pptx_complex_layout.pptx", svc)
 
 
 def test_pptx_ocr_none_notes_text(monkeypatch: pytest.MonkeyPatch) -> None:
-    prs = pptx.Presentation()
-    slide = prs.slides.add_slide(prs.slide_layouts[6])
-    slide.notes_slide.notes_text_frame.text = "some notes"
-    buf = io.BytesIO()
-    prs.save(buf)
-    buf.seek(0)
+    # Same for notes_text_frame.text, which the notes branch concatenates
+    # directly.
+    buf = _build_pptx_with_notes()
 
     real_notes = pptx.slide.NotesSlide.notes_text_frame
 
@@ -249,4 +257,4 @@ def test_pptx_ocr_none_notes_text(monkeypatch: pytest.MonkeyPatch) -> None:
     converter = PptxConverterWithOCR()
     result = converter.convert(buf, StreamInfo(extension=".pptx"))
 
-    assert result.text_content is not None
+    assert "### Notes:" in result.text_content
