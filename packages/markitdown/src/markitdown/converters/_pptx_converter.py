@@ -189,8 +189,8 @@ class PptxConverter(DocumentConverter):
                     sorted_shapes = sorted(
                         shape.shapes,
                         key=lambda x: (
-                            float("-inf") if not x.top else x.top,
-                            float("-inf") if not x.left else x.left,
+                            float("-inf") if x.top is None else x.top,
+                            float("-inf") if x.left is None else x.left,
                         ),
                     )
                     for subshape in sorted_shapes:
@@ -199,8 +199,8 @@ class PptxConverter(DocumentConverter):
             sorted_shapes = sorted(
                 slide.shapes,
                 key=lambda x: (
-                    float("-inf") if not x.top else x.top,
-                    float("-inf") if not x.left else x.left,
+                    float("-inf") if x.top is None else x.top,
+                    float("-inf") if x.left is None else x.left,
                 ),
             )
             for shape in sorted_shapes:
