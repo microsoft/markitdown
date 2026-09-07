@@ -76,7 +76,8 @@ class CsvConverter(DocumentConverter):
         if stream_info.charset:
             content = file_stream.read().decode(stream_info.charset)
         else:
-            content = str(from_bytes(file_stream.read()).best())
+            detected = from_bytes(file_stream.read()).best()
+            content = str(detected) if detected is not None else ""
 
         # Excel and other tools prepend a UTF-8 BOM to CSV exports; strip it so
         # it does not end up inside the first header cell.

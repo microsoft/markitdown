@@ -55,6 +55,7 @@ class PlainTextConverter(DocumentConverter):
         if stream_info.charset:
             text_content = file_stream.read().decode(stream_info.charset)
         else:
-            text_content = str(from_bytes(file_stream.read()).best())
+            detected = from_bytes(file_stream.read()).best()
+            text_content = str(detected) if detected is not None else ""
 
         return DocumentConverterResult(markdown=text_content)
