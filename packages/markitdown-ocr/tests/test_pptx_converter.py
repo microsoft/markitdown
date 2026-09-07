@@ -13,10 +13,14 @@ Note: PPTX slide text uses literal backslash-n (\\n) sequences from the
 underlying PPTX converter template; OCR blocks use real newlines.
 """
 
+import io
 import sys
 from pathlib import Path
 from typing import Any
 
+import pptx
+import pptx.shapes.autoshape
+import pptx.slide
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -199,3 +203,50 @@ def test_pptx_ocr_chart_with_title_text_frame() -> None:
     result = converter._convert_chart_to_markdown(mock_chart)
 
     assert "### Chart: Revenue" in result
+
+
+def test_pptx_ocr_none_shape_text(
+    svc: MockOCRService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # python-pptx returns None for shape.text when an <a:r> run has no <a:t>
+    # child, which happens in some third-party-generated decks.
+    monkeypatch.setattr(
+        pptx.shapes.autoshape.Shape,
+        "text",
+        property(lambda self: None),
+        raising=True,
+    )
+
+    assert _convert("pptx_complex_layout.pptx", svc) is not None
+
+
+def test_pptx_ocr_none_notes_text(monkeypatch: pytest.MonkeyPatch) -> None:
+    prs = pptx.Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    slide.notes_slide.notes_text_frame.text = "some notes"
+    buf = io.BytesIO()
+    prs.save(buf)
+    buf.seek(0)
+
+    real_notes = pptx.slide.NotesSlide.notes_text_frame
+
+    class _NoneText:
+        text = None
+
+    def fake_notes(self: pptx.slide.NotesSlide) -> Any:
+        frame = real_notes.fget(self)
+        if frame is None:
+            return None
+        return _NoneText()
+
+    monkeypatch.setattr(
+        pptx.slide.NotesSlide,
+        "notes_text_frame",
+        property(fake_notes),
+        raising=True,
+    )
+
+    converter = PptxConverterWithOCR()
+    result = converter.convert(buf, StreamInfo(extension=".pptx"))
+
+    assert result.text_content is not None
