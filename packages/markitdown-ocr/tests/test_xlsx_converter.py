@@ -14,6 +14,7 @@ Images are grouped at the end of each sheet under:
 """
 
 import sys
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -247,3 +248,53 @@ def test_xlsx_no_ocr_service_no_tags() -> None:
         md = converter.convert(f, StreamInfo(extension=".xlsx")).text_content
     assert "*[Image OCR]" not in md
     assert "[End OCR]*" not in md
+
+
+# ---------------------------------------------------------------------------
+# Legacy showZeroes sheet views
+# ---------------------------------------------------------------------------
+
+
+def _write_legacy_show_zeroes_xlsx(tmp_path: Path) -> Path:
+    from openpyxl import Workbook
+
+    base_path = tmp_path / "base.xlsx"
+    xlsx_path = tmp_path / "legacy_show_zeroes.xlsx"
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Data"
+    sheet["A1"] = "hello"
+    sheet["B1"] = "world"
+    workbook.save(base_path)
+
+    with zipfile.ZipFile(base_path) as source:
+        with zipfile.ZipFile(xlsx_path, "w", zipfile.ZIP_DEFLATED) as target:
+            for item in source.infolist():
+                data = source.read(item.filename)
+                if item.filename == "xl/worksheets/sheet1.xml":
+                    data = data.replace(
+                        b"<sheetView ", b'<sheetView showZeroes="0" ', 1
+                    )
+                    assert b'showZeroes="0"' in data
+                target.writestr(item, data)
+
+    return xlsx_path
+
+
+def test_xlsx_legacy_show_zeroes_sheetview(svc: MockOCRService, tmp_path: Path) -> None:
+    xlsx_path = _write_legacy_show_zeroes_xlsx(tmp_path)
+    converter = XlsxConverterWithOCR()
+    with open(xlsx_path, "rb") as f:
+        md = converter.convert(
+            f, StreamInfo(extension=".xlsx"), ocr_service=svc
+        ).text_content
+    assert md == "## Data\n\n| hello | world |\n| --- | --- |"
+
+
+def test_xlsx_legacy_show_zeroes_sheetview_no_ocr_service(tmp_path: Path) -> None:
+    xlsx_path = _write_legacy_show_zeroes_xlsx(tmp_path)
+    converter = XlsxConverterWithOCR()
+    with open(xlsx_path, "rb") as f:
+        md = converter.convert(f, StreamInfo(extension=".xlsx")).text_content
+    assert md == "## Data\n| hello | world |\n| --- | --- |"

@@ -8,6 +8,10 @@ import sys
 from typing import Any, BinaryIO, Optional
 
 from markitdown.converters import HtmlConverter
+from markitdown.converters._xlsx_converter import (
+    _read_xlsx_sheets,
+    _repair_sheetview_show_zeroes,
+)
 from markitdown import DocumentConverter, DocumentConverterResult, StreamInfo
 from markitdown._exceptions import (
     MissingDependencyException,
@@ -90,7 +94,7 @@ class XlsxConverterWithOCR(DocumentConverter):
     ) -> DocumentConverterResult:
         """Standard conversion without OCR."""
         file_stream.seek(0)
-        sheets = pd.read_excel(file_stream, sheet_name=None, engine="openpyxl")
+        sheets = _read_xlsx_sheets(file_stream)
         md_content = ""
 
         for sheet_name in sheets:
@@ -110,7 +114,13 @@ class XlsxConverterWithOCR(DocumentConverter):
     ) -> DocumentConverterResult:
         """Convert XLSX with image OCR."""
         file_stream.seek(0)
-        wb = load_workbook(file_stream)
+        try:
+            wb = load_workbook(file_stream)
+        except TypeError as exc:
+            if "showZeroes" not in str(exc):
+                raise
+            file_stream = _repair_sheetview_show_zeroes(file_stream)
+            wb = load_workbook(file_stream)
 
         md_content = ""
 
