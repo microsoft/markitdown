@@ -137,9 +137,8 @@ def test_pptx_complex_layout(svc: MockOCRService) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_pptx_svg_without_raster_fallback(svc: MockOCRService) -> None:
-    # Slide 1: one SVG picture with no rasterized fallback, so shape.image
-    # raises ValueError("no embedded image")
+def test_pptx_svg_no_fallback(svc: MockOCRService) -> None:
+    # Slide 1: one SVG picture with no rasterized fallback
     expected = (
         "\\n\\n<!-- Slide number: 1 -->\\n"
         "\n*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*"

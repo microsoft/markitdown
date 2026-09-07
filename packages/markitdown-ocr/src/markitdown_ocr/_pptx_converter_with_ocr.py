@@ -4,6 +4,7 @@ Already has LLM-based image description, this enhances it with traditional OCR f
 """
 
 import io
+import os
 import sys
 from typing import Any, BinaryIO, Optional
 
@@ -90,41 +91,35 @@ class PptxConverterWithOCR(DocumentConverter):
 
                 # Pictures
                 if self._is_picture(shape):
-                    # Get image data, resolving SVG pictures that have no
-                    # rasterized fallback (shape.image raises for those)
+                    # Resolve the image through the core converter, which also
+                    # handles SVG pictures that have no rasterized fallback
                     (
                         image_blob,
                         image_content_type,
                         image_filename,
                     ) = self._pptx_converter._get_image_info(shape)
-                    image_stream = (
-                        io.BytesIO(image_blob) if image_blob is not None else None
+
+                    image_extension = None
+                    if image_filename:
+                        image_extension = os.path.splitext(image_filename)[1]
+                    image_stream_info = StreamInfo(
+                        mimetype=image_content_type,
+                        extension=image_extension,
+                        filename=image_filename,
                     )
 
                     # Try LLM description first if available
                     llm_description = ""
                     if (
-                        image_stream is not None
+                        image_blob is not None
                         and llm_client
                         and kwargs.get("llm_model")
                     ):
                         try:
                             from ._llm_caption import llm_caption
 
-                            image_extension = None
-                            if image_filename:
-                                import os
-
-                                image_extension = os.path.splitext(image_filename)[1]
-
-                            image_stream_info = StreamInfo(
-                                mimetype=image_content_type,
-                                extension=image_extension,
-                                filename=image_filename,
-                            )
-
                             llm_description = llm_caption(
-                                image_stream,
+                                io.BytesIO(image_blob),
                                 image_stream_info,
                                 client=llm_client,
                                 model=kwargs.get("llm_model"),
@@ -135,10 +130,12 @@ class PptxConverterWithOCR(DocumentConverter):
 
                     # Try OCR if LLM failed or not available
                     ocr_text = ""
-                    if image_stream is not None and not llm_description and ocr_service:
+                    if image_blob is not None and not llm_description and ocr_service:
                         try:
-                            image_stream.seek(0)
-                            ocr_result = ocr_service.extract_text(image_stream)
+                            ocr_result = ocr_service.extract_text(
+                                io.BytesIO(image_blob),
+                                stream_info=image_stream_info,
+                            )
                             if ocr_result.text.strip():
                                 ocr_text = ocr_result.text.strip()
                         except Exception:
