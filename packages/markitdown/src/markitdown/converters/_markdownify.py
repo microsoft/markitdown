@@ -61,12 +61,13 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         **kwargs,
     ):
         """Same as usual converter, but removes JavaScript links and escapes URIs."""
+        original_text = text
         prefix, suffix, text = markdownify.chomp(text)  # type: ignore
         if not text:
-            return ""
+            return original_text
 
         if el.find_parent("pre") is not None:
-            return text
+            return original_text
 
         href = el.get("href")
         title = el.get("title")
@@ -95,14 +96,14 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
             and not self.options["default_title"]
         ):
             # Shortcut syntax
-            return "<%s>" % href
+            return "%s<%s>%s" % (prefix, href, suffix)
         if self.options["default_title"] and not title:
             title = href
         title_part = ' "%s"' % title.replace('"', r"\"") if title else ""
         return (
             "%s[%s](%s%s)%s" % (prefix, text, href, title_part, suffix)
             if href
-            else text
+            else original_text
         )
 
     def convert_img(
