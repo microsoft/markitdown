@@ -1412,6 +1412,27 @@ def test_ipynb_heading_title_preserves_leading_hash() -> None:
     assert result.title == "#hashtag campaign results"
 
 
+def test_ipynb_title_from_string_source() -> None:
+    """Cell source may be either a string or a list of strings."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    notebook = {
+        "nbformat": 4,
+        "nbformat_minor": 5,
+        "metadata": {},
+        "cells": [
+            {
+                "cell_type": "markdown",
+                "source": "# My Report\n\nContent",
+                "metadata": {},
+            }
+        ],
+    }
+    result = IpynbConverter()._convert(notebook)
+    assert result.title == "My Report"
+    assert result.markdown == "# My Report\n\nContent"
+
+
 def test_ipynb_accepts_non_ascii() -> None:
     """IpynbConverter.accepts() must not raise on non-ASCII binary content."""
     from markitdown.converters._ipynb_converter import IpynbConverter

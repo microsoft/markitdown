@@ -64,7 +64,7 @@ class IpynbConverter(DocumentConverter):
 
             for cell in notebook_content.get("cells", []):
                 cell_type = cell.get("cell_type", "")
-                source_lines = cell.get("source", [])
+                source_lines = self._get_source_lines(cell.get("source", []))
 
                 if cell_type == "markdown":
                     md_output.append("".join(source_lines))
@@ -96,3 +96,10 @@ class IpynbConverter(DocumentConverter):
             raise FileConversionException(
                 f"Error converting .ipynb file: {str(e)}"
             ) from e
+
+    def _get_source_lines(self, source: Any) -> list[str]:
+        if isinstance(source, str):
+            return source.splitlines(keepends=True)
+        if isinstance(source, list):
+            return source
+        return []
