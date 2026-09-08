@@ -18,6 +18,24 @@ ACCEPTED_FILE_EXTENSIONS = [".csv"]
 _PIPE_ESCAPE_RE = re.compile(r"(\\*)\|")
 
 
+def _decode_detected(data: bytes) -> str:
+    """Decode ``data`` by detected charset, falling back rather than to ``None``.
+
+    ``from_bytes(...).best()`` returns ``None`` when nothing decodes the bytes,
+    and ``str(None)`` is the four-character string ``"None"``. A binary file
+    handed over with a text extension therefore became a document whose entire
+    content was the word "None" -- content that was never in the file, in a
+    tool whose output is read by a model.
+
+    The fallback is the one ``_outlook_msg_converter`` already uses for the same
+    call: decode as UTF-8 and drop what does not fit.
+    """
+    detected = from_bytes(data).best()
+    if detected is not None:
+        return str(detected)
+    return data.decode("utf-8", errors="ignore")
+
+
 def _escape_table_cell(value: str) -> str:
     r"""Escape a CSV value so it is safe inside a Markdown table cell.
 
@@ -76,7 +94,7 @@ class CsvConverter(DocumentConverter):
         if stream_info.charset:
             content = file_stream.read().decode(stream_info.charset)
         else:
-            content = str(from_bytes(file_stream.read()).best())
+            content = _decode_detected(file_stream.read())
 
         # Excel and other tools prepend a UTF-8 BOM to CSV exports; strip it so
         # it does not end up inside the first header cell.
