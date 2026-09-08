@@ -29,8 +29,12 @@ pip install openai
 ### Command Line
 
 ```bash
-markitdown document.pdf --use-plugins --llm-client openai --llm-model gpt-4o
+markitdown document.pdf --use-plugins
 ```
+
+> [!NOTE]
+> The CLI has no `--llm-client` / `--llm-model` flags — the LLM-backed OCR
+> described below is configured through the Python API only.
 
 ### Python API
 
