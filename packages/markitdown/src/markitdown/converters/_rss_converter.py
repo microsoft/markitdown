@@ -85,7 +85,7 @@ class RssConverter(DocumentConverter):
             if mimetype.startswith(prefix):
                 return True
 
-        # Check for precise mimetypes and file extensions
+        # Check for candidate mimetypes and file extensions
         if extension in CANDIDATE_FILE_EXTENSIONS:
             return self._check_xml(file_stream)
 
