@@ -1,6 +1,7 @@
 import csv
 import io
 import re
+import warnings
 from typing import BinaryIO, Any
 from charset_normalizer import from_bytes
 from .._base_converter import DocumentConverter, DocumentConverterResult
@@ -90,23 +91,57 @@ class CsvConverter(DocumentConverter):
         if not rows:
             return DocumentConverterResult(markdown="")
 
+        # Issue #2390: the first line is blindly treated as the header, so a
+        # narrow preamble line (e.g. a one-field title/comment such as a
+        # WizTree export banner) followed by a wider real header silently
+        # discards every extra column. Detect that shape: a lone single-field
+        # row followed by a wider row. The first line is then emitted as plain
+        # text and the second line becomes the header.
+        preamble: str | None = None
+        if len(rows) >= 2 and len(rows[0]) == 1 and len(rows[1]) > 1:
+            preamble = rows[0][0].strip()
+            warnings.warn(
+                "CSV first row has a single field while the second row has "
+                f"{len(rows[1])} fields; treating the first row as a "
+                "preamble and using the second row as the header."
+            )
+            rows = rows[1:]
+
+        # Issue #2390 (core fix): never silently drop columns. Widen the
+        # table to the widest row instead of truncating data rows to the
+        # header width, and warn so the mismatch is visible.
+        max_width = max(len(row) for row in rows)
+        if max_width > len(rows[0]):
+            warnings.warn(
+                f"CSV column count mismatch: header has {len(rows[0])} "
+                f"column(s) but the widest row has {max_width}; "
+                "expanding the table instead of truncating data."
+            )
+
         # Create markdown table
         markdown_table = []
 
-        # Add header row
+        if preamble:
+            markdown_table.append(preamble)
+            markdown_table.append("")
+
+        # Add header row (padded to the widest row so no data is lost)
         header = [_escape_table_cell(cell) for cell in rows[0]]
+        header += [""] * (max_width - len(header))
         markdown_table.append("| " + " | ".join(header) + " |")
 
         # Add separator row
-        markdown_table.append("| " + " | ".join(["---"] * len(rows[0])) + " |")
+        markdown_table.append("| " + " | ".join(["---"] * max_width) + " |")
 
         # Add data rows
         for row in rows[1:]:
-            # Make sure row has the same number of columns as header
-            while len(row) < len(rows[0]):
+            # Work on a copy to avoid mutating the parsed rows in place
+            row = list(row)
+            # Pad short rows so every row has the same width
+            while len(row) < max_width:
                 row.append("")
-            # Truncate if row has more columns than header
-            row = row[: len(rows[0])]
+            # No truncation: max_width is the widest row, so all fields kept
+            row = row[:max_width]
             markdown_table.append(
                 "| " + " | ".join(_escape_table_cell(cell) for cell in row) + " |"
             )
