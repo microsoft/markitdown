@@ -145,16 +145,17 @@ class RssConverter(DocumentConverter):
         Returns None if the feed type is not recognized or something goes wrong.
         """
         root = doc.documentElement
-        title = self._get_data_by_tag_name(root, "title")
-        subtitle = self._get_data_by_tag_name(root, "subtitle")
+        title = self._get_flattened_text(root, "title")
+        subtitle = self._get_flattened_text(root, "subtitle")
         entries = root.getElementsByTagNameNS(root.namespaceURI, "entry")
-        md_text = f"# {title}\n"
+        md_text = f"# {title}\n" if title else ""
+
         if subtitle:
             md_text += f"{subtitle}\n"
         for entry in entries:
-            entry_title = self._get_data_by_tag_name(entry, "title")
+            entry_title = self._get_flattened_text(entry, "title")
             entry_summary, summary_is_markup = self._get_atom_content(entry, "summary")
-            entry_updated = self._get_data_by_tag_name(entry, "updated")
+            entry_updated = self._get_flattened_text(entry, "updated")
             entry_content, content_is_markup = self._get_atom_content(entry, "content")
 
             if entry_title:
@@ -244,6 +245,21 @@ class RssConverter(DocumentConverter):
                 self._localize_xhtml_names(child)
         return node
 
+    def _get_flattened_text(self, element: Element, tag_name: str) -> Union[str, None]:
+        """Get a value that is rendered as a heading or a metadata line.
+
+        Feeds are routinely pretty-printed, so a value written as
+        ``<title>\\n  Example feed\\n</title>`` carries the indentation of the
+        element it sits in. Emitted verbatim it ends the Markdown heading
+        before the text begins, leaving a bare ``#`` and the title as body
+        text, so the layout whitespace is dropped here. A value that is
+        nothing but whitespace is reported as absent.
+        """
+        value = self._get_data_by_tag_name(element, tag_name)
+        if value is None:
+            return None
+        return " ".join(part.strip() for part in value.splitlines()).strip() or None
+
     def _parse_rss_type(
         self, doc: Document, *, strict: bool = False
     ) -> DocumentConverterResult:
@@ -256,7 +272,7 @@ class RssConverter(DocumentConverter):
         if not channel_list:
             raise ValueError("No channel found in RSS feed")
         channel = channel_list[0]
-        channel_title = self._get_data_by_tag_name(channel, "title")
+        channel_title = self._get_flattened_text(channel, "title")
         channel_description = self._get_data_by_tag_name(channel, "description")
         items = channel.getElementsByTagName("item")
         md_text = ""
@@ -265,9 +281,9 @@ class RssConverter(DocumentConverter):
         if channel_description:
             md_text += f"{channel_description}\n"
         for item in items:
-            title = self._get_data_by_tag_name(item, "title")
+            title = self._get_flattened_text(item, "title")
             description = self._get_data_by_tag_name(item, "description")
-            pubDate = self._get_data_by_tag_name(item, "pubDate")
+            pubDate = self._get_flattened_text(item, "pubDate")
             content = self._get_data_by_tag_name(item, "content:encoded")
 
             if title:
