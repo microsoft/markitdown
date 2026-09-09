@@ -112,6 +112,7 @@ class EpubConverter(HtmlConverter):
                                 extension=extension,
                                 filename=filename,
                             ),
+                            **kwargs,
                         )
                         markdown_content.append(converted_content.markdown.strip())
 
