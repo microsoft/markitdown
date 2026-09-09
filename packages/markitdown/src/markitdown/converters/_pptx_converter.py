@@ -209,11 +209,14 @@ class PptxConverter(DocumentConverter):
             md_content = md_content.strip()
 
             if slide.has_notes_slide:
-                md_content += "\n\n### Notes:\n"
+                # PowerPoint attaches a notes slide to a slide whose notes pane
+                # has merely been opened, so having one says nothing about there
+                # being notes to read. Only head a section that has content.
                 notes_frame = slide.notes_slide.notes_text_frame
-                if notes_frame is not None:
-                    md_content += notes_frame.text or ""
-                md_content = md_content.strip()
+                notes_text = (notes_frame.text or "") if notes_frame is not None else ""
+                if notes_text.strip():
+                    md_content += "\n\n### Notes:\n" + notes_text
+                    md_content = md_content.strip()
 
         return DocumentConverterResult(markdown=md_content.strip())
 
