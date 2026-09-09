@@ -83,7 +83,7 @@ class CsvConverter(DocumentConverter):
         content = content.lstrip("\ufeff")
 
         # Parse CSV content
-        reader = csv.reader(io.StringIO(content))
+        reader = csv.reader(io.StringIO(content, newline=""))
         rows = list(reader)
         _trim_outer_blank_rows(rows)
 
