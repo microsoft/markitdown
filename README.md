@@ -395,6 +395,15 @@ MarkItDown performs I/O with the privileges of the current process. Like `open()
 
 **Call only the conversion method you need:** Prefer the narrowest conversion API that fits your use case. MarkItDown's `convert()` method is intentionally permissive and can handle local files, remote URIs, and byte streams. If your application only needs to read local files, call `convert_local()` instead. If you need more control over URI fetching, call `requests.get()` yourself and pass the response object to `convert_response()`. For maximum control, open a stream to the input you want converted and call `convert_stream()`.
 
+
+## ⚡ Performance Tips
+
+- For large PDFs, install optional dependencies with `pip install 'markitdown[pdf]'` to enable optimized parsing.
+- Use `--no-ocr` flag (coming soon) or disable plugins if OCR slows down processing.
+- Keep conversions local (not in Docker) if you need GPU acceleration for LLM-based image captioning.
+- Check `markitdown --debug` for detailed logs on failed conversions.
+
+
 ## Trademarks
 
 This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft
