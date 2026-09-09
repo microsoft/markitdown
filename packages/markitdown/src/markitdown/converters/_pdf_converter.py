@@ -62,6 +62,7 @@ _dependency_exc_info = None
 try:
     import pdfminer
     import pdfminer.high_level
+    import pdfminer.pdfpage
     import pdfplumber
 except ImportError:
     _dependency_exc_info = sys.exc_info()
@@ -73,6 +74,33 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 ]
 
 ACCEPTED_FILE_EXTENSIONS = [".pdf"]
+
+
+def _format_page_with_marker(page_idx: int, content: str | None) -> str:
+    marker = f"<!-- page {page_idx + 1} -->"
+    if content and content.strip():
+        return f"{marker}\n\n{_merge_partial_numbering_lines(content.strip())}"
+    return marker
+
+
+def _extract_pdfminer_page(pdf_bytes: io.BytesIO, page_idx: int) -> str:
+    pdf_bytes.seek(0)
+    return pdfminer.high_level.extract_text(pdf_bytes, page_numbers=[page_idx])
+
+
+def _extract_marked_pages_with_pdfminer(pdf_bytes: io.BytesIO) -> str:
+    pdf_bytes.seek(0)
+    page_count = sum(1 for _ in pdfminer.pdfpage.PDFPage.get_pages(pdf_bytes))
+    if page_count == 0:
+        raise ValueError("PDF contains no pages")
+
+    return "\n\n".join(
+        _format_page_with_marker(
+            page_idx,
+            _extract_pdfminer_page(pdf_bytes, page_idx),
+        )
+        for page_idx in range(page_count)
+    )
 
 
 def _to_markdown_table(table: list[list[str]], include_separator: bool = True) -> str:
@@ -538,6 +566,35 @@ class PdfConverter(DocumentConverter):
 
         # Read file stream into BytesIO for compatibility with pdfplumber
         pdf_bytes = io.BytesIO(file_stream.read())
+
+        if kwargs.get("pdf_page_markers", False):
+            try:
+                pdf = pdfplumber.open(pdf_bytes)
+            except Exception:
+                return DocumentConverterResult(
+                    markdown=_extract_marked_pages_with_pdfminer(pdf_bytes)
+                )
+
+            markdown_chunks: list[str] = []
+            with pdf:
+                for page_idx, page in enumerate(pdf.pages):
+                    try:
+                        page_content = _extract_form_content_from_words(page)
+                        if page_content is None:
+                            page_content = page.extract_text()
+                    except Exception:
+                        page_content = _extract_pdfminer_page(pdf_bytes, page_idx)
+                    finally:
+                        page.close()
+
+                    markdown_chunks.append(
+                        _format_page_with_marker(page_idx, page_content)
+                    )
+
+            if not markdown_chunks:
+                raise ValueError("PDF contains no pages")
+
+            return DocumentConverterResult(markdown="\n\n".join(markdown_chunks))
 
         try:
             # Single pass: check every page for form-style content.
