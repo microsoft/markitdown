@@ -1470,6 +1470,77 @@ def test_epub_metadata_nodevalue():
     assert missing is None
 
 
+_EPUB_CONTAINER = (
+    '<?xml version="1.0"?>'
+    '<container version="1.0" '
+    'xmlns="urn:oasis:names:tc:opendocument:xmlns:container">'
+    '<rootfiles><rootfile full-path="OEBPS/content.opf" '
+    'media-type="application/oebps-package+xml"/></rootfiles></container>'
+)
+
+_EPUB_OPF = (
+    '<?xml version="1.0"?>'
+    '<package xmlns="http://www.idpf.org/2007/opf" version="2.0" '
+    'unique-identifier="id">'
+    '<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">'
+    "<dc:title>Example book</dc:title></metadata>"
+    '<manifest><item id="c1" href="ch1.xhtml" '
+    'media-type="application/xhtml+xml"/></manifest>'
+    '<spine><itemref idref="c1"/></spine></package>'
+)
+
+_EPUB_CHAPTER = (
+    '<html xmlns="http://www.w3.org/1999/xhtml"><body>'
+    "<p>Chapter text.</p>"
+    '<img alt="diagram" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUg=="/>'
+    "</body></html>"
+)
+
+
+def _build_epub() -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("mimetype", "application/epub+zip")
+        zf.writestr("META-INF/container.xml", _EPUB_CONTAINER)
+        zf.writestr("OEBPS/content.opf", _EPUB_OPF)
+        zf.writestr("OEBPS/ch1.xhtml", _EPUB_CHAPTER)
+    return buf.getvalue()
+
+
+def test_epub_honors_keep_data_uris() -> None:
+    """EPUB chapters must be converted with the options the caller passed."""
+    result = MarkItDown().convert_stream(
+        io.BytesIO(_build_epub()),
+        stream_info=StreamInfo(extension=".epub"),
+        keep_data_uris=True,
+    )
+
+    assert (
+        "![diagram](data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==)" in result.markdown
+    )
+
+
+def test_epub_truncates_data_uris_by_default() -> None:
+    """Without the option, the default truncation must still apply."""
+    result = MarkItDown().convert_stream(
+        io.BytesIO(_build_epub()), stream_info=StreamInfo(extension=".epub")
+    )
+
+    assert "![diagram](data:image/png;base64...)" in result.markdown
+    assert "iVBORw0KGgo" not in result.markdown
+
+
+def test_epub_metadata_and_text_are_unchanged() -> None:
+    """The rest of the conversion must not move."""
+    result = MarkItDown().convert_stream(
+        io.BytesIO(_build_epub()), stream_info=StreamInfo(extension=".epub")
+    )
+
+    assert result.title == "Example book"
+    assert "**Title:** Example book" in result.markdown
+    assert "Chapter text." in result.markdown
+
+
 def test_json_with_late_non_ascii_character(tmp_path) -> None:
     payload = {
         "record": {
