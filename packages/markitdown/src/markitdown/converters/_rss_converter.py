@@ -275,7 +275,11 @@ class RssConverter(DocumentConverter):
             value = self._get_data_by_tag_name(element, tag_name)
         if value is None:
             return None
-        return " ".join(part.strip() for part in value.splitlines()).strip() or None
+        # Block boundaries become line breaks, and adjacent blocks leave blank
+        # lines between them; drop the empty parts so the flattened value is
+        # separated by single spaces rather than by runs of them.
+        parts = (part.strip() for part in value.splitlines())
+        return " ".join(part for part in parts if part) or None
 
     def _parse_rss_type(
         self, doc: Document, *, strict: bool = False
