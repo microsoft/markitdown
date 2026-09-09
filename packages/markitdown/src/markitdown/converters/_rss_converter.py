@@ -29,6 +29,7 @@ CANDIDATE_FILE_EXTENSIONS = [
     ".xml",
 ]
 
+ATOM_NAMESPACE = "http://www.w3.org/2005/Atom"
 XHTML_NAMESPACE = "http://www.w3.org/1999/xhtml"
 
 
@@ -109,9 +110,9 @@ class RssConverter(DocumentConverter):
     def _feed_type(self, doc: Any) -> str | None:
         if doc.getElementsByTagName("rss"):
             return "rss"
-        elif doc.getElementsByTagName("feed"):
-            root = doc.getElementsByTagName("feed")[0]
-            if root.getElementsByTagName("entry"):
+        root = doc.documentElement
+        if root.localName == "feed" and root.namespaceURI in (None, ATOM_NAMESPACE):
+            if root.getElementsByTagNameNS(root.namespaceURI, "entry"):
                 # An Atom feed must have a root element of <feed> and at least one <entry>
                 return "atom"
         return None
@@ -143,10 +144,10 @@ class RssConverter(DocumentConverter):
 
         Returns None if the feed type is not recognized or something goes wrong.
         """
-        root = doc.getElementsByTagName("feed")[0]
+        root = doc.documentElement
         title = self._get_data_by_tag_name(root, "title")
         subtitle = self._get_data_by_tag_name(root, "subtitle")
-        entries = root.getElementsByTagName("entry")
+        entries = root.getElementsByTagNameNS(root.namespaceURI, "entry")
         md_text = f"# {title}\n"
         if subtitle:
             md_text += f"{subtitle}\n"
@@ -182,7 +183,7 @@ class RssConverter(DocumentConverter):
         Values flagged as markup are converted by ``_parse_content``; plain text
         is returned verbatim for the caller to emit as-is.
         """
-        nodes = entry.getElementsByTagName(tag_name)
+        nodes = entry.getElementsByTagNameNS(entry.namespaceURI, tag_name)
         if not nodes:
             return None, True
 
@@ -311,7 +312,10 @@ class RssConverter(DocumentConverter):
         """Get data from first child element with the given tag name.
         Returns None when no such element is found.
         """
-        nodes = element.getElementsByTagName(tag_name)
+        if element.namespaceURI == ATOM_NAMESPACE:
+            nodes = element.getElementsByTagNameNS(ATOM_NAMESPACE, tag_name)
+        else:
+            nodes = element.getElementsByTagName(tag_name)
         if not nodes:
             return None
         fc = nodes[0].firstChild
