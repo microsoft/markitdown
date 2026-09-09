@@ -90,6 +90,11 @@ class CsvConverter(DocumentConverter):
         if not rows:
             return DocumentConverterResult(markdown="")
 
+        # Pad all rows, including the header, to preserve the widest row.
+        num_columns = max(len(row) for row in rows)
+        for row in rows:
+            row.extend([""] * (num_columns - len(row)))
+
         # Create markdown table
         markdown_table = []
 
@@ -98,15 +103,10 @@ class CsvConverter(DocumentConverter):
         markdown_table.append("| " + " | ".join(header) + " |")
 
         # Add separator row
-        markdown_table.append("| " + " | ".join(["---"] * len(rows[0])) + " |")
+        markdown_table.append("| " + " | ".join(["---"] * num_columns) + " |")
 
         # Add data rows
         for row in rows[1:]:
-            # Make sure row has the same number of columns as header
-            while len(row) < len(rows[0]):
-                row.append("")
-            # Truncate if row has more columns than header
-            row = row[: len(rows[0])]
             markdown_table.append(
                 "| " + " | ".join(_escape_table_cell(cell) for cell in row) + " |"
             )

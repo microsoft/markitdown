@@ -1543,6 +1543,36 @@ def test_csv_all_blank_input_returns_empty_markdown() -> None:
     assert result == ""
 
 
+@pytest.mark.parametrize(
+    "data,expected",
+    [
+        (
+            b"banner\nname,age,city\nAlice,30,Seattle\n",
+            "| banner |  |  |\n| --- | --- | --- |\n"
+            "| name | age | city |\n| Alice | 30 | Seattle |",
+        ),
+        (
+            b"name,age\nAlice\n\nBob,40,Seattle\nCarol,25\n",
+            "| name | age |  |\n| --- | --- | --- |\n"
+            "| Alice |  |  |\n|  |  |  |\n"
+            "| Bob | 40 | Seattle |\n| Carol | 25 |  |",
+        ),
+        (
+            b"name\nAlice,,\n",
+            "| name |  |  |\n| --- | --- | --- |\n| Alice |  |  |",
+        ),
+        (
+            b"name,age,city\nAlice,30\nBob\n",
+            "| name | age | city |\n| --- | --- | --- |\n"
+            "| Alice | 30 |  |\n| Bob |  |  |",
+        ),
+    ],
+    ids=["preamble", "widest-row-late", "trailing-empty-fields", "widest-header"],
+)
+def test_csv_table_matches_widest_row(data: bytes, expected: str) -> None:
+    assert _convert_csv(data) == expected
+
+
 def test_csv_pipe_in_cell_is_escaped() -> None:
     result = _convert_csv(b'name,description\nWidget,"cheap | fast"\n')
 
