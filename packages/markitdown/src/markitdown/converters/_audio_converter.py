@@ -1,7 +1,7 @@
 from typing import Any, BinaryIO
 
 from ._exiftool import exiftool_metadata
-from ._transcribe_audio import transcribe_audio
+from ._transcribe_audio import transcribe_audio, IS_WHISPER_CAPABLE
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException
@@ -91,9 +91,23 @@ class AudioConverter(DocumentConverter):
         # Transcribe
         if audio_format:
             try:
-                transcript = transcribe_audio(file_stream, audio_format=audio_format)
+                # Get the OpenAI client if available
+                llm_client = kwargs.get("llm_client")
+                
+                # Attempt transcription
+                transcript = transcribe_audio(
+                    file_stream, 
+                    audio_format=audio_format, 
+                    client=llm_client
+                )
+                
+                # Add the transcript to the markdown content
                 if transcript:
-                    md_content += "\n\n### Audio Transcript:\n" + transcript
+                    # Indicate if Whisper was used
+                    if IS_WHISPER_CAPABLE and llm_client is not None:
+                        md_content += "\n\n### Audio Transcript (Whisper):\n" + transcript
+                    else:
+                        md_content += "\n\n### Audio Transcript:\n" + transcript
             except MissingDependencyException:
                 pass
 
