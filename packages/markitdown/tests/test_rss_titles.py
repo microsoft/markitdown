@@ -32,9 +32,12 @@ def test_rss_pretty_printed_titles_still_make_headings() -> None:
     result = RssConverter().convert(io.BytesIO(feed), StreamInfo(extension=".rss"))
 
     assert result.title == "Example feed"
+    # The channel description retains its original whitespace.
     assert result.markdown.splitlines() == [
         "# Example feed",
-        "Example feed description",
+        "",
+        "    Example feed description",
+        "  ",
         "",
         "## A story about things",
         "Published on: Mon, 01 Jan 2024 00:00:00 GMT",
