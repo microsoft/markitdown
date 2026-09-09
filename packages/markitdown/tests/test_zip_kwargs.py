@@ -1,4 +1,5 @@
 import io
+import os
 import zipfile
 from typing import Any, BinaryIO
 
@@ -9,6 +10,8 @@ from markitdown import (
     StreamInfo,
 )
 from markitdown.converters._zip_converter import ZipConverter
+
+TEST_FILES_DIR = os.path.join(os.path.dirname(__file__), "test_files")
 
 
 class _RecordingConverter(DocumentConverter):
@@ -54,3 +57,43 @@ def test_zip_forwards_kwargs_to_nested_converters() -> None:
     assert "Hello world" in result.markdown
     assert len(recorder.seen_kwargs) == 1
     assert recorder.seen_kwargs[0].get("keep_data_uris") is True
+
+
+def test_zip_does_not_forward_outer_file_metadata() -> None:
+    """The archive's own extension/url must not override a member's."""
+    markitdown = MarkItDown(enable_builtins=False)
+    recorder = _RecordingConverter()
+    markitdown.register_converter(recorder)
+    markitdown.register_converter(ZipConverter(markitdown=markitdown))
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("hello.txt", "Hello world")
+    buf.seek(0)
+
+    result = markitdown.convert_stream(
+        buf,
+        stream_info=StreamInfo(
+            mimetype="application/zip",
+            extension=".zip",
+            url="https://example.com/archive.zip",
+        ),
+    )
+
+    assert "Hello world" in result.markdown
+    assert len(recorder.seen_kwargs) == 1
+    # The member sees its own extension, not the archive's
+    assert recorder.seen_kwargs[0].get("file_extension") == ".txt"
+    assert "url" not in recorder.seen_kwargs[0]
+
+
+def test_zip_member_reaches_its_own_converter() -> None:
+    """A ZIP-based member (docx) must not be unpacked as a nested archive."""
+    markitdown = MarkItDown()
+    result = markitdown.convert(
+        os.path.join(TEST_FILES_DIR, "test_files.zip"),
+    )
+
+    assert "## File: test.docx" in result.markdown
+    # Raw OOXML parts would appear if the docx were treated as a plain zip
+    assert "[Content_Types].xml" not in result.markdown
