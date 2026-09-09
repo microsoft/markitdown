@@ -31,9 +31,7 @@ class _RecordingConverter(DocumentConverter):
         **kwargs: Any,
     ) -> DocumentConverterResult:
         self.seen_kwargs.append(dict(kwargs))
-        return DocumentConverterResult(
-            markdown=file_stream.read().decode("utf-8")
-        )
+        return DocumentConverterResult(markdown=file_stream.read().decode("utf-8"))
 
 
 def test_zip_forwards_kwargs_to_nested_converters() -> None:
