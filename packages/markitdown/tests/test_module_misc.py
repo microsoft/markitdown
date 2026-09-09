@@ -1412,6 +1412,72 @@ def test_ipynb_heading_title_preserves_leading_hash() -> None:
     assert result.title == "#hashtag campaign results"
 
 
+_UTF8_BOM = b"\xef\xbb\xbf"
+
+_BOM_NOTEBOOK = {
+    "nbformat": 4,
+    "nbformat_minor": 5,
+    "metadata": {},
+    "cells": [
+        {"cell_type": "markdown", "source": ["# Quarterly notes\n"], "metadata": {}},
+        {"cell_type": "code", "source": ["print('hello')\n"], "metadata": {}},
+    ],
+}
+
+
+def test_ipynb_with_a_utf8_bom_is_still_converted() -> None:
+    """A leading BOM must not stop the notebook from being parsed."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    data = _UTF8_BOM + json.dumps(_BOM_NOTEBOOK).encode("utf-8")
+
+    result = IpynbConverter().convert(
+        io.BytesIO(data), StreamInfo(extension=".ipynb", charset="utf-8")
+    )
+
+    assert "# Quarterly notes" in result.markdown
+    assert "```python\nprint('hello')" in result.markdown
+    assert result.title == "Quarterly notes"
+
+
+def test_ipynb_with_a_utf8_bom_is_not_emitted_as_raw_json() -> None:
+    """The whole stack must not fall through to the plain-text converter."""
+    data = _UTF8_BOM + json.dumps(_BOM_NOTEBOOK).encode("utf-8")
+
+    result = MarkItDown().convert_stream(
+        io.BytesIO(data), stream_info=StreamInfo(extension=".ipynb")
+    )
+
+    assert result.markdown.startswith("# Quarterly notes")
+    assert "nbformat" not in result.markdown
+
+
+def test_ipynb_without_a_bom_is_unchanged() -> None:
+    """The case that already worked must produce exactly the same markdown."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    data = json.dumps(_BOM_NOTEBOOK).encode("utf-8")
+
+    result = IpynbConverter().convert(
+        io.BytesIO(data), StreamInfo(extension=".ipynb", charset="utf-8")
+    )
+
+    assert result.markdown == "# Quarterly notes\n\n\n```python\nprint('hello')\n\n```"
+
+
+def test_ipynb_utf8_sig_charset_still_works() -> None:
+    """A charset that already consumes the BOM must not be double-stripped."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    data = _UTF8_BOM + json.dumps(_BOM_NOTEBOOK).encode("utf-8")
+
+    result = IpynbConverter().convert(
+        io.BytesIO(data), StreamInfo(extension=".ipynb", charset="utf-8-sig")
+    )
+
+    assert "# Quarterly notes" in result.markdown
+
+
 def test_ipynb_accepts_non_ascii() -> None:
     """IpynbConverter.accepts() must not raise on non-ASCII binary content."""
     from markitdown.converters._ipynb_converter import IpynbConverter
@@ -1612,6 +1678,36 @@ def test_csv_all_blank_input_returns_empty_markdown() -> None:
     result = _convert_csv(b"\n\n\n")
 
     assert result == ""
+
+
+@pytest.mark.parametrize(
+    "data,expected",
+    [
+        (
+            b"banner\nname,age,city\nAlice,30,Seattle\n",
+            "| banner |  |  |\n| --- | --- | --- |\n"
+            "| name | age | city |\n| Alice | 30 | Seattle |",
+        ),
+        (
+            b"name,age\nAlice\n\nBob,40,Seattle\nCarol,25\n",
+            "| name | age |  |\n| --- | --- | --- |\n"
+            "| Alice |  |  |\n|  |  |  |\n"
+            "| Bob | 40 | Seattle |\n| Carol | 25 |  |",
+        ),
+        (
+            b"name\nAlice,,\n",
+            "| name |  |  |\n| --- | --- | --- |\n| Alice |  |  |",
+        ),
+        (
+            b"name,age,city\nAlice,30\nBob\n",
+            "| name | age | city |\n| --- | --- | --- |\n"
+            "| Alice | 30 |  |\n| Bob |  |  |",
+        ),
+    ],
+    ids=["preamble", "widest-row-late", "trailing-empty-fields", "widest-header"],
+)
+def test_csv_table_matches_widest_row(data: bytes, expected: str) -> None:
+    assert _convert_csv(data) == expected
 
 
 def test_csv_pipe_in_cell_is_escaped() -> None:
