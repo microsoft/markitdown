@@ -310,12 +310,21 @@ class RssConverter(DocumentConverter):
     ) -> Union[str, None]:
         """Get data from first child element with the given tag name.
         Returns None when no such element is found.
+
+        An element's text is not necessarily a single node: a value written as
+        ``<description>\\n  <![CDATA[...]]>\\n</description>`` reaches the parser
+        as whitespace, then the CDATA section, then more whitespace. Reading
+        only the first of those returns the layout and drops the value, so all
+        of the element's own text and CDATA children are joined.
         """
         nodes = element.getElementsByTagName(tag_name)
         if not nodes:
             return None
-        fc = nodes[0].firstChild
-        if fc:
-            if hasattr(fc, "data"):
-                return fc.data
-        return None
+        parts = [
+            child.data
+            for child in nodes[0].childNodes
+            if child.nodeType in (Node.TEXT_NODE, Node.CDATA_SECTION_NODE)
+        ]
+        if not parts:
+            return None
+        return "".join(parts)

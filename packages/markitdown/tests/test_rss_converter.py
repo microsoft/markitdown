@@ -248,3 +248,97 @@ def test_atom_plain_text_layout_whitespace_is_removed() -> None:
         "",
         "Then check status.",
     ]
+
+
+def test_rss_description_survives_a_cdata_section_on_its_own_line() -> None:
+    """A pretty-printed CDATA payload is a later child, not the first one."""
+    feed = b"""<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0"><channel>
+  <title>Example feed</title>
+  <description>Example feed description</description>
+  <item>
+    <title>Example item</title>
+    <description>
+      <![CDATA[<p>The <strong>body</strong> of the item.</p>]]>
+    </description>
+  </item>
+</channel></rss>
+"""
+
+    result = RssConverter().convert(io.BytesIO(feed), StreamInfo(extension=".rss"))
+
+    assert "The **body** of the item." in result.markdown
+
+
+def test_rss_title_survives_a_cdata_section_in_the_middle() -> None:
+    """Text either side of a CDATA section belongs to the same value."""
+    feed = b"""<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0"><channel>
+  <title>Example feed</title>
+  <description>Example feed description</description>
+  <item>
+    <title>Quarterly <![CDATA[R&D]]> report</title>
+    <description>Body.</description>
+  </item>
+</channel></rss>
+"""
+
+    result = RssConverter().convert(io.BytesIO(feed), StreamInfo(extension=".rss"))
+
+    assert "## Quarterly R&D report" in result.markdown
+
+
+def test_atom_summary_survives_a_cdata_section_on_its_own_line() -> None:
+    feed = b"""<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Example feed</title>
+  <entry>
+    <title>Example entry</title>
+    <summary type="html">
+      <![CDATA[<p>A <em>structured</em> summary.</p>]]>
+    </summary>
+  </entry>
+</feed>
+"""
+
+    result = RssConverter().convert(
+        io.BytesIO(feed), StreamInfo(mimetype="application/atom+xml")
+    )
+
+    assert "A *structured* summary." in result.markdown
+
+
+def test_rss_cdata_only_description_is_unchanged() -> None:
+    """The case that already worked must keep working."""
+    feed = b"""<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0"><channel>
+  <title>Example feed</title>
+  <description>Example feed description</description>
+  <item>
+    <title>Example item</title>
+    <description><![CDATA[<p>Only a CDATA section.</p>]]></description>
+  </item>
+</channel></rss>
+"""
+
+    result = RssConverter().convert(io.BytesIO(feed), StreamInfo(extension=".rss"))
+
+    assert "Only a CDATA section." in result.markdown
+
+
+def test_rss_item_without_a_description_is_still_converted() -> None:
+    """An absent element must stay absent, not become an empty string."""
+    feed = b"""<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0"><channel>
+  <title>Example feed</title>
+  <description>Example feed description</description>
+  <item>
+    <title>Example item</title>
+  </item>
+</channel></rss>
+"""
+
+    result = RssConverter().convert(io.BytesIO(feed), StreamInfo(extension=".rss"))
+
+    assert result.title == "Example feed"
+    assert "## Example item" in result.markdown
