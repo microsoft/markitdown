@@ -1,3 +1,4 @@
+import asyncio
 import contextlib
 import sys
 import os
@@ -20,7 +21,11 @@ mcp = FastMCP("markitdown")
 @mcp.tool()
 async def convert_to_markdown(uri: str) -> str:
     """Convert a resource described by an http:, https:, file: or data: URI to markdown"""
-    return MarkItDown(enable_plugins=check_plugins_enabled()).convert_uri(uri).markdown
+    result = await asyncio.to_thread(
+        MarkItDown(enable_plugins=check_plugins_enabled()).convert_uri,
+        uri,
+    )
+    return result.markdown
 
 
 def check_plugins_enabled() -> bool:
