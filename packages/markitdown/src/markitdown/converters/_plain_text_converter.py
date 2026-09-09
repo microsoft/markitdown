@@ -57,9 +57,6 @@ class PlainTextConverter(DocumentConverter):
         else:
             data = file_stream.read()
             detected = from_bytes(data).best()
-            # `best()` is None when nothing decodes the bytes, and `str(None)`
-            # is the word "None" -- a document whose whole content was never in
-            # the file. Same fallback `_outlook_msg_converter` uses.
             text_content = (
                 str(detected)
                 if detected is not None
