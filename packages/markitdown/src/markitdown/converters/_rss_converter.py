@@ -260,7 +260,7 @@ class RssConverter(DocumentConverter):
         value = self._get_data_by_tag_name(element, tag_name)
         if value is None:
             return None
-        return value.strip() or None
+        return " ".join(part.strip() for part in value.splitlines()).strip() or None
 
     def _parse_rss_type(
         self, doc: Document, *, strict: bool = False
