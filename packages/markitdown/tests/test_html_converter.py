@@ -1,5 +1,7 @@
 import io
 
+import pytest
+
 from markitdown import MarkItDown
 
 
@@ -63,3 +65,47 @@ def test_html_href_does_not_quote_query_or_fragment() -> None:
     markdown = _convert_html(f'<a href="{href}">example</a>')
 
     assert f"[example]({expected_href})" in markdown
+
+
+@pytest.mark.parametrize("attributes", ["", 'name="bookmark"', 'href=""'])
+@pytest.mark.parametrize("text", [" middle ", " "])
+def test_html_anchor_without_destination_preserves_word_boundaries(
+    attributes: str, text: str
+) -> None:
+    markdown = _convert_html(f"<p>before<a {attributes}>{text}</a>after</p>")
+
+    assert markdown == f"before{text}after"
+
+
+@pytest.mark.parametrize("href", ["", 'href="https://example.com"'])
+def test_html_anchor_in_pre_preserves_whitespace(href: str) -> None:
+    markdown = _convert_html(f"<pre>before<a {href}>  middle\n </a>after</pre>")
+
+    assert markdown == "```\nbefore  middle\n after\n```"
+
+
+def test_html_autolink_preserves_surrounding_spaces() -> None:
+    markdown = _convert_html(
+        '<p>before<a href="https://example.com"> https://example.com </a>after</p>'
+    )
+
+    assert markdown == "before <https://example.com> after"
+
+
+def test_html_link_with_whitespace_only_text_preserves_word_boundary() -> None:
+    markdown = _convert_html('<p>before<a href="https://example.com"> </a>after</p>')
+
+    assert markdown == "before after"
+
+
+@pytest.mark.parametrize(
+    "href, expected",
+    [
+        ("https://example.com", "before [middle](https://example.com) after"),
+        ("javascript:void(0)", "before middle after"),
+    ],
+)
+def test_html_link_preserves_surrounding_spaces(href: str, expected: str) -> None:
+    markdown = _convert_html(f'<p>before<a href="{href}"> middle </a>after</p>')
+
+    assert markdown == expected
