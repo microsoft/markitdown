@@ -1,7 +1,9 @@
 import io
 import os
 import zipfile
-from typing import Any, BinaryIO
+from typing import Any, BinaryIO, Optional
+
+import pytest
 
 from markitdown import (
     DocumentConverter,
@@ -97,3 +99,38 @@ def test_zip_member_reaches_its_own_converter() -> None:
     assert "## File: test.docx" in result.markdown
     # Raw OOXML parts would appear if the docx were treated as a plain zip
     assert "[Content_Types].xml" not in result.markdown
+
+
+@pytest.mark.parametrize(
+    "archive_url",
+    [None, "https://example.test/archive.zip"],
+    ids=["no_archive_url", "with_archive_url"],
+)
+def test_zip_member_docx_converts_as_docx(archive_url: Optional[str]) -> None:
+    """A DOCX member converts via the DOCX converter, archive URL or not.
+
+    Regression: the archive's own file_extension/url used to be forwarded into
+    the nested convert_stream call, where they take precedence over the
+    member's StreamInfo -- so the DOCX was re-selected as a ZIP and unpacked
+    into its raw OOXML parts instead of being converted.
+    """
+    markitdown = MarkItDown()
+    docx_path = os.path.join(TEST_FILES_DIR, "test.docx")
+    standalone = markitdown.convert(docx_path).markdown
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.write(docx_path, "test.docx")
+    buf.seek(0)
+
+    result = markitdown.convert_stream(
+        buf,
+        stream_info=StreamInfo(extension=".zip", url=archive_url),
+    ).markdown
+
+    assert "## File: test.docx" in result
+    # The member's real conversion output is present ...
+    assert standalone.strip() in result
+    # ... and it was not unpacked as a nested archive
+    assert "word/document.xml" not in result
+    assert "[Content_Types].xml" not in result
