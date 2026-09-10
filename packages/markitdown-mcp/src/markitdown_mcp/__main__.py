@@ -1,12 +1,16 @@
 import contextlib
+import logging
 import os
 import sys
 from collections.abc import AsyncIterator
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from starlette.applications import Starlette
-from markitdown import MarkItDown, MarkItDownException
+from markitdown import MarkItDown, FileConversionException, UnsupportedFormatException
+import requests
 import uvicorn
+
+logger = logging.getLogger(__name__)
 
 # Initialize the MCP server for MarkItDown
 mcp = MCPServer("markitdown")
@@ -18,9 +22,28 @@ async def convert_to_markdown(uri: str) -> str:
     converter = MarkItDown(enable_plugins=check_plugins_enabled())
     try:
         return converter.convert_uri(uri).markdown
-    except (MarkItDownException, OSError, ValueError) as exc:
-        # SDK 2.x only exposes ToolError messages. Preserve expected conversion,
-        # file/network (including requests errors), and URI validation failures.
+
+    # SDK 2.x only exposes ToolError messages.
+    except UnsupportedFormatException as exc:
+        raise ToolError(str(exc)) from exc
+    except requests.exceptions.HTTPError as exc:
+        status = exc.response.status_code if exc.response is not None else "unknown"
+        raise ToolError(
+            f"Fetching the resource failed with HTTP status {status}."
+        ) from exc
+    except requests.exceptions.RequestException as exc:
+        raise ToolError("Could not fetch the resource.") from exc
+    except FileConversionException as exc:
+        raise ToolError("File conversion failed.") from exc
+    except OSError as exc:
+        # str(exc) embeds the resolved path; errno's fixed strerror does not.
+        detail = (
+            os.strerror(exc.errno) if exc.errno else "the resource could not be read"
+        )
+        raise ToolError(f"Could not read the resource: {detail}.") from exc
+    except ValueError as exc:
+        # URI validation failures raised by convert_uri itself, which only
+        # restate the URI the client supplied.
         raise ToolError(str(exc)) from exc
 
 
@@ -35,12 +58,6 @@ def check_plugins_enabled() -> bool:
 def create_starlette_app(
     mcp_server: MCPServer, *, host: str = "127.0.0.1", debug: bool = False
 ) -> Starlette:
-    # Two sub-apps supply the routes: /sse + /messages/ from the SSE transport,
-    # and /mcp from Streamable HTTP. Their routes are merged into one app so the
-    # published URL surface is unchanged.
-    # The host must match what uvicorn binds to: the SDK derives its
-    # Host/Origin allowlist from it, and a localhost default would reject
-    # remote requests with 421 when serving on another interface.
     sse_app = mcp_server.sse_app(host=host)
     http_app = mcp_server.streamable_http_app(
         json_response=True,

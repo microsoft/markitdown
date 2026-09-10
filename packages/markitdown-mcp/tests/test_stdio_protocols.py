@@ -189,7 +189,9 @@ def test_conversion_errors_are_reported(modern, tmp_path, fixture_uri):
         ]
 
     failures = [
-        ((tmp_path / "missing.md").as_uri(), "missing.md"),
+        # The resolved local path is deliberately withheld from the client; only
+        # the errno's fixed strerror is returned.
+        ((tmp_path / "missing.md").as_uri(), "No such file or directory"),
         ("ftp://example.com/sample.md", "Unsupported URI scheme: ftp"),
         ("data:text/plain", "Malformed data URI, missing ',' separator"),
     ]
