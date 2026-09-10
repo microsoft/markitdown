@@ -122,3 +122,14 @@ def test_img_keeps_embedded_data_uri_over_data_src_when_keeping_data_uris() -> N
 
     assert f"![A photo]({embedded})" in markdown
     assert other_src not in markdown
+
+
+def test_html_table_escapes_pipe_characters_in_cells() -> None:
+    html = (
+        "<table><thead><tr><th>Name</th><th>Note</th></tr></thead>"
+        "<tbody><tr><td>Alice</td><td>Has a | pipe</td></tr></tbody></table>"
+    )
+
+    markdown = _convert_html(html)
+
+    assert "| Alice | Has a \\| pipe |" in markdown
