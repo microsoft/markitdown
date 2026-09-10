@@ -1371,6 +1371,26 @@ def test_youtube_converter_missing_title_metadata() -> None:
         assert "# YouTube" in result_title_tag.markdown
 
 
+def test_zip_duplicate_filenames_preserve_each_entry() -> None:
+    """Same-named ZIP entries must retain their own content and archive order."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as archive:
+        archive.writestr("notes.txt", "First archived entry.")
+        with pytest.warns(UserWarning, match="Duplicate name"):
+            archive.writestr("notes.txt", "Second archived entry.")
+    buf.seek(0)
+
+    result = MarkItDown().convert_stream(
+        buf, stream_info=StreamInfo(extension=".zip", filename="duplicate.zip")
+    )
+
+    assert result.markdown == (
+        "Content from the zip file `duplicate.zip`:\n\n"
+        "## File: notes.txt\n\nFirst archived entry.\n\n"
+        "## File: notes.txt\n\nSecond archived entry."
+    )
+
+
 def test_zip_stream_no_filename_header() -> None:
     """Regression test: ZipConverter must not render the literal string 'None'
     in the output header when the stream has no associated URL, local path, or
@@ -1836,6 +1856,7 @@ if __name__ == "__main__":
         test_docx_comments,
         test_docx_zip_filename_casing_mismatch,
         test_docx_zip_filename_non_casing_mismatch_still_rejected,
+        test_zip_duplicate_filenames_preserve_each_entry,
         test_input_as_strings,
         test_markitdown_remote,
         test_speech_transcription,
