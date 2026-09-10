@@ -3,6 +3,7 @@ import sys
 import os
 from collections.abc import AsyncIterator
 from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp.server import Settings
 from starlette.applications import Starlette
 from mcp.server.sse import SseServerTransport
 from starlette.requests import Request
@@ -12,6 +13,10 @@ from mcp.server import Server
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from markitdown import MarkItDown
 import uvicorn
+
+# Resolve the forward reference in Settings.lifespan before the model is first
+# instantiated, otherwise pydantic-settings emits IncompleteFieldDefinitionWarning.
+Settings.model_rebuild()
 
 # Initialize FastMCP server for MarkItDown (SSE)
 mcp = FastMCP("markitdown")
