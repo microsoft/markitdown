@@ -115,7 +115,18 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         """Same as usual converter, but removes data URIs"""
 
         alt = el.attrs.get("alt", None) or ""
-        src = el.attrs.get("src", None) or el.attrs.get("data-src", None) or ""
+        src = el.attrs.get("src", None) or ""
+        data_src = el.attrs.get("data-src", None) or ""
+        # Lazy-loading libraries commonly leave a tiny placeholder data URI in
+        # src and put the real image in data-src. Prefer data-src when src
+        # isn't a usable URL, so the placeholder doesn't win over actual
+        # content. When keep_data_uris is set the caller explicitly wants the
+        # embedded bytes, so a data URI in src is left alone.
+        if data_src and (
+            not src
+            or (src[:5].lower() == "data:" and not self.options["keep_data_uris"])
+        ):
+            src = data_src
         title = el.attrs.get("title", None) or ""
         title_part = ' "%s"' % title.replace('"', r"\"") if title else ""
         # Remove all line breaks from alt
@@ -144,6 +155,18 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         if el.get("type") == "checkbox":
             return "[x] " if el.has_attr("checked") else "[ ] "
         return ""
+
+    def convert_u(
+        self,
+        el: Any,
+        text: str,
+        convert_as_inline: Optional[bool] = False,
+        **kwargs,
+    ) -> str:
+        prefix, suffix, text = markdownify.chomp(text)  # type: ignore
+        if not text:
+            return ""
+        return f"{prefix}<u>{text}</u>{suffix}"
 
     def convert_strike(self, el: Any, text: str, *args, **kwargs) -> str:
         """Obsolete <strike> is still in the wild; treat it like <s>/<del>."""

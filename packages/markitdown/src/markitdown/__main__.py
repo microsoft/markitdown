@@ -133,7 +133,7 @@ def main():
     parser.add_argument(
         "--list-plugins",
         action="store_true",
-        help="List installed 3rd-party plugins. Plugins are loaded when using the -p or --use-plugin option.",
+        help="List installed 3rd-party plugins. Plugins are loaded when using the -p or --use-plugins option.",
     )
 
     parser.add_argument(
@@ -219,7 +219,7 @@ def main():
     elif args.use_cu:
         if args.cu_endpoint is None:
             _exit_with_error(
-                "Content Understanding Endpoint (--cu-endpoint) is required when using --use-cu."
+                "Content Understanding Endpoint (--cu-endpoint) is required when using --use-cu. "
                 "Pass --cu-endpoint or set MARKITDOWN_CU_ENDPOINT."
             )
 

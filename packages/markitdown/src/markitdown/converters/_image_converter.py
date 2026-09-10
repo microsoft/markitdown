@@ -134,5 +134,8 @@ class ImageConverter(DocumentConverter):
         ]
 
         # Call the OpenAI API
-        response = client.chat.completions.create(model=model, messages=messages)
-        return response.choices[0].message.content
+        try:
+            response = client.chat.completions.create(model=model, messages=messages)
+            return response.choices[0].message.content
+        except Exception:
+            return None

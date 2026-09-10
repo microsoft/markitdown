@@ -98,10 +98,18 @@ class ZipConverter(DocumentConverter):
         )
         md_content = f"Content from the zip file `{file_path}`:\n\n"
 
+        # Drop the metadata describing the outer *archive*
+        member_kwargs = {
+            key: value
+            for key, value in kwargs.items()
+            if key not in ("file_extension", "url")
+        }
+
         with zipfile.ZipFile(file_stream, "r") as zipObj:
-            for name in zipObj.namelist():
+            for entry in zipObj.infolist():
+                name = entry.filename
                 try:
-                    z_file_stream = io.BytesIO(zipObj.read(name))
+                    z_file_stream = io.BytesIO(zipObj.read(entry))
                     z_file_stream_info = StreamInfo(
                         extension=os.path.splitext(name)[1],
                         filename=os.path.basename(name),
@@ -109,6 +117,7 @@ class ZipConverter(DocumentConverter):
                     result = self._markitdown.convert_stream(
                         stream=z_file_stream,
                         stream_info=z_file_stream_info,
+                        **member_kwargs,
                     )
                     if result is not None:
                         md_content += f"## File: {name}\n\n"

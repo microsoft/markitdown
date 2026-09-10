@@ -307,12 +307,8 @@ class MarkItDown:
 
         # Local path or url
         if isinstance(source, str):
-            if (
-                source.startswith("http:")
-                or source.startswith("https:")
-                or source.startswith("file:")
-                or source.startswith("data:")
-            ):
+            scheme = urlparse(source.strip()).scheme.lower()
+            if scheme in ("http", "https", "file", "data"):
                 # Rename the url argument to mock_url
                 # (Deprecated -- use stream_info)
                 _kwargs = {k: v for k, v in kwargs.items()}
@@ -456,9 +452,10 @@ class MarkItDown:
         **kwargs: Any,
     ) -> DocumentConverterResult:
         uri = uri.strip()
+        scheme = urlparse(uri).scheme.lower()
 
         # File URIs
-        if uri.startswith("file:"):
+        if scheme == "file":
             netloc, path = file_uri_to_path(uri)
             if netloc and netloc != "localhost":
                 raise ValueError(
@@ -472,7 +469,7 @@ class MarkItDown:
                 **kwargs,
             )
         # Data URIs
-        elif uri.startswith("data:"):
+        elif scheme == "data":
             mimetype, attributes, data = parse_data_uri(uri)
 
             base_guess = StreamInfo(
@@ -490,7 +487,7 @@ class MarkItDown:
                 **kwargs,
             )
         # HTTP/HTTPS URIs
-        elif uri.startswith("http:") or uri.startswith("https:"):
+        elif scheme in ("http", "https"):
             response = self._requests_session.get(uri, stream=True)
             response.raise_for_status()
             return self.convert_response(
