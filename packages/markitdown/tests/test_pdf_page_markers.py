@@ -79,9 +79,7 @@ def test_empty_pages_keep_their_page_index() -> None:
     )
 
     assert result.markdown == (
-        "<!-- page 1 -->\n\nfirst\n\n"
-        "<!-- page 2 -->\n\n"
-        "<!-- page 3 -->\n\nthird"
+        "<!-- page 1 -->\n\nfirst\n\n" "<!-- page 2 -->\n\n" "<!-- page 3 -->\n\nthird"
     )
 
 
@@ -126,8 +124,7 @@ def test_page_extraction_failure_falls_back_only_for_that_page() -> None:
         )
 
     assert result.markdown == (
-        "<!-- page 1 -->\n\nfallback first\n\n"
-        "<!-- page 2 -->\n\nsecond"
+        "<!-- page 1 -->\n\nfallback first\n\n" "<!-- page 2 -->\n\nsecond"
     )
     extract_text.assert_called_once()
     assert extract_text.call_args.kwargs["page_numbers"] == [0]
@@ -151,9 +148,7 @@ def test_pdfplumber_failure_falls_back_page_by_page() -> None:
         )
 
     assert result.markdown == (
-        "<!-- page 1 -->\n\nfirst\n\n"
-        "<!-- page 2 -->\n\n"
-        "<!-- page 3 -->\n\nthird"
+        "<!-- page 1 -->\n\nfirst\n\n" "<!-- page 2 -->\n\n" "<!-- page 3 -->\n\nthird"
     )
     assert extract_text.call_args_list == [
         call(ANY, page_numbers=[0]),
