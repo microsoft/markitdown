@@ -3,6 +3,7 @@ import re
 import sys
 import zipfile
 from typing import BinaryIO, Any
+from ._csv_converter import _escape_table_cell
 from ._html_converter import HtmlConverter
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
@@ -84,6 +85,26 @@ def _repair_sheetview_show_zeroes(
     return repaired_stream
 
 
+def _escape_sheet(sheet: "pd.DataFrame") -> "pd.DataFrame":
+    """Escape Markdown-significant characters in string cells and headers.
+
+    A ``|`` in a value is data, not a column separator; without escaping,
+    the rendered row gains phantom columns. Reuses the CSV converter's
+    escaping so Excel tables behave like CSV tables (#2266). Non-string
+    values (numbers, dates, NaN) pass through untouched.
+    """
+    sheet = sheet.apply(
+        lambda column: column.map(
+            lambda value: _escape_table_cell(value) if isinstance(value, str) else value
+        )
+    )
+    sheet.columns = [
+        _escape_table_cell(column) if isinstance(column, str) else column
+        for column in sheet.columns
+    ]
+    return sheet
+
+
 class XlsxConverter(DocumentConverter):
     """
     Converts XLSX files to Markdown, with each sheet presented as a separate Markdown table.
@@ -135,7 +156,7 @@ class XlsxConverter(DocumentConverter):
         md_content = ""
         for s in sheets:
             md_content += f"## {s}\n"
-            html_content = sheets[s].to_html(index=False)
+            html_content = _escape_sheet(sheets[s]).to_html(index=False)
             md_content += (
                 self._html_converter.convert_string(
                     html_content, **kwargs
@@ -197,7 +218,7 @@ class XlsConverter(DocumentConverter):
         md_content = ""
         for s in sheets:
             md_content += f"## {s}\n"
-            html_content = sheets[s].to_html(index=False)
+            html_content = _escape_sheet(sheets[s]).to_html(index=False)
             md_content += (
                 self._html_converter.convert_string(
                     html_content, **kwargs
