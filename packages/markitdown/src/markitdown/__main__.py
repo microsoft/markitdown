@@ -133,7 +133,7 @@ def main():
     parser.add_argument(
         "--list-plugins",
         action="store_true",
-        help="List installed 3rd-party plugins. Plugins are loaded when using the -p or --use-plugin option.",
+        help="List installed 3rd-party plugins. Plugins are loaded when using the -p or --use-plugins option.",
     )
 
     parser.add_argument(
