@@ -1,21 +1,41 @@
 import base64
+import ntpath
 import os
 from typing import Tuple, Dict
 from urllib.request import url2pathname
 from urllib.parse import urlparse, unquote_to_bytes
 
 
+def _is_unc_or_device_path(path: str) -> bool:
+    """Recognize Windows UNC and device namespace prefixes on any platform."""
+    drive, _ = ntpath.splitdrive(path)
+    return drive.replace("\\", "/").startswith("//")
+
+
 def file_uri_to_path(file_uri: str) -> Tuple[str | None, str]:
-    """Convert a file URI to a local file path"""
+    """Convert a file URI to a path, rejecting UNC and Windows device paths."""
     parsed = urlparse(file_uri)
     if parsed.scheme != "file":
         raise ValueError(f"Not a file URL: {file_uri}")
+
+    decoded_path = unquote_to_bytes(parsed.path).replace(b"\\", b"/")
+    if decoded_path.startswith(b"//"):
+        raise ValueError(
+            f"Unsupported file URI: {file_uri}. "
+            "UNC and Windows device paths are not supported."
+        )
 
     netloc = parsed.netloc if parsed.netloc else None
     path = url2pathname(parsed.path)
     if os.name == "nt" and path[:1] in "/\\" and path[2:3] == ":":
         path = path[1:]
     path = os.path.abspath(path)
+
+    if _is_unc_or_device_path(path):
+        raise ValueError(
+            f"Unsupported file URI: {file_uri}. "
+            "UNC and Windows device paths are not supported."
+        )
     return netloc, path
 
 
