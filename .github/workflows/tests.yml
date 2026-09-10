@@ -84,8 +84,9 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      # Keep this environment free of optional converters to exercise the base install.
       - name: Install packages
-        run: pip install "./packages/markitdown[all]" ./packages/markitdown-mcp pytest
+        run: pip install ./packages/markitdown ./packages/markitdown-mcp pytest
 
       - name: Run tests
         working-directory: packages/markitdown-mcp
