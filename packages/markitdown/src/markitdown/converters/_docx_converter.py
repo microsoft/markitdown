@@ -2,7 +2,7 @@ import sys
 import io
 from warnings import warn
 
-from typing import BinaryIO, Any
+from typing import BinaryIO, Any, Optional
 
 from ._html_converter import HtmlConverter
 from ..converter_utils.docx.pre_process import pre_process_docx
@@ -27,10 +27,22 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 
 ACCEPTED_FILE_EXTENSIONS = [".docx"]
 
+_UNDERLINE_STYLE_MAP = "u => u"
+
+
+def _read_embedded_style_map(file_stream: BinaryIO) -> Optional[str]:
+    """Read the style map embedded in a .docx, if it has one."""
+    position = file_stream.tell()
+    file_stream.seek(0)
+    try:
+        return mammoth.read_embedded_style_map(file_stream)
+    finally:
+        file_stream.seek(position)
+
 
 class DocxConverter(HtmlConverter):
     """
-    Converts DOCX files to Markdown. Style information (e.g.m headings) and tables are preserved where possible.
+    Converts DOCX files to Markdown. Style information (e.g., headings) and tables are preserved where possible.
     """
 
     def __init__(self):
@@ -75,9 +87,25 @@ class DocxConverter(HtmlConverter):
                 _dependency_exc_info[2]
             )
 
-        style_map = kwargs.get("style_map", None)
         pre_process_stream = pre_process_docx(file_stream)
-        return self._html_converter.convert_string(
-            mammoth.convert_to_html(pre_process_stream, style_map=style_map).value,
-            **kwargs,
+
+        caller_style_map = kwargs.get("style_map")
+        embedded_style_map = _read_embedded_style_map(pre_process_stream)
+
+        style_map = "\n".join(
+            part
+            for part in (
+                caller_style_map,
+                embedded_style_map,
+                _UNDERLINE_STYLE_MAP,
+            )
+            if part
         )
+
+        html_result = mammoth.convert_to_html(
+            pre_process_stream,
+            style_map=style_map,
+            include_embedded_style_map=False,
+        ).value
+
+        return self._html_converter.convert_string(html_result, **kwargs)

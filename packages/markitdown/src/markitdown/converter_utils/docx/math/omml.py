@@ -66,10 +66,15 @@ def escape_latex(strs):
 
 
 def get_val(key, default=None, store=CHR):
-    if key is not None:
-        return key if not store else store.get(key, key)
-    else:
+    if key is None or not store:
         return default
+    return store.get(key, default)
+
+
+def get_char(key, default=None, store=CHR):
+    if key is None:
+        return default
+    return store.get(key, key) if store else key
 
 
 class Tag2Method(object):
@@ -223,8 +228,8 @@ class oMath2Latex(Tag2Method):
         c_dict = self.process_children_dict(elm)
         pr = c_dict["dPr"]
         null = D_DEFAULT.get("null")
-        s_val = get_val(pr.begChr, default=D_DEFAULT.get("left"), store=T)
-        e_val = get_val(pr.endChr, default=D_DEFAULT.get("right"), store=T)
+        s_val = get_char(pr.begChr, default=D_DEFAULT.get("left"), store=T)
+        e_val = get_char(pr.endChr, default=D_DEFAULT.get("right"), store=T)
         return pr.text + D.format(
             left=null if not s_val else escape_latex(s_val),
             text=c_dict["e"],
@@ -267,14 +272,24 @@ class oMath2Latex(Tag2Method):
         the func name
         """
         latex_chars = []
+        # Word may split a single function name over several runs (e.g. on a
+        # formatting boundary), so join adjacent runs before looking it up.
+        name_parts = []
+
+        def flush_name():
+            if not name_parts:
+                return
+            name = BLANK.join(name_parts)
+            del name_parts[:]
+            latex_chars.append(FUNC.get(name) or r"\operatorname{%s}({fe})" % name)
+
         for stag, t, e in self.process_children_list(elm):
             if stag == "r":
-                if FUNC.get(t):
-                    latex_chars.append(FUNC[t])
-                else:
-                    raise NotImplementedError("Not support func %s" % t)
+                name_parts.append(t)
             else:
+                flush_name()
                 latex_chars.append(t)
+        flush_name()
         t = BLANK.join(latex_chars)
         return t if FUNC_PLACE in t else t + FUNC_PLACE  # do_func will replace this
 
@@ -284,7 +299,7 @@ class oMath2Latex(Tag2Method):
         """
         c_dict = self.process_children_dict(elm)
         pr = c_dict["groupChrPr"]
-        latex_s = get_val(pr.chr)
+        latex_s = get_val(pr.chr, default=CHR_DEFAULT.get("GROUP_CHR_VAL"), store=CHR)
         return pr.text + latex_s.format(c_dict["e"])
 
     def do_rad(self, elm):
@@ -361,7 +376,7 @@ class oMath2Latex(Tag2Method):
         bo = ""
         for stag, t, e in self.process_children_list(elm):
             if stag == "naryPr":
-                bo = get_val(t.chr, store=CHR_BO)
+                bo = get_char(t.chr, store=CHR_BO)
             else:
                 res.append(t)
         return bo + BLANK.join(res)
@@ -373,7 +388,7 @@ class oMath2Latex(Tag2Method):
         @todo \text (latex pure text support)
         """
         _str = []
-        for s in elm.findtext("./{0}t".format(OMML_NS)):
+        for s in elm.findtext("./{0}t".format(OMML_NS)) or "":
             # s = s if isinstance(s,unicode) else unicode(s,'utf-8')
             _str.append(self._t_dict.get(s, s))
         return escape_latex(BLANK.join(_str))

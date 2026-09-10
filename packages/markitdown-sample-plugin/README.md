@@ -7,16 +7,16 @@
 
 This project shows how to create a sample plugin for MarkItDown. The most important parts are as follows:
 
-Next, implement your custom DocumentConverter:
+First, implement your custom DocumentConverter:
 
 ```python
 from typing import BinaryIO, Any
-from markitdown import MarkItDown, DocumentConverter, DocumentConverterResult, StreamInfo
+from markitdown import MarkItDown, DocumentConverter, DocumentConverterResult, StreamInfo, PRIORITY_SPECIFIC_FILE_FORMAT
 
 class RtfConverter(DocumentConverter):
 
     def __init__(
-        self, priority: float = DocumentConverter.PRIORITY_SPECIFIC_FILE_FORMAT
+        self, priority: float = PRIORITY_SPECIFIC_FILE_FORMAT
     ):
         super().__init__(priority=priority)
 
@@ -26,10 +26,10 @@ class RtfConverter(DocumentConverter):
         stream_info: StreamInfo,
         **kwargs: Any,
     ) -> bool:
-	
-	# Implement logic to check if the file stream is an RTF file
-	# ...
-	raise NotImplementedError()
+
+        # Implement logic to check if the file stream is an RTF file
+        # ...
+        raise NotImplementedError()
 
 
     def convert(
@@ -39,17 +39,17 @@ class RtfConverter(DocumentConverter):
         **kwargs: Any,
     ) -> DocumentConverterResult:
 
-	# Implement logic to convert the file stream to Markdown
-	# ...
-	raise NotImplementedError()
+        # Implement logic to convert the file stream to Markdown
+        # ...
+        raise NotImplementedError()
 ```
 
 Next, make sure your package implements and exports the following:
 
 ```python
-# The version of the plugin interface that this plugin uses. 
+# The version of the plugin interface that this plugin uses.
 # The only supported version is 1 for now.
-__plugin_interface_version__ = 1 
+__plugin_interface_version__ = 1
 
 # The main entrypoint for the plugin. This is called each time MarkItDown instances are created.
 def register_converters(markitdown: MarkItDown, **kwargs):
@@ -97,7 +97,7 @@ In Python, plugins can be enabled as follows:
 ```python
 from markitdown import MarkItDown
 
-md = MarkItDown(enable_plugins=True) 
+md = MarkItDown(enable_plugins=True)
 result = md.convert("path-to-file.rtf")
 print(result.text_content)
 ```

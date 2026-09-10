@@ -146,3 +146,56 @@ def test_pptx_no_ocr_service_no_tags() -> None:
         md = converter.convert(f, StreamInfo(extension=".pptx")).text_content
     assert "*[Image OCR]" not in md
     assert "[End OCR]*" not in md
+
+
+def test_pptx_ocr_chart_no_title_text_frame() -> None:
+    from unittest.mock import MagicMock
+    from markitdown_ocr._pptx_converter_with_ocr import PptxConverterWithOCR
+
+    # python-pptx's ChartTitle.text_frame is destructive -- it creates a text
+    # frame if one isn't already present, so it never returns None.
+    # has_text_frame is the property that actually reflects presence/absence.
+    mock_chart = MagicMock()
+    mock_chart.has_title = True
+    mock_chart.chart_title.has_text_frame = False
+
+    mock_category = MagicMock()
+    mock_category.label = "Cat 1"
+    mock_chart.plots = [MagicMock(categories=[mock_category])]
+
+    mock_series = MagicMock()
+    mock_series.name = "Series 1"
+    mock_series.values = [10.0]
+    mock_chart.series = [mock_series]
+
+    converter = PptxConverterWithOCR()
+    result = converter._convert_chart_to_markdown(mock_chart)
+
+    assert "### Chart" in result
+    assert "Cat 1" in result
+    assert "Series 1" in result
+    assert ":" not in result
+
+
+def test_pptx_ocr_chart_with_title_text_frame() -> None:
+    from unittest.mock import MagicMock
+    from markitdown_ocr._pptx_converter_with_ocr import PptxConverterWithOCR
+
+    mock_chart = MagicMock()
+    mock_chart.has_title = True
+    mock_chart.chart_title.has_text_frame = True
+    mock_chart.chart_title.text_frame.text = "Revenue"
+
+    mock_category = MagicMock()
+    mock_category.label = "Cat 1"
+    mock_chart.plots = [MagicMock(categories=[mock_category])]
+
+    mock_series = MagicMock()
+    mock_series.name = "Series 1"
+    mock_series.values = [10.0]
+    mock_chart.series = [mock_series]
+
+    converter = PptxConverterWithOCR()
+    result = converter._convert_chart_to_markdown(mock_chart)
+
+    assert "### Chart: Revenue" in result

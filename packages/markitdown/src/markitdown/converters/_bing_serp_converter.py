@@ -97,7 +97,7 @@ class BingSerpConverter(DocumentConverter):
                     )  # Python 3 doesn't care about extra padding
 
                     try:
-                        # RFC 4648 / Base64URL" variant, which uses "-" and "_"
+                        # RFC 4648 / Base64URL variant, which uses "-" and "_"
                         a["href"] = base64.b64decode(u, altchars="-_").decode("utf-8")
                     except UnicodeDecodeError:
                         pass
