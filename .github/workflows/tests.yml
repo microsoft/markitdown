@@ -3,12 +3,17 @@ on: [pull_request]
 permissions:
   contents: read
 
+env:
+  # Preserve Unicode in captured CLI output on Windows.
+  PYTHONUTF8: "1"
+
 jobs:
   tests:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, windows-latest]
         python-version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
@@ -20,14 +25,16 @@ jobs:
       - name: Install Hatch
         run: pipx install hatch
       - name: Run tests
-        run: cd packages/markitdown; hatch test -py=${{ matrix.python-version }}
+        working-directory: packages/markitdown
+        run: hatch test -py=${{ matrix.python-version }}
 
 
   ocr-tests:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, windows-latest]
         python-version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
@@ -47,10 +54,11 @@ jobs:
 
 
   mcp-tests:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, windows-latest]
         python-version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
