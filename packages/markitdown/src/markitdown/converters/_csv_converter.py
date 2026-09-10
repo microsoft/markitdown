@@ -76,19 +76,30 @@ class CsvConverter(DocumentConverter):
         if stream_info.charset:
             content = file_stream.read().decode(stream_info.charset)
         else:
-            content = str(from_bytes(file_stream.read()).best())
+            data = file_stream.read()
+            detected = from_bytes(data).best()
+            content = (
+                str(detected)
+                if detected is not None
+                else data.decode("utf-8", errors="ignore")
+            )
 
         # Excel and other tools prepend a UTF-8 BOM to CSV exports; strip it so
         # it does not end up inside the first header cell.
         content = content.lstrip("\ufeff")
 
         # Parse CSV content
-        reader = csv.reader(io.StringIO(content))
+        reader = csv.reader(io.StringIO(content, newline=""))
         rows = list(reader)
         _trim_outer_blank_rows(rows)
 
         if not rows:
             return DocumentConverterResult(markdown="")
+
+        # Pad all rows, including the header, to preserve the widest row.
+        num_columns = max(len(row) for row in rows)
+        for row in rows:
+            row.extend([""] * (num_columns - len(row)))
 
         # Create markdown table
         markdown_table = []
@@ -98,15 +109,10 @@ class CsvConverter(DocumentConverter):
         markdown_table.append("| " + " | ".join(header) + " |")
 
         # Add separator row
-        markdown_table.append("| " + " | ".join(["---"] * len(rows[0])) + " |")
+        markdown_table.append("| " + " | ".join(["---"] * num_columns) + " |")
 
         # Add data rows
         for row in rows[1:]:
-            # Make sure row has the same number of columns as header
-            while len(row) < len(rows[0]):
-                row.append("")
-            # Truncate if row has more columns than header
-            row = row[: len(rows[0])]
             markdown_table.append(
                 "| " + " | ".join(_escape_table_cell(cell) for cell in row) + " |"
             )

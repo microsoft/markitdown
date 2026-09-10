@@ -1281,9 +1281,14 @@ def test_markitdown_llm() -> None:
 def test_pptx_chart_no_title_text_frame() -> None:
     from markitdown.converters._pptx_converter import PptxConverter
 
+    # python-pptx's ChartTitle.text_frame is destructive -- it creates a text
+    # frame if one isn't already present, so it never returns None.
+    # has_text_frame is the property that actually reflects presence/absence,
+    # which is what the has_title=True-but-no-text-frame case looks like
+    # against the real library.
     mock_chart = MagicMock()
     mock_chart.has_title = True
-    mock_chart.chart_title.text_frame = None
+    mock_chart.chart_title.has_text_frame = False
 
     mock_category = MagicMock()
     mock_category.label = "Cat 1"
@@ -1301,6 +1306,29 @@ def test_pptx_chart_no_title_text_frame() -> None:
     assert "Cat 1" in result
     assert "Series 1" in result
     assert ":" not in result
+
+
+def test_pptx_chart_with_title_text_frame() -> None:
+    from markitdown.converters._pptx_converter import PptxConverter
+
+    mock_chart = MagicMock()
+    mock_chart.has_title = True
+    mock_chart.chart_title.has_text_frame = True
+    mock_chart.chart_title.text_frame.text = "Revenue"
+
+    mock_category = MagicMock()
+    mock_category.label = "Cat 1"
+    mock_chart.plots = [MagicMock(categories=[mock_category])]
+
+    mock_series = MagicMock()
+    mock_series.name = "Series 1"
+    mock_series.values = [10.0]
+    mock_chart.series = [mock_series]
+
+    converter = PptxConverter()
+    result = converter._convert_chart_to_markdown(mock_chart)
+
+    assert "### Chart: Revenue" in result
 
 
 def test_youtube_converter_missing_title_metadata() -> None:
@@ -1384,6 +1412,72 @@ def test_ipynb_heading_title_preserves_leading_hash() -> None:
     assert result.title == "#hashtag campaign results"
 
 
+_UTF8_BOM = b"\xef\xbb\xbf"
+
+_BOM_NOTEBOOK = {
+    "nbformat": 4,
+    "nbformat_minor": 5,
+    "metadata": {},
+    "cells": [
+        {"cell_type": "markdown", "source": ["# Quarterly notes\n"], "metadata": {}},
+        {"cell_type": "code", "source": ["print('hello')\n"], "metadata": {}},
+    ],
+}
+
+
+def test_ipynb_with_a_utf8_bom_is_still_converted() -> None:
+    """A leading BOM must not stop the notebook from being parsed."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    data = _UTF8_BOM + json.dumps(_BOM_NOTEBOOK).encode("utf-8")
+
+    result = IpynbConverter().convert(
+        io.BytesIO(data), StreamInfo(extension=".ipynb", charset="utf-8")
+    )
+
+    assert "# Quarterly notes" in result.markdown
+    assert "```python\nprint('hello')" in result.markdown
+    assert result.title == "Quarterly notes"
+
+
+def test_ipynb_with_a_utf8_bom_is_not_emitted_as_raw_json() -> None:
+    """The whole stack must not fall through to the plain-text converter."""
+    data = _UTF8_BOM + json.dumps(_BOM_NOTEBOOK).encode("utf-8")
+
+    result = MarkItDown().convert_stream(
+        io.BytesIO(data), stream_info=StreamInfo(extension=".ipynb")
+    )
+
+    assert result.markdown.startswith("# Quarterly notes")
+    assert "nbformat" not in result.markdown
+
+
+def test_ipynb_without_a_bom_is_unchanged() -> None:
+    """The case that already worked must produce exactly the same markdown."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    data = json.dumps(_BOM_NOTEBOOK).encode("utf-8")
+
+    result = IpynbConverter().convert(
+        io.BytesIO(data), StreamInfo(extension=".ipynb", charset="utf-8")
+    )
+
+    assert result.markdown == "# Quarterly notes\n\n\n```python\nprint('hello')\n\n```"
+
+
+def test_ipynb_utf8_sig_charset_still_works() -> None:
+    """A charset that already consumes the BOM must not be double-stripped."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    data = _UTF8_BOM + json.dumps(_BOM_NOTEBOOK).encode("utf-8")
+
+    result = IpynbConverter().convert(
+        io.BytesIO(data), StreamInfo(extension=".ipynb", charset="utf-8-sig")
+    )
+
+    assert "# Quarterly notes" in result.markdown
+
+
 def test_ipynb_accepts_non_ascii() -> None:
     """IpynbConverter.accepts() must not raise on non-ASCII binary content."""
     from markitdown.converters._ipynb_converter import IpynbConverter
@@ -1440,6 +1534,77 @@ def test_epub_metadata_nodevalue():
 
     missing = converter._get_text_from_node(dom, "dc:date")
     assert missing is None
+
+
+_EPUB_CONTAINER = (
+    '<?xml version="1.0"?>'
+    '<container version="1.0" '
+    'xmlns="urn:oasis:names:tc:opendocument:xmlns:container">'
+    '<rootfiles><rootfile full-path="OEBPS/content.opf" '
+    'media-type="application/oebps-package+xml"/></rootfiles></container>'
+)
+
+_EPUB_OPF = (
+    '<?xml version="1.0"?>'
+    '<package xmlns="http://www.idpf.org/2007/opf" version="2.0" '
+    'unique-identifier="id">'
+    '<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">'
+    "<dc:title>Example book</dc:title></metadata>"
+    '<manifest><item id="c1" href="ch1.xhtml" '
+    'media-type="application/xhtml+xml"/></manifest>'
+    '<spine><itemref idref="c1"/></spine></package>'
+)
+
+_EPUB_CHAPTER = (
+    '<html xmlns="http://www.w3.org/1999/xhtml"><body>'
+    "<p>Chapter text.</p>"
+    '<img alt="diagram" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUg=="/>'
+    "</body></html>"
+)
+
+
+def _build_epub() -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("mimetype", "application/epub+zip")
+        zf.writestr("META-INF/container.xml", _EPUB_CONTAINER)
+        zf.writestr("OEBPS/content.opf", _EPUB_OPF)
+        zf.writestr("OEBPS/ch1.xhtml", _EPUB_CHAPTER)
+    return buf.getvalue()
+
+
+def test_epub_honors_keep_data_uris() -> None:
+    """EPUB chapters must be converted with the options the caller passed."""
+    result = MarkItDown().convert_stream(
+        io.BytesIO(_build_epub()),
+        stream_info=StreamInfo(extension=".epub"),
+        keep_data_uris=True,
+    )
+
+    assert (
+        "![diagram](data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==)" in result.markdown
+    )
+
+
+def test_epub_truncates_data_uris_by_default() -> None:
+    """Without the option, the default truncation must still apply."""
+    result = MarkItDown().convert_stream(
+        io.BytesIO(_build_epub()), stream_info=StreamInfo(extension=".epub")
+    )
+
+    assert "![diagram](data:image/png;base64...)" in result.markdown
+    assert "iVBORw0KGgo" not in result.markdown
+
+
+def test_epub_metadata_and_text_are_unchanged() -> None:
+    """The rest of the conversion must not move."""
+    result = MarkItDown().convert_stream(
+        io.BytesIO(_build_epub()), stream_info=StreamInfo(extension=".epub")
+    )
+
+    assert result.title == "Example book"
+    assert "**Title:** Example book" in result.markdown
+    assert "Chapter text." in result.markdown
 
 
 def test_json_with_late_non_ascii_character(tmp_path) -> None:
@@ -1513,6 +1678,36 @@ def test_csv_all_blank_input_returns_empty_markdown() -> None:
     result = _convert_csv(b"\n\n\n")
 
     assert result == ""
+
+
+@pytest.mark.parametrize(
+    "data,expected",
+    [
+        (
+            b"banner\nname,age,city\nAlice,30,Seattle\n",
+            "| banner |  |  |\n| --- | --- | --- |\n"
+            "| name | age | city |\n| Alice | 30 | Seattle |",
+        ),
+        (
+            b"name,age\nAlice\n\nBob,40,Seattle\nCarol,25\n",
+            "| name | age |  |\n| --- | --- | --- |\n"
+            "| Alice |  |  |\n|  |  |  |\n"
+            "| Bob | 40 | Seattle |\n| Carol | 25 |  |",
+        ),
+        (
+            b"name\nAlice,,\n",
+            "| name |  |  |\n| --- | --- | --- |\n| Alice |  |  |",
+        ),
+        (
+            b"name,age,city\nAlice,30\nBob\n",
+            "| name | age | city |\n| --- | --- | --- |\n"
+            "| Alice | 30 |  |\n| Bob |  |  |",
+        ),
+    ],
+    ids=["preamble", "widest-row-late", "trailing-empty-fields", "widest-header"],
+)
+def test_csv_table_matches_widest_row(data: bytes, expected: str) -> None:
+    assert _convert_csv(data) == expected
 
 
 def test_csv_pipe_in_cell_is_escaped() -> None:
@@ -1650,6 +1845,7 @@ if __name__ == "__main__":
         test_markitdown_llm_parameters,
         test_markitdown_llm,
         test_pptx_chart_no_title_text_frame,
+        test_pptx_chart_with_title_text_frame,
         test_ipynb_accepts_non_ascii,
         test_epub_metadata_nodevalue,
         test_exiftool_metadata_with_nonexistent_binary,
