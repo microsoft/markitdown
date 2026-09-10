@@ -180,7 +180,12 @@ class PptxConverter(DocumentConverter):
                 elif shape.has_text_frame:
                     text = shape.text or ""
                     if shape == title:
-                        md_content += "# " + text.lstrip() + "\n"
+                        # A layout's title placeholder sits on the slide whether
+                        # or not anything was typed into it, so having one says
+                        # nothing about there being a title to read. Only emit a
+                        # heading that has text.
+                        if text.strip():
+                            md_content += "# " + text.lstrip() + "\n"
                     else:
                         md_content += text + "\n"
 
