@@ -9,6 +9,7 @@ table). See also #2019 / #2266, which fixed the same class of bug for CSV.
 import io
 
 import pandas as pd
+import pytest
 
 from markitdown import MarkItDown, StreamInfo
 
@@ -21,7 +22,7 @@ def _xlsx_bytes(frame: pd.DataFrame) -> bytes:
 
 
 def _xls_bytes(rows: list) -> bytes:
-    import xlwt
+    xlwt = pytest.importorskip("xlwt")
 
     book = xlwt.Workbook()
     sheet = book.add_sheet("Sheet1")
