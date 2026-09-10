@@ -13,6 +13,7 @@ import sys
 import tempfile
 import threading
 import time
+from pathlib import Path
 
 import pytest
 
@@ -31,7 +32,7 @@ def fixture_uri():
         path = os.path.join(tmpdir, "sample.md")
         with open(path, "w") as fh:
             fh.write(EXPECTED_MARKDOWN + "\n")
-        yield "file://" + path
+        yield Path(path).as_uri()
 
 
 def run_server(requests, expected_responses):
