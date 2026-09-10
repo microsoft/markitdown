@@ -66,6 +66,40 @@ def test_html_href_does_not_quote_query_or_fragment() -> None:
     assert f"[example]({expected_href})" in markdown
 
 
+def test_html_table_pipe_in_cell_is_escaped() -> None:
+    html = (
+        "<table><thead><tr><th>Name</th><th>Note</th></tr></thead>"
+        "<tbody><tr><td>Alice</td><td>Has a | pipe</td></tr></tbody></table>"
+    )
+
+    markdown = _convert_html(html)
+
+    assert "| Alice | Has a \\| pipe |" in markdown
+
+
+def test_html_table_pipe_in_header_is_escaped() -> None:
+    html = (
+        "<table><thead><tr><th>A|B</th><th>C</th></tr></thead>"
+        "<tbody><tr><td>1</td><td>2</td></tr></tbody></table>"
+    )
+
+    markdown = _convert_html(html)
+
+    assert "| A\\|B | C |" in markdown
+
+
+def test_html_table_already_escaped_pipe_is_not_doubled() -> None:
+    html = (
+        "<table><thead><tr><th>H1</th><th>H2</th></tr></thead>"
+        "<tbody><tr><td>a\\|b</td><td>c</td></tr></tbody></table>"
+    )
+
+    markdown = _convert_html(html)
+
+    assert "| a\\|b | c |" in markdown
+    assert "\\\\|" not in markdown
+
+
 def test_img_prefers_data_src_over_placeholder_data_uri() -> None:
     placeholder = (
         "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBTAA7"

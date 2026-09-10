@@ -7,6 +7,21 @@ from urllib.parse import quote, urlparse, urlunparse
 
 _PERCENT_ENCODED_OCTET = re.compile(r"%[0-9A-Fa-f]{2}")
 
+# Matches a pipe together with the (possibly empty) run of backslashes in
+# front of it, anchored so the run starts after a non-backslash (or at the
+# start of the string). The run therefore holds *every* backslash in front
+# of the pipe, which makes the substitution parity-correct: a pipe preceded
+# by an even run (including zero) is unescaped and gains one backslash,
+# while an already-escaped pipe (odd run) matches nothing and is left alone.
+# Idempotency matters because some converters (e.g. XLSX via _escape_sheet,
+# PPTX via html-escaped cells) pre-escape pipes before the HTML reaches us.
+_TABLE_PIPE_RE = re.compile(r"(?<!\\)((?:\\\\)*)\|")
+
+
+def _escape_table_cell_pipes(text: str) -> str:
+    """Escape unescaped pipes so cell text cannot split a Markdown table."""
+    return _TABLE_PIPE_RE.sub(r"\1\\|", text)
+
 
 def _quote_path_preserving_percent_encoded_octets(path: str) -> str:
     """Quote a URL path while preserving existing %HH byte encodings."""
@@ -171,6 +186,20 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
     def convert_strike(self, el: Any, text: str, *args, **kwargs) -> str:
         """Obsolete <strike> is still in the wild; treat it like <s>/<del>."""
         return self.convert_s(el, text, *args, **kwargs)  # type: ignore
+
+    def convert_td(self, el: Any, text: str, parent_tags: Any) -> str:
+        """Same as usual, but escape pipes so cell text cannot split the table."""
+        colspan = 1
+        if "colspan" in el.attrs and el["colspan"].isdigit():
+            colspan = max(1, min(1000, int(el["colspan"])))
+        return " " + _escape_table_cell_pipes(text.strip().replace("\n", " ")) + " |" * colspan
+
+    def convert_th(self, el: Any, text: str, parent_tags: Any) -> str:
+        """Same as usual, but escape pipes so header text cannot split the table."""
+        colspan = 1
+        if "colspan" in el.attrs and el["colspan"].isdigit():
+            colspan = max(1, min(1000, int(el["colspan"])))
+        return " " + _escape_table_cell_pipes(text.strip().replace("\n", " ")) + " |" * colspan
 
     def convert_soup(self, soup: Any) -> str:
         return super().convert_soup(soup)  # type: ignore
