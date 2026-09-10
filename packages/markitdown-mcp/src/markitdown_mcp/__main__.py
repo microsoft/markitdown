@@ -3,8 +3,9 @@ import os
 import sys
 from collections.abc import AsyncIterator
 from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 from starlette.applications import Starlette
-from markitdown import MarkItDown
+from markitdown import MarkItDown, MarkItDownException
 import uvicorn
 
 # Initialize the MCP server for MarkItDown
@@ -14,7 +15,13 @@ mcp = MCPServer("markitdown")
 @mcp.tool()
 async def convert_to_markdown(uri: str) -> str:
     """Convert a resource described by an http:, https:, file: or data: URI to markdown"""
-    return MarkItDown(enable_plugins=check_plugins_enabled()).convert_uri(uri).markdown
+    converter = MarkItDown(enable_plugins=check_plugins_enabled())
+    try:
+        return converter.convert_uri(uri).markdown
+    except (MarkItDownException, OSError, ValueError) as exc:
+        # SDK 2.x only exposes ToolError messages. Preserve expected conversion,
+        # file/network (including requests errors), and URI validation failures.
+        raise ToolError(str(exc)) from exc
 
 
 def check_plugins_enabled() -> bool:

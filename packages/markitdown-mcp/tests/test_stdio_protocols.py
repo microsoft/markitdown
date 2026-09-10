@@ -161,5 +161,64 @@ def test_unknown_method_does_not_kill_the_server(fixture_uri):
     assert responses[1]["result"]["serverInfo"]["name"] == "markitdown"
 
 
+@pytest.mark.parametrize("modern", [False, True], ids=["legacy", "modern"])
+def test_conversion_errors_are_reported(modern, tmp_path, fixture_uri):
+    """Expected failures retain their diagnosis and leave the session usable."""
+    if modern:
+        requests = [
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "server/discover",
+                "params": {"_meta": MODERN_ENVELOPE},
+            }
+        ]
+    else:
+        requests = [
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2025-06-18",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test", "version": "0"},
+                },
+            },
+            {"jsonrpc": "2.0", "method": "notifications/initialized"},
+        ]
+
+    failures = [
+        ((tmp_path / "missing.md").as_uri(), "missing.md"),
+        ("ftp://example.com/sample.md", "Unsupported URI scheme: ftp"),
+        ("data:text/plain", "Malformed data URI, missing ',' separator"),
+    ]
+    for request_id, uri in enumerate(
+        [uri for uri, _ in failures] + [fixture_uri], start=2
+    ):
+        params = {"name": "convert_to_markdown", "arguments": {"uri": uri}}
+        if modern:
+            params["_meta"] = MODERN_ENVELOPE
+        requests.append(
+            {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "method": "tools/call",
+                "params": params,
+            }
+        )
+
+    responses = run_server(requests, expected_responses=len(failures) + 2)
+    assert len(responses) == len(failures) + 2
+    for response, (_, diagnosis) in zip(responses[1:-1], failures):
+        result = response["result"]
+        assert result["isError"] is True
+        assert diagnosis in result["content"][0]["text"]
+
+    result = responses[-1]["result"]
+    assert result["isError"] is False
+    assert EXPECTED_MARKDOWN in result["content"][0]["text"]
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))
