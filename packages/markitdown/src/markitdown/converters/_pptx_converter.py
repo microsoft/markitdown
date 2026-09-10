@@ -147,7 +147,14 @@ class PptxConverter(DocumentConverter):
                         pass
 
                     # Prepare the alt, escaping any special characters
-                    alt_text = "\n".join([llm_description, alt_text]) or shape.name
+                    alt_text = (
+                        "\n".join(
+                            text
+                            for text in [llm_description, alt_text]
+                            if text and text.strip()
+                        )
+                        or shape.name
+                    )
                     alt_text = re.sub(r"[\r\n\[\]]", " ", alt_text)
                     alt_text = re.sub(r"\s+", " ", alt_text).strip()
 
@@ -171,18 +178,19 @@ class PptxConverter(DocumentConverter):
 
                 # Text areas
                 elif shape.has_text_frame:
+                    text = shape.text or ""
                     if shape == title:
-                        md_content += "# " + shape.text.lstrip() + "\n"
+                        md_content += "# " + text.lstrip() + "\n"
                     else:
-                        md_content += shape.text + "\n"
+                        md_content += text + "\n"
 
                 # Group Shapes
                 if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.GROUP:
                     sorted_shapes = sorted(
                         shape.shapes,
                         key=lambda x: (
-                            float("-inf") if not x.top else x.top,
-                            float("-inf") if not x.left else x.left,
+                            float("-inf") if x.top is None else x.top,
+                            float("-inf") if x.left is None else x.left,
                         ),
                     )
                     for subshape in sorted_shapes:
@@ -191,8 +199,8 @@ class PptxConverter(DocumentConverter):
             sorted_shapes = sorted(
                 slide.shapes,
                 key=lambda x: (
-                    float("-inf") if not x.top else x.top,
-                    float("-inf") if not x.left else x.left,
+                    float("-inf") if x.top is None else x.top,
+                    float("-inf") if x.left is None else x.left,
                 ),
             )
             for shape in sorted_shapes:
@@ -201,11 +209,14 @@ class PptxConverter(DocumentConverter):
             md_content = md_content.strip()
 
             if slide.has_notes_slide:
-                md_content += "\n\n### Notes:\n"
+                # PowerPoint attaches a notes slide to a slide whose notes pane
+                # has merely been opened, so having one says nothing about there
+                # being notes to read. Only head a section that has content.
                 notes_frame = slide.notes_slide.notes_text_frame
-                if notes_frame is not None:
-                    md_content += notes_frame.text
-                md_content = md_content.strip()
+                notes_text = (notes_frame.text or "") if notes_frame is not None else ""
+                if notes_text.strip():
+                    md_content += "\n\n### Notes:\n" + notes_text
+                    md_content = md_content.strip()
 
         return DocumentConverterResult(markdown=md_content.strip())
 
@@ -302,7 +313,11 @@ class PptxConverter(DocumentConverter):
     def _convert_chart_to_markdown(self, chart):
         try:
             md = "\n\n### Chart"
-            if chart.has_title:
+            # ChartTitle.text_frame is documented as destructive -- it creates
+            # a text frame if one isn't already present, so it never returns
+            # None. has_text_frame is the property that actually reflects
+            # whether a text frame exists.
+            if chart.has_title and chart.chart_title.has_text_frame:
                 md += f": {chart.chart_title.text_frame.text}"
             md += "\n\n"
             data = []
