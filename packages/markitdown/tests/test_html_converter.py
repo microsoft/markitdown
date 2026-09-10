@@ -3,10 +3,11 @@ import io
 from markitdown import MarkItDown
 
 
-def _convert_html(html: str) -> str:
+def _convert_html(html: str, **kwargs) -> str:
     result = MarkItDown().convert_stream(
         io.BytesIO(html.encode("utf-8")),
         file_extension=".html",
+        **kwargs,
     )
     return result.markdown
 
@@ -63,3 +64,61 @@ def test_html_href_does_not_quote_query_or_fragment() -> None:
     markdown = _convert_html(f'<a href="{href}">example</a>')
 
     assert f"[example]({expected_href})" in markdown
+
+
+def test_img_prefers_data_src_over_placeholder_data_uri() -> None:
+    placeholder = (
+        "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBTAA7"
+    )
+    real_src = "https://example.com/photo.jpg"
+    html = (
+        f'<img src="{placeholder}" data-src="{real_src}" alt="A photo" loading="lazy">'
+    )
+
+    markdown = _convert_html(html)
+
+    assert f"![A photo]({real_src})" in markdown
+    assert placeholder not in markdown
+
+
+def test_img_uses_real_src_over_data_src_when_both_present() -> None:
+    real_src = "https://example.com/photo.jpg"
+    other_src = "https://example.com/photo-alt.jpg"
+    html = f'<img src="{real_src}" data-src="{other_src}" alt="A photo">'
+
+    markdown = _convert_html(html)
+
+    assert f"![A photo]({real_src})" in markdown
+
+
+def test_img_falls_back_to_data_src_when_src_missing() -> None:
+    real_src = "https://example.com/photo.jpg"
+    html = f'<img data-src="{real_src}" alt="A photo">'
+
+    markdown = _convert_html(html)
+
+    assert f"![A photo]({real_src})" in markdown
+
+
+def test_img_keeps_truncated_data_uri_when_no_data_src() -> None:
+    placeholder = (
+        "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBTAA7"
+    )
+    html = f'<img src="{placeholder}" alt="A photo">'
+
+    markdown = _convert_html(html)
+
+    assert "![A photo](data:image/gif;base64...)" in markdown
+
+
+def test_img_keeps_embedded_data_uri_over_data_src_when_keeping_data_uris() -> None:
+    embedded = (
+        "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBTAA7"
+    )
+    other_src = "https://example.com/photo.jpg"
+    html = f'<img src="{embedded}" data-src="{other_src}" alt="A photo">'
+
+    markdown = _convert_html(html, keep_data_uris=True)
+
+    assert f"![A photo]({embedded})" in markdown
+    assert other_src not in markdown
