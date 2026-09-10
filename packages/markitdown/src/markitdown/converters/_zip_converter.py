@@ -106,9 +106,10 @@ class ZipConverter(DocumentConverter):
         }
 
         with zipfile.ZipFile(file_stream, "r") as zipObj:
-            for name in zipObj.namelist():
+            for entry in zipObj.infolist():
+                name = entry.filename
                 try:
-                    z_file_stream = io.BytesIO(zipObj.read(name))
+                    z_file_stream = io.BytesIO(zipObj.read(entry))
                     z_file_stream_info = StreamInfo(
                         extension=os.path.splitext(name)[1],
                         filename=os.path.basename(name),
