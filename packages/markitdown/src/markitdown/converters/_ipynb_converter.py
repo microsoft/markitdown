@@ -65,6 +65,11 @@ class IpynbConverter(DocumentConverter):
             for cell in notebook_content.get("cells", []):
                 cell_type = cell.get("cell_type", "")
                 source_lines = cell.get("source", [])
+                # nbformat allows `source` to be a single string as well as a
+                # list of lines. Iterating a string walks it character by
+                # character, so the title scan below never sees a whole line.
+                if isinstance(source_lines, str):
+                    source_lines = source_lines.splitlines(keepends=True)
 
                 if cell_type == "markdown":
                     md_output.append("".join(source_lines))

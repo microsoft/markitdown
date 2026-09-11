@@ -1412,6 +1412,33 @@ def test_ipynb_heading_title_preserves_leading_hash() -> None:
     assert result.title == "#hashtag campaign results"
 
 
+def test_ipynb_string_source_keeps_title() -> None:
+    """A cell whose `source` is one string must yield the same title as a list.
+
+    nbformat permits either form. The body already survived the string form,
+    because joining a string rebuilds it, so the loss was confined to the title
+    and easy to miss.
+
+    Regression for https://github.com/microsoft/markitdown/issues/2115
+    """
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    def notebook(source):
+        return {
+            "nbformat": 4,
+            "nbformat_minor": 5,
+            "metadata": {},
+            "cells": [{"cell_type": "markdown", "source": source, "metadata": {}}],
+        }
+
+    as_list = IpynbConverter()._convert(notebook(["# My Report\n", "\n", "Content"]))
+    as_string = IpynbConverter()._convert(notebook("# My Report\n\nContent"))
+
+    assert as_list.title == "My Report"
+    assert as_string.title == "My Report"
+    assert as_string.markdown == as_list.markdown
+
+
 def test_ipynb_accepts_non_ascii() -> None:
     """IpynbConverter.accepts() must not raise on non-ASCII binary content."""
     from markitdown.converters._ipynb_converter import IpynbConverter
@@ -1679,6 +1706,7 @@ if __name__ == "__main__":
         test_markitdown_llm,
         test_pptx_chart_no_title_text_frame,
         test_pptx_chart_with_title_text_frame,
+        test_ipynb_string_source_keeps_title,
         test_ipynb_accepts_non_ascii,
         test_epub_metadata_nodevalue,
         test_exiftool_metadata_with_nonexistent_binary,
