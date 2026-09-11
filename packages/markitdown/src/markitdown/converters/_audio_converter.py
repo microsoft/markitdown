@@ -1,3 +1,4 @@
+import logging
 from typing import Any, BinaryIO
 
 from ._exiftool import exiftool_metadata
@@ -5,6 +6,8 @@ from ._transcribe_audio import transcribe_audio
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException
+
+logger = logging.getLogger(__name__)
 
 ACCEPTED_MIME_TYPE_PREFIXES = [
     "audio/x-wav",
@@ -96,6 +99,9 @@ class AudioConverter(DocumentConverter):
                     md_content += "\n\n### Audio Transcript:\n" + transcript
             except MissingDependencyException:
                 pass
+            except Exception as exc:
+                logger.warning("Audio transcription failed: %s", exc)
+                md_content += "\n\n### Audio Transcript:\nError. Could not transcribe this audio."
 
         # Return the result
         return DocumentConverterResult(markdown=md_content.strip())
