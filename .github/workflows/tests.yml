@@ -31,7 +31,7 @@ jobs:
         run: pipx install hatch
       - name: Run tests
         working-directory: packages/markitdown
-        run: hatch test -py=${{ matrix.python-version }}
+        run: hatch test --python "${{ matrix.python-version }}"
 
 
   ocr-tests:
