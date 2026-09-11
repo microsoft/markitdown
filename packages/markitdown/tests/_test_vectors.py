@@ -277,3 +277,22 @@ DATA_URI_TEST_VECTORS = [
         ],
     ),
 ]
+
+
+MERGED_CELLS_TEST_VECTORS = [
+    FileTestVector(
+        filename="test.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        charset=None,
+        url=None,
+        must_include=[
+            "722.0 | NaN | NaN",
+            "NaN | 42.000000 | NaN",
+            "Merged Column | Merged Column 6 | Merged Column 2 | Merged Column 2 8",
+            "## 09060124-b5e7-4717-9d07-3c046eb",
+            "6ff4173b-42a5-4784-9b19-f49caff4d93d",
+            "affc7dad-52dc-4b98-9b5d-51e65d8a8ad0",
+        ],
+        must_not_include=["Unnamed"],
+    ),
+]
