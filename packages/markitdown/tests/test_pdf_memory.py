@@ -11,7 +11,10 @@ Verifies that:
 import gc
 import io
 import os
+import sys
 import tracemalloc
+import types
+import warnings
 
 import pytest
 from unittest.mock import patch, MagicMock
@@ -78,6 +81,19 @@ def _mock_pdfplumber_open(pages):
         return mock_pdf
 
     return mock_open
+
+
+def _inline_image_pdf_bytes() -> bytes:
+    return (
+        b"%PDF-1.7\n"
+        b"1 0 obj <<>> stream\n"
+        b"BT (BEFORE_IMAGE) Tj ET\n"
+        b"BI /W 1 /H 1 /BPC 1 /IM true ID\n"
+        b"abc\n"
+        b"EI\n"
+        b"BT (AFTER_IMAGE) Tj ET\n"
+        b"endstream endobj\n%%EOF\n"
+    )
 
 
 class TestPdfMemoryOptimization:
@@ -241,6 +257,70 @@ class TestPdfMemoryOptimization:
             f"Expected 1 pdfplumber.open call (single pass), "
             f"got {mock_pdfplumber.open.call_count}"
         )
+
+    def test_inline_image_pdf_uses_pymupdf_when_it_recovers_more_text(
+        self, monkeypatch
+    ):
+        class FakePage:
+            def get_text(self, mode):
+                assert mode == "text"
+                return "BEFORE_IMAGE\nAFTER_IMAGE\n" + ("Recovered body. " * 50)
+
+        class FakeDoc:
+            def __iter__(self):
+                return iter([FakePage()])
+
+            def close(self):
+                pass
+
+        fake_fitz = types.SimpleNamespace(open=lambda *, stream, filetype: FakeDoc())
+        monkeypatch.setitem(sys.modules, "fitz", fake_fitz)
+
+        pages = [_make_plain_page()]
+        with patch(
+            "markitdown.converters._pdf_converter.pdfplumber"
+        ) as mock_pdfplumber, patch(
+            "markitdown.converters._pdf_converter.pdfminer"
+        ) as mock_pdfminer:
+            mock_pdfplumber.open.side_effect = _mock_pdfplumber_open(pages)
+            mock_pdfminer.high_level.extract_text.return_value = "BEFORE_IMAGE"
+
+            md = MarkItDown()
+            from markitdown import StreamInfo
+
+            result = md.convert_stream(
+                io.BytesIO(_inline_image_pdf_bytes()),
+                stream_info=StreamInfo(extension=".pdf", mimetype="application/pdf"),
+            )
+
+        assert "AFTER_IMAGE" in result.text_content
+
+    def test_inline_image_pdf_warns_when_pymupdf_is_missing(self, monkeypatch):
+        monkeypatch.setitem(sys.modules, "fitz", None)
+
+        pages = [_make_plain_page()]
+        with patch(
+            "markitdown.converters._pdf_converter.pdfplumber"
+        ) as mock_pdfplumber, patch(
+            "markitdown.converters._pdf_converter.pdfminer"
+        ) as mock_pdfminer:
+            mock_pdfplumber.open.side_effect = _mock_pdfplumber_open(pages)
+            mock_pdfminer.high_level.extract_text.return_value = "BEFORE_IMAGE"
+
+            md = MarkItDown()
+            from markitdown import StreamInfo
+
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                result = md.convert_stream(
+                    io.BytesIO(_inline_image_pdf_bytes()),
+                    stream_info=StreamInfo(
+                        extension=".pdf", mimetype="application/pdf"
+                    ),
+                )
+
+        assert result.text_content == "BEFORE_IMAGE"
+        assert any("inline image data" in str(item.message) for item in caught)
 
     @pytest.mark.skipif(
         not os.path.exists(os.path.join(TEST_FILES_DIR, "test.pdf")),
