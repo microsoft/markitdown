@@ -46,6 +46,7 @@ all = [
   "pydub",
   "SpeechRecognition",
   "youtube-transcript-api~=1.0.0",
+  "readability-lxml",
   "azure-ai-documentintelligence",
   "azure-ai-contentunderstanding>=1.2.0b1",
   "azure-identity",
@@ -58,6 +59,7 @@ pdf = ["pdfminer.six>=20251230", "pdfplumber>=0.11.9"]
 outlook = ["olefile"]
 audio-transcription = ["pydub", "SpeechRecognition"]
 youtube-transcription = ["youtube-transcript-api"]
+readability = ["readability-lxml"]
 az-doc-intel = ["azure-ai-documentintelligence", "azure-identity"]
 # >=1.2.0b1 required for to_llm_input() helper used by ContentUnderstandingConverter
 az-content-understanding = ["azure-ai-contentunderstanding>=1.2.0b1", "azure-identity"]
