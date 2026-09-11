@@ -1800,6 +1800,20 @@ def test_csv_backslash_without_a_pipe_is_left_alone() -> None:
     assert r"| Widget | C:\temp\file.txt |" in result
 
 
+@pytest.mark.parametrize(
+    "suffix,escaped_suffix",
+    [("", ""), ("|", r"\|"), ("x|", r"x\|")],
+)
+def test_csv_long_backslash_runs(suffix: str, escaped_suffix: str) -> None:
+    backslashes = "\\" * 65_536
+    value = backslashes + suffix
+    expected = backslashes * (2 if suffix == "|" else 1) + escaped_suffix
+
+    result = _convert_csv(f"{value}\n{value}\n".encode("utf-8"), charset="utf-8")
+
+    assert result == f"| {expected} |\n| --- |\n| {expected} |"
+
+
 # ---------------------------------------------------------------------------
 # Regression test for issue #1960:
 # exiftool_path pointing to a nonexistent binary used to leak a raw

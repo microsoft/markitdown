@@ -15,7 +15,8 @@ ACCEPTED_FILE_EXTENSIONS = [".csv"]
 
 # Matches a pipe together with the (possibly empty) run of backslashes in front
 # of it, so that run can be doubled before the pipe is escaped.
-_PIPE_ESCAPE_RE = re.compile(r"(\\*)\|")
+# The lookbehind avoids retrying from each position inside a backslash run.
+_PIPE_ESCAPE_RE = re.compile(r"(?<!\\)(\\*)\|")
 
 
 def _escape_table_cell(value: str) -> str:
