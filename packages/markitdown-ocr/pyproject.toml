@@ -28,7 +28,6 @@ dependencies = [
   "markitdown>=0.1.0",
   "pdfminer.six>=20251230",
   "pdfplumber>=0.11.9",
-  "PyMuPDF>=1.24.0",
   "mammoth~=1.11.0",
   "python-docx",
   "python-pptx",
@@ -39,9 +38,19 @@ dependencies = [
 
 # llm_client is passed in by the user (same as for markitdown image descriptions);
 # install openai or any OpenAI-compatible SDK separately.
+#
+# NOTE: PyMuPDF (fitz) is AGPL-3.0 licensed. Install the [pymupdf] extra only
+# if you need fallback support for malformed PDFs and accept the AGPL terms.
 [project.optional-dependencies]
 llm = [
   "openai>=1.0.0",
+]
+pymupdf = [
+  "PyMuPDF>=1.24.0",
+]
+all = [
+  "openai>=1.0.0",
+  "PyMuPDF>=1.24.0",
 ]
 
 [project.urls]
