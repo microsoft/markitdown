@@ -122,3 +122,73 @@ def test_img_keeps_embedded_data_uri_over_data_src_when_keeping_data_uris() -> N
 
     assert f"![A photo]({embedded})" in markdown
     assert other_src not in markdown
+
+
+def test_html_table_pipe_in_cell_is_escaped() -> None:
+    # Issue #2438: a literal | in a cell is data, not a column separator.
+    html = (
+        "<table><thead><tr><th>Name</th><th>Note</th></tr></thead>"
+        "<tbody><tr><td>Alice</td><td>Has a | pipe</td></tr></tbody></table>"
+    )
+
+    markdown = _convert_html(html)
+
+    assert "| Alice | Has a \\| pipe |" in markdown
+
+
+def test_html_table_pipe_in_header_is_escaped() -> None:
+    html = (
+        "<table><thead><tr><th>a | b</th><th>c</th></tr></thead>"
+        "<tbody><tr><td>1</td><td>2</td></tr></tbody></table>"
+    )
+
+    markdown = _convert_html(html)
+
+    assert "| a \\| b | c |" in markdown
+
+
+def test_html_table_pipe_preceded_by_backslash_is_still_escaped() -> None:
+    # Same rule as CSV: double the backslash run so `\|` survives as data.
+    html = (
+        "<table><tr><th>name</th><th>description</th></tr>"
+        "<tr><td>Widget</td><td>left\\|right</td></tr></table>"
+    )
+
+    markdown = _convert_html(html)
+
+    assert r"| Widget | left\\\|right |" in markdown
+
+
+def test_html_table_plain_cells_are_unchanged() -> None:
+    html = (
+        "<table><tr><th>name</th><th>description</th></tr>"
+        "<tr><td>Widget</td><td>cheap and fast</td></tr></table>"
+    )
+
+    markdown = _convert_html(html)
+
+    assert "| Widget | cheap and fast |" in markdown
+    assert "\\" not in markdown
+
+
+def test_html_table_newline_in_cell_collapses_to_space() -> None:
+    html = (
+        "<table><tr><th>name</th><th>notes</th></tr>"
+        "<tr><td>Widget</td><td>line one<br/>line two</td></tr></table>"
+    )
+
+    markdown = _convert_html(html)
+
+    assert len([line for line in markdown.splitlines() if line.strip()]) == 3
+    assert "| Widget | line one line two |" in markdown
+
+
+def test_html_table_colspan_still_expands_after_escaping() -> None:
+    html = (
+        "<table><tr><th>a | b</th><th colspan=\"2\">c</th></tr>"
+        "<tr><td>1</td><td>2</td><td>3</td></tr></table>"
+    )
+
+    markdown = _convert_html(html)
+
+    assert "| a \\| b | c | |" in markdown
