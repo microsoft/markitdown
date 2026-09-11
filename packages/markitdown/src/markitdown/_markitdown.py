@@ -70,6 +70,33 @@ def _get_content_disposition_filename(content_disposition: str) -> Optional[str]
     return extended_filename or fallback_filename
 
 
+# A fenced code block carries the document's own content, blank lines included:
+# a notebook cell, or a <pre> block, that separates two definitions with two
+# blank lines has to come back with two. Only a closed fence is treated as a
+# block, so an unterminated one is still normalized.
+_FENCED_CODE_BLOCK = re.compile(
+    r"^(?P<fence>`{3,}|~{3,}).*?^(?P=fence)[`~]*[ \t]*$",
+    re.MULTILINE | re.DOTALL,
+)
+_BLANK_LINE_RUN = re.compile(r"\n{3,}")
+
+
+def _collapse_blank_lines(markdown: str) -> str:
+    """Collapse runs of blank lines, leaving fenced code blocks untouched."""
+    collapsed: List[str] = []
+    position = 0
+
+    for block in _FENCED_CODE_BLOCK.finditer(markdown):
+        collapsed.append(
+            _BLANK_LINE_RUN.sub("\n\n", markdown[position : block.start()])
+        )
+        collapsed.append(block.group(0))
+        position = block.end()
+
+    collapsed.append(_BLANK_LINE_RUN.sub("\n\n", markdown[position:]))
+    return "".join(collapsed)
+
+
 # Lower priority values are tried first.
 PRIORITY_SPECIFIC_FILE_FORMAT = (
     0.0  # e.g., .docx, .pdf, .xlsx, Or specific pages, e.g., wikipedia
@@ -658,7 +685,7 @@ class MarkItDown:
                     res.text_content = "\n".join(
                         [line.rstrip() for line in re.split(r"\r?\n", res.text_content)]
                     )
-                    res.text_content = re.sub(r"\n{3,}", "\n\n", res.text_content)
+                    res.text_content = _collapse_blank_lines(res.text_content)
                     return res
 
         # If we got this far without success, report any exceptions
