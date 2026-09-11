@@ -1,0 +1,3 @@
+# Temporary CI workaround until Windows ARM64 wheels return.
+# https://github.com/pyca/cryptography/pull/15350
+cryptography==46.0.3; sys_platform == "win32" and platform_machine == "ARM64"

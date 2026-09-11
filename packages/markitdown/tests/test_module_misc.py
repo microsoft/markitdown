@@ -311,33 +311,36 @@ def test_uppercase_data_image_uri_is_truncated_by_default() -> None:
 
 
 def test_file_uris() -> None:
+    expected_path = os.path.abspath("/path/to/file.txt")
+
     # Test file URI with an empty host
     file_uri = "file:///path/to/file.txt"
     netloc, path = file_uri_to_path(file_uri)
     assert netloc is None
-    assert path == "/path/to/file.txt"
+    assert path == expected_path
 
     # Test file URI with no host
     file_uri = "file:/path/to/file.txt"
     netloc, path = file_uri_to_path(file_uri)
     assert netloc is None
-    assert path == "/path/to/file.txt"
+    assert path == expected_path
 
     # Test file URI with localhost
     file_uri = "file://localhost/path/to/file.txt"
     netloc, path = file_uri_to_path(file_uri)
     assert netloc == "localhost"
-    assert path == "/path/to/file.txt"
+    assert path == expected_path
 
     # URI schemes are case-insensitive
     file_uri = "FILE:///path/to/file.txt"
     netloc, path = file_uri_to_path(file_uri)
     assert netloc is None
-    assert path == "/path/to/file.txt"
+    assert path == expected_path
 
 
 def test_convert_case_insensitive_uri_schemes(tmp_path) -> None:
     markitdown = MarkItDown()
+    expected_path = os.path.abspath("/path/to/file.txt")
 
     data_result = markitdown.convert("DATA:text/plain;base64,SGVsbG8sIFdvcmxkIQ==")
     assert data_result.markdown == "Hello, World!"
@@ -352,13 +355,13 @@ def test_convert_case_insensitive_uri_schemes(tmp_path) -> None:
     file_uri = "file:///path/to/file.txt?param=value"
     netloc, path = file_uri_to_path(file_uri)
     assert netloc is None
-    assert path == "/path/to/file.txt"
+    assert path == expected_path
 
     # Test file URI with fragment
     file_uri = "file:///path/to/file.txt#fragment"
     netloc, path = file_uri_to_path(file_uri)
     assert netloc is None
-    assert path == "/path/to/file.txt"
+    assert path == expected_path
 
 
 def test_file_uri_with_percent_encoded_windows_drive(
@@ -1059,6 +1062,10 @@ def test_deeply_nested_rss_item_fallback() -> None:
     assert "<p>" not in result.markdown
 
 
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="The DOCX fixture embeds a POSIX file:///tmp/test_rlink.txt target.",
+)
 def test_doc_rlink() -> None:
     # Test for: CVE-2025-11849
     markitdown = MarkItDown()
@@ -1369,6 +1376,26 @@ def test_youtube_converter_missing_title_metadata() -> None:
         result_title_tag = converter.convert(stream_title_tag, stream_info)
         assert result_title_tag.title == "Fallback Title"
         assert "# YouTube" in result_title_tag.markdown
+
+
+def test_zip_duplicate_filenames_preserve_each_entry() -> None:
+    """Same-named ZIP entries must retain their own content and archive order."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as archive:
+        archive.writestr("notes.txt", "First archived entry.")
+        with pytest.warns(UserWarning, match="Duplicate name"):
+            archive.writestr("notes.txt", "Second archived entry.")
+    buf.seek(0)
+
+    result = MarkItDown().convert_stream(
+        buf, stream_info=StreamInfo(extension=".zip", filename="duplicate.zip")
+    )
+
+    assert result.markdown == (
+        "Content from the zip file `duplicate.zip`:\n\n"
+        "## File: notes.txt\n\nFirst archived entry.\n\n"
+        "## File: notes.txt\n\nSecond archived entry."
+    )
 
 
 def test_zip_stream_no_filename_header() -> None:
@@ -1836,6 +1863,7 @@ if __name__ == "__main__":
         test_docx_comments,
         test_docx_zip_filename_casing_mismatch,
         test_docx_zip_filename_non_casing_mismatch_still_rejected,
+        test_zip_duplicate_filenames_preserve_each_entry,
         test_input_as_strings,
         test_markitdown_remote,
         test_speech_transcription,

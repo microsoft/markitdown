@@ -180,7 +180,8 @@ class PptxConverter(DocumentConverter):
                 elif shape.has_text_frame:
                     text = shape.text or ""
                     if shape == title:
-                        md_content += "# " + text.lstrip() + "\n"
+                        if text.strip():
+                            md_content += "# " + text.lstrip() + "\n"
                     else:
                         md_content += text + "\n"
 
