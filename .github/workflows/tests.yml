@@ -6,6 +6,8 @@ permissions:
 env:
   # Preserve Unicode in captured CLI output on Windows.
   PYTHONUTF8: "1"
+  PIP_CONSTRAINT: ${{ github.workspace }}/.github/constraints.txt
+  UV_CONSTRAINT: ${{ github.workspace }}/.github/constraints.txt
 
 jobs:
   tests:
