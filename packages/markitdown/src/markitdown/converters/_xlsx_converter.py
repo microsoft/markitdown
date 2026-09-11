@@ -56,7 +56,7 @@ def _read_xlsx_sheets(
                 for sheet in workbook.book.worksheets
                 if sheet.sheet_state == "visible"
             ]
-            # Select before parsing, so hidden cell data is never loaded.
+            # Select before parsing, so only visible sheets become DataFrames.
             return pd.read_excel(workbook, sheet_name=visible_sheets)
 
     start_pos = file_stream.tell()
