@@ -227,6 +227,34 @@ def _pre_process_styles(content: bytes) -> bytes:
     return str(soup).encode()
 
 
+def _pre_process_numbering(content: bytes) -> bytes:
+    """
+    Repairs DOCX numbering definitions that Mammoth cannot read properly.
+
+    In OOXML, ``w:abstractNum`` elements define list hierarchies via ``w:lvl``
+    child elements. The ``w:ilvl`` attribute defines the zero-based level index.
+    Some document exporters omit ``w:ilvl`` on ``w:lvl`` elements.
+
+    Mammoth's fallback defaults an unindexed level to "0", but only retains a
+    single unindexed level per abstract numbering definition, discarding any
+    subsequent sub-levels (levels 1, 2, etc.) and flattening or corrupting nested lists.
+    Assigning sequential level indices based on ordinal position restores the
+    intended list hierarchy.
+    """
+    if b"lvl" not in content:
+        return content
+
+    soup = BeautifulSoup(content, features="xml")
+    modified = False
+    for abstract_num in soup.find_all("w:abstractNum"):
+        for idx, lvl in enumerate(abstract_num.find_all("w:lvl")):
+            if not lvl.has_attr("w:ilvl"):
+                lvl["w:ilvl"] = str(idx)
+                modified = True
+
+    return str(soup).encode() if modified else content
+
+
 def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
     """
     Pre-processes a DOCX file with provided steps.
@@ -251,6 +279,7 @@ def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
         "word/footnotes.xml": (_pre_process_strike, _pre_process_math),
         "word/endnotes.xml": (_pre_process_strike, _pre_process_math),
         "word/styles.xml": (_pre_process_strike, _pre_process_styles),
+        "word/numbering.xml": (_pre_process_numbering,),
     }
     with zipfile.ZipFile(input_docx, mode="r") as zip_input:
         files = {name: zip_input.read(name) for name in zip_input.namelist()}
