@@ -51,6 +51,7 @@ all = [
   "azure-identity",
 ]
 pptx = ["python-pptx"]
+doc = ["olefile"]
 docx = ["mammoth~=1.11.0", "lxml"]
 xlsx = ["pandas", "openpyxl"]
 xls = ["pandas", "xlrd"]
