@@ -3,12 +3,17 @@ on: [pull_request]
 permissions:
   contents: read
 
+env:
+  # Preserve Unicode in captured CLI output on Windows.
+  PYTHONUTF8: "1"
+
 jobs:
   tests:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, windows-latest]
         python-version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
@@ -20,14 +25,16 @@ jobs:
       - name: Install Hatch
         run: pipx install hatch
       - name: Run tests
-        run: cd packages/markitdown; hatch test -py=${{ matrix.python-version }}
+        working-directory: packages/markitdown
+        run: hatch test -py=${{ matrix.python-version }}
 
 
   ocr-tests:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, windows-latest]
         python-version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
@@ -43,4 +50,26 @@ jobs:
 
       - name: Run tests
         working-directory: packages/markitdown-ocr
+        run: pytest
+
+
+  mcp-tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install packages
+        run: pip install "./packages/markitdown[all]" ./packages/markitdown-mcp pytest
+
+      - name: Run tests
+        working-directory: packages/markitdown-mcp
         run: pytest

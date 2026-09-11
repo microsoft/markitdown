@@ -311,33 +311,36 @@ def test_uppercase_data_image_uri_is_truncated_by_default() -> None:
 
 
 def test_file_uris() -> None:
+    expected_path = os.path.abspath("/path/to/file.txt")
+
     # Test file URI with an empty host
     file_uri = "file:///path/to/file.txt"
     netloc, path = file_uri_to_path(file_uri)
     assert netloc is None
-    assert path == "/path/to/file.txt"
+    assert path == expected_path
 
     # Test file URI with no host
     file_uri = "file:/path/to/file.txt"
     netloc, path = file_uri_to_path(file_uri)
     assert netloc is None
-    assert path == "/path/to/file.txt"
+    assert path == expected_path
 
     # Test file URI with localhost
     file_uri = "file://localhost/path/to/file.txt"
     netloc, path = file_uri_to_path(file_uri)
     assert netloc == "localhost"
-    assert path == "/path/to/file.txt"
+    assert path == expected_path
 
     # URI schemes are case-insensitive
     file_uri = "FILE:///path/to/file.txt"
     netloc, path = file_uri_to_path(file_uri)
     assert netloc is None
-    assert path == "/path/to/file.txt"
+    assert path == expected_path
 
 
 def test_convert_case_insensitive_uri_schemes(tmp_path) -> None:
     markitdown = MarkItDown()
+    expected_path = os.path.abspath("/path/to/file.txt")
 
     data_result = markitdown.convert("DATA:text/plain;base64,SGVsbG8sIFdvcmxkIQ==")
     assert data_result.markdown == "Hello, World!"
@@ -352,13 +355,13 @@ def test_convert_case_insensitive_uri_schemes(tmp_path) -> None:
     file_uri = "file:///path/to/file.txt?param=value"
     netloc, path = file_uri_to_path(file_uri)
     assert netloc is None
-    assert path == "/path/to/file.txt"
+    assert path == expected_path
 
     # Test file URI with fragment
     file_uri = "file:///path/to/file.txt#fragment"
     netloc, path = file_uri_to_path(file_uri)
     assert netloc is None
-    assert path == "/path/to/file.txt"
+    assert path == expected_path
 
 
 def test_file_uri_with_percent_encoded_windows_drive(
@@ -1059,6 +1062,10 @@ def test_deeply_nested_rss_item_fallback() -> None:
     assert "<p>" not in result.markdown
 
 
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="The DOCX fixture embeds a POSIX file:///tmp/test_rlink.txt target.",
+)
 def test_doc_rlink() -> None:
     # Test for: CVE-2025-11849
     markitdown = MarkItDown()
