@@ -1,0 +1,27 @@
+From: Test Sender <test.sender@example.com>
+To: Test Recipient <test.recipient@example.com>
+Cc: Copy Recipient <copy.recipient@example.com>
+Date: Thu, 14 May 2026 09:50:00 +0800
+Subject: Test EML Message
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="markitdown-test-boundary"
+
+--markitdown-test-boundary
+Content-Type: text/plain; charset="utf-8"
+
+This is the plain text body of the EML test message.
+
+It should be preferred over the HTML alternative.
+
+--markitdown-test-boundary
+Content-Type: text/html; charset="utf-8"
+
+<html><body><p>This HTML body should not be used.</p></body></html>
+
+--markitdown-test-boundary
+Content-Type: text/plain; name="notes.txt"
+Content-Disposition: attachment; filename="notes.txt"
+
+attachment content should not be inlined
+
+--markitdown-test-boundary--
