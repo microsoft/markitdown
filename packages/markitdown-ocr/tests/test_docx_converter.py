@@ -226,9 +226,10 @@ def test_docx_no_ocr_service_no_tags() -> None:
     assert "[End OCR]*" not in md
 
 
+@pytest.mark.parametrize("double_strike", [False, True])
 @pytest.mark.parametrize("use_ocr", [False, True])
 def test_docx_styles_with_redundant_default_namespace(
-    svc: MockOCRService, use_ocr: bool
+    svc: MockOCRService, use_ocr: bool, double_strike: bool
 ) -> None:
     path = TEST_DATA_DIR / "docx_image_middle.docx"
     if not path.exists():
@@ -243,6 +244,16 @@ def test_docx_styles_with_redundant_default_namespace(
         for item in source.infolist():
             content = source.read(item)
             if item.filename == "word/styles.xml":
+                if double_strike:
+                    assert content.count(b"</w:styles>") == 1
+                    content = content.replace(
+                        b"</w:styles>",
+                        b'<w:style w:type="character" w:styleId="DoubleStrike">'
+                        b'<w:name w:val="Double Strike"/>'
+                        b'<w:rPr><w:dstrike w:val="1"/></w:rPr>'
+                        b"</w:style></w:styles>",
+                        1,
+                    )
                 assert content.count(declaration) == 1
                 content = content.replace(
                     declaration, declaration + f' xmlns="{namespace}"'.encode(), 1

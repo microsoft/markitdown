@@ -216,7 +216,8 @@ def _pre_process_styles(content: bytes) -> bytes:
     to ``paragraph``, so the attribute is filled in rather than dropping the
     style, which would discard its formatting (a heading would be emitted as
     plain body text). A style with no ``w:styleId`` cannot be referenced by the
-    document body, so it is removed.
+    document body, so it is removed. Double strikethrough is normalized to
+    single strikethrough in the same namespace-aware pass.
 
     Match elements and attributes by namespace URI, preserving their qualified
     names when repairing the XML. Return the original bytes if no repair is needed.
@@ -235,6 +236,10 @@ def _pre_process_styles(content: bytes) -> bytes:
         elif namespace + "type" not in style.attrib:
             style.set(namespace + "type", "paragraph")
             changed = True
+
+    for strike in root.iter(namespace + "dstrike"):
+        strike.tag = namespace + "strike"
+        changed = True
 
     if not changed:
         return content
@@ -265,7 +270,7 @@ def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
         "word/document.xml": (_pre_process_strike, _pre_process_math),
         "word/footnotes.xml": (_pre_process_strike, _pre_process_math),
         "word/endnotes.xml": (_pre_process_strike, _pre_process_math),
-        "word/styles.xml": (_pre_process_strike, _pre_process_styles),
+        "word/styles.xml": (_pre_process_styles,),
     }
     with zipfile.ZipFile(input_docx, mode="r") as zip_input:
         files = {name: zip_input.read(name) for name in zip_input.namelist()}

@@ -17,8 +17,11 @@ W = f"{{{WORD_NAMESPACE}}}"
 TEST_DOCX = Path(__file__).parent / "test_files" / "test.docx"
 
 
+@pytest.mark.parametrize("double_strike", [False, True])
 @pytest.mark.parametrize("missing_type", [False, True])
-def test_docx_styles_with_redundant_default_namespace(missing_type: bool) -> None:
+def test_docx_styles_with_redundant_default_namespace(
+    missing_type: bool, double_strike: bool
+) -> None:
     markitdown = MarkItDown()
     expected = markitdown.convert(TEST_DOCX).markdown
     fixture = io.BytesIO()
@@ -28,6 +31,16 @@ def test_docx_styles_with_redundant_default_namespace(missing_type: bool) -> Non
         for item in source.infolist():
             content = source.read(item)
             if item.filename == "word/styles.xml":
+                if double_strike:
+                    assert content.count(b"</w:styles>") == 1
+                    content = content.replace(
+                        b"</w:styles>",
+                        b'<w:style w:type="character" w:styleId="DoubleStrike">'
+                        b'<w:name w:val="Double Strike"/>'
+                        b'<w:rPr><w:dstrike w:val="1"/></w:rPr>'
+                        b"</w:style></w:styles>",
+                        1,
+                    )
                 assert content.count(declaration) == 1
                 content = content.replace(
                     declaration,
@@ -99,3 +112,41 @@ def test_styles_without_ids_are_removed(styles_xml: bytes) -> None:
     repaired = etree.fromstring(_pre_process_styles(malformed))
 
     assert repaired.findall(W + "style") == []
+
+
+@pytest.mark.parametrize("value", [None, "0", "1"])
+@pytest.mark.parametrize("missing_type", [False, True])
+def test_style_strike_repair_preserves_namespaces(
+    styles_xml: bytes, value: str | None, missing_type: bool
+) -> None:
+    original = etree.fromstring(styles_xml)
+    style = original.find(W + "style")
+    assert style is not None
+    if missing_type:
+        del style.attrib[W + "type"]
+    properties = etree.SubElement(style, W + "rPr")
+    strike = etree.SubElement(properties, W + "dstrike")
+    if value is not None:
+        strike.set(W + "val", value)
+    etree.SubElement(properties, W + "b")
+
+    repaired = etree.fromstring(_pre_process_styles(etree.tostring(original)))
+
+    assert repaired.nsmap == original.nsmap
+    assert repaired.attrib == original.attrib
+    style = repaired.find(W + "style")
+    assert style is not None
+    assert style.attrib == {W + "type": "paragraph", W + "styleId": "Normal"}
+    assert repaired.find(".//" + W + "dstrike") is None
+    strike = style.find(f"{W}rPr/{W}strike")
+    assert strike is not None
+    assert strike.attrib == ({} if value is None else {W + "val": value})
+    assert style.find(f"{W}rPr/{W}b") is not None
+
+
+def test_other_namespace_dstrike_is_unchanged(styles_xml: bytes) -> None:
+    original = etree.fromstring(styles_xml)
+    etree.SubElement(original, "{urn:extension}dstrike")
+    content = etree.tostring(original)
+
+    assert _pre_process_styles(content) == content
