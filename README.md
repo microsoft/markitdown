@@ -37,24 +37,41 @@ MarkItDown requires Python 3.10 or higher. It is recommended to use a virtual en
 
 With the standard Python installation, you can create and activate a virtual environment using the following commands:
 
+# On macOS/Linux:
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 ```
 
-If using `uv`, you can create a virtual environment with:
+# On Windows (PowerShell / Command Prompt):
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+```
 
+# On Windows (Git Bash / Bash):
+```bash
+python -m venv .venv
+source .venv/Scripts/activate
+```
+
+If using `uv`, you can create and activate a virtual environment with:
+
+# On macOS/Linux:
 ```bash
 uv venv --python=3.12 .venv
 source .venv/bin/activate
-# NOTE: Be sure to use 'uv pip install' rather than just 'pip install' to install packages in this virtual environment
 ```
 
-If you are using Anaconda, you can create a virtual environment with:
-
+# On Windows:
 ```bash
-conda create -n markitdown python=3.12
-conda activate markitdown
+uv venv --python=3.12 .venv
+.venv\Scripts\activate
+```
+
+# or in Git Bash:
+```bash
+source .venv/Scripts/activate
 ```
 
 ## Installation
