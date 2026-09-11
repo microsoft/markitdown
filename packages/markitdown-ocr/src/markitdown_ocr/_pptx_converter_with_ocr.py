@@ -246,8 +246,7 @@ class PptxConverterWithOCR(DocumentConverter):
             header = markdown_table[0]
             separator = "|" + "|".join(["---"] * len(data[0])) + "|"
             return md + "\\n".join([header, separator] + markdown_table[1:])
-        except ValueError as e:
-            if "unsupported plot type" in str(e):
-                return "\\n\\n[unsupported chart]\\n\\n"
         except Exception:
+            # Every ValueError other than "unsupported plot type" used to fall
+            # through and return None, which the caller then concatenated.
             return "\\n\\n[unsupported chart]\\n\\n"
