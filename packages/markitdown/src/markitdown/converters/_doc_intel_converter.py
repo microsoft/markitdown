@@ -146,6 +146,7 @@ class DocumentIntelligenceConverter(DocumentConverter):
             DocumentIntelligenceFileType.BMP,
             DocumentIntelligenceFileType.TIFF,
         ],
+        extract_formulas: bool = False,
     ):
         """
         Initialize the DocumentIntelligenceConverter.
@@ -155,10 +156,12 @@ class DocumentIntelligenceConverter(DocumentConverter):
             api_version (str | None): The API version to use. Defaults to None.
             credential (AzureKeyCredential | TokenCredential | None): The credential to use for authentication.
             file_types (List[DocumentIntelligenceFileType]): The file types to accept. Defaults to all supported file types.
+            extract_formulas (bool): Whether to enable formula extraction. Defaults to False, as enabling it may degrade recognition accuracy for non-mathematical documents.
         """
 
         super().__init__()
         self._file_types = file_types
+        self._extract_formulas = extract_formulas
 
         # Raise an error if the dependencies are not available.
         # This is different than other converters since this one isn't even instantiated
@@ -232,11 +235,13 @@ class DocumentIntelligenceConverter(DocumentConverter):
             if mimetype.startswith(prefix):
                 return []
 
-        return [
-            DocumentAnalysisFeature.FORMULAS,  # enable formula extraction
+        features = [
             DocumentAnalysisFeature.OCR_HIGH_RESOLUTION,  # enable high resolution OCR
             DocumentAnalysisFeature.STYLE_FONT,  # enable font style extraction
         ]
+        if self._extract_formulas:
+            features.append(DocumentAnalysisFeature.FORMULAS)
+        return features
 
     def convert(
         self,
