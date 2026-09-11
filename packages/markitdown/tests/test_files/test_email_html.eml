@@ -1,0 +1,13 @@
+Subject: d1f0162c-600c-4f1e-a0fb-effcfe15d8b3
+From: johndoe@example.com
+To: recipient@example.com
+Date: Wed, 18 Dec 2024 10:00:00 +0000
+MIME-Version: 1.0
+Content-Type: text/html; charset="utf-8"
+
+<html>
+  <body>
+    <h1>Special Offer</h1>
+    <p>This email has <strong>no</strong> plain text fallback.</p>
+  </body>
+</html>

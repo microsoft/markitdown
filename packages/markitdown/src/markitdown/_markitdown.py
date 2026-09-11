@@ -31,6 +31,7 @@ from .converters import (
     BingSerpConverter,
     PdfConverter,
     DocxConverter,
+    DocConverter,
     XlsxConverter,
     XlsConverter,
     PptxConverter,
@@ -42,6 +43,7 @@ from .converters import (
     DocumentIntelligenceConverter,
     ContentUnderstandingConverter,
     CsvConverter,
+    EmlConverter,
 )
 
 from ._base_converter import DocumentConverter, DocumentConverterResult
@@ -212,6 +214,7 @@ class MarkItDown:
             self.register_converter(YouTubeConverter())
             self.register_converter(BingSerpConverter())
             self.register_converter(DocxConverter())
+            self.register_converter(DocConverter())
             self.register_converter(XlsxConverter())
             self.register_converter(XlsConverter())
             self.register_converter(PptxConverter())
@@ -222,6 +225,7 @@ class MarkItDown:
             self.register_converter(OutlookMsgConverter())
             self.register_converter(EpubConverter())
             self.register_converter(CsvConverter())
+            self.register_converter(EmlConverter())
 
             # Register Document Intelligence converter at the top of the stack if endpoint is provided
             docintel_endpoint = kwargs.get("docintel_endpoint")
