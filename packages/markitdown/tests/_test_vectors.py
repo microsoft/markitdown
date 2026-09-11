@@ -276,4 +276,21 @@ DATA_URI_TEST_VECTORS = [
             "![This phrase of the caption is Human-written.](Picture4.jpg)",
         ],
     ),
+    FileTestVector(
+        filename="test.vtt",
+        mimetype="text/vtt",
+        charset="utf-8",
+        url=None,
+        must_include=[
+            "[00:00:01.000] Hello and welcome to this presentation.",
+            "[00:00:04.000] Presenter: Today we'll discuss the project roadmap.",
+            "[00:00:10.000] First, let me outline the key milestones and deliverables for this quarter.",
+            "[00:00:13.000] Any questions before we begin?",
+        ],
+        must_not_include=[
+            "WEBVTT",
+            "-->",
+            "00:00:02",
+        ],
+    ),
 ]
