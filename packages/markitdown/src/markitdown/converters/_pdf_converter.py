@@ -278,7 +278,8 @@ def _extract_form_content_from_words(page: Any) -> str | None:
                     break
 
         # If row uses 2+ of the established columns, it's a table row
-        info["is_table_row"] = len(aligned_columns) >= 2
+        info["aligned"] = len(aligned_columns)
+        info["is_table_row"] = info["aligned"] >= 2
 
     # Find table regions (consecutive table rows)
     table_regions: list[tuple[int, int]] = []  # (start_idx, end_idx)
@@ -297,6 +298,25 @@ def _extract_form_content_from_words(page: Any) -> str | None:
     total_table_rows = sum(end - start for start, end in table_regions)
     if len(row_info) > 0 and total_table_rows / len(row_info) < 0.2:
         return None
+
+    # Number of columns that will be used when extracting cells
+    num_cols = len(global_columns)
+
+    # Extra guard: multi-column academic prose can look like a very wide,
+    # sparsely populated table. Real form/table pages in this converter tend to
+    # use a modest number of stable columns; prose pages instead produce many
+    # tentative columns with only a few populated per row. Reject those before
+    # formatting markdown tables.
+    table_row_fill_ratios = [
+        info.get("aligned", 0) / num_cols
+        for info in row_info
+        if info.get("is_table_row")
+    ]
+    if num_cols > 10 and table_row_fill_ratios:
+        sorted_fill_ratios = sorted(table_row_fill_ratios)
+        median_fill_ratio = sorted_fill_ratios[len(sorted_fill_ratios) // 2]
+        if median_fill_ratio < 0.4:
+            return None
 
     # Build output - collect table data first, then format with proper column widths
     result_lines: list[str] = []
