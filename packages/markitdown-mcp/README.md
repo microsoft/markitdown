@@ -56,11 +56,27 @@ Once mounted, all files under data will be accessible under `/workdir` in the co
 
 ## Accessing from Claude Desktop
 
-It is recommended to use the Docker image when running the MCP server for Claude Desktop.
+Follow [these instructions](https://modelcontextprotocol.io/quickstart/user#for-claude-desktop-users) to access Claude's `claude_desktop_config.json` file, then add the appropriate entry for your setup.
 
-Follow [these instructions](https://modelcontextprotocol.io/quickstart/user#for-claude-desktop-users) to access Claude's `claude_desktop_config.json` file.
+### Using pip
 
-Edit it to include the following JSON entry:
+If you installed `markitdown-mcp` via pip, add this to your Claude Desktop config:
+
+```json
+{
+  "mcpServers": {
+    "markitdown": {
+      "command": "markitdown-mcp"
+    }
+  }
+}
+```
+
+To access local files, pass `file:` URIs to the `convert_to_markdown` tool — for example, `file:///home/user/data/example.txt`.
+
+### Using Docker
+
+If you prefer Docker, the recommended configuration is:
 
 ```json
 {
@@ -78,7 +94,7 @@ Edit it to include the following JSON entry:
 }
 ```
 
-If you want to mount a directory, adjust it accordingly:
+To mount a local directory, adjust accordingly:
 
 ```json
 {
