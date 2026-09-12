@@ -5,6 +5,7 @@ import argparse
 import os
 import sys
 import codecs
+import io
 from typing import Any, Dict
 from textwrap import dedent
 from importlib.metadata import entry_points
@@ -132,7 +133,7 @@ def main():
     parser.add_argument(
         "--list-plugins",
         action="store_true",
-        help="List installed 3rd-party plugins. Plugins are loaded when using the -p or --use-plugin option.",
+        help="List installed 3rd-party plugins. Plugins are loaded when using the -p or --use-plugins option.",
     )
 
     parser.add_argument(
@@ -218,7 +219,7 @@ def main():
     elif args.use_cu:
         if args.cu_endpoint is None:
             _exit_with_error(
-                "Content Understanding Endpoint (--cu-endpoint) is required when using --use-cu."
+                "Content Understanding Endpoint (--cu-endpoint) is required when using --use-cu. "
                 "Pass --cu-endpoint or set MARKITDOWN_CU_ENDPOINT."
             )
 
@@ -248,8 +249,9 @@ def main():
         markitdown = MarkItDown(enable_plugins=args.use_plugins)
 
     if args.filename is None:
+        # Windows pipe-backed stdin can report seekable() even though it cannot rewind.
         result = markitdown.convert_stream(
-            sys.stdin.buffer,
+            io.BytesIO(sys.stdin.buffer.read()),
             stream_info=stream_info,
             keep_data_uris=args.keep_data_uris,
         )

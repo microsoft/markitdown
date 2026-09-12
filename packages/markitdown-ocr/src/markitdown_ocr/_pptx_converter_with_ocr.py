@@ -222,7 +222,11 @@ class PptxConverterWithOCR(DocumentConverter):
     def _convert_chart_to_markdown(self, chart):
         try:
             md = "\\n\\n### Chart"
-            if chart.has_title:
+            # ChartTitle.text_frame is documented as destructive -- it creates
+            # a text frame if one isn't already present, so it never returns
+            # None. has_text_frame is the property that actually reflects
+            # whether a text frame exists.
+            if chart.has_title and chart.chart_title.has_text_frame:
                 md += f": {chart.chart_title.text_frame.text}"
             md += "\\n\\n"
             data = []
