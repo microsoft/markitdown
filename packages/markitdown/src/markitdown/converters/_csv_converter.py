@@ -15,7 +15,8 @@ ACCEPTED_FILE_EXTENSIONS = [".csv"]
 
 # Matches a pipe together with the (possibly empty) run of backslashes in front
 # of it, so that run can be doubled before the pipe is escaped.
-_PIPE_ESCAPE_RE = re.compile(r"(\\*)\|")
+# The lookbehind avoids retrying from each position inside a backslash run.
+_PIPE_ESCAPE_RE = re.compile(r"(?<!\\)(\\*)\|")
 
 
 def _escape_table_cell(value: str) -> str:
@@ -30,17 +31,27 @@ def _escape_table_cell(value: str) -> str:
 
 def _trim_outer_blank_rows(rows: list[list[str]]) -> None:
     """Remove empty rows from the beginning and end, and immediately after the header. This operation is performed in-place."""
-    # Pop empty rows from the beginning
-    while len(rows) > 0 and not rows[0]:
-        rows.pop(0)
+    start = 0
+    while start < len(rows) and not rows[start]:
+        start += 1
 
-    # Pop empty rows after the header
-    while len(rows) > 1 and not rows[1]:
-        rows.pop(1)
+    if start == len(rows):
+        rows.clear()
+        return
 
-    # Pop empty rows from the end
-    while len(rows) > 0 and not rows[-1]:
-        rows.pop(-1)
+    header_index = start
+    start += 1
+    while start < len(rows) and not rows[start]:
+        start += 1
+
+    end = len(rows)
+    while end > start and not rows[end - 1]:
+        end -= 1
+
+    # Remove each blank run at once, rather than shifting the list per row.
+    del rows[end:]
+    del rows[header_index + 1 : start]
+    del rows[:header_index]
 
 
 class CsvConverter(DocumentConverter):

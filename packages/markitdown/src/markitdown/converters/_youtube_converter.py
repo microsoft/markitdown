@@ -7,6 +7,7 @@ from urllib.parse import parse_qs, urlparse, unquote
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
+from ._html_converter import HtmlConverter
 
 # Optional YouTube transcription support
 try:
@@ -35,7 +36,7 @@ ACCEPTED_FILE_EXTENSIONS = [
 
 
 class YouTubeConverter(DocumentConverter):
-    """Handle YouTube specially, focusing on the video title, description, and transcript."""
+    """Extract YouTube metadata and transcripts, or fall back to HTML."""
 
     def _get_video_id(self, url: str) -> Union[str, None]:
         """Extract a YouTube video ID from supported URL formats."""
@@ -92,6 +93,7 @@ class YouTubeConverter(DocumentConverter):
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
         # Parse the stream
+        start_position = file_stream.tell()
         encoding = "utf-8" if stream_info.charset is None else stream_info.charset
         soup = bs4.BeautifulSoup(file_stream, "html.parser", from_encoding=encoding)
 
@@ -134,7 +136,7 @@ class YouTubeConverter(DocumentConverter):
             pass
 
         # Start preparing the page
-        webpage_text = "# YouTube\n"
+        webpage_text = ""
 
         title = self._get(metadata, ["title", "og:title", "name"]) or ""
 
@@ -203,8 +205,12 @@ class YouTubeConverter(DocumentConverter):
             if transcript_text:
                 webpage_text += f"\n### Transcript\n{transcript_text}\n"
 
+        if not webpage_text:
+            file_stream.seek(start_position)
+            return HtmlConverter().convert(file_stream, stream_info, **kwargs)
+
         return DocumentConverterResult(
-            markdown=webpage_text,
+            markdown="# YouTube\n" + webpage_text,
             title=title,
         )
 
