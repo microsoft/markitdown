@@ -100,6 +100,18 @@ def test_html_table_already_escaped_pipe_is_not_doubled() -> None:
     assert "\\\\|" not in markdown
 
 
+def test_html_table_pipe_in_inline_code_is_escaped() -> None:
+    html = (
+        "<table><tr><th>Value</th><th>Control</th></tr>"
+        "<tr><td><code>a|b</code></td><td>end</td></tr></table>"
+    )
+
+    markdown = _convert_html(html)
+
+    assert "`a\\|b`" in markdown
+    assert "| end |" in markdown
+
+
 def test_img_prefers_data_src_over_placeholder_data_uri() -> None:
     placeholder = (
         "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBTAA7"
