@@ -344,7 +344,8 @@ def test_docx_underlined_text_is_preserved_with_ocr(
         ('<w:t xml:space="preserve"> </w:t>', "First Last"),
         ("<w:tab/>", "First Last"),
         ("<w:t>&#160;</w:t>", "First\u00a0Last"),
-        ("<w:br/>", "First\nLast"),
+        # Direct conversion keeps the two-space hard break; the dispatcher strips it.
+        ("<w:br/>", "First  \nLast"),
     ],
 )
 def test_docx_underlined_whitespace_is_preserved(
