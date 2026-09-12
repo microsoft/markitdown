@@ -1339,7 +1339,7 @@ def test_pptx_chart_with_title_text_frame() -> None:
 
 
 def test_youtube_converter_missing_title_metadata() -> None:
-    """Test that YouTubeConverter converts streams with and without title metadata without raising AssertionError."""
+    """Missing titles fall back to HTML when no video content is extracted."""
     from unittest.mock import patch
     from markitdown.converters._youtube_converter import YouTubeConverter
 
@@ -1358,8 +1358,8 @@ def test_youtube_converter_missing_title_metadata() -> None:
         html_content_no_title = b"<html><head></head><body>Video Content</body></html>"
         stream_no_title = io.BytesIO(html_content_no_title)
         result_no_title = converter.convert(stream_no_title, stream_info)
-        assert result_no_title.title == ""
-        assert "# YouTube" in result_no_title.markdown
+        assert result_no_title.title is None
+        assert result_no_title.markdown == "Video Content"
 
         # Case 2: Stream with an empty <title> tag
         html_content_empty_title = (
@@ -1367,15 +1367,15 @@ def test_youtube_converter_missing_title_metadata() -> None:
         )
         stream_empty_title = io.BytesIO(html_content_empty_title)
         result_empty_title = converter.convert(stream_empty_title, stream_info)
-        assert result_empty_title.title == ""
-        assert "# YouTube" in result_empty_title.markdown
+        assert result_empty_title.title is None
+        assert result_empty_title.markdown == "Video Content"
 
         # Case 3: Stream whose title is only available from the <title> tag
         html_content_title_tag = b"<html><head><title>Fallback Title</title></head><body>Video Content</body></html>"
         stream_title_tag = io.BytesIO(html_content_title_tag)
         result_title_tag = converter.convert(stream_title_tag, stream_info)
         assert result_title_tag.title == "Fallback Title"
-        assert "# YouTube" in result_title_tag.markdown
+        assert result_title_tag.markdown == "# YouTube\n\n## Fallback Title\n"
 
 
 def test_zip_duplicate_filenames_preserve_each_entry() -> None:
@@ -1798,6 +1798,20 @@ def test_csv_backslash_without_a_pipe_is_left_alone() -> None:
     result = _convert_csv(b"name,path\nWidget,C:\\temp\\file.txt\n")
 
     assert r"| Widget | C:\temp\file.txt |" in result
+
+
+@pytest.mark.parametrize(
+    "suffix,escaped_suffix",
+    [("", ""), ("|", r"\|"), ("x|", r"x\|")],
+)
+def test_csv_long_backslash_runs(suffix: str, escaped_suffix: str) -> None:
+    backslashes = "\\" * 65_536
+    value = backslashes + suffix
+    expected = backslashes * (2 if suffix == "|" else 1) + escaped_suffix
+
+    result = _convert_csv(f"{value}\n{value}\n".encode("utf-8"), charset="utf-8")
+
+    assert result == f"| {expected} |\n| --- |\n| {expected} |"
 
 
 # ---------------------------------------------------------------------------

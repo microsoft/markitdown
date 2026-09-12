@@ -226,6 +226,56 @@ def test_docx_no_ocr_service_no_tags() -> None:
     assert "[End OCR]*" not in md
 
 
+@pytest.mark.parametrize("double_strike", [False, True])
+@pytest.mark.parametrize("use_ocr", [False, True])
+def test_docx_styles_with_redundant_default_namespace(
+    svc: MockOCRService, use_ocr: bool, double_strike: bool
+) -> None:
+    path = TEST_DATA_DIR / "docx_image_middle.docx"
+    if not path.exists():
+        pytest.skip(f"Test file not found: {path}")
+    original = path.read_bytes()
+    fixture = io.BytesIO()
+    namespace = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    declaration = f'xmlns:w="{namespace}"'.encode("utf-8")
+    with zipfile.ZipFile(io.BytesIO(original)) as source, zipfile.ZipFile(
+        fixture, "w"
+    ) as target:
+        for item in source.infolist():
+            content = source.read(item)
+            if item.filename == "word/styles.xml":
+                if double_strike:
+                    assert content.count(b"</w:styles>") == 1
+                    content = content.replace(
+                        b"</w:styles>",
+                        b'<w:style w:type="character" w:styleId="DoubleStrike">'
+                        b'<w:name w:val="Double Strike"/>'
+                        b'<w:rPr><w:dstrike w:val="1"/></w:rPr>'
+                        b"</w:style></w:styles>",
+                        1,
+                    )
+                assert content.count(declaration) == 1
+                content = content.replace(
+                    declaration, declaration + f' xmlns="{namespace}"'.encode(), 1
+                )
+            target.writestr(item, content)
+
+    converter = DocxConverterWithOCR()
+    service = svc if use_ocr else None
+    expected = converter.convert(
+        io.BytesIO(original), StreamInfo(extension=".docx"), ocr_service=service
+    ).markdown
+    fixture.seek(0)
+    actual = converter.convert(
+        fixture, StreamInfo(extension=".docx"), ocr_service=service
+    ).markdown
+
+    assert "# Introduction" in actual
+    assert actual == expected
+    if use_ocr:
+        assert _MOCK_TEXT in actual
+
+
 # ---------------------------------------------------------------------------
 # Underlined runs survive both the OCR and the non-OCR mammoth paths
 # ---------------------------------------------------------------------------
