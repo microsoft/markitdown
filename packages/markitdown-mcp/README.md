@@ -14,11 +14,37 @@ It exposes one tool: `convert_to_markdown(uri)`, where uri can be any `http:`, `
 
 ## Installation
 
-To install the package, use pip:
+The base installation includes the MCP server and MarkItDown's core converters,
+such as text and HTML. Optional document and media converters are installed
+separately. This avoids requiring platform-specific dependencies for formats
+you do not use.
+
+To install the base package, use pip:
 
 ```bash
 pip install markitdown-mcp
 ```
+
+To install every optional converter (the previous default), use:
+
+```bash
+pip install "markitdown-mcp[all]"
+```
+
+For selected formats, install the corresponding MarkItDown extras alongside the
+server. For example, to add PDF support:
+
+```bash
+pip install markitdown-mcp "markitdown[pdf]"
+```
+
+With `uvx`, select the extra explicitly when full converter support is needed:
+
+```bash
+uvx --from "markitdown-mcp[all]" markitdown-mcp
+```
+
+The provided Docker image continues to include all optional converters.
 
 ## Usage
 

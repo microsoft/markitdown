@@ -25,9 +25,12 @@ classifiers = [
 ]
 dependencies = [
   "mcp>=2.1.1,<3.0.0",
-  "markitdown[all]>=0.1.1,<0.2.0",
+  "markitdown>=0.1.1,<0.2.0",
   "requests>=2.0.0,<3.0.0",
 ]
+
+[project.optional-dependencies]
+all = ["markitdown[all]>=0.1.1,<0.2.0"]
 
 [project.urls]
 Documentation = "https://github.com/microsoft/markitdown#readme"
