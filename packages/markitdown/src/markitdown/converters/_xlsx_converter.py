@@ -43,16 +43,31 @@ _SHEET_VIEW_START_TAG = re.compile(rb"<sheetView(?=[\s/>])[^>]*>")
 _SHOW_ZEROES_ATTRIBUTE = re.compile(rb"(?<=[\s])showZeroes(\s*=)")
 
 
-def _read_xlsx_sheets(file_stream: BinaryIO) -> dict[str, Any]:
+def _read_xlsx_sheets(
+    file_stream: BinaryIO, *, include_hidden_sheets: bool = True
+) -> dict[str, Any]:
+    def read_sheets(stream: BinaryIO) -> dict[str, Any]:
+        if include_hidden_sheets:
+            return pd.read_excel(stream, sheet_name=None, engine="openpyxl")
+
+        with pd.ExcelFile(stream, engine="openpyxl") as workbook:
+            visible_sheets = [
+                sheet.title
+                for sheet in workbook.book.worksheets
+                if sheet.sheet_state == "visible"
+            ]
+            # Select before parsing, so only visible sheets become DataFrames.
+            return pd.read_excel(workbook, sheet_name=visible_sheets)
+
     start_pos = file_stream.tell()
     try:
-        return pd.read_excel(file_stream, sheet_name=None, engine="openpyxl")
+        return read_sheets(file_stream)
     except TypeError as exc:
         if "showZeroes" not in str(exc):
             raise
 
         repaired_stream = _repair_sheetview_show_zeroes(file_stream, start_pos)
-        return pd.read_excel(repaired_stream, sheet_name=None, engine="openpyxl")
+        return read_sheets(repaired_stream)
 
 
 def _rename_show_zeroes_attribute(data: bytes) -> bytes:
@@ -87,6 +102,9 @@ def _repair_sheetview_show_zeroes(
 class XlsxConverter(DocumentConverter):
     """
     Converts XLSX files to Markdown, with each sheet presented as a separate Markdown table.
+
+    Pass ``include_hidden_sheets=False`` to convert only visible worksheets.
+    Hidden and veryHidden worksheets are included by default.
     """
 
     def __init__(self):
@@ -131,7 +149,10 @@ class XlsxConverter(DocumentConverter):
                 _xlsx_dependency_exc_info[2]
             )
 
-        sheets = _read_xlsx_sheets(file_stream)
+        sheets = _read_xlsx_sheets(
+            file_stream,
+            include_hidden_sheets=kwargs.get("include_hidden_sheets", True),
+        )
         md_content = ""
         for s in sheets:
             md_content += f"## {s}\n"
