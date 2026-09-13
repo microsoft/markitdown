@@ -133,8 +133,9 @@ class RssConverter(DocumentConverter):
         if root.tagName == "rss":
             return "rss"
         if root.localName == "feed" and root.namespaceURI in (None, ATOM_NAMESPACE):
-            if self._get_children(root, "entry"):
-                # An Atom feed must have a root element of <feed> and at least one <entry>
+            # RFC 4287 permits zero entries. Keep the entry heuristic only for
+            # legacy feeds that do not declare the Atom namespace.
+            if root.namespaceURI == ATOM_NAMESPACE or self._get_children(root, "entry"):
                 return "atom"
         return None
 
