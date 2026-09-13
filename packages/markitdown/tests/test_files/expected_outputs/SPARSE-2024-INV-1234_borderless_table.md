@@ -1,3 +1,13 @@
+- **Title:** (anonymous)
+- **Author:** (anonymous)
+- **Subject:** (unspecified)
+- **Creator:** (unspecified)
+- **Producer:** ReportLab PDF Library - www.reportlab.com
+- **Created:** 2025-12-05 10:49:50
+- **Modified:** 2025-12-05 10:49:50
+
+---
+
 INVENTORY RECONCILIATION REPORT
 Report ID: SPARSE-2024-INV-1234
 Warehouse: Distribution Center East
