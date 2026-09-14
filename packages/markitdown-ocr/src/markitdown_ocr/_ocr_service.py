@@ -4,8 +4,9 @@ Provides LLM Vision-based image text extraction.
 """
 
 import base64
-from typing import Any, BinaryIO
+import warnings
 from dataclasses import dataclass
+from typing import Any, BinaryIO
 
 from markitdown import StreamInfo
 
@@ -105,6 +106,9 @@ class LLMVisionOCRService:
                 backend_used="llm_vision",
             )
         except Exception as e:
+            warnings.warn(
+                f"LLM vision OCR failed with {type(e).__name__}", stacklevel=2
+            )
             return OCRResult(text="", backend_used="llm_vision", error=str(e))
         finally:
             image_stream.seek(0)
