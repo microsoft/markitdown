@@ -172,6 +172,18 @@ class Pr(Tag2Method):
     }
 
 
+# Every element's properties child is optional: <m:f> without <m:fPr> is a
+# fraction with default properties. Word always writes the child, because it
+# carries the control run's formatting, but nothing else has to.
+ABSENT_PR = Pr(ET.fromstring("<properties/>"))
+
+
+def get_pr(c_dict, tag_name):
+    """Read an element's properties child, which may legitimately be absent."""
+    pr = c_dict.get(tag_name)
+    return ABSENT_PR if pr is None else pr
+
+
 class oMath2Latex(Tag2Method):
     """
     Convert oMath element of omml to latex
@@ -208,7 +220,9 @@ class oMath2Latex(Tag2Method):
         """
         c_dict = self.process_children_dict(elm)
         latex_s = get_val(
-            c_dict["accPr"].chr, default=CHR_DEFAULT.get("ACC_VAL"), store=CHR
+            get_pr(c_dict, "accPr").chr,
+            default=CHR_DEFAULT.get("ACC_VAL"),
+            store=CHR,
         )
         return latex_s.format(c_dict["e"])
 
@@ -217,7 +231,7 @@ class oMath2Latex(Tag2Method):
         the bar function
         """
         c_dict = self.process_children_dict(elm)
-        pr = c_dict["barPr"]
+        pr = get_pr(c_dict, "barPr")
         latex_s = get_val(pr.pos, default=POS_DEFAULT.get("BAR_VAL"), store=POS)
         return pr.text + latex_s.format(c_dict["e"])
 
@@ -226,7 +240,7 @@ class oMath2Latex(Tag2Method):
         the delimiter object
         """
         c_dict = self.process_children_dict(elm)
-        pr = c_dict["dPr"]
+        pr = get_pr(c_dict, "dPr")
         null = D_DEFAULT.get("null")
         s_val = get_char(pr.begChr, default=D_DEFAULT.get("left"), store=T)
         e_val = get_char(pr.endChr, default=D_DEFAULT.get("right"), store=T)
@@ -255,7 +269,7 @@ class oMath2Latex(Tag2Method):
         the fraction object
         """
         c_dict = self.process_children_dict(elm)
-        pr = c_dict["fPr"]
+        pr = get_pr(c_dict, "fPr")
         latex_s = get_val(pr.type, default=F_DEFAULT, store=F)
         return pr.text + latex_s.format(num=c_dict.get("num"), den=c_dict.get("den"))
 
@@ -298,7 +312,7 @@ class oMath2Latex(Tag2Method):
         the Group-Character object
         """
         c_dict = self.process_children_dict(elm)
-        pr = c_dict["groupChrPr"]
+        pr = get_pr(c_dict, "groupChrPr")
         latex_s = get_val(pr.chr, default=CHR_DEFAULT.get("GROUP_CHR_VAL"), store=CHR)
         return pr.text + latex_s.format(c_dict["e"])
 
