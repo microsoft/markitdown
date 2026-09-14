@@ -1,11 +1,19 @@
 import io
+import sys
 import warnings
 from typing import Any, BinaryIO, Optional
 from bs4 import BeautifulSoup
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
+from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 from .._stream_info import StreamInfo
 from ._markdownify import _CustomMarkdownify
+
+_dependency_exc_info = None
+try:
+    from readability import Document as ReadabilityDocument
+except ImportError:
+    _dependency_exc_info = sys.exc_info()
 
 ACCEPTED_MIME_TYPE_PREFIXES = [
     "text/html",
@@ -45,13 +53,33 @@ class HtmlConverter(DocumentConverter):
         stream_info: StreamInfo,
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
-        # Pop our own keyword before forwarding the rest to markdownify.
+        # Pop our own keywords before forwarding the rest to markdownify.
         # strict=True raises RecursionError instead of falling back to plain text.
         strict: bool = kwargs.pop("strict", False)
+        reader_mode: bool = kwargs.pop("reader_mode", False)
 
         # Parse the stream
         encoding = "utf-8" if stream_info.charset is None else stream_info.charset
-        soup = BeautifulSoup(file_stream, "html.parser", from_encoding=encoding)
+        raw_html = file_stream.read()
+
+        title = None
+
+        if reader_mode:
+            if _dependency_exc_info is not None:
+                raise MissingDependencyException(
+                    MISSING_DEPENDENCY_MESSAGE.format(
+                        converter="HtmlConverter",
+                        extension="html (reader mode)",
+                        feature="readability",
+                    )
+                )
+            html_text = raw_html.decode(encoding, errors="replace")
+            doc = ReadabilityDocument(html_text, url=stream_info.url)
+            article_html = doc.summary()
+            title = doc.short_title()
+            soup = BeautifulSoup(article_html, "html.parser")
+        else:
+            soup = BeautifulSoup(raw_html, "html.parser", from_encoding=encoding)
 
         # Remove javascript and style blocks
         for script in soup(["script", "style"]):
@@ -85,9 +113,12 @@ class HtmlConverter(DocumentConverter):
         # remove leading and trailing \n
         webpage_text = webpage_text.strip()
 
+        if title is None:
+            title = None if soup.title is None else soup.title.string
+
         return DocumentConverterResult(
             markdown=webpage_text,
-            title=None if soup.title is None else soup.title.string,
+            title=title,
         )
 
     def convert_string(
