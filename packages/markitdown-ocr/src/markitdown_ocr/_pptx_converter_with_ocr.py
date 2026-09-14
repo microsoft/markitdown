@@ -4,12 +4,13 @@ Already has LLM-based image description, this enhances it with traditional OCR f
 """
 
 import io
+import os
 import sys
 from typing import Any, BinaryIO, Optional
 
 from typing import BinaryIO, Any, Optional
 
-from markitdown.converters import HtmlConverter
+from markitdown.converters import HtmlConverter, PptxConverter
 from markitdown import DocumentConverter, DocumentConverterResult, StreamInfo
 from markitdown._exceptions import (
     MissingDependencyException,
@@ -30,6 +31,7 @@ class PptxConverterWithOCR(DocumentConverter):
     def __init__(self, ocr_service: Optional[LLMVisionOCRService] = None):
         super().__init__()
         self._html_converter = HtmlConverter()
+        self._pptx_converter = PptxConverter()
         self.ocr_service = ocr_service
 
     def accepts(
@@ -89,30 +91,35 @@ class PptxConverterWithOCR(DocumentConverter):
 
                 # Pictures
                 if self._is_picture(shape):
-                    # Get image data
-                    image_stream = io.BytesIO(shape.image.blob)
+                    # Resolve the image through the core converter, which also
+                    # handles SVG pictures that have no rasterized fallback
+                    (
+                        image_blob,
+                        image_content_type,
+                        image_filename,
+                    ) = self._pptx_converter._get_image_info(shape)
+
+                    image_extension = None
+                    if image_filename:
+                        image_extension = os.path.splitext(image_filename)[1]
+                    image_stream_info = StreamInfo(
+                        mimetype=image_content_type,
+                        extension=image_extension,
+                        filename=image_filename,
+                    )
 
                     # Try LLM description first if available
                     llm_description = ""
-                    if llm_client and kwargs.get("llm_model"):
+                    if (
+                        image_blob is not None
+                        and llm_client
+                        and kwargs.get("llm_model")
+                    ):
                         try:
                             from ._llm_caption import llm_caption
 
-                            image_filename = shape.image.filename
-                            image_extension = None
-                            if image_filename:
-                                import os
-
-                                image_extension = os.path.splitext(image_filename)[1]
-
-                            image_stream_info = StreamInfo(
-                                mimetype=shape.image.content_type,
-                                extension=image_extension,
-                                filename=image_filename,
-                            )
-
                             llm_description = llm_caption(
-                                image_stream,
+                                io.BytesIO(image_blob),
                                 image_stream_info,
                                 client=llm_client,
                                 model=kwargs.get("llm_model"),
@@ -123,10 +130,12 @@ class PptxConverterWithOCR(DocumentConverter):
 
                     # Try OCR if LLM failed or not available
                     ocr_text = ""
-                    if not llm_description and ocr_service:
+                    if image_blob is not None and not llm_description and ocr_service:
                         try:
-                            image_stream.seek(0)
-                            ocr_result = ocr_service.extract_text(image_stream)
+                            ocr_result = ocr_service.extract_text(
+                                io.BytesIO(image_blob),
+                                stream_info=image_stream_info,
+                            )
                             if ocr_result.text.strip():
                                 ocr_text = ocr_result.text.strip()
                         except Exception:
@@ -186,12 +195,7 @@ class PptxConverterWithOCR(DocumentConverter):
         return DocumentConverterResult(markdown=md_content.strip())
 
     def _is_picture(self, shape):
-        if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.PICTURE:
-            return True
-        if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.PLACEHOLDER:
-            if hasattr(shape, "image"):
-                return True
-        return False
+        return self._pptx_converter._is_picture(shape)
 
     def _is_table(self, shape):
         if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.TABLE:
