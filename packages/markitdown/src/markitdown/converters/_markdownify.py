@@ -143,6 +143,20 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
 
         return "![%s](%s%s)" % (alt, src, title_part)
 
+    @staticmethod
+    def _escape_table_cell_pipes(text: str) -> str:
+        return re.sub(r"(?<!\\)\|", r"\|", text)
+
+    def convert_td(self, el: Any, text: str, parent_tags: Any) -> str:
+        return super().convert_td(
+            el, self._escape_table_cell_pipes(text), parent_tags
+        )
+
+    def convert_th(self, el: Any, text: str, parent_tags: Any) -> str:
+        return super().convert_th(
+            el, self._escape_table_cell_pipes(text), parent_tags
+        )
+
     def convert_input(
         self,
         el: Any,
