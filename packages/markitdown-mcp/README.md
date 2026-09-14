@@ -133,6 +133,25 @@ Finally:
 
 The server does not support authentication, and runs with the privileges of the user running it. For this reason, when running in SSE or Streamable HTTP mode, the server binds by default to `localhost`. Even still, it is important to recognize that the server can be accessed by any process or users on the same local machine, and that the `convert_to_markdown` tool can be used to read any file that the server's user has access to, or any data from the network. If you require additional security, consider running the server in a sandboxed environment, such as a virtual machine or container, and ensure that the user permissions are properly configured to limit access to sensitive files and network segments. Above all, DO NOT bind the server to other interfaces (non-localhost) unless you understand the security implications of doing so.
 
+### Subscripts and superscripts
+
+`convert_to_markdown` accepts optional `sub_symbol` and `sup_symbol` strings for
+HTML-based conversion, including DOCX:
+
+```json
+{
+  "uri": "file:///path/to/document.docx",
+  "sub_symbol": "<sub>",
+  "sup_symbol": "<sup>"
+}
+```
+
+This preserves source subscript and superscript markup, for example
+`H<sub>2</sub>O` and `x<sup>2</sup>`. Non-HTML markers such as `^` wrap both sides
+of the text (`x^2^`). Omitting the options (or passing `null`) keeps the default
+plain-text behavior; an empty string explicitly requests no marker. These options
+do not infer formatting from plain text or change PDF/cloud extraction.
+
 ## Trademarks
 
 This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft
