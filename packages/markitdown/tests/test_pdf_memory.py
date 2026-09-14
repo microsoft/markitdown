@@ -67,6 +67,34 @@ def _make_plain_page():
     return page
 
 
+def _make_positioned_plain_page():
+    """Create a mock page that needs tight x_tolerance to preserve spaces."""
+    page = MagicMock()
+    page.width = 612
+    page.close = MagicMock()
+    words = []
+    for index in range(50):
+        text = "NaturalLanguageProcessingResearch" if index < 5 else f"word{index}"
+        words.append(
+            {
+                "text": text,
+                "x0": 50,
+                "x1": 90,
+                "top": index * 12,
+                "bottom": index * 12 + 10,
+            }
+        )
+    page.extract_words.return_value = words
+
+    def extract_text(*args, **kwargs):
+        if kwargs.get("x_tolerance") == 1:
+            return "Natural Language Processing research uses positioned text."
+        return "NaturalLanguageProcessingresearchusespositionedtext."
+
+    page.extract_text.side_effect = extract_text
+    return page
+
+
 def _mock_pdfplumber_open(pages):
     """Return a mock pdfplumber.open that yields the given pages."""
 
@@ -147,6 +175,38 @@ class TestPdfMemoryOptimization:
         )
         assert result.text_content is not None
 
+    def test_space_starved_pdfminer_output_uses_pdfplumber_text(self):
+        """Use pdfplumber text when pdfminer loses positioned word boundaries."""
+        pages = [_make_positioned_plain_page(), _make_positioned_plain_page()]
+        collapsed_text = "\n".join(["NaturalLanguageProcessingResearch"] * 20)
+
+        with patch(
+            "markitdown.converters._pdf_converter.pdfplumber"
+        ) as mock_pdfplumber, patch(
+            "markitdown.converters._pdf_converter.pdfminer"
+        ) as mock_pdfminer:
+            mock_pdfplumber.open.side_effect = _mock_pdfplumber_open(pages)
+            mock_pdfminer.high_level.extract_text.return_value = collapsed_text
+
+            md = MarkItDown()
+            buf = io.BytesIO(b"fake pdf content")
+            from markitdown import StreamInfo
+
+            result = md.convert_stream(
+                buf,
+                stream_info=StreamInfo(extension=".pdf", mimetype="application/pdf"),
+            )
+
+        for page in pages:
+            page.extract_words.assert_called_with(
+                keep_blank_chars=True,
+                x_tolerance=3,
+                y_tolerance=3,
+            )
+            page.extract_text.assert_called_with(x_tolerance=1)
+        assert "Natural Language Processing" in result.text_content
+        assert "NaturalLanguageProcessingResearch" not in result.text_content
+
     def test_plain_text_pdf_still_closes_all_pages(self):
         """Even for plain-text PDFs, page.close() must be called on every page."""
         num_pages = 30
@@ -173,6 +233,41 @@ class TestPdfMemoryOptimization:
             assert (
                 page.close.called
             ), f"page.close() was NOT called on plain-text page {i}"
+
+    def test_positioned_pages_do_not_discard_a_real_table(self):
+        """Two problematic prose pages must not force a real table to plain text."""
+        pages = [
+            _make_positioned_plain_page(),
+            _make_form_page(),
+            _make_plain_page(),
+            _make_positioned_plain_page(),
+        ]
+        with patch("markitdown.converters._pdf_converter.pdfplumber") as plumber, patch(
+            "markitdown.converters._pdf_converter.pdfminer"
+        ) as miner:
+            plumber.open.side_effect = _mock_pdfplumber_open(pages)
+            miner.high_level.extract_text.return_value = "Plain text without the table"
+            from markitdown import StreamInfo
+
+            result = (
+                MarkItDown()
+                .convert_stream(
+                    io.BytesIO(b"fake pdf content"),
+                    stream_info=StreamInfo(
+                        extension=".pdf", mimetype="application/pdf"
+                    ),
+                )
+                .markdown
+            )
+
+        assert result.count("Natural Language Processing") == 2
+        assert "| Name" in result and "| Alpha" in result
+        assert result.index("Natural Language Processing") < result.index("| Name")
+        assert result.index("| Name") < result.rindex("Natural Language Processing")
+        miner.high_level.extract_text.assert_not_called()
+        pages[2].extract_text.assert_called_once_with()
+        for page in pages:
+            page.close.assert_called_once_with()
 
     def test_mixed_pdf_uses_form_extraction_per_page(self):
         """In a mixed PDF, form pages get table extraction while plain pages don't.
@@ -214,6 +309,9 @@ class TestPdfMemoryOptimization:
             ].extract_words.called, f"extract_words not called on form page {i}"
 
         # Result should contain table content from form pages
+        for i in [1, 3]:
+            pages[i].extract_text.assert_called_once_with()
+
         assert result.text_content is not None
         assert (
             "|" in result.text_content
