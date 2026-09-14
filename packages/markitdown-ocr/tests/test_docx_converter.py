@@ -281,15 +281,19 @@ def test_docx_styles_with_redundant_default_namespace(
 # ---------------------------------------------------------------------------
 
 
-def _underlined_docx(tmp_path: Path) -> Path:
+def _underlined_docx(
+    tmp_path: Path,
+    *,
+    paragraph_xml: str = (
+        "<w:r><w:t>plain </w:t></w:r>"
+        '<w:r><w:rPr><w:u w:val="single"/></w:rPr><w:t>underlined</w:t></w:r>'
+    ),
+) -> Path:
     docx_file = tmp_path / "underlined.docx"
-    document_xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    document_xml = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:body>
-    <w:p>
-      <w:r><w:t>plain </w:t></w:r>
-      <w:r><w:rPr><w:u w:val="single"/></w:rPr><w:t>underlined</w:t></w:r>
-    </w:p>
+    <w:p>{paragraph_xml}</w:p>
   </w:body>
 </w:document>"""
 
@@ -331,6 +335,41 @@ def test_docx_underlined_text_is_preserved_with_ocr(
             f, StreamInfo(extension=".docx"), ocr_service=svc
         ).markdown
     assert "plain <u>underlined</u>" in md
+
+
+@pytest.mark.parametrize("use_ocr", [False, True])
+@pytest.mark.parametrize(
+    ("run_xml", "expected"),
+    [
+        ('<w:t xml:space="preserve"> </w:t>', "First Last"),
+        ("<w:tab/>", "First Last"),
+        ("<w:t>&#160;</w:t>", "First\u00a0Last"),
+        # Direct conversion keeps the two-space hard break; the dispatcher strips it.
+        ("<w:br/>", "First  \nLast"),
+    ],
+)
+def test_docx_underlined_whitespace_is_preserved(
+    tmp_path: Path,
+    svc: MockOCRService,
+    use_ocr: bool,
+    run_xml: str,
+    expected: str,
+) -> None:
+    path = _underlined_docx(
+        tmp_path,
+        paragraph_xml=(
+            "<w:r><w:t>First</w:t></w:r>"
+            f'<w:r><w:rPr><w:u w:val="single"/></w:rPr>{run_xml}</w:r>'
+            "<w:r><w:t>Last</w:t></w:r>"
+        ),
+    )
+    converter = DocxConverterWithOCR()
+    with path.open("rb") as stream:
+        result = converter.convert(
+            stream, StreamInfo(extension=".docx"), ocr_service=svc if use_ocr else None
+        )
+
+    assert result.markdown == expected
 
 
 # ---------------------------------------------------------------------------
