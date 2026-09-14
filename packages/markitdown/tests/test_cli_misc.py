@@ -4,6 +4,8 @@ import subprocess
 import sys
 from types import SimpleNamespace
 
+import pytest
+
 from markitdown import __version__
 from markitdown.__main__ import main
 
@@ -53,6 +55,41 @@ def test_windows_pipe_input_is_buffered_before_conversion(monkeypatch, capsys) -
 
     captured = capsys.readouterr()
     assert captured.out.strip() == "# Test HTML"
+
+
+@pytest.mark.parametrize("from_stdin", [False, True], ids=["file", "stdin"])
+@pytest.mark.parametrize(
+    "options, expected",
+    [
+        ([], "H2O and x2"),
+        (
+            ["--sub-symbol", "<sub>", "--sup-symbol", "<sup>"],
+            "H<sub>2</sub>O and x<sup>2</sup>",
+        ),
+        (["--sub-symbol", "~", "--sup-symbol", "^"], "H~2~O and x^2^"),
+        (["--sub-symbol", "", "--sup-symbol", "^"], "H2O and x^2^"),
+    ],
+)
+def test_subscript_superscript_options(tmp_path, from_stdin, options, expected):
+    from .test_module_misc import _write_underlined_docx
+
+    path = tmp_path / "scripts.docx"
+    _write_underlined_docx(
+        path,
+        paragraph_xml=(
+            "<w:r><w:t>H</w:t></w:r>"
+            '<w:r><w:rPr><w:vertAlign w:val="subscript"/></w:rPr><w:t>2</w:t></w:r>'
+            '<w:r><w:t xml:space="preserve">O and x</w:t></w:r>'
+            '<w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr><w:t>2</w:t></w:r>'
+        ),
+    )
+    command = [sys.executable, "-m", "markitdown", *options]
+    command += ["--extension", "docx"] if from_stdin else [str(path)]
+    result = subprocess.run(
+        command, input=path.read_bytes() if from_stdin else None, capture_output=True
+    )
+    assert result.returncode == 0, result.stderr.decode()
+    assert result.stdout.decode().strip() == expected
 
 
 if __name__ == "__main__":
