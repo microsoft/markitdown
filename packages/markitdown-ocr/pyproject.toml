@@ -25,7 +25,8 @@ classifiers = [
 
 # Core dependencies — matches the file-format libraries markitdown already uses
 dependencies = [
-  "markitdown>=0.1.0",
+  # 0.1.8b1 is the first version with the showZeroes sheet view repair helpers
+  "markitdown>=0.1.8b1",
   "pdfminer.six>=20251230",
   "pdfplumber>=0.11.9",
   "PyMuPDF>=1.24.0",

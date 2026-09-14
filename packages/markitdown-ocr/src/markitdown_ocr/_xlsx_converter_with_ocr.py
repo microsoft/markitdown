@@ -8,6 +8,10 @@ import sys
 from typing import Any, BinaryIO, Optional
 
 from markitdown.converters import HtmlConverter
+from markitdown.converters._xlsx_converter import (
+    _read_xlsx_sheets,
+    _repair_sheetview_show_zeroes,
+)
 from markitdown import DocumentConverter, DocumentConverterResult, StreamInfo
 from markitdown._exceptions import (
     MissingDependencyException,
@@ -22,6 +26,26 @@ try:
     from openpyxl import load_workbook
 except ImportError:
     _xlsx_dependency_exc_info = sys.exc_info()
+
+
+def _load_xlsx_workbook(file_stream: BinaryIO) -> tuple[Any, BinaryIO]:
+    """
+    Load a workbook, returning it along with the stream it was read from.
+
+    Some producers write the legacy attribute "showZeroes" on <sheetView>, which
+    openpyxl rejects. The workbook is repaired and read again, the same way the core
+    XLSX converter does. The returned stream is the repaired copy in that case, so
+    callers that read the same workbook again do not hit the rejected attribute.
+    """
+    start_pos = file_stream.tell()
+    try:
+        return load_workbook(file_stream), file_stream
+    except TypeError as exc:
+        if "showZeroes" not in str(exc):
+            raise
+
+        repaired_stream = _repair_sheetview_show_zeroes(file_stream, start_pos)
+        return load_workbook(repaired_stream), repaired_stream
 
 
 class XlsxConverterWithOCR(DocumentConverter):
@@ -90,7 +114,7 @@ class XlsxConverterWithOCR(DocumentConverter):
     ) -> DocumentConverterResult:
         """Standard conversion without OCR."""
         file_stream.seek(0)
-        sheets = pd.read_excel(file_stream, sheet_name=None, engine="openpyxl")
+        sheets = _read_xlsx_sheets(file_stream)
         md_content = ""
 
         for sheet_name in sheets:
@@ -110,7 +134,7 @@ class XlsxConverterWithOCR(DocumentConverter):
     ) -> DocumentConverterResult:
         """Convert XLSX with image OCR."""
         file_stream.seek(0)
-        wb = load_workbook(file_stream)
+        wb, file_stream = _load_xlsx_workbook(file_stream)
 
         md_content = ""
 
