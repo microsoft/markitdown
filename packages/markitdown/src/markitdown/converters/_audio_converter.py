@@ -6,18 +6,31 @@ from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException
 
-ACCEPTED_MIME_TYPE_PREFIXES = [
-    "audio/x-wav",
-    "audio/mpeg",
-    "video/mp4",
-]
+# Map each accepted file extension and mimetype prefix to the audio format
+# name understood by transcribe_audio(). The ACCEPTED_* lists are derived from
+# these maps so that the formats we accept and the formats we can transcribe
+# cannot drift apart.
+_AUDIO_FORMAT_BY_EXTENSION = {
+    ".wav": "wav",
+    ".mp3": "mp3",
+    ".m4a": "mp4",
+    ".mp4": "mp4",
+}
 
-ACCEPTED_FILE_EXTENSIONS = [
-    ".wav",
-    ".mp3",
-    ".m4a",
-    ".mp4",
-]
+_AUDIO_FORMAT_BY_MIME_PREFIX = {
+    "audio/x-wav": "wav",
+    "audio/wav": "wav",
+    "audio/mpeg": "mp3",
+    "audio/mp3": "mp3",
+    "video/mp4": "mp4",
+    "audio/mp4": "mp4",
+    "audio/m4a": "mp4",
+    "audio/x-m4a": "mp4",
+}
+
+ACCEPTED_MIME_TYPE_PREFIXES = list(_AUDIO_FORMAT_BY_MIME_PREFIX)
+
+ACCEPTED_FILE_EXTENSIONS = list(_AUDIO_FORMAT_BY_EXTENSION)
 
 
 class AudioConverter(DocumentConverter):
@@ -75,18 +88,18 @@ class AudioConverter(DocumentConverter):
                 if f in metadata:
                     md_content += f"{f}: {metadata[f]}\n"
 
-        # Figure out the audio format for transcription
-        if stream_info.extension == ".wav" or stream_info.mimetype == "audio/x-wav":
-            audio_format = "wav"
-        elif stream_info.extension == ".mp3" or stream_info.mimetype == "audio/mpeg":
-            audio_format = "mp3"
-        elif (
-            stream_info.extension in [".mp4", ".m4a"]
-            or stream_info.mimetype == "video/mp4"
-        ):
-            audio_format = "mp4"
-        else:
-            audio_format = None
+        # Figure out the audio format for transcription. Normalize case here,
+        # just as accepts() does, so that e.g. "recording.WAV" is transcribed
+        # rather than silently skipped.
+        mimetype = (stream_info.mimetype or "").lower()
+        extension = (stream_info.extension or "").lower()
+
+        audio_format = _AUDIO_FORMAT_BY_EXTENSION.get(extension)
+        if audio_format is None:
+            for prefix, fmt in _AUDIO_FORMAT_BY_MIME_PREFIX.items():
+                if mimetype.startswith(prefix):
+                    audio_format = fmt
+                    break
 
         # Transcribe
         if audio_format:
