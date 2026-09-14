@@ -67,6 +67,30 @@ def _make_plain_page():
     return page
 
 
+def _make_positioned_plain_page():
+    """Create a mock page that needs tight x_tolerance to preserve spaces."""
+    page = MagicMock()
+    page.width = 612
+    page.close = MagicMock()
+    page.extract_words.return_value = [
+        {
+            "text": "Natural",
+            "x0": 50,
+            "x1": 90,
+            "top": 10,
+            "bottom": 20,
+        },
+    ]
+
+    def extract_text(*args, **kwargs):
+        if kwargs.get("x_tolerance") == 1:
+            return "Natural Language Processing research uses positioned text."
+        return "NaturalLanguageProcessingresearchusespositionedtext."
+
+    page.extract_text.side_effect = extract_text
+    return page
+
+
 def _mock_pdfplumber_open(pages):
     """Return a mock pdfplumber.open that yields the given pages."""
 
@@ -146,6 +170,37 @@ class TestPdfMemoryOptimization:
             "plain-text PDFs should fall back to pdfminer"
         )
         assert result.text_content is not None
+
+    def test_space_starved_pdfminer_output_uses_pdfplumber_text(self):
+        """Use pdfplumber text when pdfminer loses positioned word boundaries."""
+        page = _make_positioned_plain_page()
+        collapsed_text = "\n".join(["NaturalLanguageProcessingResearch"] * 20)
+
+        with patch(
+            "markitdown.converters._pdf_converter.pdfplumber"
+        ) as mock_pdfplumber, patch(
+            "markitdown.converters._pdf_converter.pdfminer"
+        ) as mock_pdfminer:
+            mock_pdfplumber.open.side_effect = _mock_pdfplumber_open([page])
+            mock_pdfminer.high_level.extract_text.return_value = collapsed_text
+
+            md = MarkItDown()
+            buf = io.BytesIO(b"fake pdf content")
+            from markitdown import StreamInfo
+
+            result = md.convert_stream(
+                buf,
+                stream_info=StreamInfo(extension=".pdf", mimetype="application/pdf"),
+            )
+
+        page.extract_words.assert_called_with(
+            keep_blank_chars=True,
+            x_tolerance=3,
+            y_tolerance=3,
+        )
+        page.extract_text.assert_called_with(x_tolerance=1)
+        assert "Natural Language Processing" in result.text_content
+        assert "NaturalLanguageProcessingResearch" not in result.text_content
 
     def test_plain_text_pdf_still_closes_all_pages(self):
         """Even for plain-text PDFs, page.close() must be called on every page."""
