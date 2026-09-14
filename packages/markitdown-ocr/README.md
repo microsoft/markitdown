@@ -65,6 +65,25 @@ md = MarkItDown(
 )
 ```
 
+### Semantic PDF OCR (Opt-in)
+
+For deeply complex or malformed PDFs (e.g., issues #41 and #83), you can opt into a full-page semantic structure mode. When enabled, this mode routes every PDF page through the vision model, asking it for faithful semantic Markdown (headings, lists, reading order, and tables), bypassing standard deterministic text extraction.
+
+```python
+md = MarkItDown(
+    enable_plugins=True,
+    llm_client=OpenAI(),
+    llm_model="gpt-4o",
+    semantic_pdf_ocr=True, # Explicit opt-in
+)
+```
+
+**Important caveats for semantic mode:**
+- **Cost & Latency:** Every page is rendered and sent to the LLM, making this significantly slower and more expensive than default extraction.
+- **Hallucinations:** The model may invent or slightly alter text, though the prompt explicitly asks it to treat the document as untrusted data.
+- **Fallback:** If any page OCR call errors or returns empty, the entire document conversion conservatively falls back to the standard deterministic text extraction without data loss.
+- **Bounded Scope:** This mode is a vision-assisted alternative for stubborn PDFs. It is not a complete solution for all arbitrary PDF semantic recovery tasks.
+
 ### Any OpenAI-Compatible Client
 
 Works with any client that follows the OpenAI API:
