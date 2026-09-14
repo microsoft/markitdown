@@ -236,7 +236,7 @@ class TestCLIArgs:
                 "pdf,jpeg,mp4",
                 "fake.pdf",
             ],
-        ), patch.object(markitdown_cli, "MarkItDown", markitdown_cls):
+        ), patch("markitdown._markitdown.MarkItDown", markitdown_cls):
             markitdown_cli.main()
 
         markitdown_cls.assert_called_once_with(
@@ -273,8 +273,8 @@ class TestCLIArgs:
                 "--cu-endpoint",
                 "https://fake-cu",
             ],
-        ), patch.object(sys, "stdin", stdin), patch.object(
-            markitdown_cli, "MarkItDown", markitdown_cls
+        ), patch.object(sys, "stdin", stdin), patch(
+            "markitdown._markitdown.MarkItDown", markitdown_cls
         ):
             markitdown_cli.main()
 
@@ -320,7 +320,7 @@ class TestEndpointEnvVars:
         monkeypatch.setenv(env_var, "https://from-env")
         monkeypatch.setattr(sys, "argv", argv)
 
-        with patch("markitdown.__main__.MarkItDown") as mock_markitdown:
+        with patch("markitdown._markitdown.MarkItDown") as mock_markitdown:
             main()
 
         assert mock_markitdown.call_args.kwargs[kwarg] == "https://from-env"
@@ -342,7 +342,7 @@ class TestEndpointEnvVars:
             ],
         )
 
-        with patch("markitdown.__main__.MarkItDown") as mock_markitdown:
+        with patch("markitdown._markitdown.MarkItDown") as mock_markitdown:
             main()
 
         assert mock_markitdown.call_args.kwargs["cu_endpoint"] == "https://from-flag"

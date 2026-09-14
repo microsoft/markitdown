@@ -10,7 +10,8 @@ from typing import Any, Dict
 from textwrap import dedent
 from importlib.metadata import entry_points
 from .__about__ import __version__
-from ._markitdown import MarkItDown, StreamInfo, DocumentConverterResult
+from ._stream_info import StreamInfo
+from ._base_converter import DocumentConverterResult
 
 
 def main():
@@ -203,6 +204,9 @@ def main():
                 "\nUse the -p (or --use-plugins) option to enable 3rd-party plugins.\n"
             )
         sys.exit(0)
+
+    # Conversion dependencies are not needed for help, version, or plugin listing.
+    from ._markitdown import MarkItDown
 
     if args.use_docintel:
         if args.endpoint is None:
