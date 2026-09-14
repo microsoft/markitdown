@@ -84,6 +84,32 @@ def _repair_sheetview_show_zeroes(
     return repaired_stream
 
 
+def _format_integral_columns(sheet: "pd.DataFrame") -> "pd.DataFrame":
+    """Render whole numbers stored as floats without a trailing ``.0``.
+
+    A single blank cell makes pandas read the column as float64, so every
+    whole number in it renders as ``1.0`` even though Excel shows ``1``.
+    Columns whose present values are all whole numbers are converted back to
+    integers for display; fractional values and missing cells are unchanged.
+    """
+    for column in sheet.columns:
+        series = sheet[column]
+        values = series.dropna()
+        if (
+            pd.api.types.is_float_dtype(series.dtype)
+            and not values.empty
+            and (values % 1 == 0).all()
+        ):
+            # The object dtype stops pandas from coercing the mixed ints and
+            # NaN values back into a float column on assignment.
+            sheet[column] = pd.Series(
+                [int(value) if pd.notna(value) else value for value in series],
+                dtype=object,
+                index=series.index,
+            )
+    return sheet
+
+
 class XlsxConverter(DocumentConverter):
     """
     Converts XLSX files to Markdown, with each sheet presented as a separate Markdown table.
@@ -135,7 +161,7 @@ class XlsxConverter(DocumentConverter):
         md_content = ""
         for s in sheets:
             md_content += f"## {s}\n"
-            html_content = sheets[s].to_html(index=False)
+            html_content = _format_integral_columns(sheets[s]).to_html(index=False)
             md_content += (
                 self._html_converter.convert_string(
                     html_content, **kwargs
@@ -197,7 +223,7 @@ class XlsConverter(DocumentConverter):
         md_content = ""
         for s in sheets:
             md_content += f"## {s}\n"
-            html_content = sheets[s].to_html(index=False)
+            html_content = _format_integral_columns(sheets[s]).to_html(index=False)
             md_content += (
                 self._html_converter.convert_string(
                     html_content, **kwargs
