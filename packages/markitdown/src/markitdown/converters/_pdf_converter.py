@@ -1,11 +1,14 @@
 import sys
 import io
+import logging
 import re
 from typing import BinaryIO, Any
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+
+_log = logging.getLogger(__name__)
 
 # Pattern for MasterFormat-style partial numbering (e.g., ".1", ".2", ".10")
 PARTIAL_NUMBERING_PATTERN = re.compile(r"^\.\d+$")
@@ -551,37 +554,59 @@ class PdfConverter(DocumentConverter):
 
             with pdfplumber.open(pdf_bytes) as pdf:
                 for page_idx, page in enumerate(pdf.pages):
-                    page_content = _extract_form_content_from_words(page)
+                    try:
+                        page_content = _extract_form_content_from_words(page)
 
-                    if page_content is not None:
-                        form_page_count += 1
-                        if page_content.strip():
-                            markdown_chunks.append(page_content)
-                    else:
-                        plain_page_indices.append(page_idx)
-                        text = page.extract_text()
-                        if text and text.strip():
-                            markdown_chunks.append(text.strip())
+                        if page_content is not None:
+                            form_page_count += 1
+                            if page_content.strip():
+                                markdown_chunks.append(page_content)
+                        else:
+                            plain_page_indices.append(page_idx)
+                            text = page.extract_text()
+                            if text and text.strip():
+                                markdown_chunks.append(text.strip())
+                    except Exception:
+                        # A single malformed page (e.g. a form XObject with an
+                        # invalid /BBox that makes the PDF backend raise) must
+                        # not abort the whole document. Skip it and keep the
+                        # text recovered from the other pages.
+                        _log.debug(
+                            "Skipping PDF page %d due to extraction error",
+                            page_idx,
+                            exc_info=True,
+                        )
+                    finally:
+                        page.close()  # Free cached page data immediately
 
-                    page.close()  # Free cached page data immediately
-
-            # If no pages had form-style content, use pdfminer for
-            # the whole document (better text spacing for prose).
+            # If no pages had form-style content, use pdfminer for the whole
+            # document (better text spacing for prose). If pdfminer fails (e.g.
+            # on a malformed page), fall back to the per-page text already
+            # collected via pdfplumber.
             if form_page_count == 0:
                 pdf_bytes.seek(0)
-                markdown = pdfminer.high_level.extract_text(pdf_bytes)
+                try:
+                    markdown = pdfminer.high_level.extract_text(pdf_bytes)
+                except Exception:
+                    markdown = "\n\n".join(markdown_chunks).strip()
             else:
                 markdown = "\n\n".join(markdown_chunks).strip()
 
         except Exception:
-            # Fallback if pdfplumber fails
+            # Fallback if pdfplumber fails entirely
             pdf_bytes.seek(0)
-            markdown = pdfminer.high_level.extract_text(pdf_bytes)
+            try:
+                markdown = pdfminer.high_level.extract_text(pdf_bytes)
+            except Exception:
+                markdown = ""
 
         # Fallback if still empty
         if not markdown:
             pdf_bytes.seek(0)
-            markdown = pdfminer.high_level.extract_text(pdf_bytes)
+            try:
+                markdown = pdfminer.high_level.extract_text(pdf_bytes)
+            except Exception:
+                markdown = ""
 
         # Post-process to merge MasterFormat-style partial numbering with following text
         markdown = _merge_partial_numbering_lines(markdown)
