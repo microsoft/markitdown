@@ -373,10 +373,12 @@ class oMath2Latex(Tag2Method):
         the n-ary object
         """
         res = []
-        bo = ""
+        # m:naryPr is itself optional, so an absent element means every property
+        # takes its default, the operator included.
+        bo = CHR_DEFAULT.get("NARY_VAL", "")
         for stag, t, e in self.process_children_list(elm):
             if stag == "naryPr":
-                bo = get_char(t.chr, store=CHR_BO)
+                bo = get_char(t.chr, default=CHR_DEFAULT.get("NARY_VAL"), store=CHR_BO)
             else:
                 res.append(t)
         return bo + BLANK.join(res)
