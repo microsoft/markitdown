@@ -2,7 +2,7 @@
 
 LLM Vision plugin for MarkItDown that extracts text from images embedded in PDF, DOCX, PPTX, and XLSX files.
 
-Uses the same `llm_client` / `llm_model` pattern that MarkItDown already supports for image descriptions — no new ML libraries or binary dependencies required.
+Uses the same `llm_client` / `llm_model` pattern that MarkItDown already supports for image descriptions — no new ML libraries or binary dependencies required. Works with any OpenAI-compatible client, or with Claude via the Anthropic SDK.
 
 ## Features
 
@@ -18,10 +18,11 @@ Uses the same `llm_client` / `llm_model` pattern that MarkItDown already support
 pip install markitdown-ocr
 ```
 
-The plugin uses whatever OpenAI-compatible client you already have. Install one if you don't have it yet:
+The plugin uses whatever vision client you already have. Install one if you don't have it yet:
 
 ```bash
-pip install openai
+pip install openai      # OpenAI, Azure OpenAI, or any OpenAI-compatible endpoint
+pip install anthropic   # Claude
 ```
 
 ## Usage
@@ -83,13 +84,50 @@ md = MarkItDown(
 )
 ```
 
+### Claude (Anthropic)
+
+MarkItDown's own converters speak the OpenAI chat-completions shape, so an Anthropic
+client cannot be passed as `llm_client`. Pass it as `ocr_llm_client` instead — the
+plugin selects the Claude backend from the client type:
+
+```python
+from anthropic import Anthropic
+from markitdown import MarkItDown
+
+md = MarkItDown(
+    enable_plugins=True,
+    ocr_llm_client=Anthropic(),
+    ocr_llm_model="claude-opus-5",
+)
+
+result = md.convert("document_with_images.pdf")
+print(result.text_content)
+```
+
+The `ocr_llm_*` kwargs override `llm_*` for OCR only, so the two can be mixed — for
+example OpenAI for MarkItDown's built-in image descriptions and Claude for OCR:
+
+```python
+md = MarkItDown(
+    enable_plugins=True,
+    llm_client=OpenAI(),
+    llm_model="gpt-4o",
+    ocr_llm_client=Anthropic(),
+    ocr_llm_model="claude-opus-5",
+    ocr_llm_prompt="Extract all text from this image, preserving table structure.",
+)
+```
+
+Any client exposing the Anthropic Messages API works, including `AnthropicBedrockMantle`
+and `AnthropicVertex`.
+
 ## How It Works
 
 When `MarkItDown(enable_plugins=True, llm_client=..., llm_model=...)` is called:
 
 1. MarkItDown discovers the plugin via the `markitdown.plugin` entry point group
 2. It calls `register_converters()`, forwarding all kwargs including `llm_client` and `llm_model`
-3. The plugin creates an `LLMVisionOCRService` from those kwargs
+3. The plugin creates an OCR service from those kwargs, choosing the backend from the client type — `LLMVisionOCRService` for an OpenAI-compatible client, `AnthropicVisionOCRService` for an Anthropic one
 4. Four OCR-enhanced converters are registered at **priority -1.0** — before the built-in converters at priority 0.0
 
 When a file is converted:
@@ -161,6 +199,12 @@ Confirm the plugin is installed and discovered:
 markitdown --list-plugins   # should show: ocr
 ```
 
+### `Unrecognized llm_client`
+
+The client passed in exposes neither `client.chat.completions.create` (OpenAI-compatible)
+nor `client.messages.create` (Anthropic). Check that the client was constructed, not the
+module itself — `OpenAI()`, not `openai`.
+
 ### API errors
 
 The plugin propagates LLM API errors as warnings and continues conversion. Check your API key, quota, and that the chosen model supports vision inputs.
@@ -191,6 +235,13 @@ Contributions are welcome! See the [MarkItDown repository](https://github.com/mi
 MIT — see [LICENSE](LICENSE).
 
 ## Changelog
+
+### Unreleased
+
+- Claude support via the Anthropic Messages API (`AnthropicVisionOCRService`)
+- Backend chosen automatically from the client type (`create_ocr_service`)
+- `ocr_llm_client` / `ocr_llm_model` / `ocr_llm_prompt` kwargs, so OCR can use a
+  different backend than MarkItDown's built-in image descriptions
 
 ### 0.1.0 (Initial Release)
 

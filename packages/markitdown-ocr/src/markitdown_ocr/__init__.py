@@ -12,6 +12,8 @@ from .__about__ import __version__
 from ._ocr_service import (
     OCRResult,
     LLMVisionOCRService,
+    AnthropicVisionOCRService,
+    create_ocr_service,
 )
 from ._pdf_converter_with_ocr import PdfConverterWithOCR
 from ._docx_converter_with_ocr import DocxConverterWithOCR
@@ -24,6 +26,8 @@ __all__ = [
     "register_converters",
     "OCRResult",
     "LLMVisionOCRService",
+    "AnthropicVisionOCRService",
+    "create_ocr_service",
     "PdfConverterWithOCR",
     "DocxConverterWithOCR",
     "PptxConverterWithOCR",
