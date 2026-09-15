@@ -134,6 +134,12 @@ class XlsxConverter(DocumentConverter):
         sheets = _read_xlsx_sheets(file_stream)
         md_content = ""
         for s in sheets:
+            # A completely empty sheet has no columns. pandas then emits a
+            # column-less HTML table that markdownify turns into broken syntax
+            # ("|\n|  |"). Skip it. A header-only sheet still has columns and
+            # already renders as a well-formed empty table.
+            if sheets[s].columns.empty:
+                continue
             md_content += f"## {s}\n"
             html_content = sheets[s].to_html(index=False)
             md_content += (
@@ -196,6 +202,10 @@ class XlsConverter(DocumentConverter):
         sheets = pd.read_excel(file_stream, sheet_name=None, engine="xlrd")
         md_content = ""
         for s in sheets:
+            # Same empty-sheet guard as XlsxConverter: no columns means pandas
+            # would emit a column-less table that is not valid Markdown.
+            if sheets[s].columns.empty:
+                continue
             md_content += f"## {s}\n"
             html_content = sheets[s].to_html(index=False)
             md_content += (
