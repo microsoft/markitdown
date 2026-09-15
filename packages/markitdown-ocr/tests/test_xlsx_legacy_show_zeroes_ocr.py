@@ -1,10 +1,17 @@
 import io
 import zipfile
+from typing import Any
 
 from openpyxl import Workbook
 
 from markitdown import StreamInfo
+from markitdown_ocr._ocr_service import OCRResult
 from markitdown_ocr._xlsx_converter_with_ocr import XlsxConverterWithOCR
+
+
+class MockOCRService:
+    def extract_text(self, image_stream: Any, **kwargs: Any) -> OCRResult:
+        return OCRResult(text="", backend_used="mock")
 
 
 def _legacy_show_zeroes_workbook() -> io.BytesIO:
@@ -13,6 +20,7 @@ def _legacy_show_zeroes_workbook() -> io.BytesIO:
     sheet.title = "Data"
     sheet["A1"] = "hello"
     sheet["B1"] = "world"
+    sheet["A2"] = ' showZeroes="0" '
 
     base = io.BytesIO()
     workbook.save(base)
@@ -25,9 +33,11 @@ def _legacy_show_zeroes_workbook() -> io.BytesIO:
                 data = source.read(item.filename)
                 if item.filename == "xl/worksheets/sheet1.xml":
                     data = data.replace(
-                        b"<sheetView ", b'<sheetView showZeroes="0" ', 1
+                        b"<sheetView ",
+                        b'<sheetView showZeroes="0" ',
+                        1,
                     )
-                    assert b'showZeroes="0"' in data
+                    assert data.count(b'showZeroes="0"') == 2
                 target.writestr(item, data)
 
     repaired.seek(0)
@@ -41,8 +51,11 @@ def test_xlsx_ocr_converter_repairs_legacy_show_zeroes() -> None:
     result = converter.convert(
         workbook,
         StreamInfo(extension=".xlsx"),
+        ocr_service=MockOCRService(),
     )
 
     assert "## Data" in result.markdown
     assert "hello" in result.markdown
     assert "world" in result.markdown
+    assert 'showZeroes="0"' in result.markdown
+    assert "showZeros" not in result.markdown
