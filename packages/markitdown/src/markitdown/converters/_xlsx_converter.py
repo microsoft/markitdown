@@ -52,12 +52,22 @@ def _read_xlsx_sheets(
     repaired_stream = None
     try:
         try:
-            sheets = pd.read_excel(file_stream, sheet_name=None, engine="openpyxl")
+            sheets = pd.read_excel(
+                file_stream,
+                sheet_name=None,
+                engine="openpyxl",
+                keep_default_na=False,
+            )
         except TypeError as exc:
             if "showZeroes" not in str(exc):
                 raise
             repaired_stream = _repair_sheetview_show_zeroes(file_stream, start_pos)
-            sheets = pd.read_excel(repaired_stream, sheet_name=None, engine="openpyxl")
+            sheets = pd.read_excel(
+                repaired_stream,
+                sheet_name=None,
+                engine="openpyxl",
+                keep_default_na=False,
+            )
         yield sheets, repaired_stream if repaired_stream is not None else file_stream
     finally:
         if repaired_stream is not None:
@@ -237,7 +247,9 @@ class XlsConverter(DocumentConverter):
                 _xls_dependency_exc_info[2]
             )
 
-        sheets = pd.read_excel(file_stream, sheet_name=None, engine="xlrd")
+        sheets = pd.read_excel(
+            file_stream, sheet_name=None, engine="xlrd", keep_default_na=False
+        )
         md_content = ""
         for s in sheets:
             md_content += f"## {s}\n"
