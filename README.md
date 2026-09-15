@@ -67,6 +67,9 @@ cd markitdown
 pip install -e 'packages/markitdown[all]'
 ```
 
+> [!NOTE]
+> On some shells (like zsh), you must quote the package name (e.g. `'markitdown[all]'`) to prevent the shell from interpreting the square brackets as a glob pattern.
+
 ## Usage
 
 ### Command-Line
@@ -303,6 +306,9 @@ If any attempt succeeds, image conversion continues normally. If the client rais
 docker build -t markitdown:latest .
 docker run --rm -i markitdown:latest < ~/your-file.pdf > output.md
 ```
+
+## Technical Documentation
+For detailed information about the technical implementation, architecture, and advanced usage of MarkItDown, please refer to the
 
 ## Contributing
 
