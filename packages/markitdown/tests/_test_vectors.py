@@ -88,6 +88,25 @@ GENERAL_TEST_VECTORS = [
         must_not_include=[],
     ),
     FileTestVector(
+        filename="test.eml",
+        mimetype="message/rfc822",
+        charset="utf-8",
+        url=None,
+        must_include=[
+            "# Email Message",
+            "**From:** Test Sender <test.sender@example.com>",
+            "**To:** Test Recipient <test.recipient@example.com>",
+            "**Subject:** Test EML Message",
+            "## Content",
+            "This is the body of the test EML message.",
+            "It has multiple lines.",
+        ],
+        must_not_include=[
+            "Content-Type:",
+            "MIME-Version:",
+        ],
+    ),
+    FileTestVector(
         filename="test.pdf",
         mimetype="application/pdf",
         charset=None,
