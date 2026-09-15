@@ -1,0 +1,18 @@
+From: html.sender@example.com
+To: html.recipient@example.com
+Subject: HTML Test Email
+Date: Fri, 21 Mar 2026 11:00:00 -0700
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="boundary123"
+
+--boundary123
+Content-Type: text/plain; charset=utf-8
+
+This is the plain text version of the email.
+
+--boundary123
+Content-Type: text/html; charset=utf-8
+
+<html><body><p>This is the <b>HTML</b> version of the email.</p></body></html>
+
+--boundary123--
