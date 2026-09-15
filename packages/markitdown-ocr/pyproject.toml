@@ -37,11 +37,14 @@ dependencies = [
   "Pillow>=9.0.0",
 ]
 
-# llm_client is passed in by the user (same as for markitdown image descriptions);
-# install openai or any OpenAI-compatible SDK separately.
+# The vision client is passed in by the user (same as for markitdown image
+# descriptions); install openai, any OpenAI-compatible SDK, or anthropic separately.
 [project.optional-dependencies]
 llm = [
   "openai>=1.0.0",
+]
+anthropic = [
+  "anthropic>=0.40.0",
 ]
 
 [project.urls]

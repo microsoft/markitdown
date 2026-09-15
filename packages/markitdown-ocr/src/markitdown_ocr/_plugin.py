@@ -6,7 +6,11 @@ Registers OCR-enhanced converters with priority-based replacement strategy.
 from typing import Any
 from markitdown import MarkItDown
 
-from ._ocr_service import LLMVisionOCRService
+from ._ocr_service import (
+    AnthropicVisionOCRService,
+    LLMVisionOCRService,
+    create_ocr_service,
+)
 from ._pdf_converter_with_ocr import PdfConverterWithOCR
 from ._docx_converter_with_ocr import DocxConverterWithOCR
 from ._pptx_converter_with_ocr import PptxConverterWithOCR
@@ -31,16 +35,26 @@ def register_converters(markitdown: MarkItDown, **kwargs: Any) -> None:
             - llm_client: OpenAI-compatible client for LLM-based OCR (required for OCR to work)
             - llm_model: Model name (e.g., 'gpt-4o')
             - llm_prompt: Custom prompt for text extraction
+            - ocr_llm_client: Client to use for OCR instead of llm_client — set
+              this to use a backend MarkItDown's own converters do not speak,
+              such as an Anthropic client
+            - ocr_llm_model: Model name paired with ocr_llm_client
+            - ocr_llm_prompt: Prompt override for OCR only
     """
-    # Create OCR service — reads the same llm_client/llm_model kwargs
-    # that MarkItDown itself already accepts for image descriptions
-    llm_client = kwargs.get("llm_client")
-    llm_model = kwargs.get("llm_model")
-    llm_prompt = kwargs.get("llm_prompt")
+    # Read the same llm_client/llm_model kwargs that MarkItDown itself already
+    # accepts for image descriptions, so the common case needs no extra config.
+    #
+    # MarkItDown's built-in converters call the OpenAI chat-completions shape
+    # directly, so a non-OpenAI client cannot be passed as llm_client without
+    # breaking them. The ocr_llm_* kwargs give OCR its own client for that case
+    # — e.g. OpenAI for image descriptions and Claude for OCR, or Claude alone.
+    llm_client = kwargs.get("ocr_llm_client") or kwargs.get("llm_client")
+    llm_model = kwargs.get("ocr_llm_model") or kwargs.get("llm_model")
+    llm_prompt = kwargs.get("ocr_llm_prompt") or kwargs.get("llm_prompt")
 
-    ocr_service: LLMVisionOCRService | None = None
+    ocr_service: LLMVisionOCRService | AnthropicVisionOCRService | None = None
     if llm_client and llm_model:
-        ocr_service = LLMVisionOCRService(
+        ocr_service = create_ocr_service(
             client=llm_client,
             model=llm_model,
             default_prompt=llm_prompt,

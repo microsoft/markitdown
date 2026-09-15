@@ -134,7 +134,8 @@ The `markitdown-ocr` plugin adds OCR support to PDF, DOCX, PPTX, and XLSX conver
 
 ```bash
 pip install markitdown-ocr
-pip install openai  # or any OpenAI-compatible client
+pip install openai     # or any OpenAI-compatible client
+pip install anthropic  # to use Claude instead
 ```
 
 **Usage:**
@@ -154,7 +155,19 @@ result = md.convert("document_with_images.pdf")
 print(result.markdown)
 ```
 
-If no `llm_client` is provided the plugin still loads, but OCR is silently skipped and the standard built-in converter is used instead.
+To use Claude, pass the Anthropic client as `ocr_llm_client` instead — MarkItDown's built-in converters speak the OpenAI chat-completions shape, so the plugin takes its own client for OCR:
+
+```python
+from anthropic import Anthropic
+
+md = MarkItDown(
+    enable_plugins=True,
+    ocr_llm_client=Anthropic(),
+    ocr_llm_model="claude-opus-5",
+)
+```
+
+If no client is provided the plugin still loads, but OCR is silently skipped and the standard built-in converter is used instead.
 
 See [`packages/markitdown-ocr/README.md`](packages/markitdown-ocr/README.md) for detailed documentation.
 
