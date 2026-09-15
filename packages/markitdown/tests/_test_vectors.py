@@ -31,6 +31,24 @@ GENERAL_TEST_VECTORS = [
             "data:image/png;base64,iVBORw0KGgoAAAANSU",
         ],
     ),
+    
+    # Test for .doc conversion Issue #23
+    FileTestVector(
+        filename="test.doc",
+        mimetype="application/msword",
+        charset=None,
+        url=None,
+        must_include=[
+            "93d437af-bc31-492f-a7fc-3cbc9b7c1710",
+            "fd0ed3e3-6373-4446-815c-4b979f6063a9",
+            "#Test for converting .doc files to MD format",
+            "Let’s test it!",
+        ],
+        must_not_include=[
+            "d0cf11e0",
+            "\x00"
+        ],
+    ),
     FileTestVector(
         filename="test.xlsx",
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -55,6 +73,8 @@ GENERAL_TEST_VECTORS = [
         ],
         must_not_include=[],
     ),
+
+    #Includes test for pptx image extaction Issue #56
     FileTestVector(
         filename="test.pptx",
         mimetype="application/vnd.openxmlformats-officedocument.presentationml.presentation",
@@ -68,7 +88,7 @@ GENERAL_TEST_VECTORS = [
             "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation",
             "a3f6004b-6f4f-4ea8-bee3-3741f4dc385f",  # chart title
             "2003",  # chart value
-            "![This phrase of the caption is Human-written.](Picture4.jpg)",
+            "![This phrase of the caption is Human-written.](Picture4_", 
         ],
         must_not_include=["data:image/jpeg;base64,/9j/4AAQSkZJRgABAQE"],
     ),
