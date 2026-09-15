@@ -32,6 +32,20 @@ GENERAL_TEST_VECTORS = [
         ],
     ),
     FileTestVector(
+        filename="test.doc",
+        mimetype="application/msword",
+        charset=None,
+        url=None,
+        must_include=[
+            "314b0a30-5b04-470b-b9f7-eed2c2bec74a",
+            "d666f1f7-46cb-42bd-9a39-9a39cf2a509f",
+            "# Abstract",
+            "# Introduction",
+            "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation",
+        ],
+        must_not_include=[],
+    ),
+    FileTestVector(
         filename="test.xlsx",
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         charset=None,
