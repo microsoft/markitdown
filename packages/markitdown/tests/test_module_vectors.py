@@ -232,6 +232,31 @@ def test_convert_docx_with_style_missing_type(tmp_path):
     assert "# Abstract" in result.markdown
 
 
+def test_convert_docx_with_numbering_missing_ilvl(tmp_path):
+    """DOCX conversion should not fail when numbering entries lack w:ilvl."""
+    source_path = os.path.join(TEST_FILES_DIR, "equations.docx")
+    malformed_path = tmp_path / "missing_numbering_ilvl.docx"
+
+    with zipfile.ZipFile(source_path, mode="r") as zip_input:
+        with zipfile.ZipFile(malformed_path, mode="w") as zip_output:
+            for item in zip_input.infolist():
+                content = zip_input.read(item.filename)
+                if item.filename == "word/numbering.xml":
+                    numbering_xml = content.decode("utf-8")
+                    numbering_xml, count = re.subn(
+                        r'\s+w:ilvl="[^"]*"',
+                        "",
+                        numbering_xml,
+                    )
+                    assert count > 0
+                    content = numbering_xml.encode("utf-8")
+                zip_output.writestr(item, content)
+
+    result = MarkItDown().convert(str(malformed_path))
+    assert result.markdown is not None
+    assert len(result.markdown) > 0
+
+
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
 
