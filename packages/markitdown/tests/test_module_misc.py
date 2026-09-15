@@ -1326,9 +1326,8 @@ def test_pptx_chart_no_title_text_frame() -> None:
     mock_chart.has_title = True
     mock_chart.chart_title.has_text_frame = False
 
-    mock_category = MagicMock()
-    mock_category.label = "Cat 1"
-    mock_chart.plots = [MagicMock(categories=[mock_category])]
+    mock_categories = MagicMock(flattened_labels=(("Cat 1",),))
+    mock_chart.plots = [MagicMock(categories=mock_categories)]
 
     mock_series = MagicMock()
     mock_series.name = "Series 1"
@@ -1352,9 +1351,8 @@ def test_pptx_chart_with_title_text_frame() -> None:
     mock_chart.chart_title.has_text_frame = True
     mock_chart.chart_title.text_frame.text = "Revenue"
 
-    mock_category = MagicMock()
-    mock_category.label = "Cat 1"
-    mock_chart.plots = [MagicMock(categories=[mock_category])]
+    mock_categories = MagicMock(flattened_labels=(("Cat 1",),))
+    mock_chart.plots = [MagicMock(categories=mock_categories)]
 
     mock_series = MagicMock()
     mock_series.name = "Series 1"
