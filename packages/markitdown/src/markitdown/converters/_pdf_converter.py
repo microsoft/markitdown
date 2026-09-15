@@ -1,6 +1,7 @@
 import sys
 import io
 import re
+from collections import Counter
 from typing import BinaryIO, Any
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
@@ -55,6 +56,104 @@ def _merge_partial_numbering_lines(text: str) -> str:
             i += 1
 
     return "\n".join(result_lines)
+
+
+def _extract_text_with_headings(pdf_bytes: io.BytesIO) -> str:
+    """
+    Extract text from a PDF using pdfminer's layout analysis, detecting headings
+    by comparing font sizes across the document.
+
+    Text blocks with font sizes significantly larger than the body text are
+    converted to Markdown headings (# for largest, ## for next, etc., up to ######).
+
+    Falls back to plain text extraction if layout analysis fails or produces
+    no useful size information.
+    """
+    try:
+        from pdfminer.high_level import extract_pages
+        from pdfminer.layout import LAParams, LTTextBox, LTTextLine, LTChar, LTAnno
+    except ImportError:
+        pdf_bytes.seek(0)
+        return pdfminer.high_level.extract_text(pdf_bytes)
+
+    laparams = LAParams()
+    pages_blocks: list[list[dict]] = []
+
+    try:
+        for page_layout in extract_pages(pdf_bytes, laparams=laparams):
+            page_blocks: list[dict] = []
+            for element in page_layout:
+                if not isinstance(element, LTTextBox):
+                    continue
+                lines_data: list[tuple[str, float]] = []
+                char_sizes: list[float] = []
+                for text_line in element:
+                    if not isinstance(text_line, LTTextLine):
+                        continue
+                    line_text = ""
+                    line_sizes: list[float] = []
+                    for char in text_line:
+                        if isinstance(char, LTChar):
+                            line_sizes.append(char.size)
+                            line_text += char.get_text()
+                        elif isinstance(char, LTAnno):
+                            line_text += char.get_text()
+                    if line_text.strip():
+                        dominant = max(line_sizes) if line_sizes else 0.0
+                        lines_data.append((line_text, dominant))
+                        char_sizes.extend(line_sizes)
+                if lines_data:
+                    block_text = "".join(lt for lt, _ in lines_data)
+                    dominant_size = max(char_sizes) if char_sizes else 0.0
+                    page_blocks.append({"text": block_text, "size": dominant_size})
+            pages_blocks.append(page_blocks)
+    except Exception:
+        pdf_bytes.seek(0)
+        return pdfminer.high_level.extract_text(pdf_bytes)
+
+    # Collect all font sizes to determine the body text size
+    all_sizes = [
+        round(b["size"] * 2) / 2
+        for page in pages_blocks
+        for b in page
+        if b["size"] > 0
+    ]
+
+    if not all_sizes:
+        pdf_bytes.seek(0)
+        return pdfminer.high_level.extract_text(pdf_bytes)
+
+    # Body text = most common (mode) font size
+    size_counter = Counter(all_sizes)
+    body_size = size_counter.most_common(1)[0][0]
+
+    # Heading threshold: at least 15% larger than body text
+    heading_threshold = body_size * 1.15
+
+    # Collect distinct heading sizes, largest first
+    heading_sizes = sorted(
+        {s for s in all_sizes if s >= heading_threshold}, reverse=True
+    )
+
+    # Map each heading size to a Markdown heading level (H1 … H6)
+    size_to_level: dict[float, int] = {
+        s: min(i + 1, 6) for i, s in enumerate(heading_sizes)
+    }
+
+    result_parts: list[str] = []
+    for page_blocks in pages_blocks:
+        for block in page_blocks:
+            text = block["text"].strip()
+            if not text:
+                continue
+            rounded = round(block["size"] * 2) / 2
+            if rounded in size_to_level:
+                level = size_to_level[rounded]
+                result_parts.append(f"{'#' * level} {text}")
+            else:
+                result_parts.append(text)
+
+    return "\n\n".join(result_parts)
 
 
 # Load dependencies
@@ -565,23 +664,23 @@ class PdfConverter(DocumentConverter):
 
                     page.close()  # Free cached page data immediately
 
-            # If no pages had form-style content, use pdfminer for
-            # the whole document (better text spacing for prose).
+            # If no pages had form-style content, use heading-aware extraction
+            # for the whole document (better text spacing and heading detection).
             if form_page_count == 0:
                 pdf_bytes.seek(0)
-                markdown = pdfminer.high_level.extract_text(pdf_bytes)
+                markdown = _extract_text_with_headings(pdf_bytes)
             else:
                 markdown = "\n\n".join(markdown_chunks).strip()
 
         except Exception:
             # Fallback if pdfplumber fails
             pdf_bytes.seek(0)
-            markdown = pdfminer.high_level.extract_text(pdf_bytes)
+            markdown = _extract_text_with_headings(pdf_bytes)
 
         # Fallback if still empty
         if not markdown:
             pdf_bytes.seek(0)
-            markdown = pdfminer.high_level.extract_text(pdf_bytes)
+            markdown = _extract_text_with_headings(pdf_bytes)
 
         # Post-process to merge MasterFormat-style partial numbering with following text
         markdown = _merge_partial_numbering_lines(markdown)
