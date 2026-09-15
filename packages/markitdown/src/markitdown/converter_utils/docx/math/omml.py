@@ -179,7 +179,9 @@ class oMath2Latex(Tag2Method):
 
     _t_dict = T
 
-    __direct_tags = ("box", "sSub", "sSup", "sSubSup", "num", "den", "deg", "e")
+    __direct_tags = frozenset(
+        ("box", "sSub", "sSup", "sSubSup", "num", "den", "deg", "e")
+    )
 
     def __init__(self, element):
         self._latex = self.process_children(element)
