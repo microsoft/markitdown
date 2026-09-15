@@ -32,6 +32,83 @@ GENERAL_TEST_VECTORS = [
         ],
     ),
     FileTestVector(
+        filename="test.doc",
+        mimetype="application/msword",
+        charset=None,
+        url=None,
+        must_include=[
+            "93d437af-bc31-492f-a7fc-3cbc9b7c1710",
+            "fd0ed3e3-6373-4446-815c-4b979f6063a9",
+            "#Test for converting .doc files to MD format",
+            "Let’s test it!",
+        ],
+        must_not_include=[
+            "d0cf11e0",
+            "\x00"
+        ],
+    ),
+    FileTestVector(
+        filename="test_email.eml",
+        mimetype="message/rfc822",
+        charset= "ascii",
+        url=None,
+        must_include=[
+            "c3158d6f-61fd-4850-8f0b-35a9e7897d09",  
+            "64759fb3-bf18-4f53-8436-95d844a7fa2a",  
+            "5f5ef9eb-af9c-47cd-8e19-1e7163fd3d34",  
+            "**From:** John Doe <john.doe@example.com>",
+            "**To:** Jane Smith <jane.smith@example.com>",
+            "test.txt",  
+    ],
+    must_not_include=[],
+),
+#EML edge case for no attachments
+ FileTestVector(
+        filename="test_email_plain.eml",
+        mimetype="message/rfc822",
+        charset= None,
+        url=None,
+        must_include=[
+            "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "98765432-dcba-0987-fedc-ba9876543210",
+    ],
+    must_not_include=["## Attachments"],
+),
+#EML edge case for no body
+ FileTestVector(
+        filename="test_email_no_body.eml",
+        mimetype="message/rfc822",
+        charset="ascii",
+        url=None,
+        must_include=[
+            "180f319f-a138-4f4e-b88d-76f75c8dd55d",
+    ],
+    must_not_include=["## Email Content\n\n##"],
+),
+#EML edge case for HTML only body
+ FileTestVector(
+        filename="test_email_html.eml",
+        mimetype="message/rfc822",
+        charset=None,
+        url=None,
+        must_include=[
+            "d1f0162c-600c-4f1e-a0fb-effcfe15d8b3",
+            "<html>",
+    ],
+    must_not_include=[],
+),
+#EML edge case for no subject
+ FileTestVector(
+        filename="test_email_nosubject.eml",
+        mimetype="message/rfc822",
+        charset="ascii",
+        url=None,
+        must_include=[
+            "This email was sent without a subject line.",
+    ],
+    must_not_include=["**Subject:**"],
+),
+    FileTestVector(
         filename="test.xlsx",
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         charset=None,
@@ -68,7 +145,7 @@ GENERAL_TEST_VECTORS = [
             "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation",
             "a3f6004b-6f4f-4ea8-bee3-3741f4dc385f",  # chart title
             "2003",  # chart value
-            "![This phrase of the caption is Human-written.](Picture4.jpg)",
+            "![This phrase of the caption is Human-written.](Picture4_",
         ],
         must_not_include=["data:image/jpeg;base64,/9j/4AAQSkZJRgABAQE"],
     ),

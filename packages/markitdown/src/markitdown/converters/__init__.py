@@ -11,12 +11,14 @@ from ._ipynb_converter import IpynbConverter
 from ._bing_serp_converter import BingSerpConverter
 from ._pdf_converter import PdfConverter
 from ._docx_converter import DocxConverter
+from ._doc_converter import DocConverter
 from ._xlsx_converter import XlsxConverter, XlsConverter
 from ._pptx_converter import PptxConverter
 from ._image_converter import ImageConverter
 from ._audio_converter import AudioConverter
 from ._outlook_msg_converter import OutlookMsgConverter
 from ._zip_converter import ZipConverter
+from ._eml_converter import EmlConverter
 from ._doc_intel_converter import (
     DocumentIntelligenceConverter,
     DocumentIntelligenceFileType,
@@ -38,6 +40,7 @@ __all__ = [
     "BingSerpConverter",
     "PdfConverter",
     "DocxConverter",
+    "DocConverter",
     "XlsxConverter",
     "XlsConverter",
     "PptxConverter",
@@ -51,4 +54,5 @@ __all__ = [
     "ContentUnderstandingFileType",
     "EpubConverter",
     "CsvConverter",
+    "EmlConverter",
 ]

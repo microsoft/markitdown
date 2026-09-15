@@ -1,0 +1,30 @@
+Content-Type: multipart/mixed; boundary="===============8484938434343225034=="
+MIME-Version: 1.0
+Subject: c3158d6f-61fd-4850-8f0b-35a9e7897d09
+From: John Doe <john.doe@example.com>
+To: Jane Smith <jane.smith@example.com>
+Date: Wed, 18 Dec 2024 10:00:00 +0000
+CC: cc.person@example.com
+
+--===============8484938434343225034==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+
+64759fb3-bf18-4f53-8436-95d844a7fa2a
+
+This is a test email for markitdown EML conversion.
+
+5f5ef9eb-af9c-47cd-8e19-1e7163fd3d34
+
+Best regards,
+John Doe
+
+--===============8484938434343225034==
+Content-Type: application/txt
+MIME-Version: 1.0
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="test.txt"
+
+VGhpcyBpcyB0ZXN0IGF0dGFjaG1lbnQgY29udGVudA==
+--===============8484938434343225034==--
