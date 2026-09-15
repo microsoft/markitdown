@@ -46,13 +46,17 @@ _SHOW_ZEROES_ATTRIBUTE = re.compile(rb"(?<=[\s])showZeroes(\s*=)")
 def _read_xlsx_sheets(file_stream: BinaryIO) -> dict[str, Any]:
     start_pos = file_stream.tell()
     try:
-        return pd.read_excel(file_stream, sheet_name=None, engine="openpyxl")
+        return pd.read_excel(
+            file_stream, sheet_name=None, engine="openpyxl", keep_default_na=False
+        )
     except TypeError as exc:
         if "showZeroes" not in str(exc):
             raise
 
         repaired_stream = _repair_sheetview_show_zeroes(file_stream, start_pos)
-        return pd.read_excel(repaired_stream, sheet_name=None, engine="openpyxl")
+        return pd.read_excel(
+            repaired_stream, sheet_name=None, engine="openpyxl", keep_default_na=False
+        )
 
 
 def _rename_show_zeroes_attribute(data: bytes) -> bytes:
@@ -193,7 +197,9 @@ class XlsConverter(DocumentConverter):
                 _xls_dependency_exc_info[2]
             )
 
-        sheets = pd.read_excel(file_stream, sheet_name=None, engine="xlrd")
+        sheets = pd.read_excel(
+            file_stream, sheet_name=None, engine="xlrd", keep_default_na=False
+        )
         md_content = ""
         for s in sheets:
             md_content += f"## {s}\n"
