@@ -3,6 +3,8 @@
 [![PyPI](https://img.shields.io/pypi/v/markitdown.svg)](https://pypi.org/project/markitdown/)
 ![PyPI - Downloads](https://img.shields.io/pypi/dd/markitdown)
 
+![MarkItDown — convert PDF, PowerPoint, Word, Excel, HTML, images, audio and more to LLM-ready Markdown.](docs/images/hero.gif)
+
 > [!IMPORTANT]
 > MarkItDown performs I/O with the privileges of the current process. Like open() or requests.get(), it will access resources that the process itself can access. Sanitize your inputs in untrusted environments, and call the narrowest `convert_*` function needed for your use case (e.g., `convert_stream()`, or `convert_local()`). See the [Security Considerations](#security-considerations) section of the documentation for more information.
 
