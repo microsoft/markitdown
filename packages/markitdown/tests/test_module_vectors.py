@@ -9,9 +9,17 @@ import zipfile
 from pathlib import Path
 
 if __name__ == "__main__":
-    from _test_vectors import GENERAL_TEST_VECTORS, DATA_URI_TEST_VECTORS
+    from _test_vectors import (
+        GENERAL_TEST_VECTORS,
+        DATA_URI_TEST_VECTORS,
+        MERGED_CELLS_TEST_VECTORS,
+    )
 else:
-    from ._test_vectors import GENERAL_TEST_VECTORS, DATA_URI_TEST_VECTORS
+    from ._test_vectors import (
+        GENERAL_TEST_VECTORS,
+        DATA_URI_TEST_VECTORS,
+        MERGED_CELLS_TEST_VECTORS,
+    )
 
 from markitdown import (
     MarkItDown,
@@ -200,6 +208,44 @@ def test_convert_stream_keep_data_uris(test_vector):
         for string in test_vector.must_not_include:
             assert string not in result.markdown
 
+@pytest.mark.parametrize("test_vector", MERGED_CELLS_TEST_VECTORS)
+def test_convert_xlsx(test_vector):
+    """Test the conversion of an XLSX file."""
+    markitdown = MarkItDown()
+
+    result = markitdown.convert(
+        os.path.join(TEST_FILES_DIR, test_vector.filename),
+        fill_merged_cells=True,
+        url=test_vector.url,
+    )
+
+    for string in test_vector.must_include:
+        assert string in result.markdown
+    for string in test_vector.must_not_include:
+        assert string not in result.markdown
+
+
+@pytest.mark.parametrize("test_vector", MERGED_CELLS_TEST_VECTORS)
+def test_convert_stream_xlsx(test_vector):
+    """Test the conversion of an XLSX file."""
+    markitdown = MarkItDown()
+
+    stream_info = StreamInfo(
+        extension=os.path.splitext(test_vector.filename)[1],
+        mimetype=test_vector.mimetype,
+        charset=test_vector.charset,
+    )
+
+    with open(os.path.join(TEST_FILES_DIR, test_vector.filename), "rb") as stream:
+        result = markitdown.convert(
+            stream, stream_info=stream_info, fill_merged_cells=True, url=test_vector.url
+        )
+
+        for string in test_vector.must_include:
+            assert string in result.markdown
+        for string in test_vector.must_not_include:
+            assert string not in result.markdown
+
 
 def test_convert_docx_with_style_missing_type(tmp_path):
     """DOCX conversion should not fail when a style entry is missing w:type."""
@@ -258,6 +304,18 @@ if __name__ == "__main__":
         test_convert_stream_keep_data_uris,
     ]:
         for test_vector in DATA_URI_TEST_VECTORS:
+            print(
+                f"Running {test_function.__name__} on {test_vector.filename}...", end=""
+            )
+            test_function(test_vector)
+            print("OK")
+
+    # XLSX parse merged cells tests
+    for test_function in [
+        test_convert_xlsx,
+        test_convert_stream_xlsx,
+    ]:
+        for test_vector in MERGED_CELLS_TEST_VECTORS:
             print(
                 f"Running {test_function.__name__} on {test_vector.filename}...", end=""
             )
