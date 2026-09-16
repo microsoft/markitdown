@@ -67,11 +67,11 @@ class _XlsxImages:
                 )
                 if not drawings:
                     continue
-                drawing_parts = _relationships(archive, sheet_part)
+                drawing_parts = _relationships(archive, sheet_part, "drawing")
                 images = self._sheets.setdefault(sheet.attrib["name"], [])
                 for drawing in drawings:
                     drawing_part = drawing_parts[drawing.attrib[_REL_ID]]
-                    image_parts = _relationships(archive, drawing_part)
+                    image_parts = _relationships(archive, drawing_part, "image")
                     drawing_root = ET.fromstring(archive.read(drawing_part))
                     # Match openpyxl's image traversal, not its XML serialization order.
                     anchors = [
