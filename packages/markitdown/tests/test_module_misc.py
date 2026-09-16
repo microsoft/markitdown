@@ -895,6 +895,52 @@ def test_get_content_disposition_filename_decodes_rfc5987() -> None:
     )
 
 
+def test_pptx_soft_line_breaks_are_not_vertical_tabs() -> None:
+    """A soft line break must not reach the Markdown as a vertical tab.
+
+    Shift+Enter inside a PowerPoint paragraph is an ``<a:br/>``, which python-pptx
+    reports as ``\v``. A vertical tab is a C0 control, not Markdown: a renderer
+    drops it, so the lines on either side run together, and nothing downstream
+    treats it as whitespace either.
+    """
+    pptx = pytest.importorskip("pptx")
+    from pptx.util import Inches
+
+    presentation = pptx.Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[5])
+    slide.shapes.title.text = "TITLE ONE\vTITLE TWO"
+
+    text_box = slide.shapes.add_textbox(Inches(0.5), Inches(2), Inches(4), Inches(1))
+    text_box.text_frame.text = "ADDRESS LINE ONE\vADDRESS LINE TWO"
+
+    table = slide.shapes.add_table(
+        2, 2, Inches(0.5), Inches(3.5), Inches(6), Inches(1.5)
+    ).table
+    table.cell(0, 0).text = "HEADER A\vHEADER B"
+    table.cell(0, 1).text = "H2"
+    table.cell(1, 0).text = "CELL LINE ONE\vCELL LINE TWO"
+    table.cell(1, 1).text = "C2"
+
+    slide.notes_slide.notes_text_frame.text = "NOTE LINE ONE\vNOTE LINE TWO"
+
+    buffer = io.BytesIO()
+    presentation.save(buffer)
+    buffer.seek(0)
+
+    md = MarkItDown().convert_stream(buffer, file_extension=".pptx").markdown
+
+    assert "\v" not in md
+    # A shape's own paragraphs are joined with newlines, so a soft break reads
+    # the same way.
+    assert "ADDRESS LINE ONE\nADDRESS LINE TWO" in md
+    assert "NOTE LINE ONE\nNOTE LINE TWO" in md
+    # A heading and a table row cannot carry a newline, so those collapse to a
+    # space and the row stays one row.
+    assert "# TITLE ONE TITLE TWO" in md
+    assert "| CELL LINE ONE CELL LINE TWO | C2 |" in md
+    assert "| HEADER A HEADER B | H2 |" in md
+
+
 def test_pptx_chart_multi_series_conversion() -> None:
     """Charts with multiple series and many categories must convert correctly.
 
