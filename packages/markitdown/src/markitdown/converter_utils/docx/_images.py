@@ -4,12 +4,13 @@ import mimetypes
 from typing import Any, Callable, Optional
 from uuid import uuid4
 
-from bs4 import BeautifulSoup, Doctype, Tag
+from bs4 import BeautifulSoup, Tag
 from bs4.builder import HTMLTreeBuilder
 from mammoth import html, images
 from mammoth.docx.files import InvalidFileReferenceError
 
 from ..._stream_info import StreamInfo
+from .._image import _parse_image_html
 
 
 _BLOCK_ELEMENTS = HTMLTreeBuilder.DEFAULT_BLOCK_ELEMENTS | {
@@ -73,16 +74,10 @@ class _DocxImages:
                 # Mammoth swallows this exception for missing document images,
                 # but an error raised by the override must reach the dispatcher.
                 raise RuntimeError("_image_to_html failed") from exc
-        if fragment is not None and not isinstance(fragment, str):
-            raise TypeError("_image_to_html must return an HTML string or None")
-        if fragment is None or not fragment.strip():
+        soup = _parse_image_html(fragment)
+        if soup is None:
             return images.data_uri(image)
 
-        soup = BeautifulSoup(fragment, "html.parser")
-        if soup.find(["html", "head", "body"]) or any(
-            isinstance(node, Doctype) for node in soup.descendants
-        ):
-            raise ValueError("_image_to_html must return a fragment, not a document")
         key = str(len(self._fragments))
         self._fragments[key] = soup
         return [html.element("img", {self._attribute: key})]
