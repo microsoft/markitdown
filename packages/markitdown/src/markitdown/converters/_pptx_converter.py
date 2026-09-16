@@ -31,6 +31,18 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 ACCEPTED_FILE_EXTENSIONS = [".pptx"]
 
 
+def _normalize_soft_line_breaks(text: str) -> str:
+    """Turn the soft line breaks python-pptx reports into newlines.
+
+    A soft line break (Shift+Enter) is an ``<a:br/>`` inside one paragraph, and
+    python-pptx renders it as a vertical tab. A vertical tab is not Markdown: it
+    is a C0 control that renderers drop and that nothing downstream treats as
+    whitespace, so the lines on either side of it run together. The paragraphs
+    of a shape already arrive joined with newlines, so use the same separator.
+    """
+    return text.replace("\v", "\n")
+
+
 class PptxConverter(DocumentConverter):
     """
     Converts PPTX files to Markdown. Supports heading, tables and images with alt text.
@@ -178,10 +190,12 @@ class PptxConverter(DocumentConverter):
 
                 # Text areas
                 elif shape.has_text_frame:
-                    text = shape.text or ""
+                    text = _normalize_soft_line_breaks(shape.text or "")
                     if shape == title:
                         if text.strip():
-                            md_content += "# " + text.lstrip() + "\n"
+                            # An ATX heading cannot span lines: a newline would
+                            # close the heading and leave the rest as body text.
+                            md_content += "# " + text.replace("\n", " ").strip() + "\n"
                     else:
                         md_content += text + "\n"
 
@@ -214,7 +228,11 @@ class PptxConverter(DocumentConverter):
                 # has merely been opened, so having one says nothing about there
                 # being notes to read. Only head a section that has content.
                 notes_frame = slide.notes_slide.notes_text_frame
-                notes_text = (notes_frame.text or "") if notes_frame is not None else ""
+                notes_text = (
+                    _normalize_soft_line_breaks(notes_frame.text or "")
+                    if notes_frame is not None
+                    else ""
+                )
                 if notes_text.strip():
                     md_content += "\n\n### Notes:\n" + notes_text
                     md_content = md_content.strip()
@@ -298,10 +316,11 @@ class PptxConverter(DocumentConverter):
         for row in table.rows:
             html_table += "<tr>"
             for cell in row.cells:
+                cell_text = html.escape(_normalize_soft_line_breaks(cell.text))
                 if first_row:
-                    html_table += "<th>" + html.escape(cell.text) + "</th>"
+                    html_table += "<th>" + cell_text + "</th>"
                 else:
-                    html_table += "<td>" + html.escape(cell.text) + "</td>"
+                    html_table += "<td>" + cell_text + "</td>"
             html_table += "</tr>"
             first_row = False
         html_table += "</table></body></html>"
@@ -319,7 +338,7 @@ class PptxConverter(DocumentConverter):
             # None. has_text_frame is the property that actually reflects
             # whether a text frame exists.
             if chart.has_title and chart.chart_title.has_text_frame:
-                md += f": {chart.chart_title.text_frame.text}"
+                md += f": {_normalize_soft_line_breaks(chart.chart_title.text_frame.text)}"
             md += "\n\n"
             data = []
             category_names = [c.label for c in chart.plots[0].categories]
