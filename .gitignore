@@ -1,4 +1,8 @@
 .vscode
+debug/
+test_pdf*.md
+images_*/
+my_*/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
