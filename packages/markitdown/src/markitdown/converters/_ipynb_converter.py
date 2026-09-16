@@ -12,6 +12,45 @@ CANDIDATE_MIME_TYPE_PREFIXES = [
 ACCEPTED_FILE_EXTENSIONS = [".ipynb"]
 
 
+def _source_lines(cell: dict) -> list:
+    """The lines of a cell's source.
+
+    nbformat types `source` as a `multiline_string`, which is a list of lines
+    *or* a single string. Joining is the same either way, but reading the lines
+    is not, so normalize to lines.
+    """
+    source = cell.get("source", [])
+    if isinstance(source, str):
+        return source.splitlines(keepends=True)
+    if isinstance(source, list):
+        return [line for line in source if isinstance(line, str)]
+    return []
+
+
+def _fence_language(notebook_content: dict) -> str:
+    """The language the notebook says its code cells are written in.
+
+    nbformat records it in `metadata.language_info.name`; older notebooks carry
+    only `metadata.kernelspec.language`. A notebook that records neither keeps
+    the previous default.
+    """
+    metadata = notebook_content.get("metadata")
+    if not isinstance(metadata, dict):
+        return "python"
+    for section, key in (("language_info", "name"), ("kernelspec", "language")):
+        values = metadata.get(section)
+        if not isinstance(values, dict):
+            continue
+        language = values.get(key)
+        if not isinstance(language, str):
+            continue
+        language = language.strip()
+        # A fence info string ends at the first space and cannot hold a backtick.
+        if language and " " not in language and "`" not in language:
+            return language
+    return "python"
+
+
 class IpynbConverter(DocumentConverter):
     """Converts Jupyter Notebook (.ipynb) files to Markdown."""
 
@@ -66,10 +105,11 @@ class IpynbConverter(DocumentConverter):
         try:
             md_output = []
             title = None
+            language = _fence_language(notebook_content)
 
             for cell in notebook_content.get("cells", []):
                 cell_type = cell.get("cell_type", "")
-                source_lines = cell.get("source", [])
+                source_lines = _source_lines(cell)
 
                 if cell_type == "markdown":
                     md_output.append("".join(source_lines))
@@ -83,7 +123,7 @@ class IpynbConverter(DocumentConverter):
 
                 elif cell_type == "code":
                     # Code cells are wrapped in Markdown code blocks
-                    md_output.append(f"```python\n{''.join(source_lines)}\n```")
+                    md_output.append(f"```{language}\n{''.join(source_lines)}\n```")
                 elif cell_type == "raw":
                     md_output.append(f"```\n{''.join(source_lines)}\n```")
 
