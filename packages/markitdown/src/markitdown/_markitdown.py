@@ -5,6 +5,7 @@ import sys
 import shutil
 import traceback
 import io
+import csv
 from dataclasses import dataclass
 from email.message import Message
 from email.utils import collapse_rfc2231_value
@@ -96,6 +97,18 @@ def _read_charset_sample(file_stream: BinaryIO) -> bytes:
         pass
 
     return sample
+
+
+def _looks_like_delimited_text(data: bytes) -> bool:
+    detected = charset_normalizer.from_bytes(data).best()
+    text = str(detected) if detected is not None else data.decode("utf-8", "ignore")
+
+    try:
+        dialect = csv.Sniffer().sniff(text.lstrip("\ufeff"), delimiters=",;\t|")
+    except csv.Error:
+        return False
+
+    return dialect.delimiter in {",", ";", "\t", "|"}
 
 
 # Lower priority values are tried first.
@@ -778,24 +791,38 @@ class MarkItDown:
 
                     if charset_result is not None:
                         charset = self._normalize_charset(charset_result.encoding)
+                else:
+                    stream_page = b""
+
+                output_mimetype = result.prediction.output.mime_type
+                output_extensions = result.prediction.output.extensions
+                if (
+                    base_guess.mimetype is None
+                    and base_guess.extension is None
+                    and result.prediction.output.is_text
+                    and output_mimetype == "text/csv"
+                    and not _looks_like_delimited_text(stream_page)
+                ):
+                    output_mimetype = "text/plain"
+                    output_extensions = ["txt"]
 
                 # Normalize the first extension listed
                 guessed_extension = None
-                if len(result.prediction.output.extensions) > 0:
-                    guessed_extension = "." + result.prediction.output.extensions[0]
+                if len(output_extensions) > 0:
+                    guessed_extension = "." + output_extensions[0]
 
                 # Determine if the guess is compatible with the base guess
                 compatible = True
                 if (
                     base_guess.mimetype is not None
-                    and base_guess.mimetype != result.prediction.output.mime_type
+                    and base_guess.mimetype != output_mimetype
                 ):
                     compatible = False
 
                 if (
                     base_guess.extension is not None
                     and base_guess.extension.lstrip(".")
-                    not in result.prediction.output.extensions
+                    not in output_extensions
                 ):
                     compatible = False
 
@@ -810,7 +837,7 @@ class MarkItDown:
                     guesses.append(
                         StreamInfo(
                             mimetype=base_guess.mimetype
-                            or result.prediction.output.mime_type,
+                            or output_mimetype,
                             extension=base_guess.extension or guessed_extension,
                             charset=base_guess.charset or charset,
                             filename=base_guess.filename,
@@ -823,7 +850,7 @@ class MarkItDown:
                     guesses.append(enhanced_guess)
                     guesses.append(
                         StreamInfo(
-                            mimetype=result.prediction.output.mime_type,
+                            mimetype=output_mimetype,
                             extension=guessed_extension,
                             charset=charset,
                             filename=base_guess.filename,
