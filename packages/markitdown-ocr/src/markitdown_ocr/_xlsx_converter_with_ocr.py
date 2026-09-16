@@ -8,6 +8,7 @@ import sys
 from typing import Any, BinaryIO, Optional
 
 from markitdown.converters import HtmlConverter
+from markitdown.converters._xlsx_converter import sheet_to_html
 from markitdown import DocumentConverter, DocumentConverterResult, StreamInfo
 from markitdown._exceptions import (
     MissingDependencyException,
@@ -90,12 +91,14 @@ class XlsxConverterWithOCR(DocumentConverter):
     ) -> DocumentConverterResult:
         """Standard conversion without OCR."""
         file_stream.seek(0)
-        sheets = pd.read_excel(file_stream, sheet_name=None, engine="openpyxl")
+        sheets = pd.read_excel(
+            file_stream, sheet_name=None, engine="openpyxl", dtype=object
+        )
         md_content = ""
 
         for sheet_name in sheets:
             md_content += f"## {sheet_name}\n"
-            html_content = sheets[sheet_name].to_html(index=False)
+            html_content = sheet_to_html(sheets[sheet_name])
             md_content += (
                 self._html_converter.convert_string(
                     html_content, **kwargs
@@ -122,9 +125,9 @@ class XlsxConverterWithOCR(DocumentConverter):
             file_stream.seek(0)
             try:
                 df = pd.read_excel(
-                    file_stream, sheet_name=sheet_name, engine="openpyxl"
+                    file_stream, sheet_name=sheet_name, engine="openpyxl", dtype=object
                 )
-                html_content = df.to_html(index=False)
+                html_content = sheet_to_html(df)
                 md_content += (
                     self._html_converter.convert_string(
                         html_content, **kwargs
