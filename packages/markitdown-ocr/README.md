@@ -14,6 +14,8 @@ Uses the same `llm_client` / `llm_model` pattern that MarkItDown already support
 
 ## Installation
 
+Requires `markitdown>=0.1.8b3`, which introduces the DOCX image-rendering hook used by this plugin. Installing the plugin automatically resolves a compatible core version.
+
 ```bash
 pip install markitdown-ocr
 ```

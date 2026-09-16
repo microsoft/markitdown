@@ -281,5 +281,6 @@ def test_older_core_is_rejected_instead_of_silently_skipping_ocr(
 ) -> None:
     monkeypatch.delattr(_docx_converter.DocxConverter, "_image_to_html")
 
-    with pytest.raises(RuntimeError, match="same source checkout"):
+    with pytest.raises(RuntimeError, match=r"markitdown>=0\.1\.8b3") as caught:
         DocxConverterWithOCR()
+    assert "pip install --upgrade 'markitdown>=0.1.8b3'" in str(caught.value)

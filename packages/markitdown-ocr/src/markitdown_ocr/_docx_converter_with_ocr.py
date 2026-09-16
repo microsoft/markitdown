@@ -18,8 +18,9 @@ class DocxConverterWithOCR(DocxConverter):
         super().__init__()
         if not hasattr(DocxConverter, "_image_to_html"):
             raise RuntimeError(
-                "DOCX OCR requires the core DocxConverter._image_to_html hook. "
-                "Install markitdown and markitdown-ocr from the same source checkout."
+                "DOCX OCR requires markitdown>=0.1.8b3 for the "
+                "DocxConverter._image_to_html hook. "
+                "Upgrade with: pip install --upgrade 'markitdown>=0.1.8b3'."
             )
         self.ocr_service = ocr_service
 
