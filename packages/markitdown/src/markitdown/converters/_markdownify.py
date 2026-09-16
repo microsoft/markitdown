@@ -22,6 +22,61 @@ def _quote_path_preserving_percent_encoded_octets(path: str) -> str:
     return "".join(parts)
 
 
+def _span(cell: Any, attribute: str) -> int:
+    """A cell's rowspan or colspan, clamped the way markdownify clamps colspan."""
+    value = cell.attrs.get(attribute)
+    if isinstance(value, str) and value.isdigit():
+        return max(1, min(1000, int(value)))
+    return 1
+
+
+def _fill_row_spans(soup: Any) -> None:
+    """Give every row the cells a rowspan from an earlier row takes up.
+
+    A Markdown table has no way to merge cells down, so a `rowspan` cell is
+    written once and the rows it reaches into come out one cell short. Every
+    value in those rows then reads under the wrong column: a table whose first
+    column is a region spanning several product rows puts the product under
+    `Region` and the count under `Product`.
+
+    Adding the empty cells the span stands for keeps the columns lined up.
+    """
+    for table in soup.find_all("table"):
+        rows = table.find_all("tr")
+        # Per row: the columns an earlier row's rowspan reaches into, and where
+        # the row's own cells sit.
+        covered: dict[int, set[int]] = {}
+        placed: dict[int, list[tuple[int, Any]]] = {}
+
+        for index, row in enumerate(rows):
+            column = 0
+            taken = covered.get(index, set())
+            placed[index] = []
+            for cell in row.find_all(["td", "th"], recursive=False):
+                while column in taken:
+                    column += 1
+                placed[index].append((column, cell))
+                columns = _span(cell, "colspan")
+                for below in range(index + 1, index + _span(cell, "rowspan")):
+                    covered.setdefault(below, set()).update(
+                        range(column, column + columns)
+                    )
+                column += columns
+
+        for index, row in enumerate(rows):
+            # Descending, so each placeholder lands directly in front of the
+            # first own cell at or after its column and the order comes out right.
+            for column in sorted(covered.get(index, ()), reverse=True):
+                anchor = next(
+                    (cell for at, cell in placed[index] if at >= column), None
+                )
+                placeholder = soup.new_tag("td")
+                if anchor is None:
+                    row.append(placeholder)
+                else:
+                    anchor.insert_before(placeholder)
+
+
 class _CustomMarkdownify(markdownify.MarkdownConverter):
     """
     A custom version of markdownify's MarkdownConverter. Changes include:
@@ -176,4 +231,5 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         return self.convert_s(el, text, *args, **kwargs)  # type: ignore
 
     def convert_soup(self, soup: Any) -> str:
+        _fill_row_spans(soup)
         return super().convert_soup(soup)  # type: ignore
