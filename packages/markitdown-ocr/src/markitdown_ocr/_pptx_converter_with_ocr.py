@@ -8,7 +8,7 @@ from warnings import warn
 from markitdown import DocumentConverterResult, StreamInfo
 from markitdown.converters import PptxConverter
 
-from ._ocr_service import LLMVisionOCRService
+from ._ocr_service import LLMVisionOCRService, _extract_text_with_metadata
 
 
 class PptxConverterWithOCR(PptxConverter):
@@ -49,8 +49,7 @@ class PptxConverterWithOCR(PptxConverter):
         if key in cache:
             return cache[key]
 
-        # Preserve compatibility with services accepting only an image stream.
-        result = ocr_service.extract_text(image_stream)
+        result = _extract_text_with_metadata(ocr_service, image_stream, stream_info)
         if result.error:
             warn(
                 f"PPTX image OCR failed: {result.error}. Keeping the native image.",

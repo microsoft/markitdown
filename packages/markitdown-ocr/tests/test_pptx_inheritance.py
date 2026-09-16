@@ -5,7 +5,8 @@ import inspect
 import io
 from pathlib import Path
 from typing import Any
-from unittest.mock import Mock
+from unittest.mock import Mock, create_autospec
+import zipfile
 
 from PIL import Image
 from pptx import Presentation
@@ -17,7 +18,7 @@ from markitdown.converters import PptxConverter
 from markitdown.converters import _pptx_converter
 import markitdown._markitdown as markitdown_module
 from markitdown_ocr import _plugin
-from markitdown_ocr._ocr_service import OCRResult
+from markitdown_ocr._ocr_service import LLMVisionOCRService, OCRResult
 from markitdown_ocr._pptx_converter_with_ocr import PptxConverterWithOCR
 
 
@@ -53,7 +54,8 @@ def _presentation(images: tuple[bytes, ...] = (_RED,)) -> bytes:
 
 
 def _service(text: str = "recognized") -> Mock:
-    return Mock(extract_text=Mock(side_effect=lambda stream: OCRResult(text=text)))
+    recognize = lambda stream: OCRResult(text=text)
+    return Mock(extract_text=create_autospec(recognize, side_effect=recognize))
 
 
 def _convert(converter: PptxConverter, data: bytes, **kwargs: Any) -> str:
@@ -120,7 +122,7 @@ def test_recognition_uses_image_identity_in_reading_order_with_native_fallback()
         calls.append(image)
         return OCRResult(text="blue" if image == _BLUE else "")
 
-    service = Mock(extract_text=Mock(side_effect=recognize))
+    service = Mock(extract_text=create_autospec(recognize, side_effect=recognize))
     result = _convert(
         PptxConverterWithOCR(service), _presentation((_BLUE, _RED, _BLUE))
     )
@@ -205,12 +207,38 @@ def test_svg_only_images_use_inherited_resolution_and_ocr() -> None:
 
     data = (_CORE_FILES / "test_svg_no_fallback.pptx").read_bytes()
     result = _convert(
-        PptxConverterWithOCR(Mock(extract_text=Mock(side_effect=recognize))), data
+        PptxConverterWithOCR(
+            Mock(extract_text=create_autospec(recognize, side_effect=recognize))
+        ),
+        data,
     )
 
     assert len(seen) == 1 and b"<svg" in seen[0]
     assert "*[Image OCR]  \nSVG text  \n[End OCR]*" in result
     assert "data:image" not in result
+
+
+def test_svg_metadata_reaches_bundled_vision_request() -> None:
+    data = (_CORE_FILES / "test_svg_no_fallback.pptx").read_bytes()
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        svg_parts = [name for name in archive.namelist() if name.endswith(".svg")]
+        assert len(svg_parts) == 1
+        svg = archive.read(svg_parts[0])
+    client = Mock()
+    client.chat.completions.create.return_value.choices = [
+        Mock(message=Mock(content="SVG text"))
+    ]
+    service = LLMVisionOCRService(client, "vision-model")
+
+    result = _convert(PptxConverterWithOCR(service), data)
+
+    assert "*[Image OCR]  \nSVG text  \n[End OCR]*" in result
+    client.chat.completions.create.assert_called_once()
+    request = client.chat.completions.create.call_args.kwargs
+    assert request["model"] == "vision-model"
+    assert request["messages"][0]["content"][1]["image_url"]["url"] == (
+        "data:image/svg+xml;base64," + base64.b64encode(svg).decode("ascii")
+    )
 
 
 @pytest.mark.parametrize("caption_succeeds", [False, True])

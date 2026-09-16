@@ -4,7 +4,7 @@ import base64
 import inspect
 import io
 from typing import Any
-from unittest.mock import Mock
+from unittest.mock import Mock, create_autospec
 import zipfile
 
 import openpyxl
@@ -57,7 +57,8 @@ def _workbook(images: tuple[bytes, ...] = (_RED,)) -> bytes:
 
 
 def _service(text: str = "recognized") -> Mock:
-    return Mock(extract_text=Mock(side_effect=lambda stream: OCRResult(text=text)))
+    recognize = lambda stream: OCRResult(text=text)
+    return Mock(extract_text=create_autospec(recognize, side_effect=recognize))
 
 
 def _convert(converter: XlsxConverter, data: bytes, **kwargs: Any) -> str:
@@ -168,7 +169,9 @@ def test_recognition_identity_and_blank_images_preserve_anchor_order() -> None:
         calls.append(data)
         return OCRResult(text="blue" if data == _BLUE else "")
 
-    converter = XlsxConverterWithOCR(Mock(extract_text=Mock(side_effect=recognize)))
+    converter = XlsxConverterWithOCR(
+        Mock(extract_text=create_autospec(recognize, side_effect=recognize))
+    )
     result = _convert(converter, _workbook((_RED, _BLUE, _RED, _BLUE)))
 
     assert calls == [_RED, _BLUE]
@@ -218,7 +221,10 @@ def test_mixed_anchor_recognition_keeps_legacy_openpyxl_order() -> None:
         return OCRResult(text=label)
 
     result = _convert(
-        XlsxConverterWithOCR(Mock(extract_text=Mock(side_effect=recognize))), data
+        XlsxConverterWithOCR(
+            Mock(extract_text=create_autospec(recognize, side_effect=recognize))
+        ),
+        data,
     )
     assert calls == legacy_order
     blocks = [f"*[Image OCR]  \n{label}  \n[End OCR]*" for label in legacy_order]

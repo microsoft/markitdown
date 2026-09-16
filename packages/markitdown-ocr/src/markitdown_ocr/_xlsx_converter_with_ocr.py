@@ -8,7 +8,7 @@ from warnings import warn
 from markitdown import DocumentConverterResult, StreamInfo
 from markitdown.converters import XlsxConverter
 
-from ._ocr_service import LLMVisionOCRService
+from ._ocr_service import LLMVisionOCRService, _extract_text_with_metadata
 
 
 class XlsxConverterWithOCR(XlsxConverter):
@@ -49,7 +49,7 @@ class XlsxConverterWithOCR(XlsxConverter):
         if key in cache:
             return cache[key]
 
-        result = ocr_service.extract_text(image_stream)
+        result = _extract_text_with_metadata(ocr_service, image_stream, stream_info)
         if result.error:
             warn(
                 f"XLSX image OCR failed: {result.error}. Keeping the native image.",

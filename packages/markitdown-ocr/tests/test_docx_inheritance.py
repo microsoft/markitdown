@@ -4,7 +4,7 @@ import base64
 import inspect
 import io
 from typing import Any
-from unittest.mock import Mock
+from unittest.mock import Mock, create_autospec
 
 from bs4 import BeautifulSoup
 from docx import Document
@@ -63,7 +63,8 @@ def _document(
 
 def _service(text: str = "recognized") -> Mock:
     # A one-argument service must remain supported, without injected keywords.
-    return Mock(extract_text=Mock(side_effect=lambda stream: OCRResult(text=text)))
+    recognize = lambda stream: OCRResult(text=text)
+    return Mock(extract_text=create_autospec(recognize, side_effect=recognize))
 
 
 def _convert(converter: DocxConverter, data: bytes, **kwargs: Any) -> str:
@@ -169,7 +170,7 @@ def test_image_identity_not_relationship_order_and_failed_images_stay_native() -
         calls.append(image)
         return OCRResult(text="blue" if image == _BLUE else "")
 
-    service = Mock(extract_text=Mock(side_effect=recognize))
+    service = Mock(extract_text=create_autospec(recognize, side_effect=recognize))
     result = _convert(DocxConverterWithOCR(service), stream.getvalue())
 
     assert calls == [_BLUE, _RED]
