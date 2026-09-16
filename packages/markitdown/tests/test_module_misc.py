@@ -1468,6 +1468,63 @@ def test_ipynb_heading_title_preserves_leading_hash() -> None:
     assert result.title == "#hashtag campaign results"
 
 
+def _notebook_with_metadata(metadata: dict) -> dict:
+    return {
+        "nbformat": 4,
+        "nbformat_minor": 5,
+        "metadata": metadata,
+        "cells": [
+            {"cell_type": "code", "source": ["x <- 1\n"], "metadata": {}, "outputs": []}
+        ],
+    }
+
+
+def test_ipynb_code_fence_uses_the_notebook_language() -> None:
+    """A non-Python notebook must not have its code fenced as Python."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    notebook = _notebook_with_metadata(
+        {"language_info": {"name": "julia"}, "kernelspec": {"language": "julia"}}
+    )
+
+    result = IpynbConverter()._convert(notebook)
+
+    assert "```julia\nx <- 1" in result.markdown
+    assert "```python" not in result.markdown
+
+
+def test_ipynb_code_fence_falls_back_to_the_kernelspec() -> None:
+    """Notebooks written by some tools carry the language only in kernelspec."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    notebook = _notebook_with_metadata({"kernelspec": {"language": "R"}})
+
+    assert "```R\nx <- 1" in IpynbConverter()._convert(notebook).markdown
+
+
+def test_ipynb_code_fence_defaults_to_python() -> None:
+    """Without usable metadata the long-standing Python assumption is kept."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    for metadata in ({}, {"language_info": {}}, {"kernelspec": {"language": "   "}}):
+        result = IpynbConverter()._convert(_notebook_with_metadata(metadata))
+        assert "```python\nx <- 1" in result.markdown
+
+
+def test_ipynb_code_fence_language_cannot_break_out_of_the_fence() -> None:
+    """A language string is attacker-controlled input from the file."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    notebook = _notebook_with_metadata(
+        {"language_info": {"name": "py`\n```\n# heading"}}
+    )
+
+    result = IpynbConverter()._convert(notebook)
+
+    assert result.markdown.startswith("```py\n")
+    assert "# heading" not in result.markdown
+
+
 _UTF8_BOM = b"\xef\xbb\xbf"
 
 _BOM_NOTEBOOK = {

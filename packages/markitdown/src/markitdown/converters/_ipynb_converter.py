@@ -11,6 +11,34 @@ CANDIDATE_MIME_TYPE_PREFIXES = [
 
 ACCEPTED_FILE_EXTENSIONS = [".ipynb"]
 
+# Notebooks that declare no language are overwhelmingly Python, and this is the
+# language the converter has always assumed.
+DEFAULT_CODE_LANGUAGE = "python"
+
+
+def _code_fence_language(notebook_content: dict) -> str:
+    """Return the info string for code fences, from the notebook's own metadata.
+
+    Jupyter records the language in ``language_info`` (written by the kernel on
+    save) and in ``kernelspec`` (what the notebook asks to run on), so a notebook
+    saved by a non-Python kernel says so in at least one of them.
+    """
+    metadata = notebook_content.get("metadata")
+    if not isinstance(metadata, dict):
+        return DEFAULT_CODE_LANGUAGE
+
+    for section, key in (("language_info", "name"), ("kernelspec", "language")):
+        values = metadata.get(section)
+        if not isinstance(values, dict):
+            continue
+        language = values.get(key)
+        if isinstance(language, str) and language.strip():
+            # An info string ends at the first whitespace, and a backtick in it
+            # would close the fence it is meant to open.
+            return language.split()[0].replace("`", "")
+
+    return DEFAULT_CODE_LANGUAGE
+
 
 class IpynbConverter(DocumentConverter):
     """Converts Jupyter Notebook (.ipynb) files to Markdown."""
@@ -66,6 +94,7 @@ class IpynbConverter(DocumentConverter):
         try:
             md_output = []
             title = None
+            code_language = _code_fence_language(notebook_content)
 
             for cell in notebook_content.get("cells", []):
                 cell_type = cell.get("cell_type", "")
@@ -83,7 +112,9 @@ class IpynbConverter(DocumentConverter):
 
                 elif cell_type == "code":
                     # Code cells are wrapped in Markdown code blocks
-                    md_output.append(f"```python\n{''.join(source_lines)}\n```")
+                    md_output.append(
+                        f"```{code_language}\n{''.join(source_lines)}\n```"
+                    )
                 elif cell_type == "raw":
                     md_output.append(f"```\n{''.join(source_lines)}\n```")
 
