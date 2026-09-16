@@ -19,6 +19,12 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 ACCEPTED_FILE_EXTENSIONS = [".zip"]
 
 
+# General purpose bit 0 of the ZIP local file header: the entry is encrypted. `zipfile`
+# raises RuntimeError on read() for such a member, which would otherwise abort the whole
+# archive over one file the reader may not even care about.
+_ENCRYPTED_FLAG = 0x1
+
+
 class ZipConverter(DocumentConverter):
     """Converts ZIP files to markdown by extracting and converting all contained files.
 
@@ -108,8 +114,28 @@ class ZipConverter(DocumentConverter):
         with zipfile.ZipFile(file_stream, "r") as zipObj:
             for entry in zipObj.infolist():
                 name = entry.filename
+                if entry.flag_bits & _ENCRYPTED_FLAG:
+                    md_content += f"## File: {name}\n\n"
+                    md_content += "This entry is encrypted and was not read.\n\n"
+                    continue
+
                 try:
-                    z_file_stream = io.BytesIO(zipObj.read(entry))
+                    payload = zipObj.read(entry)
+                except (
+                    RuntimeError,
+                    zipfile.BadZipFile,
+                    NotImplementedError,
+                    EOFError,
+                ) as exc:
+                    # A bad CRC, a truncated entry, or a compression method this build does
+                    # not carry. One such member must not cost the reader every other file
+                    # in the archive, so it is reported in place and the rest continues.
+                    md_content += f"## File: {name}\n\n"
+                    md_content += f"This entry could not be read: {exc}\n\n"
+                    continue
+
+                try:
+                    z_file_stream = io.BytesIO(payload)
                     z_file_stream_info = StreamInfo(
                         extension=os.path.splitext(name)[1],
                         filename=os.path.basename(name),
