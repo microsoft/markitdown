@@ -1,76 +1,28 @@
-"""
-Enhanced DOCX Converter with OCR support for embedded images.
-Extracts images from Word documents and performs OCR while maintaining context.
-"""
+"""DOCX image OCR using the core document conversion pipeline."""
 
-import io
-import re
-import sys
+import hashlib
+import html
 from typing import Any, BinaryIO, Optional
+from warnings import warn
 
-from markitdown.converters import HtmlConverter
-from markitdown.converter_utils.docx.pre_process import pre_process_docx
 from markitdown import DocumentConverterResult, StreamInfo
-from markitdown._exceptions import (
-    MissingDependencyException,
-    MISSING_DEPENDENCY_MESSAGE,
-)
+from markitdown.converters import DocxConverter
+
 from ._ocr_service import LLMVisionOCRService
 
-# Try loading dependencies
-_dependency_exc_info = None
-try:
-    import mammoth
-    from docx import Document
-except ImportError:
-    _dependency_exc_info = sys.exc_info()
 
-# Placeholder injected into HTML so that mammoth never sees the OCR markers.
-# Must be a single token with no special markdown characters.
-_PLACEHOLDER = "MARKITDOWNOCRBLOCK{}"
-
-_UNDERLINE_STYLE_MAP = "u => u"
-
-
-def _read_embedded_style_map(file_stream: BinaryIO) -> Optional[str]:
-    """Read the style map embedded in a .docx, if it has one."""
-    position = file_stream.tell()
-    file_stream.seek(0)
-    try:
-        return mammoth.read_embedded_style_map(file_stream)
-    finally:
-        file_stream.seek(position)
-
-
-class DocxConverterWithOCR(HtmlConverter):
-    """
-    Enhanced DOCX Converter with OCR support for embedded images.
-    Maintains document flow while extracting text from images inline.
-    """
+class DocxConverterWithOCR(DocxConverter):
+    """Recognize embedded images while inheriting native DOCX conversion."""
 
     def __init__(self, ocr_service: Optional[LLMVisionOCRService] = None):
         super().__init__()
-        self._html_converter = HtmlConverter()
+        if not hasattr(DocxConverter, "_image_to_html"):
+            raise RuntimeError(
+                "DOCX OCR requires markitdown>=0.1.8b3 for the "
+                "DocxConverter._image_to_html hook. "
+                "Upgrade with: pip install --upgrade 'markitdown>=0.1.8b3'."
+            )
         self.ocr_service = ocr_service
-
-    def accepts(
-        self,
-        file_stream: BinaryIO,
-        stream_info: StreamInfo,
-        **kwargs: Any,
-    ) -> bool:
-        mimetype = (stream_info.mimetype or "").lower()
-        extension = (stream_info.extension or "").lower()
-
-        if extension == ".docx":
-            return True
-
-        if mimetype.startswith(
-            "application/vnd.openxmlformats-officedocument.wordprocessingml"
-        ):
-            return True
-
-        return False
 
     def convert(
         self,
@@ -78,151 +30,43 @@ class DocxConverterWithOCR(HtmlConverter):
         stream_info: StreamInfo,
         **kwargs: Any,
     ) -> DocumentConverterResult:
-        if _dependency_exc_info is not None:
-            raise MissingDependencyException(
-                MISSING_DEPENDENCY_MESSAGE.format(
-                    converter=type(self).__name__,
-                    extension=".docx",
-                    feature="docx",
-                )
-            ) from _dependency_exc_info[1].with_traceback(
-                _dependency_exc_info[2]
-            )  # type: ignore[union-attr]
+        # Keep repeated-image recognition local to this document, not the instance.
+        kwargs["_docx_ocr_cache"] = {}
+        return super().convert(file_stream, stream_info, **kwargs)
 
-        # Get OCR service if available (from kwargs or instance)
-        ocr_service: Optional[LLMVisionOCRService] = (
-            kwargs.get("ocr_service") or self.ocr_service
-        )
+    def _image_to_html(
+        self,
+        image_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,
+    ) -> Optional[str]:
+        ocr_service = kwargs.get("ocr_service") or self.ocr_service
+        if ocr_service is None:
+            return None
 
-        # Pre-process once, up front, so that every subsequent read sees the
-        # repaired archive. pre_process_docx() also fixes .docx files whose ZIP
-        # local file headers disagree with the central directory; reading the
-        # original stream first would make those raise, or silently yield no
-        # images and drop the OCR output.
-        pre_process_stream = pre_process_docx(file_stream)
+        cache: dict[bytes, Optional[str]] = kwargs.get("_docx_ocr_cache", {})
+        key = hashlib.sha256(image_stream.read()).digest()
+        image_stream.seek(0)
+        if key in cache:
+            return cache[key]
 
-        # Read the embedded style map and combine with any provided style map
-        caller_style_map = kwargs.get("style_map")
-        embedded_style_map = _read_embedded_style_map(pre_process_stream)
-
-        style_map = "\n".join(
-            part
-            for part in (
-                caller_style_map,
-                embedded_style_map,
-                _UNDERLINE_STYLE_MAP,
+        # Preserve compatibility with services accepting only an image stream.
+        result = ocr_service.extract_text(image_stream)
+        if result.error:
+            warn(
+                f"DOCX image OCR failed: {result.error}. Keeping the native image.",
+                RuntimeWarning,
+                stacklevel=2,
             )
-            if part
-        )
+            cache[key] = None
+            return None
+        text = result.text.strip()
+        if not text:
+            cache[key] = None
+            return None
 
-        if ocr_service:
-            # 1. Extract and OCR images — returns raw text per image
-            pre_process_stream.seek(0)
-            image_ocr_map = self._extract_and_ocr_images(
-                pre_process_stream, ocr_service
-            )
-
-            # 2. Convert DOCX → HTML via mammoth
-            pre_process_stream.seek(0)
-            html_result = mammoth.convert_to_html(
-                pre_process_stream,
-                style_map=style_map,
-                include_embedded_style_map=False,
-            ).value
-
-            # 3. Replace <img> tags with plain placeholder tokens so that
-            #    mammoth's HTML→markdown step never escapes our OCR markers.
-            html_with_placeholders, ocr_texts = self._inject_placeholders(
-                html_result, image_ocr_map
-            )
-
-            # 4. Convert HTML → markdown
-            md_result = self._html_converter.convert_string(
-                html_with_placeholders, **kwargs
-            )
-            md = md_result.markdown
-
-            # 5. Swap placeholders for the actual OCR blocks (post-conversion
-            #    so * and _ are never escaped by the markdown converter).
-            for i, raw_text in enumerate(ocr_texts):
-                placeholder = _PLACEHOLDER.format(i)
-                ocr_block = f"*[Image OCR]\n{raw_text}\n[End OCR]*"
-                md = md.replace(placeholder, ocr_block)
-
-            return DocumentConverterResult(markdown=md)
-        else:
-            # Standard conversion without OCR
-            pre_process_stream.seek(0)
-            return self._html_converter.convert_string(
-                mammoth.convert_to_html(
-                    pre_process_stream,
-                    style_map=style_map,
-                    include_embedded_style_map=False,
-                ).value,
-                **kwargs,
-            )
-
-    def _extract_and_ocr_images(
-        self, file_stream: BinaryIO, ocr_service: LLMVisionOCRService
-    ) -> dict[str, str]:
-        """
-        Extract images from DOCX and OCR them.
-
-        Returns:
-            Dict mapping image relationship IDs to raw OCR text (no markers).
-        """
-        ocr_map = {}
-
-        try:
-            file_stream.seek(0)
-            doc = Document(file_stream)
-
-            for rel in doc.part.rels.values():
-                if "image" in rel.target_ref.lower():
-                    try:
-                        image_bytes = rel.target_part.blob
-                        image_stream = io.BytesIO(image_bytes)
-                        ocr_result = ocr_service.extract_text(image_stream)
-
-                        if ocr_result.text.strip():
-                            # Store raw text only — markers added later
-                            ocr_map[rel.rId] = ocr_result.text.strip()
-
-                    except Exception:
-                        continue
-
-        except Exception:
-            pass
-
-        return ocr_map
-
-    def _inject_placeholders(
-        self, html: str, ocr_map: dict[str, str]
-    ) -> tuple[str, list[str]]:
-        """
-        Replace <img> tags with numbered placeholder tokens.
-
-        Returns:
-            (html_with_placeholders, ordered list of raw OCR texts)
-        """
-        if not ocr_map:
-            return html, []
-
-        ocr_texts = list(ocr_map.values())
-        used: list[int] = []
-
-        def replace_img(match: re.Match) -> str:  # type: ignore[type-arg]
-            for i in range(len(ocr_texts)):
-                if i not in used:
-                    used.append(i)
-                    return f"<p>{_PLACEHOLDER.format(i)}</p>"
-            return ""  # remove image if all OCR texts already used
-
-        result = re.sub(r"<img[^>]*>", replace_img, html)
-
-        # Any OCR texts that had no matching <img> tag go at the end
-        for i in range(len(ocr_texts)):
-            if i not in used:
-                result += f"<p>{_PLACEHOLDER.format(i)}</p>"
-
-        return result, ocr_texts
+        text = text.replace("\r\n", "\n").replace("\r", "\n")
+        content = html.escape(text).replace("\n", "<br>")
+        fragment = f"<p><em>[Image OCR]<br>{content}<br>[End OCR]</em></p>"
+        cache[key] = fragment
+        return fragment
