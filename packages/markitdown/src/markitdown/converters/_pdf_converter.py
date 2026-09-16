@@ -1,3 +1,4 @@
+import os
 import sys
 import io
 import re
@@ -6,6 +7,7 @@ from typing import BinaryIO, Any
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+from ..converter_utils.images import resolve_images_dir
 
 # Pattern for MasterFormat-style partial numbering (e.g., ".1", ".2", ".10")
 PARTIAL_NUMBERING_PATTERN = re.compile(r"^\.\d+$")
@@ -492,6 +494,90 @@ def _extract_tables_from_words(page: Any) -> list[list[list[str]]]:
     return [table_rows]
 
 
+def _iter_lt_images(layout: Any):
+    """Recursively yield LTImage objects from a pdfminer layout tree."""
+    from pdfminer.layout import LTFigure, LTImage
+
+    for elem in layout:
+        if isinstance(elem, LTFigure):
+            yield from _iter_lt_images(elem)
+        elif isinstance(elem, LTImage):
+            yield elem
+
+
+def _extract_region_text(region: Any) -> str:
+    """Extract text from a cropped page region, preserving table structure."""
+    form_text = _extract_form_content_from_words(region)
+    if form_text is not None:
+        return form_text.strip()
+    text = region.extract_text()
+    return text.strip() if text else ""
+
+
+def _extract_text_with_images(page: Any, image_items: list, md_prefix: str) -> str:
+    """Extract page text with image links interleaved by vertical position."""
+    chunks = []
+    current_y = 0.0
+    page_h = page.height
+    page_w = page.width
+
+    for img_top, img_bottom, filename in image_items:
+        if img_top > current_y + 1:
+            text = _extract_region_text(page.crop((0, current_y, page_w, img_top)))
+            if text:
+                chunks.append(text)
+        chunks.append(f"![image]({md_prefix}/{filename})")
+        current_y = max(current_y, img_bottom)
+
+    if current_y < page_h - 1:
+        text = _extract_region_text(page.crop((0, current_y, page_w, page_h)))
+        if text:
+            chunks.append(text)
+
+    return "\n\n".join(chunks)
+
+
+def _save_lt_image(lt_img: Any, images_dir: str, index: int) -> str | None:
+    """Save an LTImage and return its path, or None on failure."""
+    try:
+        filters = lt_img.stream.get_filters() or []
+        filter_names = []
+        for filter_item in filters:
+            filter_name = (
+                filter_item[0] if isinstance(filter_item, tuple) else filter_item
+            )
+            filter_names.append(getattr(filter_name, "name", str(filter_name)))
+
+        if filter_names in (["DCTDecode"], ["JPXDecode"]):
+            ext = ".jpg" if "DCTDecode" in filter_names else ".jp2"
+            img_bytes = lt_img.stream.get_rawdata()
+        else:
+            try:
+                import PIL.Image as PILImage
+
+                raw = lt_img.stream.get_data()
+                attrs = lt_img.stream.attrs
+                w, h = int(attrs.get("Width", 0)), int(attrs.get("Height", 0))
+                if not w or not h:
+                    return None
+                mode = "RGB" if "RGB" in str(attrs.get("ColorSpace", "")) else "L"
+                img = PILImage.frombytes(mode, (w, h), raw)
+                buf = io.BytesIO()
+                img.save(buf, format="PNG")
+                img_bytes = buf.getvalue()
+                ext = ".png"
+            except Exception:
+                return None
+
+        filename = f"image_{index}{ext}"
+        dest = os.path.join(images_dir, filename)
+        with open(dest, "wb") as fout:
+            fout.write(img_bytes)
+        return dest
+    except Exception:
+        return None
+
+
 class PdfConverter(DocumentConverter):
     """
     Converts PDFs to Markdown.
@@ -536,6 +622,16 @@ class PdfConverter(DocumentConverter):
 
         assert isinstance(file_stream, io.IOBase)
 
+        save_images = kwargs.get("save_images", False)
+        actual_images_dir: str | None = None
+        md_images_prefix: str | None = None
+        img_count = 0
+
+        if save_images:
+            actual_images_dir, md_images_prefix = resolve_images_dir(
+                save_images, stream_info, "pdf"
+            )
+
         # Read file stream into BytesIO for compatibility with pdfplumber
         pdf_bytes = io.BytesIO(file_stream.read())
 
@@ -551,23 +647,50 @@ class PdfConverter(DocumentConverter):
 
             with pdfplumber.open(pdf_bytes) as pdf:
                 for page_idx, page in enumerate(pdf.pages):
+                    page_image_items: list = []
+                    if actual_images_dir:
+                        for lt_img in _iter_lt_images(page.layout):
+                            dest = _save_lt_image(
+                                lt_img, actual_images_dir, img_count + 1
+                            )
+                            if dest:
+                                img_count += 1
+                                pptop = page.height - lt_img.y1
+                                ppbot = page.height - lt_img.y0
+                                page_image_items.append(
+                                    (pptop, ppbot, os.path.basename(dest))
+                                )
+                        page_image_items.sort(key=lambda x: x[0])
+
                     page_content = _extract_form_content_from_words(page)
 
                     if page_content is not None:
                         form_page_count += 1
                         if page_content.strip():
-                            markdown_chunks.append(page_content)
+                            if page_image_items:
+                                chunk = _extract_text_with_images(
+                                    page, page_image_items, md_images_prefix
+                                )
+                            else:
+                                chunk = page_content
+                            if chunk:
+                                markdown_chunks.append(chunk)
                     else:
                         plain_page_indices.append(page_idx)
-                        text = page.extract_text()
-                        if text and text.strip():
-                            markdown_chunks.append(text.strip())
+                        if page_image_items:
+                            chunk = _extract_text_with_images(
+                                page, page_image_items, md_images_prefix
+                            )
+                        else:
+                            text = page.extract_text()
+                            chunk = text.strip() if text else ""
+                        if chunk:
+                            markdown_chunks.append(chunk)
 
                     page.close()  # Free cached page data immediately
 
-            # If no pages had form-style content, use pdfminer for
-            # the whole document (better text spacing for prose).
-            if form_page_count == 0:
+            # Keep pdfplumber output when images were requested so links remain.
+            if form_page_count == 0 and not save_images:
                 pdf_bytes.seek(0)
                 markdown = pdfminer.high_level.extract_text(pdf_bytes)
             else:
