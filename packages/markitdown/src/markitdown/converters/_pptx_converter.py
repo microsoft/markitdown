@@ -195,7 +195,7 @@ class PptxConverter(DocumentConverter):
                     pass
 
         if (
-            not llm_description
+            (not llm_description or not llm_description.strip())
             and image_blob is not None
             and type(self)._image_to_html is not PptxConverter._image_to_html
         ):
