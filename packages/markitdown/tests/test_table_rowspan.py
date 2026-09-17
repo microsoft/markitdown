@@ -80,6 +80,54 @@ def test_a_cell_that_spans_in_both_directions_fills_both_columns() -> None:
     assert _rows(_convert(html.encode("utf-8"), ".html"))[3] == ["", "", "2"]
 
 
+def test_a_rowspan_of_zero_fills_the_rest_of_its_row_group() -> None:
+    """`rowspan="0"` reaches to the last row of the group, so all of the rows
+    below the cell need the placeholder, not just one.
+    """
+    html = (
+        "<table><tr><th>Region</th><th>Product</th><th>Units</th></tr>"
+        "<tr><td rowspan='0'>EU</td><td>Cable</td><td>12</td></tr>"
+        "<tr><td>Hub</td><td>7</td></tr>"
+        "<tr><td>Dock</td><td>4</td></tr></table>"
+    )
+
+    assert _rows(_convert(html.encode("utf-8"), ".html")) == [
+        ["Region", "Product", "Units"],
+        ["---", "---", "---"],
+        ["EU", "Cable", "12"],
+        ["", "Hub", "7"],
+        ["", "Dock", "4"],
+    ]
+
+
+@pytest.mark.parametrize("rowspan", ["0", "5"])
+def test_a_rowspan_stops_at_the_end_of_its_row_group(rowspan: str) -> None:
+    """A span reaches no further than the group it starts in, so the `tfoot`
+    row keeps its own columns whether the span is open ended or just too long.
+    """
+    html = (
+        "<table>"
+        f"<tbody><tr><td rowspan='{rowspan}'>EU</td><td>Cable</td><td>12</td></tr>"
+        "<tr><td>Hub</td><td>7</td></tr></tbody>"
+        "<tfoot><tr><td>Total</td><td>19</td></tr></tfoot></table>"
+    )
+
+    rows = _rows(_convert(html.encode("utf-8"), ".html"))
+
+    assert rows[2:4] == [["EU", "Cable", "12"], ["", "Hub", "7"]]
+    assert rows[-1] == ["Total", "19"]
+
+
+def test_a_colspan_of_zero_is_one_column() -> None:
+    """HTML5 dropped `colspan="0"`, and a browser reads it as a single column."""
+    html = (
+        "<table><tr><th>A</th><th>B</th></tr>"
+        "<tr><td colspan='0'>x</td><td>1</td></tr></table>"
+    )
+
+    assert _rows(_convert(html.encode("utf-8"), ".html"))[2:] == [["x", "1"]]
+
+
 @pytest.mark.parametrize(
     ("html", "expected"),
     [
@@ -134,6 +182,27 @@ def test_a_span_attribute_does_not_blow_up_the_output() -> None:
         "<table><tr><td rowspan='1000' colspan='1000'>x</td></tr>"
         + "<tr><td>a</td></tr>" * 999
         + "</table><p>after</p>"
+    )
+
+    started = time.perf_counter()
+    markdown = _convert(html.encode("utf-8"), ".html")
+    elapsed = time.perf_counter() - started
+
+    assert elapsed < 5
+    assert len(markdown) < 10 * len(html)
+    assert markdown.rstrip().endswith("after")
+
+
+def test_a_rowspan_of_zero_goes_through_the_same_budget() -> None:
+    """`rowspan="0"` asks for the rest of the row group without naming a number,
+    so it has to be counted like any other span: 200 of them over 2000 rows ask
+    for 399,800 placeholders and the table is left as markdownify writes it."""
+    html = (
+        "<table><tbody><tr>"
+        + "<td rowspan='0'>x</td>" * 200
+        + "</tr>"
+        + "<tr><td>a</td></tr>" * 1999
+        + "</tbody></table><p>after</p>"
     )
 
     started = time.perf_counter()

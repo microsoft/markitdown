@@ -22,11 +22,19 @@ def _quote_path_preserving_percent_encoded_octets(path: str) -> str:
     return "".join(parts)
 
 
-def _span(cell: Any, attribute: str) -> int:
-    """A cell's rowspan or colspan, clamped the way markdownify clamps colspan."""
+def _span(cell: Any, attribute: str, zero: int = 1) -> int:
+    """A cell's rowspan or colspan, clamped the way markdownify clamps colspan.
+
+    `zero` is what a span of `0` stands for. `rowspan="0"` reaches to the last
+    row of the cell's row group, so its caller passes that many rows;
+    `colspan="0"` is no longer part of HTML and a browser reads it as one column.
+    """
     value = cell.attrs.get(attribute)
     if isinstance(value, str) and value.isdigit():
-        return max(1, min(1000, int(value)))
+        number = int(value)
+        if number == 0:
+            return zero
+        return max(1, min(1000, number))
     return 1
 
 
@@ -47,9 +55,14 @@ def _fill_row_spans(soup: Any) -> None:
     `Region` and the count under `Product`.
 
     Adding the empty cells the span stands for keeps the columns lined up.
+
+    A span is laid out inside its own row group, because a rowspan never reaches
+    past the group it starts in, and `rowspan="0"` reaches exactly that far. A
+    `thead`, `tbody` or `tfoot` is such a group, and so is a `table` for the rows
+    written directly under it.
     """
-    for table in soup.find_all("table"):
-        rows = table.find_all("tr")
+    for group in soup.find_all(["table", "thead", "tbody", "tfoot"]):
+        rows = group.find_all("tr", recursive=False)
         cells = [row.find_all(["td", "th"], recursive=False) for row in rows]
         layout = _row_span_layout(cells)
         if layout is None:
@@ -65,13 +78,15 @@ def _row_span_layout(
 ) -> tuple[list[list[tuple[int, Any]]], list[set[int]]] | None:
     """Where each row's own cells sit, and which columns earlier rowspans take.
 
-    Returns None once the placeholders would pass the table's budget.
+    Returns None once the placeholders would pass the row group's budget.
     """
     budget = _MIN_PLACEHOLDERS + _PLACEHOLDERS_PER_CELL * sum(map(len, cells))
     covered: list[set[int]] = [set() for _ in cells]
     placed: list[list[tuple[int, Any]]] = []
     needed = 0
     for index, row_cells in enumerate(cells):
+        # The rows a span can still reach, which is also what `rowspan="0"` means.
+        rows_left = len(cells) - index
         column = 0
         row_placed = []
         for cell in row_cells:
@@ -79,8 +94,7 @@ def _row_span_layout(
                 column += 1
             row_placed.append((column, cell))
             columns = _span(cell, "colspan")
-            # A rowspan never reaches past the table.
-            rows_below = min(_span(cell, "rowspan"), len(cells) - index) - 1
+            rows_below = min(_span(cell, "rowspan", zero=rows_left), rows_left) - 1
             needed += columns * rows_below
             if needed > budget:
                 return None
