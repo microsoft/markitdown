@@ -7,6 +7,32 @@ from urllib.parse import quote, urlparse, urlunparse
 
 _PERCENT_ENCODED_OCTET = re.compile(r"%[0-9A-Fa-f]{2}")
 
+# Inline tags whose markdownify conversion runs the text through chomp(), which
+# lifts the surrounding whitespace out of the text and then returns an empty
+# string once nothing is left. A whitespace-only element therefore disappears
+# together with its whitespace, and the words on either side of it run together:
+# `further<strong> </strong>reference` becomes `furtherreference`. A word
+# processor keeps a differently formatted space as a run of its own, so that
+# shape is what a document with a bolded space actually converts to.
+# `a` is deliberately absent: anchors have their own converter here.
+_WHITESPACE_ONLY_PRESERVING_TAGS = frozenset(
+    {
+        "b",
+        "code",
+        "del",
+        "em",
+        "i",
+        "kbd",
+        "s",
+        "samp",
+        "strike",
+        "strong",
+        "sub",
+        "sup",
+        "u",
+    }
+)
+
 
 def _quote_path_preserving_percent_encoded_octets(path: str) -> str:
     """Quote a URL path while preserving existing %HH byte encodings."""
@@ -174,6 +200,28 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
     def convert_strike(self, el: Any, text: str, *args, **kwargs) -> str:
         """Obsolete <strike> is still in the wild; treat it like <s>/<del>."""
         return self.convert_s(el, text, *args, **kwargs)  # type: ignore
+
+    def get_conv_fn(self, tag_name: str) -> Any:
+        """Same as usual, but keep the whitespace of a whitespace-only inline element.
+
+        markdownify resolves a tag to its conversion function here, so wrapping the
+        result covers every inline tag at once, including the ones this class
+        overrides itself. Older markdownify releases dispatch without this method and
+        are left with their own behaviour.
+        """
+        convert_fn = super().get_conv_fn(tag_name)  # type: ignore
+        if (
+            convert_fn is None
+            or tag_name.lower() not in _WHITESPACE_ONLY_PRESERVING_TAGS
+        ):
+            return convert_fn
+
+        def _keep_whitespace_only(el: Any, text: str, *args: Any, **kwargs: Any) -> str:
+            if not text.strip():
+                return text
+            return convert_fn(el, text, *args, **kwargs)  # type: ignore
+
+        return _keep_whitespace_only
 
     def convert_soup(self, soup: Any) -> str:
         return super().convert_soup(soup)  # type: ignore
