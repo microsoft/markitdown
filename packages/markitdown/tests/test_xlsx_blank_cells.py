@@ -7,6 +7,7 @@ pandas upcasts a column that holds one, so a single empty cell turned `12` into
 
 import datetime
 import io
+from pathlib import Path
 
 import pytest
 
@@ -114,6 +115,31 @@ def test_a_date_cell_carries_no_time_and_a_blank_one_is_empty() -> None:
         "| 2026-01-05 | 1 |\n"
         "|  | 2 |\n"
         "| 2026-02-09 14:30:00 | 3 |"
+    )
+
+
+def test_an_xls_blank_cell_is_read_the_same_way() -> None:
+    """`.xls` is read with the same options as `.xlsx`.
+
+    With pandas' own inference, a blank turned a date column into
+    ``datetime64``, and the date formatter cannot render its ``NaT``.
+    """
+    pytest.importorskip("xlrd")
+    path = Path(__file__).parent / "test_files" / "test_blank_cells.xls"
+    with path.open("rb") as stream:
+        markdown = (
+            MarkItDown(enable_plugins=False)
+            .convert_stream(stream, stream_info=StreamInfo(extension=".xls"))
+            .markdown
+        )
+
+    assert markdown == (
+        "## Sheet1\n"
+        "| Units | Shipped | Due | Id |\n"
+        "| --- | --- | --- | --- |\n"
+        "| 12 | True | 2026-01-05 | 1 |\n"
+        "|  |  |  | 2 |\n"
+        "| 7 | False | 2026-02-09 14:30:00 | 3 |"
     )
 
 

@@ -271,9 +271,9 @@ class XlsConverter(DocumentConverter):
                 _xls_dependency_exc_info[2]
             )
 
-        # xlrd stores every number as a double, so there is no integer to keep
-        # here and the sheets are read with pandas' own inference.
-        sheets = pd.read_excel(file_stream, sheet_name=None, engine="xlrd")
+        sheets = pd.read_excel(
+            file_stream, sheet_name=None, engine="xlrd", dtype=object
+        )
         md_content = ""
         for s in sheets:
             md_content += f"## {s}\n"
