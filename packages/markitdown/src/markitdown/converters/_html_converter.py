@@ -53,18 +53,33 @@ class HtmlConverter(DocumentConverter):
         encoding = "utf-8" if stream_info.charset is None else stream_info.charset
         soup = BeautifulSoup(file_stream, "html.parser", from_encoding=encoding)
 
+        # Capture the title before any element is removed from the soup
+        title = None if soup.title is None else soup.title.string
+
         # Remove javascript and style blocks
         for script in soup(["script", "style"]):
             script.extract()
 
-        # Print only the main content
-        body_elm = soup.find("body")
+        # A browser moves stray content into <body> and keeps document
+        # metadata in <head>, but the html.parser tree leaves elements where
+        # they were written. Converting only the <body> element would drop
+        # content placed before or after it, while converting the whole
+        # document would leak <head> text (e.g. the <title>) into the
+        # markdown. Remove the metadata containers instead, and convert
+        # everything that remains.
+        for head in soup(["head"]):
+            head.extract()
+
+        # HTML5 allows the <head> tags to be omitted, so a document <title>
+        # can sit outside any <head> element. A <title> inside SVG or MathML
+        # describes a graphic and is content, so those are kept.
+        for title_elm in soup.find_all("title"):
+            if title_elm.find_parent(["svg", "math"]) is None:
+                title_elm.extract()
+
         webpage_text = ""
         try:
-            if body_elm:
-                webpage_text = _CustomMarkdownify(**kwargs).convert_soup(body_elm)
-            else:
-                webpage_text = _CustomMarkdownify(**kwargs).convert_soup(soup)
+            webpage_text = _CustomMarkdownify(**kwargs).convert_soup(soup)
         except RecursionError:
             if strict:
                 raise
@@ -77,8 +92,7 @@ class HtmlConverter(DocumentConverter):
                 "(RecursionError). Falling back to plain-text extraction.",
                 stacklevel=2,
             )
-            target = body_elm if body_elm else soup
-            webpage_text = target.get_text("\n", strip=True)
+            webpage_text = soup.get_text("\n", strip=True)
 
         assert isinstance(webpage_text, str)
 
@@ -87,7 +101,7 @@ class HtmlConverter(DocumentConverter):
 
         return DocumentConverterResult(
             markdown=webpage_text,
-            title=None if soup.title is None else soup.title.string,
+            title=title,
         )
 
     def convert_string(
