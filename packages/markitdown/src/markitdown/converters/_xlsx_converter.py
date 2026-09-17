@@ -82,19 +82,28 @@ def _format_cell(value: Any) -> str:
     return str(value)
 
 
+def _format_float(value: float) -> str:
+    """Render a fractional number with the 15 significant digits Excel shows."""
+    return format(value, ".15g")
+
+
 def sheet_to_html(sheet: Any) -> str:
     """Render one sheet as an HTML table.
 
     ``na_rep=""`` keeps an empty cell empty: the default writes the string
     ``NaN`` into it, which reads as a value rather than as a blank. The
     formatters are what keep the remaining cells rendered as themselves --
-    pandas applies ``na_rep`` to the blanks and the formatter to everything
-    else, without re-inferring a dtype for the column.
+    pandas applies ``na_rep`` to the blanks, ``float_format`` to fractional
+    numbers, and the formatter to everything else, without re-inferring a
+    dtype for the column. A float needs ``float_format`` because with
+    ``index=False`` pandas renders it with its own display precision and
+    never reaches ``formatters``.
     """
     return sheet.to_html(
         index=False,
         na_rep="",
         formatters=[_format_cell] * len(sheet.columns),
+        float_format=_format_float,
     )
 
 

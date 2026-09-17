@@ -77,6 +77,24 @@ def test_a_blank_cell_does_not_turn_the_column_into_floats() -> None:
     )
 
 
+def test_a_fractional_number_keeps_its_value() -> None:
+    markdown = _convert(
+        [
+            ["Small", "Pi"],
+            [1e-7, 3.14159265358979],
+            [None, 2],
+        ]
+    )
+
+    assert markdown == (
+        "## Sheet1\n"
+        "| Small | Pi |\n"
+        "| --- | --- |\n"
+        "| 1e-07 | 3.14159265358979 |\n"
+        "|  | 2 |"
+    )
+
+
 def test_a_blank_cell_does_not_turn_booleans_into_numbers() -> None:
     markdown = _convert(
         [
