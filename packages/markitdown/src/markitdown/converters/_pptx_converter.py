@@ -5,11 +5,11 @@ import io
 import re
 import html
 
-from typing import BinaryIO, Any
-from operator import attrgetter
+from typing import BinaryIO, Any, Optional
 
 from ._html_converter import HtmlConverter
 from ._llm_caption import llm_caption
+from ..converter_utils._image import _parse_image_html
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
@@ -93,80 +93,7 @@ class PptxConverter(DocumentConverter):
                 nonlocal md_content
                 # Pictures
                 if self._is_picture(shape):
-                    # https://github.com/scanny/python-pptx/pull/512#issuecomment-1713100069
-
-                    llm_description = ""
-                    alt_text = ""
-
-                    # Resolve the image blob, handling SVG images that lack a
-                    # rasterized fallback (shape.image raises in that case).
-                    (
-                        image_blob,
-                        image_content_type,
-                        image_filename,
-                    ) = self._get_image_info(shape)
-
-                    # Potentially generate a description using an LLM
-                    llm_client = kwargs.get("llm_client")
-                    llm_model = kwargs.get("llm_model")
-                    if (
-                        llm_client is not None
-                        and llm_model is not None
-                        and image_blob is not None
-                    ):
-                        # Prepare a file_stream and stream_info for the image data
-                        image_extension = None
-                        if image_filename:
-                            image_extension = os.path.splitext(image_filename)[1]
-                        image_stream_info = StreamInfo(
-                            mimetype=image_content_type,
-                            extension=image_extension,
-                            filename=image_filename,
-                        )
-
-                        image_stream = io.BytesIO(image_blob)
-
-                        # Caption the image
-                        try:
-                            llm_description = llm_caption(
-                                image_stream,
-                                image_stream_info,
-                                client=llm_client,
-                                model=llm_model,
-                                prompt=kwargs.get("llm_prompt"),
-                            )
-                        except Exception:
-                            # Unable to generate a description
-                            pass
-
-                    # Also grab any description embedded in the deck
-                    try:
-                        alt_text = shape._element._nvXxPr.cNvPr.attrib.get("descr", "")
-                    except Exception:
-                        # Unable to get alt text
-                        pass
-
-                    # Prepare the alt, escaping any special characters
-                    alt_text = (
-                        "\n".join(
-                            text
-                            for text in [llm_description, alt_text]
-                            if text and text.strip()
-                        )
-                        or shape.name
-                    )
-                    alt_text = re.sub(r"[\r\n\[\]]", " ", alt_text)
-                    alt_text = re.sub(r"\s+", " ", alt_text).strip()
-
-                    # If keep_data_uris is True, use base64 encoding for images
-                    if kwargs.get("keep_data_uris", False) and image_blob is not None:
-                        content_type = image_content_type or "image/png"
-                        b64_string = base64.b64encode(image_blob).decode("utf-8")
-                        md_content += f"\n![{alt_text}](data:{content_type};base64,{b64_string})\n"
-                    else:
-                        # A placeholder name
-                        filename = re.sub(r"\W", "", shape.name) + ".jpg"
-                        md_content += "\n![" + alt_text + "](" + filename + ")\n"
+                    md_content += self._convert_picture_to_markdown(shape, **kwargs)
 
                 # Tables
                 if self._is_table(shape):
@@ -220,6 +147,90 @@ class PptxConverter(DocumentConverter):
                     md_content = md_content.strip()
 
         return DocumentConverterResult(markdown=md_content.strip())
+
+    def _image_to_html(
+        self,
+        image_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,
+    ) -> Optional[str]:
+        """Override to render an embedded image as an HTML fragment.
+
+        The stream is borrowed, seekable, and positioned at zero; do not close
+        or retain it. StreamInfo describes the image, not the presentation.
+        Existing conversion options are forwarded through kwargs.
+
+        Native LLM captions take precedence. Otherwise, return None or blank
+        text to retain the native image representation, or HTML with literal
+        text escaped. The fragment passes through HtmlConverter before being
+        placed at the picture's position in slide/group order. Hook failures
+        propagate through the normal conversion failure path.
+        """
+        return None
+
+    def _convert_picture_to_markdown(self, shape, **kwargs):
+        llm_description = ""
+        alt_text = ""
+        image_blob, image_content_type, image_filename = self._get_image_info(shape)
+        image_stream_info = StreamInfo(
+            mimetype=image_content_type,
+            extension=os.path.splitext(image_filename)[1] if image_filename else None,
+            filename=image_filename,
+        )
+
+        llm_client = kwargs.get("llm_client")
+        llm_model = kwargs.get("llm_model")
+        if llm_client is not None and llm_model is not None and image_blob is not None:
+            with io.BytesIO(image_blob) as image_stream:
+                try:
+                    llm_description = llm_caption(
+                        image_stream,
+                        image_stream_info,
+                        client=llm_client,
+                        model=llm_model,
+                        prompt=kwargs.get("llm_prompt"),
+                    )
+                except Exception:
+                    # Preserve native caption failure fallback.
+                    pass
+
+        if (
+            (not llm_description or not llm_description.strip())
+            and image_blob is not None
+            and type(self)._image_to_html is not PptxConverter._image_to_html
+        ):
+            with io.BytesIO(image_blob) as image_stream:
+                fragment = self._image_to_html(
+                    image_stream, image_stream_info, **kwargs
+                )
+            soup = _parse_image_html(fragment)
+            if soup is not None:
+                return (
+                    "\n"
+                    + self._html_converter.convert_string(str(soup), **kwargs).markdown
+                    + "\n"
+                )
+
+        # Keep native caption/alt Markdown separate from custom image HTML.
+        try:
+            alt_text = shape._element._nvXxPr.cNvPr.attrib.get("descr", "")
+        except Exception:
+            pass
+        alt_text = (
+            "\n".join(
+                text for text in [llm_description, alt_text] if text and text.strip()
+            )
+            or shape.name
+        )
+        alt_text = re.sub(r"[\r\n\[\]]", " ", alt_text)
+        alt_text = re.sub(r"\s+", " ", alt_text).strip()
+
+        if kwargs.get("keep_data_uris", False) and image_blob is not None:
+            content_type = image_content_type or "image/png"
+            b64_string = base64.b64encode(image_blob).decode("utf-8")
+            return f"\n![{alt_text}](data:{content_type};base64,{b64_string})\n"
+        filename = re.sub(r"\W", "", shape.name) + ".jpg"
+        return "\n![" + alt_text + "](" + filename + ")\n"
 
     def _find_svg_blip_part(self, shape):
         """Return the image part referenced by an ``<asvg:svgBlip>``, if any.
