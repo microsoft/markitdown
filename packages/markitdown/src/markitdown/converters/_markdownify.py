@@ -8,6 +8,37 @@ from urllib.parse import quote, urlparse, urlunparse
 _PERCENT_ENCODED_OCTET = re.compile(r"%[0-9A-Fa-f]{2}")
 
 
+def _first_srcset_candidate(srcset: str) -> str:
+    """Return the URL of the first candidate in an HTML ``srcset`` value.
+
+    A ``srcset`` value is a comma-separated list of image candidate strings,
+    each an image URL optionally followed by a width or pixel-density
+    descriptor (``photo.jpg 2x``, ``photo.jpg 800w``). The URL itself may
+    contain commas (e.g. ``?crop=1,2``), so a candidate is split on a comma
+    only when the following text starts a new candidate rather than
+    continuing the current URL.
+
+    markitdown emits a single image destination, so the first candidate is
+    used -- it is the one a browser picks at the default 1x density.
+    """
+    if not srcset:
+        return ""
+
+    # A comma separates candidates only when followed by whitespace (or when
+    # the whole value is a single bare URL). This keeps commas that are part
+    # of a URL query string intact.
+    for candidate in re.split(r",(?=\s)", srcset):
+        candidate = candidate.strip()
+        if not candidate:
+            continue
+        # The URL is the first whitespace-delimited token; anything after it
+        # is a width/density descriptor.
+        url = candidate.split()[0].strip()
+        if url:
+            return url
+    return ""
+
+
 def _quote_path_preserving_percent_encoded_octets(path: str) -> str:
     """Quote a URL path while preserving existing %HH byte encodings."""
     parts: list[str] = []
@@ -117,6 +148,10 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         alt = el.attrs.get("alt", None) or ""
         src = el.attrs.get("src", None) or ""
         data_src = el.attrs.get("data-src", None) or ""
+        # Responsive images carry their URL in srcset / data-srcset instead of
+        # (or alongside) src. Only the first candidate is used, matching 1x.
+        srcset = _first_srcset_candidate(el.attrs.get("srcset", None) or "")
+        data_srcset = _first_srcset_candidate(el.attrs.get("data-srcset", None) or "")
         # Lazy-loading libraries commonly leave a tiny placeholder data URI in
         # src and put the real image in data-src. Prefer data-src when src
         # isn't a usable URL, so the placeholder doesn't win over actual
@@ -127,6 +162,19 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
             or (src[:5].lower() == "data:" and not self.options["keep_data_uris"])
         ):
             src = data_src
+        # Same placeholder-vs-real logic for the responsive attributes, which
+        # are consulted only when src still carries nothing usable.
+        if data_srcset and (
+            not src
+            or (src[:5].lower() == "data:" and not self.options["keep_data_uris"])
+        ):
+            src = data_srcset
+        if not src and srcset:
+            src = srcset
+        # A data: placeholder is only replaced by srcset when the caller did
+        # not explicitly ask for the embedded bytes.
+        if srcset and src[:5].lower() == "data:" and not self.options["keep_data_uris"]:
+            src = srcset
         title = el.attrs.get("title", None) or ""
         title_part = ' "%s"' % title.replace('"', r"\"") if title else ""
         # Remove all line breaks from alt
