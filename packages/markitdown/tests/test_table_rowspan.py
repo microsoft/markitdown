@@ -1,5 +1,6 @@
 import io
 import re
+import time
 
 import pytest
 
@@ -122,3 +123,41 @@ def test_a_merged_word_cell_keeps_the_table_lined_up() -> None:
     rows = _rows(_convert(buffer.getvalue(), ".docx"))
 
     assert rows[-3:] == [["EU", "Cable", "12"], ["", "Hub", "7"], ["US", "Cable", "3"]]
+
+
+def test_a_span_attribute_does_not_blow_up_the_output() -> None:
+    """One cell spanning 1000 rows and 1000 columns asked for a million
+    placeholders: 19 KB of HTML became 3 MB of Markdown in 20 s. Past a few
+    placeholders per real cell the table is converted as markdownify converts
+    it, without the padding."""
+    html = (
+        "<table><tr><td rowspan='1000' colspan='1000'>x</td></tr>"
+        + "<tr><td>a</td></tr>" * 999
+        + "</table><p>after</p>"
+    )
+
+    started = time.perf_counter()
+    markdown = _convert(html.encode("utf-8"), ".html")
+    elapsed = time.perf_counter() - started
+
+    assert elapsed < 5
+    assert len(markdown) < 10 * len(html)
+    assert markdown.rstrip().endswith("after")
+
+
+def test_many_rowspans_are_filled_in_linear_time() -> None:
+    """Inserting each placeholder with insert_before scanned its siblings, so
+    30,000 of them in front of one cell took about 12 s."""
+    spans = 30_000
+    html = (
+        "<table><tr>"
+        + "<td rowspan='2'>h</td>" * spans
+        + "</tr><tr><td>last</td></tr></table>"
+    )
+
+    started = time.perf_counter()
+    rows = _rows(_convert(html.encode("utf-8"), ".html"))
+    elapsed = time.perf_counter() - started
+
+    assert elapsed < 5
+    assert rows[-1] == [""] * spans + ["last"]

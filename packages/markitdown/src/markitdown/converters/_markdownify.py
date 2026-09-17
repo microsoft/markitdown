@@ -30,6 +30,13 @@ def _span(cell: Any, attribute: str) -> int:
     return 1
 
 
+# A span attribute must not be able to make the output, or the conversion, much
+# larger than the page: a table gets its placeholders only while they stay within
+# a few per real cell, and is otherwise converted as markdownify converts it.
+_PLACEHOLDERS_PER_CELL = 8
+_MIN_PLACEHOLDERS = 64
+
+
 def _fill_row_spans(soup: Any) -> None:
     """Give every row the cells a rowspan from an earlier row takes up.
 
@@ -43,38 +50,71 @@ def _fill_row_spans(soup: Any) -> None:
     """
     for table in soup.find_all("table"):
         rows = table.find_all("tr")
-        # Per row: the columns an earlier row's rowspan reaches into, and where
-        # the row's own cells sit.
-        covered: dict[int, set[int]] = {}
-        placed: dict[int, list[tuple[int, Any]]] = {}
+        cells = [row.find_all(["td", "th"], recursive=False) for row in rows]
+        layout = _row_span_layout(cells)
+        if layout is None:
+            continue
+        placed, covered = layout
+        for row, row_placed, row_covered in zip(rows, placed, covered):
+            if row_covered:
+                _pad_row(soup, row, row_placed, sorted(row_covered))
 
-        for index, row in enumerate(rows):
-            column = 0
-            taken = covered.get(index, set())
-            placed[index] = []
-            for cell in row.find_all(["td", "th"], recursive=False):
-                while column in taken:
-                    column += 1
-                placed[index].append((column, cell))
-                columns = _span(cell, "colspan")
-                for below in range(index + 1, index + _span(cell, "rowspan")):
-                    covered.setdefault(below, set()).update(
-                        range(column, column + columns)
-                    )
-                column += columns
 
-        for index, row in enumerate(rows):
-            # Descending, so each placeholder lands directly in front of the
-            # first own cell at or after its column and the order comes out right.
-            for column in sorted(covered.get(index, ()), reverse=True):
-                anchor = next(
-                    (cell for at, cell in placed[index] if at >= column), None
-                )
-                placeholder = soup.new_tag("td")
-                if anchor is None:
-                    row.append(placeholder)
-                else:
-                    anchor.insert_before(placeholder)
+def _row_span_layout(
+    cells: list[list[Any]],
+) -> tuple[list[list[tuple[int, Any]]], list[set[int]]] | None:
+    """Where each row's own cells sit, and which columns earlier rowspans take.
+
+    Returns None once the placeholders would pass the table's budget.
+    """
+    budget = _MIN_PLACEHOLDERS + _PLACEHOLDERS_PER_CELL * sum(map(len, cells))
+    covered: list[set[int]] = [set() for _ in cells]
+    placed: list[list[tuple[int, Any]]] = []
+    needed = 0
+    for index, row_cells in enumerate(cells):
+        column = 0
+        row_placed = []
+        for cell in row_cells:
+            while column in covered[index]:
+                column += 1
+            row_placed.append((column, cell))
+            columns = _span(cell, "colspan")
+            # A rowspan never reaches past the table.
+            rows_below = min(_span(cell, "rowspan"), len(cells) - index) - 1
+            needed += columns * rows_below
+            if needed > budget:
+                return None
+            for below in range(index + 1, index + 1 + rows_below):
+                covered[below].update(range(column, column + columns))
+            column += columns
+        placed.append(row_placed)
+    return placed, covered
+
+
+def _pad_row(
+    soup: Any, row: Any, placed: list[tuple[int, Any]], columns: list[int]
+) -> None:
+    """Put an empty cell in front of the first own cell after each column.
+
+    The row is rebuilt in one pass. Its children are taken out front to back,
+    so every `extract()` finds its node at index 0, and put back in order; a
+    placeholder inserted with `insert_before` would scan its siblings instead.
+    """
+    column_of = {id(cell): at for at, cell in placed}
+    children = list(row.contents)
+    for child in children:
+        child.extract()
+    pending = iter(columns)
+    column = next(pending, None)
+    for child in children:
+        at = column_of.get(id(child))
+        while at is not None and column is not None and column < at:
+            row.append(soup.new_tag("td"))
+            column = next(pending, None)
+        row.append(child)
+    while column is not None:
+        row.append(soup.new_tag("td"))
+        column = next(pending, None)
 
 
 class _CustomMarkdownify(markdownify.MarkdownConverter):
