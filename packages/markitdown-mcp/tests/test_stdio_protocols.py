@@ -162,6 +162,59 @@ def test_unknown_method_does_not_kill_the_server(fixture_uri):
     assert responses[1]["result"]["serverInfo"]["name"] == "markitdown"
 
 
+def test_subscript_superscript_options(tmp_path):
+    """The published schema and actual tool calls expose both optional markers."""
+    path = tmp_path / "scripts.html"
+    path.write_text("<p>H<sub>2</sub>O and x<sup>2</sup></p>", encoding="utf-8")
+    cases = [
+        ({}, "H2O and x2"),
+        (
+            {"sub_symbol": "<sub>", "sup_symbol": "<sup>"},
+            "H<sub>2</sub>O and x<sup>2</sup>",
+        ),
+        ({"sub_symbol": "~", "sup_symbol": "^"}, "H~2~O and x^2^"),
+        ({"sub_symbol": "", "sup_symbol": "^"}, "H2O and x^2^"),
+        ({"sub_symbol": None, "sup_symbol": None}, "H2O and x2"),
+    ]
+    requests = [
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "server/discover",
+            "params": {"_meta": MODERN_ENVELOPE},
+        },
+        {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/list",
+            "params": {"_meta": MODERN_ENVELOPE},
+        },
+    ]
+    for request_id, (options, _) in enumerate(cases, start=3):
+        requests.append(
+            {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "method": "tools/call",
+                "params": {
+                    "name": "convert_to_markdown",
+                    "arguments": {"uri": path.as_uri(), **options},
+                    "_meta": MODERN_ENVELOPE,
+                },
+            }
+        )
+    responses = run_server(requests, expected_responses=len(requests))
+    assert len(responses) == len(requests)
+    tool = next(
+        t for t in responses[1]["result"]["tools"] if t["name"] == "convert_to_markdown"
+    )
+    assert tool["inputSchema"]["required"] == ["uri"]
+    assert {"sub_symbol", "sup_symbol"} <= tool["inputSchema"]["properties"].keys()
+    for response, (_, expected) in zip(responses[2:], cases):
+        assert response["result"]["isError"] is False
+        assert response["result"]["content"][0]["text"].strip() == expected
+
+
 @pytest.mark.parametrize("modern", [False, True], ids=["legacy", "modern"])
 def test_conversion_errors_are_reported(modern, tmp_path, fixture_uri):
     """Expected failures retain their diagnosis and leave the session usable."""

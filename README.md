@@ -297,6 +297,29 @@ print(result.markdown)
 
 If any attempt succeeds, image conversion continues normally. If the client raises an error after exhausting its retries, or encounters a non-retryable error, MarkItDown tries other applicable converters and raises `FileConversionException` only if none succeeds.
 
+### Subscripts and superscripts
+
+For HTML-based conversion, including DOCX, the Python API accepts markdownify's
+`sub_symbol` and `sup_symbol` options. No custom converter is needed:
+
+```python
+result = MarkItDown().convert(
+    "document.docx", sub_symbol="<sub>", sup_symbol="<sup>"
+)
+```
+
+The same options are available from the CLI, including when reading from stdin:
+
+```bash
+markitdown document.docx --sub-symbol '<sub>' --sup-symbol '<sup>'
+```
+
+For example, `H2O and x2` becomes `H<sub>2</sub>O and x<sup>2</sup>` when the
+source marks the numbers as subscript and superscript. A non-HTML marker such as
+`^` is placed on both sides (`x^2^`). By default, both markers are empty, so the
+text is retained without subscript/superscript markup. These options do not infer
+formatting from plain text or change PDF/cloud extraction.
+
 ### Docker
 
 ```sh
