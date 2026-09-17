@@ -1,0 +1,68 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "markitdown-dicom"
+dynamic = ["version"]
+description = 'DICOM converter plugin for MarkItDown - Extracts metadata from .dcm files'
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+keywords = ["markitdown", "dicom", "metadata", "pydicom"]
+authors = [
+  { name = "Aryan Kaushik", email = "aryankaushik251@gmail.com" },
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: Implementation :: CPython",
+]
+dependencies = [
+  "markitdown>=0.1.0a1",
+  "pydicom>=2.4.0",
+]
+
+[project.urls]
+Documentation = "https://github.com/microsoft/markitdown#readme"
+Issues = "https://github.com/microsoft/markitdown/issues"
+Source = "https://github.com/microsoft/markitdown"
+
+[tool.hatch.version]
+path = "src/markitdown_dicom/__about__.py"
+
+[project.entry-points."markitdown.plugin"]
+dicom = "markitdown_dicom"
+
+[tool.hatch.envs.types]
+extra-dependencies = [
+  "mypy>=1.0.0",
+]
+[tool.hatch.envs.types.scripts]
+check = "mypy --install-types --non-interactive {args:src/markitdown_dicom tests}"
+
+[tool.coverage.run]
+source_pkgs = ["markitdown_dicom", "tests"]
+branch = true
+parallel = true
+omit = [
+  "src/markitdown_dicom/__about__.py",
+]
+
+[tool.coverage.paths]
+markitdown-dicom = ["src/markitdown_dicom", "*/markitdown-dicom/src/markitdown_dicom"]
+tests = ["tests", "*/markitdown-dicom/tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+]
+
+[tool.hatch.build.targets.sdist]
+only-include = ["src/markitdown_dicom"]
