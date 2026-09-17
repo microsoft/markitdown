@@ -142,6 +142,12 @@ def main():
         help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
     )
 
+    parser.add_argument(
+        "--password",
+        type=str,
+        help="Password for opening password-protected files (e.g., encrypted PDFs).",
+    )
+
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
 
@@ -248,16 +254,20 @@ def main():
     else:
         markitdown = MarkItDown(enable_plugins=args.use_plugins)
 
+    convert_kwargs: dict = {"keep_data_uris": args.keep_data_uris}
+    if args.password is not None:
+        convert_kwargs["password"] = args.password
+
     if args.filename is None:
         # Windows pipe-backed stdin can report seekable() even though it cannot rewind.
         result = markitdown.convert_stream(
             io.BytesIO(sys.stdin.buffer.read()),
             stream_info=stream_info,
-            keep_data_uris=args.keep_data_uris,
+            **convert_kwargs,
         )
     else:
         result = markitdown.convert(
-            args.filename, stream_info=stream_info, keep_data_uris=args.keep_data_uris
+            args.filename, stream_info=stream_info, **convert_kwargs
         )
 
     _handle_output(args, result)
