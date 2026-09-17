@@ -32,6 +32,13 @@ pip install -e 'packages/markitdown[all]'
 markitdown path-to-file.pdf > document.md
 ```
 
+Use `--pdf-page-markers` to emit a one-based HTML comment before every PDF
+page, including empty pages:
+
+```bash
+markitdown --pdf-page-markers path-to-file.pdf
+```
+
 ### Python API
 
 ```python
@@ -40,6 +47,12 @@ from markitdown import MarkItDown
 md = MarkItDown()
 result = md.convert("test.xlsx")
 print(result.markdown)
+```
+
+For opt-in PDF page-boundary preservation:
+
+```python
+result = md.convert("test.pdf", pdf_page_markers=True)
 ```
 
 ### More Information

@@ -142,6 +142,12 @@ def main():
         help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
     )
 
+    parser.add_argument(
+        "--pdf-page-markers",
+        action="store_true",
+        help="Add one-based HTML comment markers before every PDF page.",
+    )
+
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
 
@@ -248,16 +254,24 @@ def main():
     else:
         markitdown = MarkItDown(enable_plugins=args.use_plugins)
 
+    conversion_kwargs: Dict[str, Any] = {
+        "keep_data_uris": args.keep_data_uris,
+    }
+    if args.pdf_page_markers:
+        conversion_kwargs["pdf_page_markers"] = True
+
     if args.filename is None:
         # Windows pipe-backed stdin can report seekable() even though it cannot rewind.
         result = markitdown.convert_stream(
             io.BytesIO(sys.stdin.buffer.read()),
             stream_info=stream_info,
-            keep_data_uris=args.keep_data_uris,
+            **conversion_kwargs,
         )
     else:
         result = markitdown.convert(
-            args.filename, stream_info=stream_info, keep_data_uris=args.keep_data_uris
+            args.filename,
+            stream_info=stream_info,
+            **conversion_kwargs,
         )
 
     _handle_output(args, result)
