@@ -1,6 +1,7 @@
 import io
 import warnings
 from typing import Any, BinaryIO, Optional
+from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
@@ -52,6 +53,25 @@ class HtmlConverter(DocumentConverter):
         # Parse the stream
         encoding = "utf-8" if stream_info.charset is None else stream_info.charset
         soup = BeautifulSoup(file_stream, "html.parser", from_encoding=encoding)
+
+        base_url = stream_info.url
+        base_element = soup.find("base", href=True)
+        if base_element is not None:
+            try:
+                base_url = urljoin(base_url or "", base_element["href"])
+            except ValueError:
+                pass
+        if base_url:
+            for element in soup.find_all(["a", "img"]):
+                attributes = ("href",) if element.name == "a" else ("src", "data-src")
+                for attribute in attributes:
+                    reference = element.get(attribute)
+                    if reference:
+                        try:
+                            element[attribute] = urljoin(base_url, reference)
+                        except ValueError:
+                            # Preserve the converter's existing malformed-URL handling.
+                            pass
 
         # Remove javascript and style blocks
         for script in soup(["script", "style"]):
