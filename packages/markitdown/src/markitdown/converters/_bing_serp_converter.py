@@ -1,6 +1,7 @@
 import re
 import base64
 import binascii
+import warnings
 from urllib.parse import parse_qs, urlparse
 from typing import Any, BinaryIO
 from bs4 import BeautifulSoup
@@ -62,6 +63,10 @@ class BingSerpConverter(DocumentConverter):
     ) -> DocumentConverterResult:
         assert stream_info.url is not None
 
+        # Pop our own keyword before forwarding the rest to markdownify.
+        # strict=True raises RecursionError instead of falling back to plain text.
+        strict: bool = kwargs.pop("strict", False)
+
         # Parse the query parameters
         parsed_params = parse_qs(urlparse(stream_info.url).query)
         query = parsed_params.get("q", [""])[0]
@@ -105,7 +110,7 @@ class BingSerpConverter(DocumentConverter):
                         pass
 
             # Convert to markdown
-            md_result = _markdownify.convert_soup(result).strip()
+            md_result = self._convert_soup(result, _markdownify, strict=strict).strip()
             lines = [line.strip() for line in re.split(r"\n+", md_result)]
             results.append("\n".join([line for line in lines if len(line) > 0]))
 
@@ -118,3 +123,23 @@ class BingSerpConverter(DocumentConverter):
             markdown=webpage_text,
             title=None if soup.title is None else soup.title.string,
         )
+
+    def _convert_soup(
+        self, target: Any, markdownify: _CustomMarkdownify, *, strict: bool
+    ) -> str:
+        """Convert one result, tolerating markup too deep for markdownify."""
+        try:
+            return markdownify.convert_soup(target)
+        except RecursionError:
+            if strict:
+                raise
+            # Large or deeply-nested HTML can exceed Python's recursion limit
+            # during markdownify's recursive DOM traversal.  Fall back to
+            # BeautifulSoup's iterative get_text() so the caller still gets the
+            # result's text rather than losing the search-results extraction.
+            warnings.warn(
+                "HTML document is too deeply nested for markdown conversion "
+                "(RecursionError). Falling back to plain-text extraction.",
+                stacklevel=2,
+            )
+            return target.get_text("\n", strip=True)
