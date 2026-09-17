@@ -14,6 +14,8 @@ Uses the same `llm_client` / `llm_model` pattern that MarkItDown already support
 
 ## Installation
 
+Requires `markitdown>=0.1.8b3`, which introduces the Office image-rendering hooks used by this plugin. Installing the plugin automatically resolves a compatible core version.
+
 ```bash
 pip install markitdown-ocr
 ```
@@ -97,8 +99,10 @@ When a file is converted:
 1. The OCR converter accepts the file
 2. It extracts embedded images from the document
 3. Each image is sent to the LLM with an extraction prompt
-4. The returned text is inserted inline, preserving document structure
+4. The returned text is placed alongside document content (XLSX images follow their sheet's table)
 5. If the LLM call fails, conversion continues without that image's text
+
+The DOCX, PPTX, and XLSX converters subclass their core counterparts and override the same semi-private `_image_to_html` method. Core handles native content, preprocessing, and placement; the plugin supplies escaped OCR HTML, which passes through the shared HTML-to-Markdown renderer. PDF uses its separate existing pipeline.
 
 ## Supported File Formats
 
@@ -110,21 +114,23 @@ When a file is converted:
 
 ### DOCX
 
-- Images are extracted via document part relationships (`doc.part.rels`).
-- OCR is run before the DOCX→HTML→Markdown pipeline executes: placeholder tokens are injected into the HTML so that the markdown converter does not escape the OCR markers, and the final placeholders are replaced with the formatted `*[Image OCR]...[End OCR]*` blocks after conversion.
-- Document flow (headings, paragraphs, tables) is fully preserved around the OCR blocks.
+- Inherits core DOCX preprocessing, styles, math, and Mammoth conversion.
+- Mammoth provides each embedded image to `_image_to_html`. OCR fragments are inserted into the document's HTML before Markdown rendering, not substituted into finished Markdown.
+- Block fragments split enclosing paragraphs where necessary and remain inside their table cell or list item. Table-cell line breaks follow the shared HTML converter's existing limitations.
 
 ### PPTX
 
 - Picture shapes, placeholder shapes with images, and images inside groups are all supported.
-- Shapes are processed in top-to-left reading order per slide.
+- Inherits core shape ordering, native text, tables, charts, and speaker notes.
+- Slide content now uses the core converter's real line breaks rather than the old plugin's literal `\n` text, and inherits its empty-title and empty-notes handling.
 - If an `llm_client` is configured, the LLM is asked for a description first; OCR is used as the fallback when no description is returned.
 
 ### XLSX
 
-- Images embedded in worksheets (`sheet._images`) are extracted per sheet.
-- Cell position is calculated from the image anchor coordinates (column/row → Excel letter notation).
+- Inherits core workbook repair and table rendering; images are read from the same repaired workbook.
 - Images are listed under a `### Images in this sheet:` section after the sheet's data table — they are not interleaved into the table rows.
+- Sheet heading spacing follows the core converter; no new cell-position labels are added.
+- Legacy `.xls` files remain handled by the existing core converter, without image OCR.
 
 ### Output format
 
@@ -135,6 +141,10 @@ Every extracted OCR block is wrapped as:
 <extracted text>
 [End OCR]*
 ```
+
+For Office formats, recognized text is escaped as literal HTML text before Markdown rendering. Markdown escaping and line breaks therefore follow the shared HTML converter: for example, underscores may be backslash-escaped, and direct converter results use Markdown hard breaks. `MarkItDown` subsequently strips trailing whitespace from each output line. Empty recognition retains the native image representation (XLSX normally omits images).
+
+Repeated image bytes are recognized once per conversion, while the result is placed at every occurrence. The cache is not shared across documents or service overrides.
 
 ## Troubleshooting
 
@@ -165,6 +175,8 @@ markitdown --list-plugins   # should show: ocr
 
 The plugin propagates LLM API errors as warnings and continues conversion. Check your API key, quota, and that the chosen model supports vision inputs.
 
+For Office OCR, a service-reported error emits a warning and retains native image rendering. Exceptions raised by custom OCR services propagate from direct converter calls; `MarkItDown` can retry another applicable converter through its normal fallback behavior.
+
 ## Development
 
 ### Running Tests
@@ -178,8 +190,8 @@ pytest tests/ -v
 
 ```bash
 git clone https://github.com/microsoft/markitdown.git
-cd markitdown/packages/markitdown-ocr
-pip install -e .
+cd markitdown
+pip install -e 'packages/markitdown[docx,pptx,xlsx]' -e packages/markitdown-ocr
 ```
 
 ## Contributing

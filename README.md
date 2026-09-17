@@ -287,11 +287,15 @@ To use Large Language Models for image descriptions (currently only for pptx and
 from markitdown import MarkItDown
 from openai import OpenAI
 
-client = OpenAI()
+client = OpenAI(max_retries=5)
 md = MarkItDown(llm_client=client, llm_model="gpt-4o", llm_prompt="optional custom prompt")
 result = md.convert("example.jpg")
 print(result.markdown)
 ```
+
+`max_retries` controls the OpenAI client's automatic retries for retryable errors (the default is 2); `5` allows up to six attempts with backoff. See the [OpenAI SDK retry documentation](https://github.com/openai/openai-python#retries).
+
+If any attempt succeeds, image conversion continues normally. If the client raises an error after exhausting its retries, or encounters a non-retryable error, MarkItDown tries other applicable converters and raises `FileConversionException` only if none succeeds.
 
 ### Docker
 
