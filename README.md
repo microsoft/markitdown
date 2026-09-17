@@ -101,6 +101,7 @@ At the moment, the following optional dependencies are available:
 * `[all]` Installs all optional dependencies
 * `[pptx]` Installs dependencies for PowerPoint files
 * `[docx]` Installs dependencies for Word files
+* `[doc]` Installs dependencies for older Word files
 * `[xlsx]` Installs dependencies for Excel files
 * `[xls]` Installs dependencies for older Excel files
 * `[pdf]` Installs dependencies for PDF files
