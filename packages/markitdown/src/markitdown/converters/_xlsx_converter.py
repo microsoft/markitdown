@@ -1,3 +1,4 @@
+import datetime
 import io
 import re
 import sys
@@ -52,16 +53,58 @@ def _read_xlsx_sheets(
     repaired_stream = None
     try:
         try:
-            sheets = pd.read_excel(file_stream, sheet_name=None, engine="openpyxl")
+            sheets = pd.read_excel(
+                file_stream, sheet_name=None, engine="openpyxl", dtype=object
+            )
         except TypeError as exc:
             if "showZeroes" not in str(exc):
                 raise
             repaired_stream = _repair_sheetview_show_zeroes(file_stream, start_pos)
-            sheets = pd.read_excel(repaired_stream, sheet_name=None, engine="openpyxl")
+            sheets = pd.read_excel(
+                repaired_stream, sheet_name=None, engine="openpyxl", dtype=object
+            )
         yield sheets, repaired_stream if repaired_stream is not None else file_stream
     finally:
         if repaired_stream is not None:
             repaired_stream.close()
+
+
+def _format_cell(value: Any) -> str:
+    """Render one cell the way the spreadsheet holds it.
+
+    openpyxl hands back a ``datetime`` for a date cell, and ``str()`` on it
+    appends a midnight time that is not in the spreadsheet.
+    """
+    if isinstance(value, datetime.datetime):
+        if value.time() == datetime.time.min:
+            return value.date().isoformat()
+        return value.isoformat(sep=" ")
+    return str(value)
+
+
+def _format_float(value: float) -> str:
+    """Render a fractional number with the 15 significant digits Excel shows."""
+    return format(value, ".15g")
+
+
+def sheet_to_html(sheet: Any) -> str:
+    """Render one sheet as an HTML table.
+
+    ``na_rep=""`` keeps an empty cell empty: the default writes the string
+    ``NaN`` into it, which reads as a value rather than as a blank. The
+    formatters are what keep the remaining cells rendered as themselves --
+    pandas applies ``na_rep`` to the blanks, ``float_format`` to fractional
+    numbers, and the formatter to everything else, without re-inferring a
+    dtype for the column. A float needs ``float_format`` because with
+    ``index=False`` pandas renders it with its own display precision and
+    never reaches ``formatters``.
+    """
+    return sheet.to_html(
+        index=False,
+        na_rep="",
+        formatters=[_format_cell] * len(sheet.columns),
+        float_format=_format_float,
+    )
 
 
 def _rename_show_zeroes_attribute(data: bytes) -> bytes:
@@ -150,7 +193,7 @@ class XlsxConverter(DocumentConverter):
 
             for s in sheets:
                 md_content += f"## {s}\n"
-                html_content = sheets[s].to_html(index=False)
+                html_content = sheet_to_html(sheets[s])
                 md_content += (
                     self._html_converter.convert_string(
                         html_content, **kwargs
@@ -237,11 +280,13 @@ class XlsConverter(DocumentConverter):
                 _xls_dependency_exc_info[2]
             )
 
-        sheets = pd.read_excel(file_stream, sheet_name=None, engine="xlrd")
+        sheets = pd.read_excel(
+            file_stream, sheet_name=None, engine="xlrd", dtype=object
+        )
         md_content = ""
         for s in sheets:
             md_content += f"## {s}\n"
-            html_content = sheets[s].to_html(index=False)
+            html_content = sheet_to_html(sheets[s])
             md_content += (
                 self._html_converter.convert_string(
                     html_content, **kwargs
