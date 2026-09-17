@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from markitdown_ocr._ocr_service import OCRResult  # noqa: E402
 from markitdown_ocr._pdf_converter_with_ocr import (  # noqa: E402
     PdfConverterWithOCR,
+    _extract_images_from_page,
 )
 from markitdown import StreamInfo  # noqa: E402
 
@@ -40,6 +41,47 @@ class MockOCRService:
         **kwargs: Any,
     ) -> OCRResult:
         return OCRResult(text=_MOCK_TEXT, backend_used="mock")
+
+
+def test_extract_images_clamps_slightly_out_of_bounds_bbox() -> None:
+    class FakeRenderedImage:
+        def save(self, stream: Any, format: str) -> None:
+            stream.write(b"fake png data")
+
+    class FakePageImage:
+        original = FakeRenderedImage()
+
+    class FakeCroppedPage:
+        def to_image(self, resolution: int) -> FakePageImage:
+            return FakePageImage()
+
+    class FakePage:
+        page_number = 1
+        bbox = (0, 0, 100, 100)
+        images = [{"x0": 10, "top": -1.999e-05, "x1": 90, "bottom": 80}]
+
+        def __init__(self) -> None:
+            self.cropped_bbox: tuple[float, float, float, float] | None = None
+
+        def within_bbox(
+            self, bbox: tuple[float, float, float, float]
+        ) -> FakeCroppedPage:
+            x0, y0, x1, y1 = bbox
+            assert x0 >= self.bbox[0]
+            assert y0 >= self.bbox[1]
+            assert x1 <= self.bbox[2]
+            assert y1 <= self.bbox[3]
+            self.cropped_bbox = bbox
+            return FakeCroppedPage()
+
+    page = FakePage()
+
+    images = _extract_images_from_page(page)
+
+    assert page.cropped_bbox == (10, 0, 90, 80)
+    assert len(images) == 1
+    assert images[0]["name"] == "page_1_img_0"
+    assert images[0]["y_pos"] == 0
 
 
 @pytest.fixture(scope="module")
