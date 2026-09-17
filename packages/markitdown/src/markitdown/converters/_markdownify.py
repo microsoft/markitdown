@@ -141,6 +141,9 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         if src[:5].lower() == "data:" and not self.options["keep_data_uris"]:
             src = src.split(",")[0] + "..."
 
+        # Escape backslashes and brackets to preserve Markdown image syntax
+        alt = alt.replace("\\", "\\\\").replace("[", r"\[").replace("]", r"\]")
+
         return "![%s](%s%s)" % (alt, src, title_part)
 
     def convert_input(
