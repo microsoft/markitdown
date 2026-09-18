@@ -37,6 +37,113 @@ ACCEPTED_XLS_MIME_TYPE_PREFIXES = [
 ACCEPTED_XLS_FILE_EXTENSIONS = [".xls"]
 
 
+# Currency symbols that may appear in Excel number formats, either as quoted
+# literals (e.g. '"$"#,##0.00') or locale blocks (e.g. '[$€-x-euro2]').
+# See https://github.com/microsoft/markitdown/issues/53.
+_CURRENCY_SYMBOL_RE = re.compile(r'[$€£¥₹₽₩₪₺₴₸₫₦¤]')
+_LOCALE_BLOCK_RE = re.compile(r'\[\$([^\]-]+)')
+_QUOTED_LITERAL_RE = re.compile(r'"([^"]*)"')
+
+
+def _currency_symbol(number_format: Any) -> Optional[str]:
+  """Return the currency symbol of an Excel number format, if it has one.
+
+  Only the first (`;`-separated) section is considered, matching how
+  positive values are rendered.
+  """
+  if not isinstance(number_format, str):
+    return None
+  first_section = number_format.split(';')[0]
+  quoted = ''.join(_QUOTED_LITERAL_RE.findall(first_section))
+  locale = ''.join(_LOCALE_BLOCK_RE.findall(first_section))
+  candidates = quoted + locale
+  if not candidates:
+    candidates = first_section
+  match = _CURRENCY_SYMBOL_RE.search(candidates)
+  return match.group(0) if match else None
+
+
+def _is_currency_position_prefix(number_format: str) -> bool:
+  """Decide whether the currency symbol renders before the value."""
+  first_section = number_format.split(';')[0]
+  symbol_match = _CURRENCY_SYMBOL_RE.search(first_section)
+  placeholder_match = re.search(r'[#0?]', first_section)
+  if not symbol_match or not placeholder_match:
+    return True
+  return symbol_match.start() < placeholder_match.start()
+
+
+def _overlay_currency_labels(
+    sheets: dict[str, Any], workbook_stream: BinaryIO
+) -> None:
+  """Rewrite currency-formatted numeric cells with their display label.
+
+  `pandas.read_excel` returns raw values and drops Excel number formats, so
+  currency-formatted cells lose their label (e.g. 1199 instead of $1199).
+  This overlays the label in place so the downstream HTML/markdown table
+  shows what the spreadsheet shows. DataFrames are mutated in place.
+  """
+  import openpyxl  # Local import: already a required dependency (see above).
+
+  position = workbook_stream.tell()
+  try:
+    workbook_stream.seek(0)
+    workbook = openpyxl.load_workbook(
+        workbook_stream, data_only=True, read_only=True
+    )
+  except Exception:
+    return
+  try:
+    for worksheet in workbook.worksheets:
+      frame = sheets.get(worksheet.title)
+      if frame is None:
+        continue
+      object_cols: set[int] = set()
+      # pandas treats the first row as the header, so data row i lives in
+      # openpyxl row i + 2 (both 1-indexed vs 0-indexed and header offset).
+      for openpyxl_row in worksheet.iter_rows(min_row=2):
+        for cell in openpyxl_row:
+          value = cell.value
+          if (
+              value is None
+              or isinstance(value, bool)
+              or not isinstance(value, (int, float))
+          ):
+            continue
+          symbol = _currency_symbol(cell.number_format)
+          if symbol is None:
+            continue
+          data_row = cell.row - 2
+          data_col = cell.column - 1
+          if not (0 <= data_row < len(frame)) or not (
+              0 <= data_col < len(frame.columns)
+          ):
+            continue
+          text = str(frame.iat[data_row, data_col])
+          if symbol in text:
+            continue
+          if data_col not in object_cols:
+            # A str label cannot live in a numeric column: widen it once.
+            frame[frame.columns[data_col]] = frame[
+                frame.columns[data_col]
+            ].astype(object)
+            object_cols.add(data_col)
+          if _is_currency_position_prefix(str(cell.number_format)):
+            text = f'{symbol}{text}'
+          else:
+            text = f'{text}{symbol}'
+          frame.iat[data_row, data_col] = text
+  finally:
+    try:
+      workbook.close()
+    except Exception:
+      pass
+    try:
+      workbook_stream.seek(position)
+    except Exception:
+      pass
+
+
 # Some producers write the legacy attribute "showZeroes" on <sheetView>, where the
 # schema calls it "showZeros". openpyxl rejects the unknown attribute outright, so the
 # workbook is repaired by renaming it. The rename is confined to <sheetView> start tags.
@@ -142,6 +249,9 @@ class XlsxConverter(DocumentConverter):
 
         md_content = ""
         with _read_xlsx_sheets(file_stream) as (sheets, workbook_stream):
+            # pandas drops Excel number formats: overlay currency labels so
+            # currency-formatted cells render as the spreadsheet shows them.
+            _overlay_currency_labels(sheets, workbook_stream)
             images = None
             if type(self)._image_to_html is not XlsxConverter._image_to_html:
                 from ..converter_utils._xlsx_images import _XlsxImages
