@@ -53,6 +53,74 @@ from ._exceptions import (
 )
 
 
+# A fenced code block delimiter: three or more backticks or tildes, optionally
+# indented by up to three spaces (CommonMark fence syntax).
+_CODE_FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
+
+
+def _is_code_fence(line: str) -> Optional[re.Match]:
+    """Match a code fence delimiter at the start of a line, if any."""
+    return _CODE_FENCE_RE.match(line)
+
+
+def _closes_fence(line: str, fence_char: str, fence_len: int) -> bool:
+    """Whether a line inside a fenced code block closes the fence."""
+    match = _is_code_fence(line)
+    if match is None:
+        return False
+    marker = match.group(1)
+    # The closing fence uses the same character, is at least as long, and
+    # carries no info string.
+    return marker[0] == fence_char and len(marker) >= fence_len and not line[match.end() :].strip()
+
+
+def _normalize_whitespace_outside_code_fences(text: str) -> str:
+    """Normalize whitespace while leaving fenced code blocks untouched.
+
+    Outside code fences, the previous normalization is applied: trailing
+    whitespace is stripped from each line and runs of three or more newlines
+    are collapsed to two. Content inside a fenced code block is
+    whitespace-significant, so it is passed through verbatim apart from
+    CRLF newline normalization.
+    """
+    lines = re.split(r"\r?\n", text)
+    out: list[str] = []
+    segment: list[str] = []
+    fence_char = ""
+    fence_len = 0
+
+    def flush_segment() -> None:
+        if segment:
+            normalized = re.sub(
+                r"\n{3,}", "\n\n", "\n".join(line.rstrip() for line in segment)
+            )
+            out.append(normalized)
+            segment.clear()
+
+    for line in lines:
+        if fence_char:
+            # Inside a code fence: keep the line exactly as it is.
+            out.append(line)
+            if _closes_fence(line, fence_char, fence_len):
+                fence_char = ""
+            continue
+
+        match = _is_code_fence(line)
+        if match is not None:
+            flush_segment()
+            # An opening fence may carry an info string (e.g. ```python).
+            marker = match.group(1)
+            fence_char = marker[0]
+            fence_len = len(marker)
+            out.append(line.rstrip())
+            continue
+
+        segment.append(line)
+
+    flush_segment()
+    return "\n".join(out)
+
+
 def _get_content_disposition_filename(content_disposition: str) -> Optional[str]:
     message = Message()
     message["content-disposition"] = content_disposition
@@ -683,10 +751,9 @@ class MarkItDown:
 
                 if res is not None:
                     # Normalize the content
-                    res.text_content = "\n".join(
-                        [line.rstrip() for line in re.split(r"\r?\n", res.text_content)]
+                    res.text_content = _normalize_whitespace_outside_code_fences(
+                        res.text_content
                     )
-                    res.text_content = re.sub(r"\n{3,}", "\n\n", res.text_content)
                     return res
 
         # If we got this far without success, report any exceptions
