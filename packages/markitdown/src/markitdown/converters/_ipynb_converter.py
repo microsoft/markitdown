@@ -61,6 +61,32 @@ class IpynbConverter(DocumentConverter):
 
         return self._convert(json.loads(notebook_content))
 
+
+    @staticmethod
+    def _render_outputs(outputs: list) -> str:
+        """Render a code cell's outputs as markdown, text-bearing ones only."""
+        parts: list[str] = []
+        for out in outputs:
+            if not isinstance(out, dict):
+                continue
+            out_type = out.get("output_type", "")
+            if out_type == "stream":
+                text = "".join(out.get("text", []) or [])
+                if text.strip():
+                    lang = "text" if out.get("name", "stdout") != "stderr" else ""
+                    parts.append(f"```{lang}\n{text.rstrip()}\n```")
+            elif out_type == "error":
+                lines = out.get("traceback") or []
+                header = f"{out.get('ename', 'Error')}: {out.get('evalue', '')}".rstrip(": ")
+                body = "\n".join(lines) if lines else header
+                parts.append(f"```\n{body}\n```")
+            elif out_type in ("execute_result", "display_data"):
+                data = out.get("data", {}) or {}
+                text = "".join(data.get("text/plain", []) or [])
+                if text.strip():
+                    parts.append(f"```\n{text.rstrip()}\n```")
+        return "\n\n".join(parts)
+
     def _convert(self, notebook_content: dict) -> DocumentConverterResult:
         """Helper function that converts notebook JSON content to Markdown."""
         try:
@@ -84,10 +110,14 @@ class IpynbConverter(DocumentConverter):
                 elif cell_type == "code":
                     # Code cells are wrapped in Markdown code blocks
                     md_output.append(f"```python\n{''.join(source_lines)}\n```")
+                    # Text-bearing outputs (stdout/stderr streams, error
+                    # tracebacks, text results) follow their cell so the
+                    # notebook's recorded results survive conversion (#2285).
+                    md_output.append(self._render_outputs(cell.get("outputs", [])))
                 elif cell_type == "raw":
                     md_output.append(f"```\n{''.join(source_lines)}\n```")
 
-            md_text = "\n\n".join(md_output)
+            md_text = "\n\n".join(part for part in md_output if part.strip())
 
             # Check for title in notebook metadata
             title = notebook_content.get("metadata", {}).get("title", title)
