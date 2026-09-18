@@ -180,9 +180,13 @@ class RssConverter(DocumentConverter):
             entry_summary, summary_is_markup = self._get_atom_content(entry, "summary")
             entry_updated = self._get_flattened_text(entry, "updated")
             entry_content, content_is_markup = self._get_atom_content(entry, "content")
+            entry_link = self._get_entry_link(entry, base_url=doc.documentURI or "")
 
             if entry_title:
-                md_text += f"\n## {entry_title}\n"
+                heading = f"## {entry_title}"
+                if entry_link:
+                    heading = f"[{entry_title}]({entry_link})"
+                md_text += f"\n{heading}\n"
             if entry_updated:
                 md_text += f"Updated on: {entry_updated}\n"
             body_parts = (
@@ -207,6 +211,19 @@ class RssConverter(DocumentConverter):
             markdown=md_text,
             title=title,
         )
+
+    def _get_entry_link(self, entry: Element, *, base_url: str) -> str | None:
+        """Return the entry's own URL: an Atom <link href>, or an RSS <link>'s text."""
+        if entry.namespaceURI == ATOM_NAMESPACE:
+            node = self._get_child(entry, "link")
+            if node is None:
+                return None
+            href = (node.getAttribute("href") or "").strip()
+            return _resolve_url(base_url, href) if href else None
+        text = self._get_flattened_text(entry, "link")
+        if not text:
+            return None
+        return _resolve_url(base_url, text.strip())
 
     def _get_atom_content(
         self, entry: Element, tag_name: str
@@ -308,9 +325,13 @@ class RssConverter(DocumentConverter):
             description = self._get_data_by_tag_name(item, "description", kind="html")
             pubDate = self._get_flattened_text(item, "pubDate")
             content = self._get_data_by_tag_name(item, "content:encoded", kind="html")
+            item_link = self._get_entry_link(item, base_url=doc.documentURI or "")
 
             if title:
-                md_text += f"\n## {title}\n"
+                heading = f"## {title}"
+                if item_link:
+                    heading = f"[{title}]({item_link})"
+                md_text += f"\n{heading}\n"
             if pubDate:
                 md_text += f"Published on: {pubDate}\n"
             body_parts = (
