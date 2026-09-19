@@ -29,7 +29,7 @@ def _is_bing_redirect(parsed_href: ParseResult) -> bool:
     host = (parsed_href.netloc or "").lower()
     if host != "bing.com" and not host.endswith(".bing.com"):
         return False
-    return parsed_href.path.startswith("/ck/a")
+    return parsed_href.path == "/ck/a"
 
 
 class BingSerpConverter(DocumentConverter):

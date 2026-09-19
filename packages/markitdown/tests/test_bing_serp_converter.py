@@ -23,6 +23,10 @@ NORMAL_HREF = "https://example.com/profile?u=abcdef"
 
 LOOKALIKE_HREF = "https://not-bing.com/ck/a?u=a1aHR0cHM6Ly9kb2NzLnB5dGhvbi5vcmcvMy8="
 
+LOOKALIKE_PATH_HREF = (
+    "https://www.bing.com/ck/abc?u=a1aHR0cHM6Ly9kb2NzLnB5dGhvbi5vcmcvMy8="
+)
+
 
 def _serp(*hrefs: str) -> io.BytesIO:
     items = "".join(
@@ -77,3 +81,9 @@ def test_lookalike_host_is_not_treated_as_a_bing_redirect() -> None:
     markdown = _convert(LOOKALIKE_HREF)
 
     assert "](%s)" % LOOKALIKE_HREF in markdown
+
+
+def test_lookalike_path_is_not_treated_as_a_bing_redirect() -> None:
+    markdown = _convert(LOOKALIKE_PATH_HREF)
+
+    assert "](%s)" % LOOKALIKE_PATH_HREF in markdown
