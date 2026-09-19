@@ -311,33 +311,36 @@ def test_uppercase_data_image_uri_is_truncated_by_default() -> None:
 
 
 def test_file_uris() -> None:
+    expected_path = os.path.abspath("/path/to/file.txt")
+
     # Test file URI with an empty host
     file_uri = "file:///path/to/file.txt"
     netloc, path = file_uri_to_path(file_uri)
     assert netloc is None
-    assert path == "/path/to/file.txt"
+    assert path == expected_path
 
     # Test file URI with no host
     file_uri = "file:/path/to/file.txt"
     netloc, path = file_uri_to_path(file_uri)
     assert netloc is None
-    assert path == "/path/to/file.txt"
+    assert path == expected_path
 
     # Test file URI with localhost
     file_uri = "file://localhost/path/to/file.txt"
     netloc, path = file_uri_to_path(file_uri)
     assert netloc == "localhost"
-    assert path == "/path/to/file.txt"
+    assert path == expected_path
 
     # URI schemes are case-insensitive
     file_uri = "FILE:///path/to/file.txt"
     netloc, path = file_uri_to_path(file_uri)
     assert netloc is None
-    assert path == "/path/to/file.txt"
+    assert path == expected_path
 
 
 def test_convert_case_insensitive_uri_schemes(tmp_path) -> None:
     markitdown = MarkItDown()
+    expected_path = os.path.abspath("/path/to/file.txt")
 
     data_result = markitdown.convert("DATA:text/plain;base64,SGVsbG8sIFdvcmxkIQ==")
     assert data_result.markdown == "Hello, World!"
@@ -352,13 +355,13 @@ def test_convert_case_insensitive_uri_schemes(tmp_path) -> None:
     file_uri = "file:///path/to/file.txt?param=value"
     netloc, path = file_uri_to_path(file_uri)
     assert netloc is None
-    assert path == "/path/to/file.txt"
+    assert path == expected_path
 
     # Test file URI with fragment
     file_uri = "file:///path/to/file.txt#fragment"
     netloc, path = file_uri_to_path(file_uri)
     assert netloc is None
-    assert path == "/path/to/file.txt"
+    assert path == expected_path
 
 
 def test_file_uri_with_percent_encoded_windows_drive(
@@ -384,15 +387,20 @@ def test_docx_comments() -> None:
     validate_strings(result, DOCX_COMMENT_TEST_STRINGS)
 
 
-def _write_underlined_docx(path, embedded_style_map: Optional[str] = None) -> str:
+def _write_underlined_docx(
+    path,
+    embedded_style_map: Optional[str] = None,
+    *,
+    paragraph_xml: str = (
+        "<w:r><w:t>plain </w:t></w:r>"
+        '<w:r><w:rPr><w:u w:val="single"/></w:rPr><w:t>underlined</w:t></w:r>'
+    ),
+) -> str:
     """Write a minimal .docx holding one underlined run, and return its path."""
-    document_xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    document_xml = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:body>
-    <w:p>
-      <w:r><w:t>plain </w:t></w:r>
-      <w:r><w:rPr><w:u w:val="single"/></w:rPr><w:t>underlined</w:t></w:r>
-    </w:p>
+    <w:p>{paragraph_xml}</w:p>
   </w:body>
 </w:document>"""
 
@@ -435,6 +443,30 @@ def test_docx_underlined_text_is_preserved(tmp_path) -> None:
     result = MarkItDown().convert(docx_file)
 
     assert "plain <u>underlined</u>" in result.markdown
+
+
+@pytest.mark.parametrize(
+    ("run_xml", "expected"),
+    [
+        ('<w:t xml:space="preserve"> </w:t>', "First Last"),
+        ("<w:tab/>", "First Last"),
+        ("<w:t>&#160;</w:t>", "First\u00a0Last"),
+        ("<w:br/>", "First\nLast"),
+    ],
+)
+def test_docx_underlined_whitespace_is_preserved(
+    tmp_path, run_xml: str, expected: str
+) -> None:
+    docx_file = _write_underlined_docx(
+        tmp_path / "underlined_whitespace.docx",
+        paragraph_xml=(
+            "<w:r><w:t>First</w:t></w:r>"
+            f'<w:r><w:rPr><w:u w:val="single"/></w:rPr>{run_xml}</w:r>'
+            "<w:r><w:t>Last</w:t></w:r>"
+        ),
+    )
+
+    assert MarkItDown().convert(docx_file).markdown == expected
 
 
 def test_docx_embedded_style_map_overrides_underline_default(tmp_path) -> None:
@@ -1059,6 +1091,10 @@ def test_deeply_nested_rss_item_fallback() -> None:
     assert "<p>" not in result.markdown
 
 
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="The DOCX fixture embeds a POSIX file:///tmp/test_rlink.txt target.",
+)
 def test_doc_rlink() -> None:
     # Test for: CVE-2025-11849
     markitdown = MarkItDown()
@@ -1332,7 +1368,7 @@ def test_pptx_chart_with_title_text_frame() -> None:
 
 
 def test_youtube_converter_missing_title_metadata() -> None:
-    """Test that YouTubeConverter converts streams with and without title metadata without raising AssertionError."""
+    """Missing titles fall back to HTML when no video content is extracted."""
     from unittest.mock import patch
     from markitdown.converters._youtube_converter import YouTubeConverter
 
@@ -1351,8 +1387,8 @@ def test_youtube_converter_missing_title_metadata() -> None:
         html_content_no_title = b"<html><head></head><body>Video Content</body></html>"
         stream_no_title = io.BytesIO(html_content_no_title)
         result_no_title = converter.convert(stream_no_title, stream_info)
-        assert result_no_title.title == ""
-        assert "# YouTube" in result_no_title.markdown
+        assert result_no_title.title is None
+        assert result_no_title.markdown == "Video Content"
 
         # Case 2: Stream with an empty <title> tag
         html_content_empty_title = (
@@ -1360,15 +1396,35 @@ def test_youtube_converter_missing_title_metadata() -> None:
         )
         stream_empty_title = io.BytesIO(html_content_empty_title)
         result_empty_title = converter.convert(stream_empty_title, stream_info)
-        assert result_empty_title.title == ""
-        assert "# YouTube" in result_empty_title.markdown
+        assert result_empty_title.title is None
+        assert result_empty_title.markdown == "Video Content"
 
         # Case 3: Stream whose title is only available from the <title> tag
         html_content_title_tag = b"<html><head><title>Fallback Title</title></head><body>Video Content</body></html>"
         stream_title_tag = io.BytesIO(html_content_title_tag)
         result_title_tag = converter.convert(stream_title_tag, stream_info)
         assert result_title_tag.title == "Fallback Title"
-        assert "# YouTube" in result_title_tag.markdown
+        assert result_title_tag.markdown == "# YouTube\n\n## Fallback Title\n"
+
+
+def test_zip_duplicate_filenames_preserve_each_entry() -> None:
+    """Same-named ZIP entries must retain their own content and archive order."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as archive:
+        archive.writestr("notes.txt", "First archived entry.")
+        with pytest.warns(UserWarning, match="Duplicate name"):
+            archive.writestr("notes.txt", "Second archived entry.")
+    buf.seek(0)
+
+    result = MarkItDown().convert_stream(
+        buf, stream_info=StreamInfo(extension=".zip", filename="duplicate.zip")
+    )
+
+    assert result.markdown == (
+        "Content from the zip file `duplicate.zip`:\n\n"
+        "## File: notes.txt\n\nFirst archived entry.\n\n"
+        "## File: notes.txt\n\nSecond archived entry."
+    )
 
 
 def test_zip_stream_no_filename_header() -> None:
@@ -1410,6 +1466,72 @@ def test_ipynb_heading_title_preserves_leading_hash() -> None:
     }
     result = IpynbConverter()._convert(notebook)
     assert result.title == "#hashtag campaign results"
+
+
+_UTF8_BOM = b"\xef\xbb\xbf"
+
+_BOM_NOTEBOOK = {
+    "nbformat": 4,
+    "nbformat_minor": 5,
+    "metadata": {},
+    "cells": [
+        {"cell_type": "markdown", "source": ["# Quarterly notes\n"], "metadata": {}},
+        {"cell_type": "code", "source": ["print('hello')\n"], "metadata": {}},
+    ],
+}
+
+
+def test_ipynb_with_a_utf8_bom_is_still_converted() -> None:
+    """A leading BOM must not stop the notebook from being parsed."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    data = _UTF8_BOM + json.dumps(_BOM_NOTEBOOK).encode("utf-8")
+
+    result = IpynbConverter().convert(
+        io.BytesIO(data), StreamInfo(extension=".ipynb", charset="utf-8")
+    )
+
+    assert "# Quarterly notes" in result.markdown
+    assert "```python\nprint('hello')" in result.markdown
+    assert result.title == "Quarterly notes"
+
+
+def test_ipynb_with_a_utf8_bom_is_not_emitted_as_raw_json() -> None:
+    """The whole stack must not fall through to the plain-text converter."""
+    data = _UTF8_BOM + json.dumps(_BOM_NOTEBOOK).encode("utf-8")
+
+    result = MarkItDown().convert_stream(
+        io.BytesIO(data), stream_info=StreamInfo(extension=".ipynb")
+    )
+
+    assert result.markdown.startswith("# Quarterly notes")
+    assert "nbformat" not in result.markdown
+
+
+def test_ipynb_without_a_bom_is_unchanged() -> None:
+    """The case that already worked must produce exactly the same markdown."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    data = json.dumps(_BOM_NOTEBOOK).encode("utf-8")
+
+    result = IpynbConverter().convert(
+        io.BytesIO(data), StreamInfo(extension=".ipynb", charset="utf-8")
+    )
+
+    assert result.markdown == "# Quarterly notes\n\n\n```python\nprint('hello')\n\n```"
+
+
+def test_ipynb_utf8_sig_charset_still_works() -> None:
+    """A charset that already consumes the BOM must not be double-stripped."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    data = _UTF8_BOM + json.dumps(_BOM_NOTEBOOK).encode("utf-8")
+
+    result = IpynbConverter().convert(
+        io.BytesIO(data), StreamInfo(extension=".ipynb", charset="utf-8-sig")
+    )
+
+    assert "# Quarterly notes" in result.markdown
 
 
 def test_ipynb_accepts_non_ascii() -> None:
@@ -1468,6 +1590,77 @@ def test_epub_metadata_nodevalue():
 
     missing = converter._get_text_from_node(dom, "dc:date")
     assert missing is None
+
+
+_EPUB_CONTAINER = (
+    '<?xml version="1.0"?>'
+    '<container version="1.0" '
+    'xmlns="urn:oasis:names:tc:opendocument:xmlns:container">'
+    '<rootfiles><rootfile full-path="OEBPS/content.opf" '
+    'media-type="application/oebps-package+xml"/></rootfiles></container>'
+)
+
+_EPUB_OPF = (
+    '<?xml version="1.0"?>'
+    '<package xmlns="http://www.idpf.org/2007/opf" version="2.0" '
+    'unique-identifier="id">'
+    '<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">'
+    "<dc:title>Example book</dc:title></metadata>"
+    '<manifest><item id="c1" href="ch1.xhtml" '
+    'media-type="application/xhtml+xml"/></manifest>'
+    '<spine><itemref idref="c1"/></spine></package>'
+)
+
+_EPUB_CHAPTER = (
+    '<html xmlns="http://www.w3.org/1999/xhtml"><body>'
+    "<p>Chapter text.</p>"
+    '<img alt="diagram" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUg=="/>'
+    "</body></html>"
+)
+
+
+def _build_epub() -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("mimetype", "application/epub+zip")
+        zf.writestr("META-INF/container.xml", _EPUB_CONTAINER)
+        zf.writestr("OEBPS/content.opf", _EPUB_OPF)
+        zf.writestr("OEBPS/ch1.xhtml", _EPUB_CHAPTER)
+    return buf.getvalue()
+
+
+def test_epub_honors_keep_data_uris() -> None:
+    """EPUB chapters must be converted with the options the caller passed."""
+    result = MarkItDown().convert_stream(
+        io.BytesIO(_build_epub()),
+        stream_info=StreamInfo(extension=".epub"),
+        keep_data_uris=True,
+    )
+
+    assert (
+        "![diagram](data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==)" in result.markdown
+    )
+
+
+def test_epub_truncates_data_uris_by_default() -> None:
+    """Without the option, the default truncation must still apply."""
+    result = MarkItDown().convert_stream(
+        io.BytesIO(_build_epub()), stream_info=StreamInfo(extension=".epub")
+    )
+
+    assert "![diagram](data:image/png;base64...)" in result.markdown
+    assert "iVBORw0KGgo" not in result.markdown
+
+
+def test_epub_metadata_and_text_are_unchanged() -> None:
+    """The rest of the conversion must not move."""
+    result = MarkItDown().convert_stream(
+        io.BytesIO(_build_epub()), stream_info=StreamInfo(extension=".epub")
+    )
+
+    assert result.title == "Example book"
+    assert "**Title:** Example book" in result.markdown
+    assert "Chapter text." in result.markdown
 
 
 def test_json_with_late_non_ascii_character(tmp_path) -> None:
@@ -1543,6 +1736,36 @@ def test_csv_all_blank_input_returns_empty_markdown() -> None:
     assert result == ""
 
 
+@pytest.mark.parametrize(
+    "data,expected",
+    [
+        (
+            b"banner\nname,age,city\nAlice,30,Seattle\n",
+            "| banner |  |  |\n| --- | --- | --- |\n"
+            "| name | age | city |\n| Alice | 30 | Seattle |",
+        ),
+        (
+            b"name,age\nAlice\n\nBob,40,Seattle\nCarol,25\n",
+            "| name | age |  |\n| --- | --- | --- |\n"
+            "| Alice |  |  |\n|  |  |  |\n"
+            "| Bob | 40 | Seattle |\n| Carol | 25 |  |",
+        ),
+        (
+            b"name\nAlice,,\n",
+            "| name |  |  |\n| --- | --- | --- |\n| Alice |  |  |",
+        ),
+        (
+            b"name,age,city\nAlice,30\nBob\n",
+            "| name | age | city |\n| --- | --- | --- |\n"
+            "| Alice | 30 |  |\n| Bob |  |  |",
+        ),
+    ],
+    ids=["preamble", "widest-row-late", "trailing-empty-fields", "widest-header"],
+)
+def test_csv_table_matches_widest_row(data: bytes, expected: str) -> None:
+    assert _convert_csv(data) == expected
+
+
 def test_csv_pipe_in_cell_is_escaped() -> None:
     result = _convert_csv(b'name,description\nWidget,"cheap | fast"\n')
 
@@ -1604,6 +1827,20 @@ def test_csv_backslash_without_a_pipe_is_left_alone() -> None:
     result = _convert_csv(b"name,path\nWidget,C:\\temp\\file.txt\n")
 
     assert r"| Widget | C:\temp\file.txt |" in result
+
+
+@pytest.mark.parametrize(
+    "suffix,escaped_suffix",
+    [("", ""), ("|", r"\|"), ("x|", r"x\|")],
+)
+def test_csv_long_backslash_runs(suffix: str, escaped_suffix: str) -> None:
+    backslashes = "\\" * 65_536
+    value = backslashes + suffix
+    expected = backslashes * (2 if suffix == "|" else 1) + escaped_suffix
+
+    result = _convert_csv(f"{value}\n{value}\n".encode("utf-8"), charset="utf-8")
+
+    assert result == f"| {expected} |\n| --- |\n| {expected} |"
 
 
 # ---------------------------------------------------------------------------
@@ -1669,6 +1906,7 @@ if __name__ == "__main__":
         test_docx_comments,
         test_docx_zip_filename_casing_mismatch,
         test_docx_zip_filename_non_casing_mismatch_still_rejected,
+        test_zip_duplicate_filenames_preserve_each_entry,
         test_input_as_strings,
         test_markitdown_remote,
         test_speech_transcription,

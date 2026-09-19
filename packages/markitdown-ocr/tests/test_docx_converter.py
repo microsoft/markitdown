@@ -4,10 +4,8 @@ Unit tests for DocxConverterWithOCR.
 For each DOCX test file: convert with a mock OCR service then compare the
 full output string against the expected snapshot.
 
-OCR block format used by the converter:
-    *[Image OCR]
-    MOCK_OCR_TEXT_12345
-    [End OCR]*
+OCR blocks pass through the shared HTML converter, including literal-text
+escaping and two-space Markdown hard breaks in direct conversion.
 """
 
 import io
@@ -30,6 +28,7 @@ from markitdown import StreamInfo  # noqa: E402
 TEST_DATA_DIR = Path(__file__).parent / "ocr_test_data"
 
 _MOCK_TEXT = "MOCK_OCR_TEXT_12345"
+_MOCK_BLOCK = "*[Image OCR]  \nMOCK\\_OCR\\_TEXT\\_12345  \n[End OCR]*"
 
 
 class MockOCRService:
@@ -52,7 +51,7 @@ def _convert(filename: str, ocr_service: MockOCRService) -> str:
     with open(path, "rb") as f:
         return converter.convert(
             f, StreamInfo(extension=".docx"), ocr_service=ocr_service
-        ).text_content
+        ).markdown
 
 
 # ---------------------------------------------------------------------------
@@ -63,7 +62,7 @@ def _convert(filename: str, ocr_service: MockOCRService) -> str:
 def test_docx_image_start(svc: MockOCRService) -> None:
     expected = (
         "Document with Image at Start\n\n"
-        "*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*\n\n"
+        f"{_MOCK_BLOCK}\n\n"
         "This is the main content after the header image.\n\n"
         "More text content here."
     )
@@ -80,7 +79,7 @@ def test_docx_image_middle(svc: MockOCRService) -> None:
         "# Introduction\n\n"
         "This is the introduction section.\n\n"
         "We will see an image below.\n\n"
-        "*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*\n\n"
+        f"{_MOCK_BLOCK}\n\n"
         "# Analysis\n\n"
         "This section comes after the image."
     )
@@ -98,7 +97,7 @@ def test_docx_image_end(svc: MockOCRService) -> None:
         "Main findings of the report.\n\n"
         "Details and analysis.\n\n"
         "Recommendations.\n\n"
-        "*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*"
+        f"{_MOCK_BLOCK}"
     )
     assert _convert("docx_image_end.docx", svc) == expected
 
@@ -112,9 +111,9 @@ def test_docx_multiple_images(svc: MockOCRService) -> None:
     expected = (
         "Multi-Image Document\n\n"
         "First section\n\n"
-        "*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*\n\n"
+        f"{_MOCK_BLOCK}\n\n"
         "Second section with another image\n\n"
-        "*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*\n\n"
+        f"{_MOCK_BLOCK}\n\n"
         "Conclusion"
     )
     assert _convert("docx_multiple_images.docx", svc) == expected
@@ -130,7 +129,7 @@ def test_docx_multipage(svc: MockOCRService) -> None:
         "# Page 1 - Mixed Content\n\n"
         "This is the first paragraph on page 1.\n\n"
         "BEFORE IMAGE: Important content appears here.\n\n"
-        "*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*\n\n"
+        f"{_MOCK_BLOCK}\n\n"
         "AFTER IMAGE: This content follows the image.\n\n"
         "More text on page 1.\n\n"
         "# Page 2 - Image at End\n\n"
@@ -138,9 +137,9 @@ def test_docx_multipage(svc: MockOCRService) -> None:
         "Multiple paragraphs of text.\n\n"
         "Building up to the image...\n\n"
         "Final paragraph before image.\n\n"
-        "*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*\n\n"
+        f"{_MOCK_BLOCK}\n\n"
         "# Page 3 - Image at Start\n\n"
-        "*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*\n\n"
+        f"{_MOCK_BLOCK}\n\n"
         "Content that follows the header image.\n\n"
         "AFTER IMAGE: This text is after the image."
     )
@@ -161,53 +160,9 @@ def test_docx_complex_layout(svc: MockOCRService) -> None:
         "| Authentication | Active |\n"
         "| Encryption | Enabled |\n\n"
         "Security notice:\n\n"
-        "*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*"
+        f"{_MOCK_BLOCK}"
     )
     assert _convert("docx_complex_layout.docx", svc) == expected
-
-
-# ---------------------------------------------------------------------------
-# _inject_placeholders — internal unit tests (no file I/O)
-# ---------------------------------------------------------------------------
-
-
-def test_inject_placeholders_single_image() -> None:
-    converter = DocxConverterWithOCR()
-    html = "<p>Before</p><img src='x.png'/><p>After</p>"
-    result_html, texts = converter._inject_placeholders(html, {"rId1": "TEXT"})
-    assert "<img" not in result_html
-    assert "MARKITDOWNOCRBLOCK0" in result_html
-    assert texts == ["TEXT"]
-
-
-def test_inject_placeholders_two_images_sequential_tokens() -> None:
-    converter = DocxConverterWithOCR()
-    html = "<img src='a.png'/><p>Mid</p><img src='b.png'/>"
-    result_html, texts = converter._inject_placeholders(
-        html, {"rId1": "FIRST", "rId2": "SECOND"}
-    )
-    assert "MARKITDOWNOCRBLOCK0" in result_html
-    assert "MARKITDOWNOCRBLOCK1" in result_html
-    assert result_html.index("MARKITDOWNOCRBLOCK0") < result_html.index(
-        "MARKITDOWNOCRBLOCK1"
-    )
-    assert len(texts) == 2
-
-
-def test_inject_placeholders_no_img_tag_appends_at_end() -> None:
-    converter = DocxConverterWithOCR()
-    html = "<p>No images</p>"
-    result_html, texts = converter._inject_placeholders(html, {"rId1": "ORPHAN"})
-    assert "MARKITDOWNOCRBLOCK0" in result_html
-    assert texts == ["ORPHAN"]
-
-
-def test_inject_placeholders_empty_map_leaves_html_unchanged() -> None:
-    converter = DocxConverterWithOCR()
-    html = "<p>Content</p><img src='pic.jpg'/>"
-    result_html, texts = converter._inject_placeholders(html, {})
-    assert result_html == html
-    assert texts == []
 
 
 # ---------------------------------------------------------------------------
@@ -221,9 +176,59 @@ def test_docx_no_ocr_service_no_tags() -> None:
         pytest.skip(f"Test file not found: {path}")
     converter = DocxConverterWithOCR()
     with open(path, "rb") as f:
-        md = converter.convert(f, StreamInfo(extension=".docx")).text_content
+        md = converter.convert(f, StreamInfo(extension=".docx")).markdown
     assert "*[Image OCR]" not in md
     assert "[End OCR]*" not in md
+
+
+@pytest.mark.parametrize("double_strike", [False, True])
+@pytest.mark.parametrize("use_ocr", [False, True])
+def test_docx_styles_with_redundant_default_namespace(
+    svc: MockOCRService, use_ocr: bool, double_strike: bool
+) -> None:
+    path = TEST_DATA_DIR / "docx_image_middle.docx"
+    if not path.exists():
+        pytest.skip(f"Test file not found: {path}")
+    original = path.read_bytes()
+    fixture = io.BytesIO()
+    namespace = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    declaration = f'xmlns:w="{namespace}"'.encode("utf-8")
+    with zipfile.ZipFile(io.BytesIO(original)) as source, zipfile.ZipFile(
+        fixture, "w"
+    ) as target:
+        for item in source.infolist():
+            content = source.read(item)
+            if item.filename == "word/styles.xml":
+                if double_strike:
+                    assert content.count(b"</w:styles>") == 1
+                    content = content.replace(
+                        b"</w:styles>",
+                        b'<w:style w:type="character" w:styleId="DoubleStrike">'
+                        b'<w:name w:val="Double Strike"/>'
+                        b'<w:rPr><w:dstrike w:val="1"/></w:rPr>'
+                        b"</w:style></w:styles>",
+                        1,
+                    )
+                assert content.count(declaration) == 1
+                content = content.replace(
+                    declaration, declaration + f' xmlns="{namespace}"'.encode(), 1
+                )
+            target.writestr(item, content)
+
+    converter = DocxConverterWithOCR()
+    service = svc if use_ocr else None
+    expected = converter.convert(
+        io.BytesIO(original), StreamInfo(extension=".docx"), ocr_service=service
+    ).markdown
+    fixture.seek(0)
+    actual = converter.convert(
+        fixture, StreamInfo(extension=".docx"), ocr_service=service
+    ).markdown
+
+    assert "# Introduction" in actual
+    assert actual == expected
+    if use_ocr:
+        assert _MOCK_BLOCK in actual
 
 
 # ---------------------------------------------------------------------------
@@ -231,15 +236,19 @@ def test_docx_no_ocr_service_no_tags() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _underlined_docx(tmp_path: Path) -> Path:
+def _underlined_docx(
+    tmp_path: Path,
+    *,
+    paragraph_xml: str = (
+        "<w:r><w:t>plain </w:t></w:r>"
+        '<w:r><w:rPr><w:u w:val="single"/></w:rPr><w:t>underlined</w:t></w:r>'
+    ),
+) -> Path:
     docx_file = tmp_path / "underlined.docx"
-    document_xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    document_xml = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:body>
-    <w:p>
-      <w:r><w:t>plain </w:t></w:r>
-      <w:r><w:rPr><w:u w:val="single"/></w:rPr><w:t>underlined</w:t></w:r>
-    </w:p>
+    <w:p>{paragraph_xml}</w:p>
   </w:body>
 </w:document>"""
 
@@ -283,6 +292,41 @@ def test_docx_underlined_text_is_preserved_with_ocr(
     assert "plain <u>underlined</u>" in md
 
 
+@pytest.mark.parametrize("use_ocr", [False, True])
+@pytest.mark.parametrize(
+    ("run_xml", "expected"),
+    [
+        ('<w:t xml:space="preserve"> </w:t>', "First Last"),
+        ("<w:tab/>", "First Last"),
+        ("<w:t>&#160;</w:t>", "First\u00a0Last"),
+        # Direct conversion keeps the two-space hard break; the dispatcher strips it.
+        ("<w:br/>", "First  \nLast"),
+    ],
+)
+def test_docx_underlined_whitespace_is_preserved(
+    tmp_path: Path,
+    svc: MockOCRService,
+    use_ocr: bool,
+    run_xml: str,
+    expected: str,
+) -> None:
+    path = _underlined_docx(
+        tmp_path,
+        paragraph_xml=(
+            "<w:r><w:t>First</w:t></w:r>"
+            f'<w:r><w:rPr><w:u w:val="single"/></w:rPr>{run_xml}</w:r>'
+            "<w:r><w:t>Last</w:t></w:r>"
+        ),
+    )
+    converter = DocxConverterWithOCR()
+    with path.open("rb") as stream:
+        result = converter.convert(
+            stream, StreamInfo(extension=".docx"), ocr_service=svc if use_ocr else None
+        )
+
+    assert result.markdown == expected
+
+
 # ---------------------------------------------------------------------------
 # ZIP local file header casing mismatch
 # ---------------------------------------------------------------------------
@@ -310,8 +354,7 @@ def test_docx_zip_filename_casing_mismatch_preserves_ocr(svc: MockOCRService) ->
     """OCR output survives a .docx whose local file headers disagree with the
     central directory on casing.
 
-    The image extraction swallows every exception, so an unrepaired stream used
-    to yield an empty OCR map and silently drop the OCR blocks rather than fail.
+    The inherited core converter repairs the archive before Mammoth opens images.
     """
     path = TEST_DATA_DIR / "docx_image_middle.docx"
     if not path.exists():
@@ -335,5 +378,5 @@ def test_docx_zip_filename_casing_mismatch_preserves_ocr(svc: MockOCRService) ->
         io.BytesIO(mismatched), StreamInfo(extension=".docx"), ocr_service=svc
     ).markdown
 
-    assert _MOCK_TEXT in actual
+    assert _MOCK_BLOCK in actual
     assert actual == expected

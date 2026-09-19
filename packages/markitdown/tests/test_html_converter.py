@@ -1,14 +1,44 @@
 import io
 
+import pytest
+from bs4 import BeautifulSoup
+
 from markitdown import MarkItDown
+from markitdown.converters._markdownify import _CustomMarkdownify
 
 
-def _convert_html(html: str) -> str:
+def _convert_html(html: str, **kwargs) -> str:
     result = MarkItDown().convert_stream(
         io.BytesIO(html.encode("utf-8")),
         file_extension=".html",
+        **kwargs,
     )
     return result.markdown
+
+
+@pytest.mark.parametrize(
+    "whitespace", ["", " ", "  ", "\t", "\n", "\r\n", "\u00a0", " \t\n\u00a0 "]
+)
+def test_underline_preserves_whitespace_verbatim(whitespace: str) -> None:
+    element = BeautifulSoup("<u></u>", "html.parser").u
+
+    assert _CustomMarkdownify().convert_u(element, whitespace) == whitespace
+
+
+@pytest.mark.parametrize(
+    ("content", "expected"),
+    [
+        ("", "FirstLast"),
+        (" ", "First Last"),
+        ("\t", "First Last"),
+        ("&#160;", "First\u00a0Last"),
+        ("<br>", "First\nLast"),
+        ("word", "First<u>word</u>Last"),
+        (" word ", "First <u>word</u> Last"),
+    ],
+)
+def test_html_underlined_content_is_preserved(content: str, expected: str) -> None:
+    assert _convert_html(f"<p>First<u>{content}</u>Last</p>") == expected
 
 
 def test_preserves_non_utf8_percent_encoded_href_path() -> None:
@@ -63,3 +93,61 @@ def test_html_href_does_not_quote_query_or_fragment() -> None:
     markdown = _convert_html(f'<a href="{href}">example</a>')
 
     assert f"[example]({expected_href})" in markdown
+
+
+def test_img_prefers_data_src_over_placeholder_data_uri() -> None:
+    placeholder = (
+        "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBTAA7"
+    )
+    real_src = "https://example.com/photo.jpg"
+    html = (
+        f'<img src="{placeholder}" data-src="{real_src}" alt="A photo" loading="lazy">'
+    )
+
+    markdown = _convert_html(html)
+
+    assert f"![A photo]({real_src})" in markdown
+    assert placeholder not in markdown
+
+
+def test_img_uses_real_src_over_data_src_when_both_present() -> None:
+    real_src = "https://example.com/photo.jpg"
+    other_src = "https://example.com/photo-alt.jpg"
+    html = f'<img src="{real_src}" data-src="{other_src}" alt="A photo">'
+
+    markdown = _convert_html(html)
+
+    assert f"![A photo]({real_src})" in markdown
+
+
+def test_img_falls_back_to_data_src_when_src_missing() -> None:
+    real_src = "https://example.com/photo.jpg"
+    html = f'<img data-src="{real_src}" alt="A photo">'
+
+    markdown = _convert_html(html)
+
+    assert f"![A photo]({real_src})" in markdown
+
+
+def test_img_keeps_truncated_data_uri_when_no_data_src() -> None:
+    placeholder = (
+        "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBTAA7"
+    )
+    html = f'<img src="{placeholder}" alt="A photo">'
+
+    markdown = _convert_html(html)
+
+    assert "![A photo](data:image/gif;base64...)" in markdown
+
+
+def test_img_keeps_embedded_data_uri_over_data_src_when_keeping_data_uris() -> None:
+    embedded = (
+        "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBTAA7"
+    )
+    other_src = "https://example.com/photo.jpg"
+    html = f'<img src="{embedded}" data-src="{other_src}" alt="A photo">'
+
+    markdown = _convert_html(html, keep_data_uris=True)
+
+    assert f"![A photo]({embedded})" in markdown
+    assert other_src not in markdown

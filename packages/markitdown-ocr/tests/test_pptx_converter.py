@@ -4,13 +4,12 @@ Unit tests for PptxConverterWithOCR.
 For each PPTX test file: convert with a mock OCR service then compare the
 full output string against the expected snapshot.
 
-OCR block format used by the converter:
+OCR blocks use shared HTML escaping and Markdown hard breaks:
     *[Image OCR]
-    MOCK_OCR_TEXT_12345
+    MOCK\\_OCR\\_TEXT\\_12345
     [End OCR]*
 
-Note: PPTX slide text uses literal backslash-n (\\n) sequences from the
-underlying PPTX converter template; OCR blocks use real newlines.
+Slide text, notes, and layout come from the core PPTX converter.
 """
 
 import sys
@@ -30,7 +29,7 @@ from markitdown import StreamInfo  # noqa: E402
 TEST_DATA_DIR = Path(__file__).parent / "ocr_test_data"
 
 _MOCK_TEXT = "MOCK_OCR_TEXT_12345"
-_OCR_BLOCK = f"*[Image OCR]\n{_MOCK_TEXT}\n[End OCR]*"
+_OCR_BLOCK = "*[Image OCR]  \nMOCK\\_OCR\\_TEXT\\_12345  \n[End OCR]*"
 
 
 class MockOCRService:
@@ -65,10 +64,7 @@ def _convert(filename: str, ocr_service: MockOCRService) -> str:
 
 def test_pptx_image_start(svc: MockOCRService) -> None:
     # Slide 1: title "Welcome" followed by an image
-    expected = (
-        "\\n\\n<!-- Slide number: 1 -->\\n# Welcome\\n\\n"
-        "\n*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*"
-    )
+    expected = "<!-- Slide number: 1 -->\n# Welcome\n\n\n" + _OCR_BLOCK
     assert _convert("pptx_image_start.pptx", svc) == expected
 
 
@@ -80,10 +76,10 @@ def test_pptx_image_start(svc: MockOCRService) -> None:
 def test_pptx_image_middle(svc: MockOCRService) -> None:
     # Slide 1: Introduction | Slide 2: Architecture + image | Slide 3: Conclusion  # noqa: E501
     expected = (
-        "\\n\\n<!-- Slide number: 1 -->\\n# Introduction"
-        "\\n\\n\\n\\n<!-- Slide number: 2 -->\\n# Architecture\\n\\n"
-        "\n*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*"
-        "\\n\\n<!-- Slide number: 3 -->\\n# Conclusion\\n\\n"
+        "<!-- Slide number: 1 -->\n# Introduction"
+        "\n\n<!-- Slide number: 2 -->\n# Architecture\n\n\n"
+        + _OCR_BLOCK
+        + "\n\n<!-- Slide number: 3 -->\n# Conclusion"
     )
     assert _convert("pptx_image_middle.pptx", svc) == expected
 
@@ -96,9 +92,8 @@ def test_pptx_image_middle(svc: MockOCRService) -> None:
 def test_pptx_image_end(svc: MockOCRService) -> None:
     # Slide 1: Presentation | Slide 2: Thank You + image
     expected = (
-        "\\n\\n<!-- Slide number: 1 -->\\n# Presentation"
-        "\\n\\n\\n\\n<!-- Slide number: 2 -->\\n# Thank You\\n\\n"
-        "\n*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*"
+        "<!-- Slide number: 1 -->\n# Presentation"
+        "\n\n<!-- Slide number: 2 -->\n# Thank You\n\n\n" + _OCR_BLOCK
     )
     assert _convert("pptx_image_end.pptx", svc) == expected
 
@@ -110,11 +105,7 @@ def test_pptx_image_end(svc: MockOCRService) -> None:
 
 def test_pptx_multiple_images(svc: MockOCRService) -> None:
     # Slide 1: two images, no title text
-    expected = (
-        "\\n\\n<!-- Slide number: 1 -->\\n# \\n"
-        "\n*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*"
-        "\n\n*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*"
-    )
+    expected = "<!-- Slide number: 1 -->\n\n" + _OCR_BLOCK + "\n\n" + _OCR_BLOCK
     assert _convert("pptx_multiple_images.pptx", svc) == expected
 
 
@@ -125,9 +116,8 @@ def test_pptx_multiple_images(svc: MockOCRService) -> None:
 
 def test_pptx_complex_layout(svc: MockOCRService) -> None:
     expected = (
-        "\\n\\n<!-- Slide number: 1 -->\\n# Product Comparison"
-        "\\n\\nOur products lead the market\\n"
-        "\n*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*"
+        "<!-- Slide number: 1 -->\n# Product Comparison"
+        "\n\nOur products lead the market\n\n" + _OCR_BLOCK
     )
     assert _convert("pptx_complex_layout.pptx", svc) == expected
 

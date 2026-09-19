@@ -7,8 +7,9 @@ import struct
 from unittest.mock import patch
 
 import olefile
+import pytest
 
-from markitdown import MarkItDown
+from markitdown import DocumentConverterResult, MarkItDown
 from markitdown._stream_info import StreamInfo
 from markitdown.converters._outlook_msg_converter import OutlookMsgConverter
 
@@ -104,13 +105,144 @@ def _fake_olefile(streams: dict):
     return _FakeOleFileIO
 
 
-def _convert(streams: dict) -> str:
+def _convert_result(streams: dict) -> DocumentConverterResult:
     with patch.object(olefile, "OleFileIO", _fake_olefile(streams)):
-        return (
-            OutlookMsgConverter()
-            .convert(io.BytesIO(b""), StreamInfo(extension=".msg"))
-            .markdown
+        return OutlookMsgConverter().convert(
+            io.BytesIO(b""), StreamInfo(extension=".msg")
         )
+
+
+def _convert(streams: dict) -> str:
+    return _convert_result(streams).markdown
+
+
+@pytest.mark.parametrize("codepage", [1252, 0, 99999, 20127])
+@pytest.mark.parametrize("terminator", [b"\x00", b"\x00\x00"])
+def test_ansi_terminators_are_removed(codepage: int, terminator: bytes) -> None:
+    """Strip terminators with declared, detected, and contradicted code pages."""
+    streams = _ansi_streams(codepage=codepage)
+    for path in streams:
+        if path.endswith("001E"):
+            streams[path] = b" \t" + streams[path] + b"\r\n " + terminator
+
+    result = _convert_result(streams)
+
+    assert result.title == SUBJECT
+    assert result.markdown == (
+        f"# Email Message\n\n**From:** {SENDER}\n**To:** {RECIPIENT}\n"
+        f"**Subject:** {SUBJECT}\n\n## Content\n\n{BODY}"
+    )
+
+
+@pytest.mark.parametrize("codepage", [1252, 0])
+@pytest.mark.parametrize("value", [b"", b"\x00", b"\x00\x00"])
+def test_empty_ansi_properties_are_omitted(codepage: int, value: bytes) -> None:
+    streams = _ansi_streams(codepage=codepage)
+    for path in streams:
+        if path.endswith("001E"):
+            streams[path] = value
+
+    result = _convert_result(streams)
+
+    assert not result.title
+    assert result.markdown == "# Email Message\n\n\n## Content"
+
+
+def test_ansi_terminators_are_removed_without_a_detected_charset() -> None:
+    streams = _ansi_streams(encoding="utf-8", codepage=0)
+    for path in streams:
+        streams[path] += b"\x00"
+    with patch("markitdown.converters._outlook_msg_converter.from_bytes") as detect:
+        detect.return_value.best.return_value = None
+        result = _convert_result(streams)
+
+    assert result.title == SUBJECT
+    assert result.markdown.endswith(BODY)
+    assert "\x00" not in result.markdown
+
+
+@pytest.mark.parametrize(
+    "codepage, value, expected",
+    [
+        (50220, b"\x1b$BF|K\\8l\x1b(B", "日本語"),
+        (50221, b"\x1b(I6@6E\x1b(B", "ｶﾀｶﾅ"),
+        (50221, b"\x1b$BF|K\\\x1b(I6@6E\x1b(B ABC", "日本ｶﾀｶﾅ ABC"),
+        (50222, b"Plain ASCII", "Plain ASCII"),
+        (50222, b"\x0e6@6E\x0f", "ｶﾀｶﾅ"),
+        (50222, b"ABC \x0e6@6E\x0f XYZ", "ABC ｶﾀｶﾅ XYZ"),
+        # SI must restore the preceding designation, which may not be ASCII.
+        (50222, b"\x1b$BF|\x0e6@6E\x0fK\\\x1b(B", "日ｶﾀｶﾅ本"),
+        (50222, b"\x1b(J\\\x0e6@6E\x0f~\x1b(B", "¥ｶﾀｶﾅ‾"),
+        (50222, b"\x0e6@\x0f/\x0e6E\x0f", "ｶﾀ/ｶﾅ"),
+        (50222, b"\x0e6@6E", "ｶﾀｶﾅ"),
+    ],
+)
+def test_japanese_codepages_decode_without_detection(
+    codepage: int, value: bytes, expected: str
+) -> None:
+    """Use literal wire bytes so an incorrect encoder cannot mask a decoder bug."""
+    streams = {
+        f"__substg1.0_{tag}001E": value + b"\x00"
+        for tag in (SENDER_TAG, RECIPIENT_TAG, SUBJECT_TAG, BODY_TAG)
+    }
+    streams["__properties_version1.0"] = _properties_stream(
+        {PR_MESSAGE_CODEPAGE: codepage}
+    )
+    with patch(
+        "markitdown.converters._outlook_msg_converter.from_bytes",
+        side_effect=AssertionError("The declared Japanese code page must be honored"),
+    ):
+        result = _convert_result(streams)
+
+    assert result.title == expected
+    assert result.markdown == (
+        f"# Email Message\n\n**From:** {expected}\n**To:** {expected}\n"
+        f"**Subject:** {expected}\n\n## Content\n\n{expected}"
+    )
+
+
+@pytest.mark.parametrize(
+    "codepage, body",
+    [(50221, b"\x1b(I6@6E\x1b(B"), (50222, b"\x0e6@6E\x0f")],
+)
+def test_japanese_internet_codepage_decodes_body(codepage: int, body: bytes) -> None:
+    streams = {
+        "__substg1.0_0037001E": AMBIGUOUS_LATIN.encode("cp1252") + b"\x00",
+        "__substg1.0_1000001E": body + b"\x00",
+        "__properties_version1.0": _properties_stream(
+            {PR_MESSAGE_CODEPAGE: 1252, PR_INTERNET_CPID: codepage}
+        ),
+    }
+    with patch(
+        "markitdown.converters._outlook_msg_converter.from_bytes",
+        side_effect=AssertionError("The declared code pages must be honored"),
+    ):
+        result = _convert_result(streams)
+
+    assert result.title == AMBIGUOUS_LATIN
+    assert result.markdown == (
+        f"# Email Message\n\n**Subject:** {AMBIGUOUS_LATIN}\n\n## Content\n\nｶﾀｶﾅ"
+    )
+
+
+@pytest.mark.parametrize(
+    "codepage, value",
+    [(50221, b"\x1b(I~\x1b(B"), (50222, b"\x0e~\x0f")],
+)
+def test_invalid_japanese_bytes_fall_back_to_detection(
+    codepage: int, value: bytes
+) -> None:
+    """Invalid Katakana must still reach detection with the original bytes."""
+    streams = {
+        "__substg1.0_0037001E": value + b"\x00",
+        "__properties_version1.0": _properties_stream({PR_MESSAGE_CODEPAGE: codepage}),
+    }
+    with patch("markitdown.converters._outlook_msg_converter.from_bytes") as detect:
+        detect.return_value.best.return_value = "Recovered subject"
+        result = _convert_result(streams)
+
+    detect.assert_called_once_with(value)
+    assert result.title == "Recovered subject"
 
 
 def test_ansi_message_keeps_headers_and_body() -> None:
@@ -259,6 +391,4 @@ def test_real_unicode_fixture_still_converts() -> None:
 
 
 if __name__ == "__main__":
-    import pytest
-
     pytest.main([__file__, "-v"])
