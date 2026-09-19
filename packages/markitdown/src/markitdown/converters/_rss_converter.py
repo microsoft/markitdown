@@ -185,7 +185,7 @@ class RssConverter(DocumentConverter):
             if entry_title:
                 heading = f"## {entry_title}"
                 if entry_link:
-                    heading = f"[{entry_title}]({entry_link})"
+                    heading = f"## [{entry_title}]({entry_link})"
                 md_text += f"\n{heading}\n"
             if entry_updated:
                 md_text += f"Updated on: {entry_updated}\n"
