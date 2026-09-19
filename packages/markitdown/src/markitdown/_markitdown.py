@@ -544,13 +544,14 @@ class MarkItDown:
         charset: Optional[str] = None
 
         if "content-type" in response.headers:
-            parts = response.headers["content-type"].split(";")
-            mimetype = parts.pop(0).strip()
-            for part in parts:
-                if part.strip().startswith("charset="):
-                    _charset = part.split("=")[1].strip()
-                    if len(_charset) > 0:
-                        charset = _charset
+            content_type = response.headers["content-type"]
+            mimetype = content_type.split(";", 1)[0].strip()
+            # A semicolon inside a quoted parameter is not a delimiter.
+            message = Message()
+            message["content-type"] = content_type
+            _charset = message.get_param("charset")
+            if isinstance(_charset, str) and _charset.strip():
+                charset = _charset.strip()
 
         # If there is a content-disposition header, get the filename and possibly the extension
         filename: Optional[str] = None
