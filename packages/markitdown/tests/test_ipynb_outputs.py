@@ -1,6 +1,7 @@
 """Code cell outputs (streams, errors, text results) survive conversion."""
 import io
 import json
+import re
 
 from markitdown import MarkItDown, StreamInfo
 
@@ -42,3 +43,29 @@ def test_no_outputs_leaves_cell_unchanged():
     ])
     result = MarkItDown().convert_stream(buf, stream_info=StreamInfo(extension=".ipynb"))
     assert result.markdown.strip() == "```python\nx = 1\n```"
+
+def test_output_containing_backticks_gets_longer_fence():
+    """A printed ``` run must not close the output fence early."""
+    nb = {
+        "cells": [
+            {
+                "cell_type": "code",
+                "execution_count": 1,
+                "metadata": {},
+                "source": ["print(markdown_example)"],
+                "outputs": [
+                    {"output_type": "stream", "name": "stdout", "text": ["before\n```\nafter\n"]}
+                ],
+            }
+        ],
+        "metadata": {},
+        "nbformat": 4,
+        "nbformat_minor": 5,
+    }
+    buf = io.BytesIO(json.dumps(nb).encode())
+    result = MarkItDown().convert_stream(buf, stream_info=StreamInfo(extension=".ipynb"))
+    md = result.markdown
+    assert "````text\nbefore\n```\nafter" in md
+    fences = [len(run) for run in re.findall(r"^`+", md, re.MULTILINE)]
+    # source fence stays 3 (no backticks in it), output fence grows to 4
+    assert 4 in fences
