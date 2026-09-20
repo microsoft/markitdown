@@ -14,6 +14,7 @@ MarkItDown currently supports the conversion from:
 - PowerPoint
 - Word
 - Excel
+- OpenDocument (ODT, ODS, ODP, and the flat FODT/FODS/FODP variants)
 - Images (EXIF metadata and OCR)
 - Audio (EXIF metadata and speech transcription)
 - HTML
