@@ -268,6 +268,12 @@ def test_data_uris() -> None:
     assert attributes["charset"] == "utf-8"
     assert data == b"Hello, World!"
 
+    data_uri = "data:text/plain;charset=utf%2D8,Hello%2C%20World%21"
+    mime_type, attributes, data = parse_data_uri(data_uri)
+    assert mime_type == "text/plain"
+    assert attributes["charset"] == "utf-8"
+    assert data == b"Hello, World!"
+
     data_uri = "data:text/plain;CHARSET=utf-8;BASE64,SGVsbG8sIFdvcmxkIQ=="
     mime_type, attributes, data = parse_data_uri(data_uri)
     assert mime_type == "text/plain"
