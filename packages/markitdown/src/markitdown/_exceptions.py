@@ -73,4 +73,10 @@ class FileConversionException(MarkItDownException):
                     else:
                         message += f" - {type(attempt.converter).__name__} threw {attempt.exc_info[0].__name__} with message: {attempt.exc_info[1]}\n"
 
+                        if isinstance(attempt.exc_info[1], UnicodeDecodeError):
+                            message += (
+                                "The charset may have been automatically guessed incorrectly. "
+                                "If you didn't specify the charset, please retry with an explicitly defined one.\n"
+                            )
+
         super().__init__(message)

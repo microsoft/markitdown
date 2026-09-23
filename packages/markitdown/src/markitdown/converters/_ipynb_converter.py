@@ -38,6 +38,8 @@ class IpynbConverter(DocumentConverter):
                         "nbformat" in notebook_content
                         and "nbformat_minor" in notebook_content
                     )
+                except (ValueError, LookupError):
+                    return False
                 finally:
                     file_stream.seek(cur_pos)
 
@@ -52,6 +54,11 @@ class IpynbConverter(DocumentConverter):
         # Parse and convert the notebook
         encoding = stream_info.charset or "utf-8"
         notebook_content = file_stream.read().decode(encoding=encoding)
+
+        # Editors and Windows tooling prepend a UTF-8 BOM, which json rejects
+        # outright; strip it so the notebook is read as a notebook.
+        notebook_content = notebook_content.lstrip("\ufeff")
+
         return self._convert(json.loads(notebook_content))
 
     def _convert(self, notebook_content: dict) -> DocumentConverterResult:
@@ -71,7 +78,7 @@ class IpynbConverter(DocumentConverter):
                     if title is None:
                         for line in source_lines:
                             if line.startswith("# "):
-                                title = line.lstrip("# ").strip()
+                                title = line.removeprefix("# ").strip()
                                 break
 
                 elif cell_type == "code":
