@@ -269,12 +269,30 @@ def _handle_output(args, result: DocumentConverterResult):
         with open(args.output, "w", encoding="utf-8") as f:
             f.write(result.markdown)
     else:
-        # Handle stdout encoding errors more gracefully
-        print(
-            result.markdown.encode(sys.stdout.encoding, errors="replace").decode(
-                sys.stdout.encoding
+        # On Windows (and other locale-restricted shells) ``sys.stdout`` is
+        # bound to the system codepage — cp1252, gbk, etc. Many .docx /
+        # .pptx / .pdf inputs contain characters those codecs can't encode
+        # (bullets, em-dashes, CJK), and the previous ``errors="replace"``
+        # round-trip silently lost them, while older Python builds raised
+        # ``UnicodeEncodeError: 'charmap' codec can't encode characters``.
+        # Reconfigure stdout to UTF-8 first so users redirecting to a file
+        # (``markitdown foo.docx > foo.md``) get a faithful, lossless
+        # conversion. ``reconfigure`` exists on Python 3.7+; the lossy
+        # replace path remains as a defensive fallback for unusual stdout
+        # objects (test-runner captures, embedded interpreters) where
+        # reconfiguration isn't available. See markitdown#1802 / #1788.
+        try:
+            if hasattr(sys.stdout, "reconfigure"):
+                sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        except (OSError, ValueError):
+            pass
+        try:
+            print(result.markdown)
+        except UnicodeEncodeError:
+            target = sys.stdout.encoding or "utf-8"
+            print(
+                result.markdown.encode(target, errors="replace").decode(target)
             )
-        )
 
 
 def _exit_with_error(message: str):
