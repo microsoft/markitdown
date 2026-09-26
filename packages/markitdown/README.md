@@ -53,3 +53,14 @@ trademarks or logos is subject to and must follow
 [Microsoft's Trademark & Brand Guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks/usage/general).
 Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship.
 Any use of third-party trademarks or logos are subject to those third-party's policies.
+
+### Optional PDF text recovery
+
+Install `markitdown[pdf,pdf-recovery]` to enable local PyMuPDF recovery for
+plain-text pages truncated around inline images. Recovery also works with
+compressed page streams and empty primary text. A replacement must extend the
+primary word sequence; pages already recognized as tables/forms retain their
+Markdown. The normal extraction path is retained when no page can be recovered
+or the optional backend fails. This is conservative text recovery, not OCR;
+it does not recover every PDF layout or text missing inside a table/form.
+The `pdf-recovery` extra is separate from `all` and `pdf`.
