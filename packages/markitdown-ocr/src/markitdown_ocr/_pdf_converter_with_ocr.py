@@ -196,9 +196,22 @@ class PdfConverterWithOCR(DocumentConverter):
                         if not text_content.strip():
                             try:
                                 ocr_text = self._ocr_page(page, ocr_service)
-                            except Exception as e:
-                                ocr_text = (
-                                    f"*[Error processing page {page_num}: {str(e)}]*"
+                            except Exception as e:  # noqa: BLE001
+                                # Rendering can fail for a page even when its embedded
+                                # image stream remains readable. Keep full-page OCR as the
+                                # preferred path, but retain the previous image-level
+                                # recovery behavior in that case.
+                                image_ocr = []
+                                for img_info in self._extract_page_images(page):
+                                    ocr_result = ocr_service.extract_text(
+                                        img_info["stream"]
+                                    )
+                                    if ocr_result.text.strip():
+                                        image_ocr.append(
+                                            f"*[Image OCR]\n{ocr_result.text.strip()}\n[End OCR]*"
+                                        )
+                                ocr_text = "\n\n".join(image_ocr) or (
+                                    f"*[Error processing page {page_num}: {e!s}]*"
                                 )
                             markdown_content.append(f"\n\n{ocr_text}\n")
                             continue

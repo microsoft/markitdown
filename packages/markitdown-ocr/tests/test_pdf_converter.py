@@ -258,6 +258,38 @@ def test_scanned_page_uses_full_page_ocr(svc: MockOCRService) -> None:
     open_pdf.assert_called_once()
 
 
+def test_scanned_page_falls_back_to_embedded_image_ocr_when_rendering_fails(
+    svc: MockOCRService,
+) -> None:
+    """A render failure must not discard a decodable embedded scan."""
+    converter = PdfConverterWithOCR()
+    page = MagicMock()
+    page.extract_text.return_value = ""
+    page.to_image.side_effect = RuntimeError("render failed")
+
+    pdf = MagicMock()
+    pdf.pages = [page]
+    pdf.__enter__.return_value = pdf
+    image_stream = io.BytesIO(b"embedded scan")
+
+    with (
+        patch("pdfplumber.open", return_value=pdf),
+        patch.object(
+            converter,
+            "_extract_page_images",
+            return_value=[{"stream": image_stream, "y_pos": 0, "name": "scan"}],
+        ) as extract_images,
+    ):
+        result = converter.convert(
+            io.BytesIO(b"pdf"),
+            StreamInfo(extension=".pdf"),
+            ocr_service=svc,
+        )
+
+    assert _OCR_BLOCK in result.text_content
+    extract_images.assert_called_once_with(page)
+
+
 def test_convert_reuses_open_page_for_image_extraction(svc: MockOCRService) -> None:
     """Embedded-image extraction must not reopen and reparse the PDF."""
     converter = PdfConverterWithOCR()
