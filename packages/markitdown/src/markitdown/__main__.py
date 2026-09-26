@@ -142,6 +142,12 @@ def main():
         help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
     )
 
+    parser.add_argument(
+        "--exclude-hidden-sheets",
+        action="store_true",
+        help="Exclude hidden and veryHidden worksheets with the built-in XLSX converter.",
+    )
+
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
 
@@ -248,16 +254,20 @@ def main():
     else:
         markitdown = MarkItDown(enable_plugins=args.use_plugins)
 
+    conversion_options: Dict[str, Any] = {"keep_data_uris": args.keep_data_uris}
+    if args.exclude_hidden_sheets:
+        conversion_options["include_hidden_sheets"] = False
+
     if args.filename is None:
         # Windows pipe-backed stdin can report seekable() even though it cannot rewind.
         result = markitdown.convert_stream(
             io.BytesIO(sys.stdin.buffer.read()),
             stream_info=stream_info,
-            keep_data_uris=args.keep_data_uris,
+            **conversion_options,
         )
     else:
         result = markitdown.convert(
-            args.filename, stream_info=stream_info, keep_data_uris=args.keep_data_uris
+            args.filename, stream_info=stream_info, **conversion_options
         )
 
     _handle_output(args, result)
