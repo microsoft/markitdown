@@ -387,15 +387,20 @@ def test_docx_comments() -> None:
     validate_strings(result, DOCX_COMMENT_TEST_STRINGS)
 
 
-def _write_underlined_docx(path, embedded_style_map: Optional[str] = None) -> str:
+def _write_underlined_docx(
+    path,
+    embedded_style_map: Optional[str] = None,
+    *,
+    paragraph_xml: str = (
+        "<w:r><w:t>plain </w:t></w:r>"
+        '<w:r><w:rPr><w:u w:val="single"/></w:rPr><w:t>underlined</w:t></w:r>'
+    ),
+) -> str:
     """Write a minimal .docx holding one underlined run, and return its path."""
-    document_xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    document_xml = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:body>
-    <w:p>
-      <w:r><w:t>plain </w:t></w:r>
-      <w:r><w:rPr><w:u w:val="single"/></w:rPr><w:t>underlined</w:t></w:r>
-    </w:p>
+    <w:p>{paragraph_xml}</w:p>
   </w:body>
 </w:document>"""
 
@@ -438,6 +443,30 @@ def test_docx_underlined_text_is_preserved(tmp_path) -> None:
     result = MarkItDown().convert(docx_file)
 
     assert "plain <u>underlined</u>" in result.markdown
+
+
+@pytest.mark.parametrize(
+    ("run_xml", "expected"),
+    [
+        ('<w:t xml:space="preserve"> </w:t>', "First Last"),
+        ("<w:tab/>", "First Last"),
+        ("<w:t>&#160;</w:t>", "First\u00a0Last"),
+        ("<w:br/>", "First\nLast"),
+    ],
+)
+def test_docx_underlined_whitespace_is_preserved(
+    tmp_path, run_xml: str, expected: str
+) -> None:
+    docx_file = _write_underlined_docx(
+        tmp_path / "underlined_whitespace.docx",
+        paragraph_xml=(
+            "<w:r><w:t>First</w:t></w:r>"
+            f'<w:r><w:rPr><w:u w:val="single"/></w:rPr>{run_xml}</w:r>'
+            "<w:r><w:t>Last</w:t></w:r>"
+        ),
+    )
+
+    assert MarkItDown().convert(docx_file).markdown == expected
 
 
 def test_docx_embedded_style_map_overrides_underline_default(tmp_path) -> None:
@@ -1339,7 +1368,7 @@ def test_pptx_chart_with_title_text_frame() -> None:
 
 
 def test_youtube_converter_missing_title_metadata() -> None:
-    """Test that YouTubeConverter converts streams with and without title metadata without raising AssertionError."""
+    """Missing titles fall back to HTML when no video content is extracted."""
     from unittest.mock import patch
     from markitdown.converters._youtube_converter import YouTubeConverter
 
@@ -1358,8 +1387,8 @@ def test_youtube_converter_missing_title_metadata() -> None:
         html_content_no_title = b"<html><head></head><body>Video Content</body></html>"
         stream_no_title = io.BytesIO(html_content_no_title)
         result_no_title = converter.convert(stream_no_title, stream_info)
-        assert result_no_title.title == ""
-        assert "# YouTube" in result_no_title.markdown
+        assert result_no_title.title is None
+        assert result_no_title.markdown == "Video Content"
 
         # Case 2: Stream with an empty <title> tag
         html_content_empty_title = (
@@ -1367,15 +1396,15 @@ def test_youtube_converter_missing_title_metadata() -> None:
         )
         stream_empty_title = io.BytesIO(html_content_empty_title)
         result_empty_title = converter.convert(stream_empty_title, stream_info)
-        assert result_empty_title.title == ""
-        assert "# YouTube" in result_empty_title.markdown
+        assert result_empty_title.title is None
+        assert result_empty_title.markdown == "Video Content"
 
         # Case 3: Stream whose title is only available from the <title> tag
         html_content_title_tag = b"<html><head><title>Fallback Title</title></head><body>Video Content</body></html>"
         stream_title_tag = io.BytesIO(html_content_title_tag)
         result_title_tag = converter.convert(stream_title_tag, stream_info)
         assert result_title_tag.title == "Fallback Title"
-        assert "# YouTube" in result_title_tag.markdown
+        assert result_title_tag.markdown == "# YouTube\n\n## Fallback Title\n"
 
 
 def test_zip_duplicate_filenames_preserve_each_entry() -> None:
@@ -1837,9 +1866,7 @@ def test_xlsx_pipe_in_cell_is_escaped() -> None:
 
 def test_xlsx_pipe_in_header_is_escaped() -> None:
     pd = pytest.importorskip("pandas")
-    result = _convert_xlsx_dataframe(
-        pd.DataFrame({"a | b": [1], "c": [2]})
-    )
+    result = _convert_xlsx_dataframe(pd.DataFrame({"a | b": [1], "c": [2]}))
 
     assert "| a \\| b | c |" in result
 

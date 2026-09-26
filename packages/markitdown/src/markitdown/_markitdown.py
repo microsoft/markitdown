@@ -70,6 +70,34 @@ def _get_content_disposition_filename(content_disposition: str) -> Optional[str]
     return extended_filename or fallback_filename
 
 
+def _read_charset_sample(file_stream: BinaryIO) -> bytes:
+    """Read a 64 KiB sample, completing a trailing split UTF-8 character."""
+    sample = file_stream.read(65536)
+    if len(sample) < 65536:
+        return sample
+
+    decoder = codecs.getincrementaldecoder("utf-8")(errors="strict")
+    try:
+        decoder.decode(sample, final=False)
+        if not decoder.getstate()[0]:
+            return sample
+
+        suffix = b""
+        for _ in range(3):
+            chunk = file_stream.read(1)
+            if not chunk:
+                break
+            suffix += chunk
+            decoder.decode(chunk, final=False)
+            if not decoder.getstate()[0]:
+                return sample + suffix
+    except UnicodeDecodeError:
+        # Leave invalid UTF-8 unchanged for the existing charset detector.
+        pass
+
+    return sample
+
+
 # Lower priority values are tried first.
 PRIORITY_SPECIFIC_FILE_FORMAT = (
     0.0  # e.g., .docx, .pdf, .xlsx, Or specific pages, e.g., wikipedia
@@ -743,9 +771,9 @@ class MarkItDown:
                 # If it's text, also guess the charset
                 charset = None
                 if result.prediction.output.is_text:
-                    # Read the first 64k to guess the charset
+                    # Complete a split UTF-8 character at the sample boundary.
                     file_stream.seek(cur_pos)
-                    stream_page = file_stream.read(65536)
+                    stream_page = _read_charset_sample(file_stream)
                     charset_result = charset_normalizer.from_bytes(stream_page).best()
 
                     if charset_result is not None:
