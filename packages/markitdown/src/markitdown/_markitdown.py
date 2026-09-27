@@ -516,15 +516,15 @@ class MarkItDown:
             )
         # HTTP/HTTPS URIs
         elif scheme in ("http", "https"):
-            response = self._requests_session.get(uri, stream=True)
-            response.raise_for_status()
-            return self.convert_response(
-                response,
-                stream_info=stream_info,
-                file_extension=file_extension,
-                url=mock_url,
-                **kwargs,
-            )
+            with self._requests_session.get(uri, stream=True) as response:
+                response.raise_for_status()
+                return self.convert_response(
+                    response,
+                    stream_info=stream_info,
+                    file_extension=file_extension,
+                    url=mock_url,
+                    **kwargs,
+                )
         else:
             raise ValueError(
                 f"Unsupported URI scheme: {uri.split(':')[0]}. Supported schemes are: file:, data:, http:, https:"
