@@ -1523,5 +1523,54 @@ class TestPdfInlineImageRecovery:
         assert not _contains_inline_image(b"%PDF-1.7\nno images here")
 
 
+
+
+@pytest.mark.parametrize("padding", [170, 237])
+@pytest.mark.parametrize("delimiter", [b"\n", b"\r\n"])
+def test_flate_checksum_bytes_are_not_trimmed(padding, delimiter):
+    # Contributed-by-cagdasyurekli case: a compressed stream whose Adler-32
+    # checksum ends in 0x0a or 0x0d must not be trimmed as PDF whitespace.
+    from pdfminer.pdfdocument import PDFDocument
+    from pdfminer.pdfpage import PDFPage
+    from pdfminer.pdfparser import PDFParser
+    from markitdown.converters._pdf_converter import _contains_inline_image
+
+    content = (
+        b"q\nBI /W 1 /H 1 /BPC 8 /CS /G ID\n\x00\nEI\nQ\n% " + b"A" * padding + b"\n"
+    )
+    packed = zlib.compress(content)
+    # Adler-32 ends in 0x0a or 0x0d: these are data, not PDF whitespace.
+    assert packed[-1:] in (b"\n", b"\r")
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 100] "
+        b"/Resources << >> /Contents 4 0 R >>",
+        b"<< /Length "
+        + str(len(packed)).encode()
+        + b" /Filter /FlateDecode >>"
+        + b"\nstream\n"
+        + packed
+        + delimiter
+        + b"endstream",
+    ]
+    pdf = b"%PDF-1.7\n"
+    offsets = [0]
+    for number, obj in enumerate(objects, 1):
+        offsets.append(len(pdf))
+        pdf += f"{number} 0 obj\n".encode() + obj + b"\nendobj\n"
+    xref = len(pdf)
+    pdf += b"xref\n0 5\n0000000000 65535 f \n"
+    for offset in offsets[1:]:
+        pdf += f"{offset:010d} 00000 n \n".encode()
+    pdf += b"trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n"
+    pdf += str(xref).encode() + b"\n%%EOF\n"
+
+    # A real PDF parser must recognize the page and decode the intact stream.
+    document = PDFDocument(PDFParser(io.BytesIO(pdf)))
+    page = next(PDFPage.create_pages(document))
+    assert page.contents[0].get_data() == content
+    assert _contains_inline_image(pdf)
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
