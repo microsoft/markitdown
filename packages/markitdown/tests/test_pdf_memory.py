@@ -15,6 +15,7 @@ import sys
 import tracemalloc
 import types
 import warnings
+import zlib
 
 import pytest
 from unittest.mock import patch, MagicMock
@@ -93,6 +94,26 @@ def _inline_image_pdf_bytes() -> bytes:
         b"EI\n"
         b"BT (AFTER_IMAGE) Tj ET\n"
         b"endstream endobj\n%%EOF\n"
+    )
+
+
+def _inline_image_pdf_bytes_compressed() -> bytes:
+    """Same inline image, but inside a Flate-compressed content stream."""
+    content = (
+        b"BT (BEFORE_IMAGE) Tj ET\n"
+        b"BI /W 1 /H 1 /BPC 1 /IM true ID\n"
+        b"abc\n"
+        b"EI\n"
+        b"BT (AFTER_IMAGE) Tj ET\n"
+    )
+    packed = zlib.compress(content)
+    return (
+        b"%PDF-1.7\n"
+        b"1 0 obj << /Length "
+        + str(len(packed)).encode()
+        + b" /Filter /FlateDecode >> stream\n"
+        + packed
+        + b"\nendstream endobj\n%%EOF\n"
     )
 
 
@@ -295,7 +316,13 @@ class TestPdfMemoryOptimization:
 
         assert "AFTER_IMAGE" in result.text_content
 
-    def test_inline_image_pdf_warns_when_pymupdf_is_missing(self, monkeypatch):
+    @pytest.mark.parametrize(
+        "pdf_bytes_factory",
+        [_inline_image_pdf_bytes, _inline_image_pdf_bytes_compressed],
+    )
+    def test_inline_image_pdf_warns_when_pymupdf_is_missing(
+        self, monkeypatch, pdf_bytes_factory
+    ):
         monkeypatch.setitem(sys.modules, "fitz", None)
 
         pages = [_make_plain_page()]
@@ -313,7 +340,7 @@ class TestPdfMemoryOptimization:
             with warnings.catch_warnings(record=True) as caught:
                 warnings.simplefilter("always")
                 result = md.convert_stream(
-                    io.BytesIO(_inline_image_pdf_bytes()),
+                    io.BytesIO(pdf_bytes_factory()),
                     stream_info=StreamInfo(
                         extension=".pdf", mimetype="application/pdf"
                     ),
@@ -321,6 +348,15 @@ class TestPdfMemoryOptimization:
 
         assert result.text_content == "BEFORE_IMAGE"
         assert any("inline image data" in str(item.message) for item in caught)
+
+    def test_inline_image_detection_reads_flate_content_streams(self):
+        # The BI/ID/EI operators live in the page's content stream; when that
+        # stream is Flate-compressed the raw bytes show nothing.
+        from markitdown.converters._pdf_converter import _contains_inline_image
+
+        assert _contains_inline_image(_inline_image_pdf_bytes())
+        assert _contains_inline_image(_inline_image_pdf_bytes_compressed())
+        assert not _contains_inline_image(b"%PDF-1.7\nno images here")
 
     @pytest.mark.skipif(
         not os.path.exists(os.path.join(TEST_FILES_DIR, "test.pdf")),

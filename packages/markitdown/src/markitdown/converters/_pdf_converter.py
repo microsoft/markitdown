@@ -2,6 +2,7 @@ import sys
 import io
 import re
 import warnings
+import zlib
 from typing import BinaryIO, Any
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
@@ -13,6 +14,7 @@ PARTIAL_NUMBERING_PATTERN = re.compile(r"^\.\d+$")
 INLINE_IMAGE_START_PATTERN = re.compile(rb"(?:^|\s)BI\s+")
 INLINE_IMAGE_DATA_PATTERN = re.compile(rb"\sID\s+")
 INLINE_IMAGE_END_PATTERN = re.compile(rb"\sEI(?:\s|$)")
+INLINE_IMAGE_STREAM_PATTERN = re.compile(rb"stream\r?\n(.*?)endstream", re.DOTALL)
 PYMUPDF_RECOVERY_MARGIN = 500
 PYMUPDF_RECOVERY_RATIO = 1.3
 
@@ -63,12 +65,27 @@ def _merge_partial_numbering_lines(text: str) -> str:
     return "\n".join(result_lines)
 
 
-def _contains_inline_image(pdf_bytes: bytes) -> bool:
+def _has_inline_image_operators(data: bytes) -> bool:
     return (
-        INLINE_IMAGE_START_PATTERN.search(pdf_bytes) is not None
-        and INLINE_IMAGE_DATA_PATTERN.search(pdf_bytes) is not None
-        and INLINE_IMAGE_END_PATTERN.search(pdf_bytes) is not None
+        INLINE_IMAGE_START_PATTERN.search(data) is not None
+        and INLINE_IMAGE_DATA_PATTERN.search(data) is not None
+        and INLINE_IMAGE_END_PATTERN.search(data) is not None
     )
+
+
+def _contains_inline_image(pdf_bytes: bytes) -> bool:
+    if _has_inline_image_operators(pdf_bytes):
+        return True
+    # Content streams are usually Flate-compressed, which hides the operators
+    # from the raw-byte search. Decode every Flate stream and look again.
+    for match in INLINE_IMAGE_STREAM_PATTERN.finditer(pdf_bytes):
+        try:
+            decoded = zlib.decompress(match.group(1).rstrip(b"\r\n"))
+        except zlib.error:
+            continue
+        if _has_inline_image_operators(decoded):
+            return True
+    return False
 
 
 def _extract_text_with_pymupdf(pdf_bytes: bytes) -> str | None:
