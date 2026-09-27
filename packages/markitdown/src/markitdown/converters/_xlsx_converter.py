@@ -2,7 +2,8 @@ import io
 import re
 import sys
 import zipfile
-from typing import BinaryIO, Any
+from contextlib import contextmanager
+from typing import BinaryIO, Any, Iterator, Optional
 from ._html_converter import HtmlConverter
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
@@ -43,16 +44,24 @@ _SHEET_VIEW_START_TAG = re.compile(rb"<sheetView(?=[\s/>])[^>]*>")
 _SHOW_ZEROES_ATTRIBUTE = re.compile(rb"(?<=[\s])showZeroes(\s*=)")
 
 
-def _read_xlsx_sheets(file_stream: BinaryIO) -> dict[str, Any]:
+@contextmanager
+def _read_xlsx_sheets(
+    file_stream: BinaryIO,
+) -> Iterator[tuple[dict[str, Any], BinaryIO]]:
     start_pos = file_stream.tell()
+    repaired_stream = None
     try:
-        return pd.read_excel(file_stream, sheet_name=None, engine="openpyxl")
-    except TypeError as exc:
-        if "showZeroes" not in str(exc):
-            raise
-
-        repaired_stream = _repair_sheetview_show_zeroes(file_stream, start_pos)
-        return pd.read_excel(repaired_stream, sheet_name=None, engine="openpyxl")
+        try:
+            sheets = pd.read_excel(file_stream, sheet_name=None, engine="openpyxl")
+        except TypeError as exc:
+            if "showZeroes" not in str(exc):
+                raise
+            repaired_stream = _repair_sheetview_show_zeroes(file_stream, start_pos)
+            sheets = pd.read_excel(repaired_stream, sheet_name=None, engine="openpyxl")
+        yield sheets, repaired_stream if repaired_stream is not None else file_stream
+    finally:
+        if repaired_stream is not None:
+            repaired_stream.close()
 
 
 def _rename_show_zeroes_attribute(data: bytes) -> bytes:
@@ -131,25 +140,66 @@ class XlsxConverter(DocumentConverter):
                 _xlsx_dependency_exc_info[2]
             )
 
-        sheets = _read_xlsx_sheets(file_stream)
         md_content = ""
-        for s in sheets:
-            # A completely empty sheet has no columns. pandas then emits a
-            # column-less HTML table that markdownify turns into broken syntax
-            # ("|\n|  |"). Skip it. A header-only sheet still has columns and
-            # already renders as a well-formed empty table.
-            if sheets[s].columns.empty:
-                continue
-            md_content += f"## {s}\n"
-            html_content = sheets[s].to_html(index=False)
-            md_content += (
-                self._html_converter.convert_string(
-                    html_content, **kwargs
-                ).markdown.strip()
-                + "\n\n"
-            )
+        with _read_xlsx_sheets(file_stream) as (sheets, workbook_stream):
+            images = None
+            if type(self)._image_to_html is not XlsxConverter._image_to_html:
+                from ..converter_utils._xlsx_images import _XlsxImages
+
+                images = _XlsxImages(workbook_stream)
+
+            for s in sheets:
+                image_content = (
+                    images.to_html(s, self._image_to_html, kwargs)
+                    if images is not None
+                    else None
+                )
+                # A completely empty sheet has no columns. pandas then emits a
+                # column-less HTML table that markdownify turns into broken syntax
+                # ("|\n|  |"). Skip the table, and the sheet when it has no images
+                # either. A header-only sheet still has columns and already renders
+                # as a well-formed empty table.
+                has_table = not sheets[s].columns.empty
+                if not has_table and not image_content:
+                    continue
+                md_content += f"## {s}\n"
+                if has_table:
+                    html_content = sheets[s].to_html(index=False)
+                    md_content += (
+                        self._html_converter.convert_string(
+                            html_content, **kwargs
+                        ).markdown.strip()
+                        + "\n\n"
+                    )
+                if image_content:
+                    md_content += (
+                        self._html_converter.convert_string(
+                            image_content, **kwargs
+                        ).markdown.strip()
+                        + "\n\n"
+                    )
 
         return DocumentConverterResult(markdown=md_content.strip())
+
+    def _image_to_html(
+        self,
+        image_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,
+    ) -> Optional[str]:
+        """Override to render an embedded image as an HTML fragment.
+
+        The stream is borrowed, seekable, and positioned at zero; do not close
+        or retain it. StreamInfo describes the image, not the workbook. Existing
+        conversion options are forwarded through kwargs.
+
+        Return None or blank text to retain the native representation (no image
+        output). Otherwise return HTML, escaping any literal text. Images appear
+        after their sheet's table, in the existing worksheet image order. Linked
+        images are not fetched. Hook failures propagate through the normal
+        conversion failure path.
+        """
+        return None
 
 
 class XlsConverter(DocumentConverter):

@@ -58,3 +58,40 @@ def test_single_completely_empty_workbook_emits_nothing() -> None:
 
     assert result.markdown.strip() == ""
     assert "|" not in result.markdown
+
+
+def test_empty_sheet_with_image_keeps_the_image() -> None:
+    """Skipping an empty sheet's table must not drop images anchored on it."""
+    from typing import Any, BinaryIO, Optional
+
+    from openpyxl.drawing.image import Image as SheetImage
+    from PIL import Image
+
+    from markitdown.converters import XlsxConverter
+
+    class ImageConverter(XlsxConverter):
+        def _image_to_html(
+            self, image_stream: BinaryIO, stream_info: StreamInfo, **kwargs: Any
+        ) -> Optional[str]:
+            return "<p>sheet image</p>"
+
+    png = io.BytesIO()
+    Image.new("RGB", (2, 2), "red").save(png, "PNG")
+    workbook = Workbook()
+    workbook.active.title = "HasData"
+    workbook.active["A1"] = "col"
+    workbook.create_sheet("OnlyAnImage").add_image(
+        SheetImage(io.BytesIO(png.getvalue())), "B2"
+    )
+    workbook.create_sheet("CompletelyEmpty")
+
+    markdown = (
+        ImageConverter()
+        .convert(io.BytesIO(_xlsx_bytes(workbook)), StreamInfo(extension=".xlsx"))
+        .markdown
+    )
+
+    assert "## OnlyAnImage" in markdown
+    assert "sheet image" in markdown.split("## OnlyAnImage", 1)[1]
+    assert "## CompletelyEmpty" not in markdown
+    assert "|  |" not in markdown
