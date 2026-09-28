@@ -47,21 +47,47 @@ _SHOW_ZEROES_ATTRIBUTE = re.compile(rb"(?<=[\s])showZeroes(\s*=)")
 @contextmanager
 def _read_xlsx_sheets(
     file_stream: BinaryIO,
+    include_hidden_sheets: bool = False,
 ) -> Iterator[tuple[dict[str, Any], BinaryIO]]:
     start_pos = file_stream.tell()
     repaired_stream = None
+
+    def read_sheets(stream: BinaryIO) -> dict[str, Any]:
+        sheet_names: Optional[list[str]] = None
+        if not include_hidden_sheets:
+            sheet_names = _get_visible_sheet_names(stream)
+            if not sheet_names:
+                return {}
+        return pd.read_excel(stream, sheet_name=sheet_names, engine="openpyxl")
+
     try:
         try:
-            sheets = pd.read_excel(file_stream, sheet_name=None, engine="openpyxl")
+            sheets = read_sheets(file_stream)
         except TypeError as exc:
             if "showZeroes" not in str(exc):
                 raise
             repaired_stream = _repair_sheetview_show_zeroes(file_stream, start_pos)
-            sheets = pd.read_excel(repaired_stream, sheet_name=None, engine="openpyxl")
+            sheets = read_sheets(repaired_stream)
         yield sheets, repaired_stream if repaired_stream is not None else file_stream
     finally:
         if repaired_stream is not None:
             repaired_stream.close()
+
+
+def _get_visible_sheet_names(file_stream: BinaryIO) -> list[str]:
+    start_pos = file_stream.tell()
+    workbook = None
+    try:
+        workbook = openpyxl.load_workbook(file_stream, read_only=True)
+        return [
+            name
+            for name in workbook.sheetnames
+            if workbook[name].sheet_state == "visible"
+        ]
+    finally:
+        if workbook is not None:
+            workbook.close()
+        file_stream.seek(start_pos)
 
 
 def _rename_show_zeroes_attribute(data: bytes) -> bytes:
@@ -96,6 +122,9 @@ def _repair_sheetview_show_zeroes(
 class XlsxConverter(DocumentConverter):
     """
     Converts XLSX files to Markdown, with each sheet presented as a separate Markdown table.
+
+    Hidden and very hidden sheets are excluded by default. Pass
+    ``include_hidden_sheets=True`` to include them.
     """
 
     def __init__(self):
@@ -140,8 +169,11 @@ class XlsxConverter(DocumentConverter):
                 _xlsx_dependency_exc_info[2]
             )
 
+        include_hidden_sheets = kwargs.pop("include_hidden_sheets", False)
         md_content = ""
-        with _read_xlsx_sheets(file_stream) as (sheets, workbook_stream):
+        with _read_xlsx_sheets(
+            file_stream, include_hidden_sheets=include_hidden_sheets
+        ) as (sheets, workbook_stream):
             images = None
             if type(self)._image_to_html is not XlsxConverter._image_to_html:
                 from ..converter_utils._xlsx_images import _XlsxImages
