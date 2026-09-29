@@ -136,9 +136,9 @@ def test_pdf_complex_layout(svc: MockOCRService) -> None:
         "## Page 1\n\n\n"
         "Complex Layout Document\n\n"
         "Table:\n\n"
-        "ItemQuantity\n\n\n\n"
+        "Item Quantity\n\n\n\n"
         "*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*\n\n\n"
-        "Widget A5"
+        "Widget A 5"
     )
     assert _convert("pdf_complex_layout.pdf", svc) == expected
 
@@ -245,3 +245,41 @@ def test_pdf_no_ocr_service_no_tags() -> None:
         md = converter.convert(f, StreamInfo(extension=".pdf")).text_content
     assert "*[Image OCR]" not in md
     assert "[End OCR]*" not in md
+
+
+# ---------------------------------------------------------------------------
+# Native text on a page that also has an embedded image
+# ---------------------------------------------------------------------------
+
+
+def _two_column_page_with_image() -> bytes:
+    """One native-text page: two columns sharing a baseline, plus a small image."""
+    import fitz  # PyMuPDF is a dependency of this package
+
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=842)
+    page.insert_text((50, 100), "Customer Name", fontsize=11)
+    page.insert_text((350, 100), "Vendor Name Ltd", fontsize=11)
+    page.insert_text((50, 130), "Unit price", fontsize=11)
+    page.insert_text((350, 130), "Total price", fontsize=11)
+    pix = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 60, 40), False)
+    pix.set_rect(pix.irect, (200, 30, 30))
+    page.insert_image(fitz.Rect(50, 30, 110, 70), stream=pix.tobytes("png"))
+    return doc.tobytes()
+
+
+def test_pdf_page_with_image_keeps_spaces_between_columns(svc: MockOCRService) -> None:
+    """Regression: on a page with an embedded image (e.g. a logo) the text used to be
+    rebuilt from raw chars joined with "", gluing adjacent columns together
+    ("Customer NameVendor Name Ltd")."""
+    converter = PdfConverterWithOCR()
+    md = converter.convert(
+        io.BytesIO(_two_column_page_with_image()),
+        StreamInfo(extension=".pdf"),
+        ocr_service=svc,
+    ).text_content
+
+    assert "Customer Name Vendor Name Ltd" in md
+    assert "Unit price Total price" in md
+    # the image is still OCR'd and interleaved
+    assert _OCR_BLOCK in md
