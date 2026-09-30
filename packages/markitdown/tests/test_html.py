@@ -1,6 +1,9 @@
 """HTML conversion, link handling, and Wikipedia pages."""
 
 import io
+import sys
+import warnings
+from typing import Final
 
 import pytest
 from bs4 import BeautifulSoup
@@ -288,7 +291,7 @@ K</strike>L.</p>
             "Empty GH.",
             # A line break inside the element is kept, and the markup
             # survives it because strikethrough may span a single newline
-            "Newline I~~J\nK~~L.",
+            "Newline I~~J K~~L.",
             "Break M~~N\nO~~P.",
         ]
     )
@@ -347,3 +350,97 @@ def test_deeply_nested_html_fallback() -> None:
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
+
+
+@pytest.mark.parametrize(
+    ("html", "expected", "title"),
+    [
+        pytest.param(
+            "<title>Title</title><h1>Heading</h1><p>body</p>",
+            "Title\n\n# Heading\n\nbody",
+            "Title",
+            id="orphan-title",
+        ),
+        pytest.param(
+            "<template><p>hidden</p></template><p>shown</p>",
+            "hidden\n\nshown",
+            None,
+            id="orphan-template",
+        ),
+        pytest.param(
+            "<head><title>Title</title></head>between<p>shown</p>",
+            "Titlebetween\n\nshown",
+            "Title",
+            id="inline-boundary",
+        ),
+        pytest.param(
+            "<script>secret()</script><style>secret</style><p>shown</p>",
+            "shown",
+            None,
+            id="script-style",
+        ),
+        pytest.param(
+            "<html><head><title>Title</title></head><body><p>shown</p></body></html>",
+            "shown",
+            "Title",
+            id="explicit-body",
+        ),
+    ],
+)
+def test_html_fragment_content(html: str, expected: str, title: str | None) -> None:
+    result = MarkItDown().convert_stream(io.BytesIO(html.encode()), file_extension=".html")
+    assert (result.markdown, result.title) == (expected, title)
+
+
+def test_html_fragment_sniffs_unknown_charset() -> None:
+    result = MarkItDown().convert_stream(
+        io.BytesIO("<title>Café</title><p>Résumé</p>".encode("cp1252")),
+        stream_info=StreamInfo(extension=".html", charset="utf-8"),
+    )
+    assert (result.markdown, result.title) == ("Café\n\nRésumé", "Café")
+
+
+def test_html_table_cell_list_keeps_item_boundaries() -> None:
+    html: Final = (
+        '<table><tr><th>Traded as</th><td><ul>'
+        '<li><a href="/nasdaq">Nasdaq</a></li><li>DJIA</li>'
+        '</ul></td></tr></table>'
+    )
+    assert "| Traded as | * [Nasdaq](/nasdaq) * DJIA |" in _convert_html(html)
+
+
+@pytest.mark.parametrize(
+    ("html", "expected"),
+    [
+        pytest.param("<code><ul><li>one</li><li>two</li></ul></code>", "`one two`", id="list"),
+        pytest.param("<code><p>one</p><p>two</p></code>", "`one two`", id="paragraphs"),
+        pytest.param("<pre><code><ul><li>one</li><li>two</li></ul></code></pre>", "```\none\ntwo\n```", id="pre"),
+        pytest.param(
+            "<table><tr><td><code><p>one</p><p>two</p></code></td></tr></table>",
+            "|  |\n| --- |\n| `one two` |",
+            id="table-cell",
+        ),
+    ],
+)
+def test_html_code_block_descendants_keep_boundaries(html: str, expected: str) -> None:
+    assert _convert_html(html) == expected
+
+
+def test_deeply_nested_html_converts() -> None:
+    html: Final = (
+        "<html><body>"
+        + '<div style="margin-left:10px">' * 500
+        + "<p>Deep content with <b>bold text</b></p>"
+        + "</div>" * 500
+        + "</body></html>"
+    )
+    original_limit: Final = sys.getrecursionlimit()
+    try:
+        sys.setrecursionlimit(200)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            result = MarkItDown().convert_stream(io.BytesIO(html.encode()), file_extension=".html")
+    finally:
+        sys.setrecursionlimit(original_limit)
+
+    assert result.markdown == "Deep content with **bold text**"
