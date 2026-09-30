@@ -1,10 +1,9 @@
 import re
-import bs4
 from typing import Any, BinaryIO
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
-from ._markdownify import _CustomMarkdownify
+from ._markdown import _CustomMarkdown, _document_title, _parse_html
 
 ACCEPTED_MIME_TYPE_PREFIXES = [
     "text/html",
@@ -54,33 +53,19 @@ class WikipediaConverter(DocumentConverter):
         stream_info: StreamInfo,
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
-        # Parse the stream
-        encoding = "utf-8" if stream_info.charset is None else stream_info.charset
-        soup = bs4.BeautifulSoup(file_stream, "html.parser", from_encoding=encoding)
-
-        # Remove javascript and style blocks
-        for script in soup(["script", "style"]):
-            script.extract()
+        doc = _parse_html(file_stream, stream_info)
 
         # Print only the main content
-        body_elm = soup.find("div", {"id": "mw-content-text"})
-        # Wikipedia only wraps the title in mw-page-title-main when it is plain
-        # text. Titles that carry markup -- italicised species, film, album and
-        # journal names -- are written straight into the first heading instead.
-        title_elm = soup.find("span", {"class": "mw-page-title-main"}) or soup.find(
-            "h1", {"id": "firstHeading"}
-        )
+        body_elm = doc.select_one("div#mw-content-text")
+        title_elm = doc.select_one("span.mw-page-title-main") or doc.select_one("h1#firstHeading")
 
         webpage_text = ""
-        main_title = None if soup.title is None else soup.title.string
+        main_title = _document_title(doc)
 
         if body_elm:
             # What's the title
-            if title_elm and isinstance(title_elm, bs4.Tag):
-                # .string is None as soon as the element holds more than one
-                # child, which is what a title mixing markup with plain text
-                # looks like, so gather the descendant text instead.
-                main_title = title_elm.get_text()
+        body_elm = doc.select_one("div#mw-content-text")
+        title_elm = doc.select_one("span.mw-page-title-main") or doc.select_one("h1#firstHeading")
 
             # Treat whitespace-only titles as if they were absent
             if main_title:
@@ -89,9 +74,9 @@ class WikipediaConverter(DocumentConverter):
             # Convert the page
             webpage_text = (
                 f"# {main_title}\n\n" if main_title else ""
-            ) + _CustomMarkdownify(**kwargs).convert_soup(body_elm)
+            ) + _CustomMarkdown(**kwargs).convert(body_elm)
         else:
-            webpage_text = _CustomMarkdownify(**kwargs).convert_soup(soup)
+            webpage_text = _CustomMarkdown(**kwargs).convert(doc)
 
         return DocumentConverterResult(
             markdown=webpage_text,

@@ -3,11 +3,10 @@ import base64
 import binascii
 from urllib.parse import parse_qs, urlparse
 from typing import Any, BinaryIO
-from bs4 import BeautifulSoup
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
-from ._markdownify import _CustomMarkdownify
+from ._markdown import _CustomMarkdown, _document_title, _parse_html
 
 ACCEPTED_MIME_TYPE_PREFIXES = [
     "text/html",
@@ -66,27 +65,22 @@ class BingSerpConverter(DocumentConverter):
         parsed_params = parse_qs(urlparse(stream_info.url).query)
         query = parsed_params.get("q", [""])[0]
 
-        # Parse the stream
-        encoding = "utf-8" if stream_info.charset is None else stream_info.charset
-        soup = BeautifulSoup(file_stream, "html.parser", from_encoding=encoding)
+        doc = _parse_html(file_stream, stream_info)
 
         # Clean up some formatting
-        for tptt in soup.find_all(class_="tptt"):
-            if hasattr(tptt, "string") and tptt.string:
-                tptt.string += " "
-        for slug in soup.find_all(class_="algoSlug_icon"):
+        for tptt in doc.select(".tptt"):
+            if len(tptt.children) == 1 and tptt.text:
+                tptt.set_text(tptt.text + " ")
+        for slug in doc.select(".algoSlug_icon"):
             slug.extract()
 
         # Parse the algorithmic results
-        _markdownify = _CustomMarkdownify(**kwargs)
+        _markdown = _CustomMarkdown(**kwargs)
         results = list()
-        for result in soup.find_all(class_="b_algo"):
-            if not hasattr(result, "find_all"):
-                continue
-
+        for result in doc.select(".b_algo"):
             # Rewrite redirect urls
-            for a in result.find_all("a", href=True):
-                parsed_href = urlparse(a["href"])
+            for a in result.select("a[href]"):
+                parsed_href = urlparse(a.attr("href") or "")
                 qs = parse_qs(parsed_href.query)
 
                 # The destination is contained in the u parameter,
@@ -98,14 +92,16 @@ class BingSerpConverter(DocumentConverter):
 
                     try:
                         # RFC 4648 / Base64URL variant, which uses "-" and "_"
-                        a["href"] = base64.b64decode(u, altchars="-_").decode("utf-8")
+                        a.attrs["href"] = base64.b64decode(u, altchars="-_").decode(
+                            "utf-8"
+                        )
                     except UnicodeDecodeError:
                         pass
                     except binascii.Error:
                         pass
 
             # Convert to markdown
-            md_result = _markdownify.convert_soup(result).strip()
+            md_result = _markdown.convert(result).strip()
             lines = [line.strip() for line in re.split(r"\n+", md_result)]
             results.append("\n".join([line for line in lines if len(line) > 0]))
 
@@ -116,5 +112,5 @@ class BingSerpConverter(DocumentConverter):
 
         return DocumentConverterResult(
             markdown=webpage_text,
-            title=None if soup.title is None else soup.title.string,
+            title=_document_title(doc),
         )
