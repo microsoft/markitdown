@@ -163,6 +163,9 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         convert_as_inline: Optional[bool] = False,
         **kwargs,
     ) -> str:
+        if not text.strip():
+            return text
+
         prefix, suffix, text = markdownify.chomp(text)  # type: ignore
         if not text:
             return ""
