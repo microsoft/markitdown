@@ -1,8 +1,8 @@
 import io
 import sys
+import warnings
 
 import pytest
-
 from markitdown import MarkItDown, StreamInfo
 from markitdown.converters import RssConverter
 
@@ -491,24 +491,29 @@ def test_complete_feed_content_through_public_api(field: str) -> None:
     assert result.markdown.endswith("## Entry\nBefore **nested** after.")
 
 
-@pytest.mark.parametrize("field", ["rss-description", "atom-content"])
-def test_deep_xml_body_uses_rendering_fallback(field: str) -> None:
+@pytest.mark.parametrize(
+    ("field", "atom_type", "cdata"),
+    [
+        pytest.param("rss-description", "html", False, id="rss-description"),
+        pytest.param("rss-content", "html", True, id="rss-content-cdata"),
+        pytest.param("atom-content", "html", True, id="atom-html-cdata"),
+        pytest.param("atom-content", "xhtml", False, id="atom-xhtml"),
+    ],
+)
+def test_deep_xml_body_converts(field: str, atom_type: str, *, cdata: bool) -> None:
     payload = "<div>" * 500 + "Deep <b>body</b>." + "</div>" * 500
-    feed = _feed_with_body(field, payload, atom_type="xhtml")
+    feed = _feed_with_body(field, f"<![CDATA[{payload}]]>" if cdata else payload, atom_type=atom_type)
     stream_info = StreamInfo(extension=".rss" if field.startswith("rss-") else ".atom")
     original_limit = sys.getrecursionlimit()
     try:
         sys.setrecursionlimit(200)
-        with pytest.warns(UserWarning, match="too deeply nested"):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
             result = RssConverter().convert(io.BytesIO(feed), stream_info)
-        with pytest.raises(RecursionError):
-            RssConverter().convert(io.BytesIO(feed), stream_info, strict=True)
     finally:
         sys.setrecursionlimit(original_limit)
 
-    assert "Deep" in result.markdown
-    assert "body" in result.markdown
-    assert "<div>" not in result.markdown
+    assert result.markdown.endswith("Deep **body**.")
 
 
 def test_rss_content_namespace_alias_and_field_ownership() -> None:
