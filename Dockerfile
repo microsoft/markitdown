@@ -1,13 +1,14 @@
-FROM python:3.13-slim-bullseye
+FROM python:3.13-slim-trixie
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV EXIFTOOL_PATH=/usr/bin/exiftool
 ENV FFMPEG_PATH=/usr/bin/ffmpeg
+ENV ORT_DISABLE_TELEMETRY=1
 
 # Runtime dependency
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
-    exiftool
+    libimage-exiftool-perl
 
 ARG INSTALL_GIT=false
 RUN if [ "$INSTALL_GIT" = "true" ]; then \
