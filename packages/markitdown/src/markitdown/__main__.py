@@ -272,9 +272,7 @@ def _handle_output(args, result: DocumentConverterResult):
         # Handle stdout encoding errors more gracefully, with fallback for
         # cases where sys.stdout.encoding is None (e.g. redirected streams).
         encoding = sys.stdout.encoding or "utf-8"
-        print(
-            result.markdown.encode(encoding, errors="replace").decode(encoding)
-        )
+        print(result.markdown.encode(encoding, errors="replace").decode(encoding))
 
 
 def _exit_with_error(message: str):
