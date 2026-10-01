@@ -151,3 +151,91 @@ def test_img_keeps_embedded_data_uri_over_data_src_when_keeping_data_uris() -> N
 
     assert f"![A photo]({embedded})" in markdown
     assert other_src not in markdown
+
+
+def test_table_caption_keeps_header_row() -> None:
+    html = (
+        "<table><caption>Constructors</caption>"
+        "<tr><th>Constructor</th><th>Description</th></tr>"
+        "<tr><td>ArrayList()</td><td>Empty list</td></tr></table>"
+    )
+
+    assert _convert_html(html) == (
+        "Constructors\n\n"
+        "| Constructor | Description |\n"
+        "| --- | --- |\n"
+        "| ArrayList() | Empty list |"
+    )
+
+
+def test_table_caption_with_td_first_row_matches_table_without_caption() -> None:
+    rows = "<tr><td>Name</td><td>Qty</td></tr><tr><td>Apple</td><td>3</td></tr>"
+
+    assert _convert_html(f"<table><caption>Stock</caption>{rows}</table>") == (
+        "Stock\n\n" + _convert_html(f"<table>{rows}</table>")
+    )
+
+
+@pytest.mark.parametrize("before", ["Intro text", "<span>Intro text</span>"])
+def test_table_caption_stays_apart_from_inline_content_before_table(
+    before: str,
+) -> None:
+    html = (
+        f"<div>{before}<table><caption>Cap</caption>"
+        "<tr><th>A</th><th>B</th></tr>"
+        "<tr><td>1</td><td>2</td></tr></table></div>"
+    )
+
+    assert _convert_html(html) == (
+        "Intro text\n\nCap\n\n| A | B |\n| --- | --- |\n| 1 | 2 |"
+    )
+
+
+@pytest.mark.parametrize(
+    "columns",
+    [
+        "<colgroup><col><col></colgroup>",
+        "<col><col>",
+        # The </colgroup> end tag is optional, and html.parser then nests the
+        # rows inside the <colgroup>.
+        "<colgroup><col><col>",
+    ],
+)
+def test_table_colgroup_keeps_header_row(columns: str) -> None:
+    html = (
+        f"<table>{columns}"
+        "<tr><th>Name</th><th>Qty</th></tr>"
+        "<tr><td>Apple</td><td>3</td></tr></table>"
+    )
+
+    assert _convert_html(html) == "| Name | Qty |\n| --- | --- |\n| Apple | 3 |"
+
+
+@pytest.mark.parametrize(
+    ("html", "expected"),
+    [
+        (
+            "<table><thead><tr><th>Item</th><th>Cost</th></tr></thead>"
+            "<tbody><tr><td>A</td><td>1</td></tr><tr><td>B</td><td>2</td></tr></tbody>"
+            "<tfoot><tr><td>Total</td><td>3</td></tr></tfoot></table>",
+            "| Item | Cost |\n| --- | --- |\n| A | 1 |\n| B | 2 |\n| Total | 3 |",
+        ),
+        # HTML4 allowed <tfoot> before <tbody>, but it still renders last.
+        (
+            "<table><thead><tr><th>Item</th><th>Cost</th></tr></thead>"
+            "<tfoot><tr><td>Total</td><td>3</td></tr></tfoot>"
+            "<tbody><tr><td>A</td><td>1</td></tr><tr><td>B</td><td>2</td></tr></tbody>"
+            "</table>",
+            "| Item | Cost |\n| --- | --- |\n| A | 1 |\n| B | 2 |\n| Total | 3 |",
+        ),
+        (
+            "<table><thead><tr><th>Name</th><th>Office</th></tr></thead>"
+            "<tbody><tr><td>Tiger Nixon</td><td>Edinburgh</td></tr></tbody>"
+            "<tfoot><tr><th>Name</th><th>Office</th></tr></tfoot></table>",
+            "| Name | Office |\n| --- | --- |\n"
+            "| Tiger Nixon | Edinburgh |\n| Name | Office |",
+        ),
+    ],
+)
+def test_table_tfoot_rows_are_plain_trailing_rows(html: str, expected: str) -> None:
+    assert _convert_html(html) == expected
