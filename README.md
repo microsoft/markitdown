@@ -21,6 +21,7 @@ MarkItDown currently supports the conversion from:
 - ZIP files (iterates over contents)
 - YouTube URLs
 - EPubs
+- RSS and Atom feeds (including Atom feeds without entries)
 - ... and more!
 
 ## Why Markdown?

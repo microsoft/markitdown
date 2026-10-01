@@ -7,6 +7,54 @@ from markitdown import MarkItDown, StreamInfo
 from markitdown.converters import RssConverter
 
 
+@pytest.mark.parametrize("prefix", ["", "a:"])
+@pytest.mark.parametrize(
+    "stream_info",
+    [
+        StreamInfo(extension=".xml"),
+        StreamInfo(extension=".atom"),
+        StreamInfo(mimetype="application/xml"),
+        StreamInfo(mimetype="application/atom+xml"),
+    ],
+)
+def test_atom_without_entries(prefix: str, stream_info: StreamInfo) -> None:
+    namespace = "xmlns:a" if prefix else "xmlns"
+    feed = f"""<{prefix}feed {namespace}="http://www.w3.org/2005/Atom">
+  <{prefix}title>Release updates</{prefix}title>
+  <{prefix}subtitle>No releases yet.</{prefix}subtitle>
+  <{prefix}id>urn:example:releases</{prefix}id>
+  <{prefix}updated>2026-09-13T00:00:00Z</{prefix}updated>
+  <{prefix}author><{prefix}name>Example project</{prefix}name></{prefix}author>
+</{prefix}feed>""".encode(
+        "utf-8"
+    )
+    converter = RssConverter()
+    stream = io.BytesIO(feed)
+
+    assert converter.accepts(stream, stream_info)
+    assert stream.tell() == 0
+    result = converter.convert(stream, stream_info)
+    assert result.title == "Release updates"
+    assert result.markdown == "# Release updates\nNo releases yet.\n"
+
+    converted = MarkItDown().convert_stream(io.BytesIO(feed), stream_info=stream_info)
+    assert converted.title == result.title
+    assert converted.markdown == result.markdown
+
+
+@pytest.mark.parametrize("namespace", ["", "urn:example:other"])
+def test_non_atom_feed_without_entries_is_not_accepted(namespace: str) -> None:
+    feed = f'<feed xmlns="{namespace}"><title>Other feed</title></feed>'.encode()
+    converter = RssConverter()
+    stream_info = StreamInfo(extension=".xml")
+    stream = io.BytesIO(feed)
+
+    assert not converter.accepts(stream, stream_info)
+    assert stream.tell() == 0
+    with pytest.raises(ValueError, match="Unknown feed type"):
+        converter.convert(stream, stream_info)
+
+
 @pytest.mark.parametrize(
     "root_prefix, child_prefix",
     [("", ""), ("a:", "a:"), ("a:", "b:"), ("a:", ""), ("", "a:")],
