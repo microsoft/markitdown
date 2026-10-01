@@ -64,7 +64,12 @@ class WikipediaConverter(DocumentConverter):
 
         # Print only the main content
         body_elm = soup.find("div", {"id": "mw-content-text"})
-        title_elm = soup.find("span", {"class": "mw-page-title-main"})
+        # Wikipedia only wraps the title in mw-page-title-main when it is plain
+        # text. Titles that carry markup -- italicised species, film, album and
+        # journal names -- are written straight into the first heading instead.
+        title_elm = soup.find("span", {"class": "mw-page-title-main"}) or soup.find(
+            "h1", {"id": "firstHeading"}
+        )
 
         webpage_text = ""
         main_title = None if soup.title is None else soup.title.string
@@ -72,7 +77,10 @@ class WikipediaConverter(DocumentConverter):
         if body_elm:
             # What's the title
             if title_elm and isinstance(title_elm, bs4.Tag):
-                main_title = title_elm.string
+                # .string is None as soon as the element holds more than one
+                # child, which is what a title mixing markup with plain text
+                # looks like, so gather the descendant text instead.
+                main_title = title_elm.get_text()
 
             # Treat whitespace-only titles as if they were absent
             if main_title:
