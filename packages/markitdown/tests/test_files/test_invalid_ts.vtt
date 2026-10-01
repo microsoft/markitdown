@@ -1,0 +1,7 @@
+WEBVTT
+
+00:00:01.000 --> invalid-timestamp
+This cue has an invalid timestamp.
+
+99:99:99.999 --> 00:00:05.000
+Another invalid timestamp.
