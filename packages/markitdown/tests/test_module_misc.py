@@ -761,6 +761,47 @@ def test_docx_malformed_equations() -> None:
     assert "After unnamespaced oMath" in result.markdown
 
 
+def test_xlsx_float_values_keep_their_precision(tmp_path) -> None:
+    """A float must survive the conversion instead of collapsing to six digits.
+
+    pandas' default ``to_html`` float rendering switches to scientific notation with
+    six significant digits, so ``123456789.123`` came out as ``1.234568e+08``: the
+    fractional part was silently dropped.
+    """
+    from openpyxl import Workbook
+
+    xlsx_path = tmp_path / "floats.xlsx"
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Data"
+    sheet["A1"] = "money"
+    sheet["A2"] = 123456789.123
+    sheet["A3"] = 0.1
+    sheet["A4"] = 42.0
+    workbook.save(xlsx_path)
+
+    result = MarkItDown().convert(str(xlsx_path))
+
+    assert "123456789.123" in result.markdown
+    assert "0.1" in result.markdown
+    assert "42.0" in result.markdown
+    # Guard against a regression back to pandas' scientific-notation default.
+    assert "e+08" not in result.markdown
+    assert "1.234568" not in result.markdown
+
+
+def test_xlsx_float_format_handles_numpy_scalars() -> None:
+    """``repr`` must not leak numpy's ``np.float64(...)`` wrapper into the output."""
+    import numpy as np
+
+    from markitdown.converters._xlsx_converter import _format_float
+
+    assert _format_float(123456789.123) == "123456789.123"
+    assert _format_float(0.1) == "0.1"
+    assert _format_float(np.float64(0.1)) == "0.1"
+
+
 def test_xlsx_legacy_show_zeroes_sheetview(tmp_path) -> None:
     from openpyxl import Workbook
 

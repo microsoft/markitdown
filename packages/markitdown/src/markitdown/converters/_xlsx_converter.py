@@ -25,6 +25,19 @@ try:
 except ImportError:
     _xls_dependency_exc_info = sys.exc_info()
 
+
+def _format_float(value: float) -> str:
+    """Render a float with the shortest string that round-trips.
+
+    pandas' default float rendering in ``to_html`` falls back to scientific notation
+    with six significant digits, which silently drops digits from values such as
+    ``123456789.123`` (rendered as ``1.234568e+08``). ``repr`` returns the shortest
+    round-tripping form instead. The value is converted to a builtin float first,
+    because ``repr`` of a numpy scalar is ``np.float64(...)``.
+    """
+    return repr(float(value))
+
+
 ACCEPTED_XLSX_MIME_TYPE_PREFIXES = [
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 ]
@@ -150,7 +163,9 @@ class XlsxConverter(DocumentConverter):
 
             for s in sheets:
                 md_content += f"## {s}\n"
-                html_content = sheets[s].to_html(index=False)
+                html_content = sheets[s].to_html(
+                    index=False, float_format=_format_float
+                )
                 md_content += (
                     self._html_converter.convert_string(
                         html_content, **kwargs
@@ -241,7 +256,7 @@ class XlsConverter(DocumentConverter):
         md_content = ""
         for s in sheets:
             md_content += f"## {s}\n"
-            html_content = sheets[s].to_html(index=False)
+            html_content = sheets[s].to_html(index=False, float_format=_format_float)
             md_content += (
                 self._html_converter.convert_string(
                     html_content, **kwargs
