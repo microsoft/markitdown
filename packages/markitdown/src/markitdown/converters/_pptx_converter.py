@@ -333,7 +333,12 @@ class PptxConverter(DocumentConverter):
                 md += f": {chart.chart_title.text_frame.text}"
             md += "\n\n"
             data = []
-            category_names = [c.label for c in chart.plots[0].categories]
+            # Iteration yields only leaf labels, losing the parent context of
+            # hierarchical categories (e.g. the year above a quarter).
+            category_names = [
+                " / ".join(labels)
+                for labels in chart.plots[0].categories.flattened_labels
+            ]
             series_list = list(chart.series)
             series_names = [s.name for s in series_list]
             data.append(["Category"] + series_names)
