@@ -32,7 +32,7 @@ def test_underline_preserves_whitespace_verbatim(whitespace: str) -> None:
         (" ", "First Last"),
         ("\t", "First Last"),
         ("&#160;", "First\u00a0Last"),
-        ("<br>", "First\nLast"),
+        ("<br>", "First  \nLast"),
         ("word", "First<u>word</u>Last"),
         (" word ", "First <u>word</u> Last"),
     ],

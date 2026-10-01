@@ -451,7 +451,7 @@ def test_docx_underlined_text_is_preserved(tmp_path) -> None:
         ('<w:t xml:space="preserve"> </w:t>', "First Last"),
         ("<w:tab/>", "First Last"),
         ("<w:t>&#160;</w:t>", "First\u00a0Last"),
-        ("<w:br/>", "First\nLast"),
+        ("<w:br/>", "First  \nLast"),
     ],
 )
 def test_docx_underlined_whitespace_is_preserved(
@@ -524,9 +524,10 @@ K</strike>L.</p>
             # An empty element contributes nothing
             "Empty GH.",
             # A line break inside the element is kept, and the markup
-            # survives it because strikethrough may span a single newline
+            # survives it because strikethrough may span a single newline.
+            # <br> is a hard break, so the two trailing spaces stay.
             "Newline I~~J\nK~~L.",
-            "Break M~~N\nO~~P.",
+            "Break M~~N  \nO~~P.",
         ]
     )
 
