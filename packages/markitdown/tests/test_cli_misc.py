@@ -3,8 +3,10 @@ import io
 import subprocess
 import sys
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 from markitdown import __version__
+from markitdown import DocumentConverterResult
 from markitdown.__main__ import main
 
 # This file contains CLI tests that are not directly tested by the FileTestVectors.
@@ -53,6 +55,26 @@ def test_windows_pipe_input_is_buffered_before_conversion(monkeypatch, capsys) -
 
     captured = capsys.readouterr()
     assert captured.out.strip() == "# Test HTML"
+
+
+def test_pdf_page_markers_flag_is_forwarded(monkeypatch, capsys) -> None:
+    convert = MagicMock(return_value=DocumentConverterResult(markdown="result"))
+    monkeypatch.setattr("markitdown.__main__.MarkItDown.convert", convert)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["markitdown", "--pdf-page-markers", "document.pdf"],
+    )
+
+    main()
+
+    convert.assert_called_once_with(
+        "document.pdf",
+        stream_info=None,
+        keep_data_uris=False,
+        pdf_page_markers=True,
+    )
+    assert capsys.readouterr().out.strip() == "result"
 
 
 if __name__ == "__main__":

@@ -81,6 +81,16 @@ Or use `-o` to specify the output file:
 markitdown path-to-file.pdf -o document.md
 ```
 
+To preserve PDF page boundaries as one-based HTML comments, use
+`--pdf-page-markers`:
+
+```bash
+markitdown --pdf-page-markers path-to-file.pdf
+```
+
+This emits `<!-- page 1 -->` before the first page and a corresponding marker
+before every subsequent page, including empty pages.
+
 You can also pipe content:
 
 ```bash
@@ -268,6 +278,16 @@ from markitdown import MarkItDown
 
 md = MarkItDown(enable_plugins=False) # Set to True to enable plugins
 result = md.convert("test.xlsx")
+print(result.markdown)
+```
+
+PDF page-boundary preservation is opt-in:
+
+```python
+from markitdown import MarkItDown
+
+md = MarkItDown()
+result = md.convert("test.pdf", pdf_page_markers=True)
 print(result.markdown)
 ```
 
