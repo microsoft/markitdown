@@ -6,6 +6,7 @@ from typing import BinaryIO, Any
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+from ..converter_utils.pdf.cid_decoder import build_cid_map, decode_cids
 
 # Pattern for MasterFormat-style partial numbering (e.g., ".1", ".2", ".10")
 PARTIAL_NUMBERING_PATTERN = re.compile(r"^\.\d+$")
@@ -585,5 +586,11 @@ class PdfConverter(DocumentConverter):
 
         # Post-process to merge MasterFormat-style partial numbering with following text
         markdown = _merge_partial_numbering_lines(markdown)
+
+        # Resolve (cid:N) tokens from LaTeX math fonts to Unicode. On by
+        # default; pass decode_cid=False to keep the raw pdfminer tokens.
+        if kwargs.get("decode_cid", True) and "(cid:" in markdown:
+            cid_map = build_cid_map(pdf_bytes)
+            markdown = decode_cids(markdown, cid_map)
 
         return DocumentConverterResult(markdown=markdown)
