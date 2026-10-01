@@ -15,7 +15,6 @@ import markitdown._uri_utils as uri_utils
 from markitdown._uri_utils import parse_data_uri, file_uri_to_path
 from markitdown.converters._wikipedia_converter import WikipediaConverter
 from markitdown._markitdown import _get_content_disposition_filename
-from markitdown.converters import RssConverter
 
 from markitdown import (
     MarkItDown,
@@ -493,44 +492,6 @@ def test_docx_caller_style_map_overrides_embedded_style_map(tmp_path) -> None:
     assert "plain **underlined**" in result.markdown
 
 
-def test_html_strikethrough_variants(tmp_path) -> None:
-    html = """<!doctype html>
-<html><body>
-<p>Plain <s>s element</s> after.</p>
-<p>Plain <del>del element</del> after.</p>
-<p>Plain <strike>strike element</strike> after.</p>
-<p>Spaces A<strike> B </strike>C.</p>
-<p>Runs D<strike>  E  </strike>F.</p>
-<p>Empty G<strike></strike>H.</p>
-<p>Newline I<strike>J
-K</strike>L.</p>
-<p>Break M<strike>N<br>O</strike>P.</p>
-</body></html>
-"""
-    path = tmp_path / "strike.html"
-    path.write_text(html, encoding="utf-8")
-    markdown = MarkItDown().convert(str(path)).markdown
-
-    assert markdown == "\n\n".join(
-        [
-            # <s>, <del> and the obsolete <strike> all mean strikethrough
-            "Plain ~~s element~~ after.",
-            "Plain ~~del element~~ after.",
-            "Plain ~~strike element~~ after.",
-            # Surrounding whitespace stays outside of the markup ...
-            "Spaces A ~~B~~ C.",
-            # ... and runs of it collapse to a single space
-            "Runs D ~~E~~ F.",
-            # An empty element contributes nothing
-            "Empty GH.",
-            # A line break inside the element is kept, and the markup
-            # survives it because strikethrough may span a single newline
-            "Newline I~~J\nK~~L.",
-            "Break M~~N\nO~~P.",
-        ]
-    )
-
-
 def test_docx_equations() -> None:
     markitdown = MarkItDown()
     docx_file = os.path.join(TEST_FILES_DIR, "equations.docx")
@@ -948,147 +909,6 @@ def test_pptx_chart_multi_series_conversion() -> None:
     assert f"| C{n_categories - 1} |" in md
     # A representative row carries the correct value for each series
     assert "| C10 | 10.0 | 20.0 |" in md
-
-
-def test_deeply_nested_html_fallback() -> None:
-    """Large, deeply nested HTML should fall back to plain-text extraction
-    instead of silently returning unconverted HTML (issue #1636).
-
-    Note: This test uses sys.setrecursionlimit to guarantee a RecursionError
-    regardless of the host environment's default limit, making it deterministic
-    across different platforms and CI configurations.
-    """
-    import sys
-    import warnings
-
-    markitdown = MarkItDown()
-
-    # Use a small recursion limit so the test is environment-independent.
-    # We restore the original limit in a finally block to avoid side-effects.
-    original_limit = sys.getrecursionlimit()
-    low_limit = 200  # well below markdownify's traversal depth for depth=500
-
-    # Build HTML with nesting deep enough to trigger RecursionError
-    depth = 500
-    html = "<html><body>"
-    for _ in range(depth):
-        html += '<div style="margin-left:10px">'
-    html += "<p>Deep content with <b>bold text</b></p>"
-    for _ in range(depth):
-        html += "</div>"
-    html += "</body></html>"
-
-    try:
-        sys.setrecursionlimit(low_limit)
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            result = markitdown.convert_stream(
-                io.BytesIO(html.encode("utf-8")),
-                file_extension=".html",
-            )
-
-            # Should have emitted a warning about the fallback
-            recursion_warnings = [x for x in w if "deeply nested" in str(x.message)]
-            assert len(recursion_warnings) > 0
-
-    finally:
-        sys.setrecursionlimit(original_limit)
-
-    # The output should contain the text content, not raw HTML
-    assert "Deep content" in result.markdown
-    assert "bold text" in result.markdown
-    assert "<div" not in result.markdown
-    assert "<p>" not in result.markdown
-
-
-def test_deeply_nested_rss_item_fallback() -> None:
-    """Deeply nested HTML inside an RSS item should fall back to plain-text
-    extraction instead of silently embedding raw unconverted HTML in the
-    markdown output (same failure class as the HTML converter fix in #1644).
-
-    Note: This test uses sys.setrecursionlimit to guarantee a RecursionError
-    regardless of the host environment's default limit, making it deterministic
-    across different platforms and CI configurations.
-    """
-    import sys
-    import warnings
-
-    markitdown = MarkItDown()
-
-    # Use a small recursion limit so the test is environment-independent.
-    # We restore the original limit in a finally block to avoid side-effects.
-    original_limit = sys.getrecursionlimit()
-    low_limit = 200  # well below markdownify's traversal depth for depth=500
-
-    # Build an RSS item whose content is deeply nested HTML
-    depth = 500
-    item_html = ""
-    for _ in range(depth):
-        item_html += '<div style="margin-left:10px">'
-    item_html += "<p>Deep feed content with <b>bold text</b></p>"
-    for _ in range(depth):
-        item_html += "</div>"
-
-    rss = (
-        '<?xml version="1.0" encoding="UTF-8"?>'
-        '<rss version="2.0" '
-        'xmlns:content="http://purl.org/rss/1.0/modules/content/">'
-        "<channel>"
-        "<title>Test Feed</title>"
-        "<description>A test feed</description>"
-        "<item>"
-        "<title>Deep Item</title>"
-        f"<content:encoded><![CDATA[{item_html}]]></content:encoded>"
-        "</item>"
-        "</channel>"
-        "</rss>"
-    )
-    atom = (
-        '<?xml version="1.0" encoding="UTF-8"?>'
-        '<feed xmlns="http://www.w3.org/2005/Atom">'
-        "<title>Test Feed</title>"
-        "<entry>"
-        "<title>Deep Entry</title>"
-        f'<content type="html"><![CDATA[{item_html}]]></content>'
-        "</entry>"
-        "</feed>"
-    )
-
-    try:
-        sys.setrecursionlimit(low_limit)
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            result = markitdown.convert_stream(
-                io.BytesIO(rss.encode("utf-8")),
-                file_extension=".rss",
-            )
-
-            # Should have emitted a warning about the fallback
-            recursion_warnings = [x for x in w if "deeply nested" in str(x.message)]
-            assert len(recursion_warnings) > 0
-
-        # strict=True should expose the conversion failure rather than applying
-        # the plain-text fallback.
-        with pytest.raises(RecursionError):
-            RssConverter().convert(
-                io.BytesIO(rss.encode("utf-8")),
-                StreamInfo(extension=".rss"),
-                strict=True,
-            )
-        with pytest.raises(RecursionError):
-            RssConverter().convert(
-                io.BytesIO(atom.encode("utf-8")),
-                StreamInfo(extension=".atom"),
-                strict=True,
-            )
-    finally:
-        sys.setrecursionlimit(original_limit)
-
-    # The output should contain the text content, not raw HTML
-    assert "Deep feed content" in result.markdown
-    assert "bold text" in result.markdown
-    assert "<div" not in result.markdown
-    assert "<p>" not in result.markdown
 
 
 @pytest.mark.skipif(

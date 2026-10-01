@@ -1,14 +1,14 @@
 import textwrap
-import warnings
 from html import escape
 from urllib.parse import urljoin
 
 from defusedxml import minidom
 from xml.dom.minidom import Document, Element, Node
 from typing import BinaryIO, Any, Union
-from bs4 import BeautifulSoup, Tag
+import turbohtml
+from bs4 import BeautifulSoup
 
-from ._markdownify import _CustomMarkdownify
+from ._markdown import _CustomMarkdown
 from .._stream_info import StreamInfo
 from .._base_converter import DocumentConverter, DocumentConverterResult
 
@@ -144,24 +144,19 @@ class RssConverter(DocumentConverter):
         stream_info: StreamInfo,
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
-        # Pop our own keyword before forwarding the rest to markdownify.
-        # strict=True raises RecursionError instead of falling back to plain text.
-        strict: bool = kwargs.pop("strict", False)
         self._kwargs = kwargs
         doc = minidom.parse(file_stream)
         doc.documentURI = stream_info.url or kwargs.get("url")
         feed_type = self._feed_type(doc)
 
         if feed_type == "rss":
-            return self._parse_rss_type(doc, strict=strict)
+            return self._parse_rss_type(doc)
         elif feed_type == "atom":
-            return self._parse_atom_type(doc, strict=strict)
+            return self._parse_atom_type(doc)
         else:
             raise ValueError("Unknown feed type")
 
-    def _parse_atom_type(
-        self, doc: Document, *, strict: bool = False
-    ) -> DocumentConverterResult:
+    def _parse_atom_type(self, doc: Document) -> DocumentConverterResult:
         """Parse the type of an Atom feed.
 
         Returns None if the feed type is not recognized or something goes wrong.
@@ -185,13 +180,14 @@ class RssConverter(DocumentConverter):
                 md_text += f"\n## {entry_title}\n"
             if entry_updated:
                 md_text += f"Updated on: {entry_updated}\n"
+            # HTML parsing would drop tag-shaped plain text such as <job_id>.
             body_parts = (
-                self._render_atom_content(
+                self._parse_content(
                     value,
-                    is_markup=is_markup,
                     base_url=self._get_field_base_url(entry, tag_name),
-                    strict=strict,
                 )
+                if is_markup
+                else value
                 for value, is_markup, tag_name in (
                     (entry_summary, summary_is_markup, "summary"),
                     (entry_content, content_is_markup, "content"),
@@ -241,16 +237,6 @@ class RssConverter(DocumentConverter):
             text = lines[0] + "\n" + textwrap.dedent("\n".join(lines[1:]))
         return text.strip(), False
 
-    def _render_atom_content(
-        self, value: str, *, is_markup: bool, base_url: str = "", strict: bool = False
-    ) -> str:
-        """Render one Atom summary or content value as markdown."""
-        if not is_markup:
-            # Plain text is returned verbatim: routing it through the HTML
-            # parser drops tag-shaped text such as ``<job_id>`` entirely.
-            return value
-        return self._parse_content(value, base_url=base_url, strict=strict)
-
     def _get_flattened_text(
         self, element: Element, tag_name: str, *, atom_text: bool = False
     ) -> Union[str, None]:
@@ -281,9 +267,7 @@ class RssConverter(DocumentConverter):
         parts = (part.strip() for part in value.splitlines())
         return " ".join(part for part in parts if part) or None
 
-    def _parse_rss_type(
-        self, doc: Document, *, strict: bool = False
-    ) -> DocumentConverterResult:
+    def _parse_rss_type(self, doc: Document) -> DocumentConverterResult:
         """Parse the type of an RSS feed.
 
         Returns None if the feed type is not recognized or something goes wrong.
@@ -317,7 +301,6 @@ class RssConverter(DocumentConverter):
                 self._parse_content(
                     value,
                     base_url=self._get_field_base_url(item, tag_name),
-                    strict=strict,
                 )
                 for value, tag_name in (
                     (description, "description"),
@@ -335,28 +318,13 @@ class RssConverter(DocumentConverter):
             title=channel_title,
         )
 
-    def _parse_content(
-        self, content: str, *, base_url: str = "", strict: bool = False
-    ) -> str:
+    def _parse_content(self, content: str, *, base_url: str = "") -> str:
         """Parse the content of an RSS feed item"""
         try:
-            # using bs4 because many RSS feeds have HTML-styled content
-            soup = BeautifulSoup(content, "html.parser")
-            self._resolve_content_links(soup, base_url)
-            return _CustomMarkdownify(**self._kwargs).convert_soup(soup)
-        except RecursionError:
-            if strict:
-                raise
-            # Deeply nested item content can exceed Python's recursion limit
-            # during markdownify's recursive DOM traversal.  Fall back to
-            # BeautifulSoup's iterative get_text() so the caller still gets
-            # usable plain-text content instead of raw HTML.
-            warnings.warn(
-                "RSS item content is too deeply nested for markdown conversion "
-                "(RecursionError). Falling back to plain-text extraction.",
-                stacklevel=2,
-            )
-            return BeautifulSoup(content, "html.parser").get_text("\n", strip=True)
+            # using an HTML parser because many RSS feeds have HTML-styled content
+            fragment = turbohtml.parse_fragment(content)
+            self._resolve_content_links(fragment, base_url)
+            return _CustomMarkdown(**self._kwargs).convert(fragment)
         except BaseException as _:
             return content
 
@@ -380,36 +348,37 @@ class RssConverter(DocumentConverter):
             base_url = _resolve_url(base_url, reference)
         return base_url
 
-    def _resolve_content_links(self, soup: BeautifulSoup, base_url: str) -> None:
+    def _resolve_content_links(
+        self, fragment: turbohtml.Element, base_url: str
+    ) -> None:
         """Resolve rendered links/images, retaining nested XML Base scopes.
 
         Inline XHTML keeps its xml:base attributes during serialization; HTML
-        carried in text/CDATA inherits the enclosing field's base. Traverse
-        iteratively so deeply nested content can still reach the fallback.
+        carried in text/CDATA inherits the enclosing field's base.
         """
-        stack: list[tuple[Tag, str]] = [(soup, base_url)]
+        stack: list[tuple[turbohtml.Element, str]] = [(fragment, base_url)]
         while stack:
             node, inherited_base = stack.pop()
-            override = node.get("xml:base")
+            override = node.attr("xml:base")
             current_base = (
                 _resolve_url(inherited_base, override)
-                if isinstance(override, str)
+                if override is not None
                 else inherited_base
             )
             attributes: tuple[str, ...] = ()
-            if node.name == "a":
+            if node.tag == "a":
                 attributes = ("href",)
-            elif node.name == "img":
+            elif node.tag == "img":
                 attributes = ("src", "data-src")
             for attribute in attributes:
-                reference = node.get(attribute)
-                # Empty src must still allow markdownify's data-src fallback.
-                if isinstance(reference, str) and (reference or attribute == "href"):
-                    node[attribute] = _resolve_url(current_base, reference)
+                reference = node.attr(attribute)
+                # Empty src must still allow the data-src fallback.
+                if reference is not None and (reference or attribute == "href"):
+                    node.attrs[attribute] = _resolve_url(current_base, reference)
             stack.extend(
                 (child, current_base)
                 for child in node.children
-                if isinstance(child, Tag)
+                if isinstance(child, turbohtml.Element)
             )
 
     def _get_children(self, element: Element, tag_name: str) -> list[Element]:
@@ -469,7 +438,7 @@ class RssConverter(DocumentConverter):
                         parts.append("\n")
                         stack.append("\n")
                 else:
-                    # markdownify recognizes local HTML names, not x:strong.
+                    # The HTML parser recognizes local HTML names, not x:strong.
                     name = (
                         child.localName
                         if child.namespaceURI == XHTML_NAMESPACE
