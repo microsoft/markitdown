@@ -1,0 +1,382 @@
+"""
+Unit tests for DocxConverterWithOCR.
+
+For each DOCX test file: convert with a mock OCR service then compare the
+full output string against the expected snapshot.
+
+OCR blocks pass through the shared HTML converter, including literal-text
+escaping and two-space Markdown hard breaks in direct conversion.
+"""
+
+import io
+import struct
+import sys
+import zipfile
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+from markitdown_ocr._ocr_service import OCRResult  # noqa: E402
+from markitdown_ocr._docx_converter_with_ocr import (  # noqa: E402
+    DocxConverterWithOCR,
+)
+from markitdown import StreamInfo  # noqa: E402
+
+TEST_DATA_DIR = Path(__file__).parent / "ocr_test_data"
+
+_MOCK_TEXT = "MOCK_OCR_TEXT_12345"
+_MOCK_BLOCK = "*[Image OCR]  \nMOCK\\_OCR\\_TEXT\\_12345  \n[End OCR]*"
+
+
+class MockOCRService:
+    def extract_text(  # noqa: ANN101
+        self, image_stream: Any, **kwargs: Any
+    ) -> OCRResult:
+        return OCRResult(text=_MOCK_TEXT, backend_used="mock")
+
+
+@pytest.fixture(scope="module")
+def svc() -> MockOCRService:
+    return MockOCRService()
+
+
+def _convert(filename: str, ocr_service: MockOCRService) -> str:
+    path = TEST_DATA_DIR / filename
+    if not path.exists():
+        pytest.skip(f"Test file not found: {path}")
+    converter = DocxConverterWithOCR()
+    with open(path, "rb") as f:
+        return converter.convert(
+            f, StreamInfo(extension=".docx"), ocr_service=ocr_service
+        ).markdown
+
+
+# ---------------------------------------------------------------------------
+# docx_image_start.docx
+# ---------------------------------------------------------------------------
+
+
+def test_docx_image_start(svc: MockOCRService) -> None:
+    expected = (
+        "Document with Image at Start\n\n"
+        f"{_MOCK_BLOCK}\n\n"
+        "This is the main content after the header image.\n\n"
+        "More text content here."
+    )
+    assert _convert("docx_image_start.docx", svc) == expected
+
+
+# ---------------------------------------------------------------------------
+# docx_image_middle.docx
+# ---------------------------------------------------------------------------
+
+
+def test_docx_image_middle(svc: MockOCRService) -> None:
+    expected = (
+        "# Introduction\n\n"
+        "This is the introduction section.\n\n"
+        "We will see an image below.\n\n"
+        f"{_MOCK_BLOCK}\n\n"
+        "# Analysis\n\n"
+        "This section comes after the image."
+    )
+    assert _convert("docx_image_middle.docx", svc) == expected
+
+
+# ---------------------------------------------------------------------------
+# docx_image_end.docx
+# ---------------------------------------------------------------------------
+
+
+def test_docx_image_end(svc: MockOCRService) -> None:
+    expected = (
+        "Report\n\n"
+        "Main findings of the report.\n\n"
+        "Details and analysis.\n\n"
+        "Recommendations.\n\n"
+        f"{_MOCK_BLOCK}"
+    )
+    assert _convert("docx_image_end.docx", svc) == expected
+
+
+# ---------------------------------------------------------------------------
+# docx_multiple_images.docx
+# ---------------------------------------------------------------------------
+
+
+def test_docx_multiple_images(svc: MockOCRService) -> None:
+    expected = (
+        "Multi-Image Document\n\n"
+        "First section\n\n"
+        f"{_MOCK_BLOCK}\n\n"
+        "Second section with another image\n\n"
+        f"{_MOCK_BLOCK}\n\n"
+        "Conclusion"
+    )
+    assert _convert("docx_multiple_images.docx", svc) == expected
+
+
+# ---------------------------------------------------------------------------
+# docx_multipage.docx
+# ---------------------------------------------------------------------------
+
+
+def test_docx_multipage(svc: MockOCRService) -> None:
+    expected = (
+        "# Page 1 - Mixed Content\n\n"
+        "This is the first paragraph on page 1.\n\n"
+        "BEFORE IMAGE: Important content appears here.\n\n"
+        f"{_MOCK_BLOCK}\n\n"
+        "AFTER IMAGE: This content follows the image.\n\n"
+        "More text on page 1.\n\n"
+        "# Page 2 - Image at End\n\n"
+        "Content on page 2.\n\n"
+        "Multiple paragraphs of text.\n\n"
+        "Building up to the image...\n\n"
+        "Final paragraph before image.\n\n"
+        f"{_MOCK_BLOCK}\n\n"
+        "# Page 3 - Image at Start\n\n"
+        f"{_MOCK_BLOCK}\n\n"
+        "Content that follows the header image.\n\n"
+        "AFTER IMAGE: This text is after the image."
+    )
+    assert _convert("docx_multipage.docx", svc) == expected
+
+
+# ---------------------------------------------------------------------------
+# docx_complex_layout.docx
+# ---------------------------------------------------------------------------
+
+
+def test_docx_complex_layout(svc: MockOCRService) -> None:
+    expected = (
+        "Complex Document\n\n"
+        "|  |  |\n"
+        "| --- | --- |\n"
+        "| Feature | Status |\n"
+        "| Authentication | Active |\n"
+        "| Encryption | Enabled |\n\n"
+        "Security notice:\n\n"
+        f"{_MOCK_BLOCK}"
+    )
+    assert _convert("docx_complex_layout.docx", svc) == expected
+
+
+# ---------------------------------------------------------------------------
+# No OCR service — no OCR tags emitted
+# ---------------------------------------------------------------------------
+
+
+def test_docx_no_ocr_service_no_tags() -> None:
+    path = TEST_DATA_DIR / "docx_image_middle.docx"
+    if not path.exists():
+        pytest.skip(f"Test file not found: {path}")
+    converter = DocxConverterWithOCR()
+    with open(path, "rb") as f:
+        md = converter.convert(f, StreamInfo(extension=".docx")).markdown
+    assert "*[Image OCR]" not in md
+    assert "[End OCR]*" not in md
+
+
+@pytest.mark.parametrize("double_strike", [False, True])
+@pytest.mark.parametrize("use_ocr", [False, True])
+def test_docx_styles_with_redundant_default_namespace(
+    svc: MockOCRService, use_ocr: bool, double_strike: bool
+) -> None:
+    path = TEST_DATA_DIR / "docx_image_middle.docx"
+    if not path.exists():
+        pytest.skip(f"Test file not found: {path}")
+    original = path.read_bytes()
+    fixture = io.BytesIO()
+    namespace = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    declaration = f'xmlns:w="{namespace}"'.encode("utf-8")
+    with zipfile.ZipFile(io.BytesIO(original)) as source, zipfile.ZipFile(
+        fixture, "w"
+    ) as target:
+        for item in source.infolist():
+            content = source.read(item)
+            if item.filename == "word/styles.xml":
+                if double_strike:
+                    assert content.count(b"</w:styles>") == 1
+                    content = content.replace(
+                        b"</w:styles>",
+                        b'<w:style w:type="character" w:styleId="DoubleStrike">'
+                        b'<w:name w:val="Double Strike"/>'
+                        b'<w:rPr><w:dstrike w:val="1"/></w:rPr>'
+                        b"</w:style></w:styles>",
+                        1,
+                    )
+                assert content.count(declaration) == 1
+                content = content.replace(
+                    declaration, declaration + f' xmlns="{namespace}"'.encode(), 1
+                )
+            target.writestr(item, content)
+
+    converter = DocxConverterWithOCR()
+    service = svc if use_ocr else None
+    expected = converter.convert(
+        io.BytesIO(original), StreamInfo(extension=".docx"), ocr_service=service
+    ).markdown
+    fixture.seek(0)
+    actual = converter.convert(
+        fixture, StreamInfo(extension=".docx"), ocr_service=service
+    ).markdown
+
+    assert "# Introduction" in actual
+    assert actual == expected
+    if use_ocr:
+        assert _MOCK_BLOCK in actual
+
+
+# ---------------------------------------------------------------------------
+# Underlined runs survive both the OCR and the non-OCR mammoth paths
+# ---------------------------------------------------------------------------
+
+
+def _underlined_docx(
+    tmp_path: Path,
+    *,
+    paragraph_xml: str = (
+        "<w:r><w:t>plain </w:t></w:r>"
+        '<w:r><w:rPr><w:u w:val="single"/></w:rPr><w:t>underlined</w:t></w:r>'
+    ),
+) -> Path:
+    docx_file = tmp_path / "underlined.docx"
+    document_xml = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>{paragraph_xml}</w:p>
+  </w:body>
+</w:document>"""
+
+    with zipfile.ZipFile(docx_file, "w") as archive:
+        archive.writestr(
+            "[Content_Types].xml",
+            """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>""",
+        )
+        archive.writestr(
+            "_rels/.rels",
+            """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>""",
+        )
+        archive.writestr("word/document.xml", document_xml)
+
+    return docx_file
+
+
+def test_docx_underlined_text_is_preserved_without_ocr(tmp_path: Path) -> None:
+    converter = DocxConverterWithOCR()
+    with open(_underlined_docx(tmp_path), "rb") as f:
+        md = converter.convert(f, StreamInfo(extension=".docx")).markdown
+    assert "plain <u>underlined</u>" in md
+
+
+def test_docx_underlined_text_is_preserved_with_ocr(
+    tmp_path: Path, svc: MockOCRService
+) -> None:
+    converter = DocxConverterWithOCR()
+    with open(_underlined_docx(tmp_path), "rb") as f:
+        md = converter.convert(
+            f, StreamInfo(extension=".docx"), ocr_service=svc
+        ).markdown
+    assert "plain <u>underlined</u>" in md
+
+
+@pytest.mark.parametrize("use_ocr", [False, True])
+@pytest.mark.parametrize(
+    ("run_xml", "expected"),
+    [
+        ('<w:t xml:space="preserve"> </w:t>', "First Last"),
+        ("<w:tab/>", "First Last"),
+        ("<w:t>&#160;</w:t>", "First\u00a0Last"),
+        # Direct conversion keeps the two-space hard break; the dispatcher strips it.
+        ("<w:br/>", "First  \nLast"),
+    ],
+)
+def test_docx_underlined_whitespace_is_preserved(
+    tmp_path: Path,
+    svc: MockOCRService,
+    use_ocr: bool,
+    run_xml: str,
+    expected: str,
+) -> None:
+    path = _underlined_docx(
+        tmp_path,
+        paragraph_xml=(
+            "<w:r><w:t>First</w:t></w:r>"
+            f'<w:r><w:rPr><w:u w:val="single"/></w:rPr>{run_xml}</w:r>'
+            "<w:r><w:t>Last</w:t></w:r>"
+        ),
+    )
+    converter = DocxConverterWithOCR()
+    with path.open("rb") as stream:
+        result = converter.convert(
+            stream, StreamInfo(extension=".docx"), ocr_service=svc if use_ocr else None
+        )
+
+    assert result.markdown == expected
+
+
+# ---------------------------------------------------------------------------
+# ZIP local file header casing mismatch
+# ---------------------------------------------------------------------------
+
+
+def _uppercase_local_header_names(docx_bytes: bytes) -> bytes:
+    """Uppercase every local file header filename, leaving the central directory
+    untouched, to mimic generators that disagree with themselves about casing."""
+    raw = bytearray(docx_bytes)
+    offset = patched = 0
+    while offset + 30 <= len(raw) and raw[offset : offset + 4] == b"PK\x03\x04":
+        fname_len = struct.unpack_from("<H", raw, offset + 26)[0]
+        extra_len = struct.unpack_from("<H", raw, offset + 28)[0]
+        comp_size = struct.unpack_from("<I", raw, offset + 18)[0]
+        name = raw[offset + 30 : offset + 30 + fname_len]
+        if name.upper() != name:
+            raw[offset + 30 : offset + 30 + fname_len] = name.upper()
+            patched += 1
+        offset += 30 + fname_len + extra_len + comp_size
+    assert patched, "fixture produced no mismatched local file headers"
+    return bytes(raw)
+
+
+def test_docx_zip_filename_casing_mismatch_preserves_ocr(svc: MockOCRService) -> None:
+    """OCR output survives a .docx whose local file headers disagree with the
+    central directory on casing.
+
+    The inherited core converter repairs the archive before Mammoth opens images.
+    """
+    path = TEST_DATA_DIR / "docx_image_middle.docx"
+    if not path.exists():
+        pytest.skip(f"Test file not found: {path}")
+
+    original = path.read_bytes()
+    mismatched = _uppercase_local_header_names(original)
+
+    # Plain zipfile cannot read the mismatched archive ...
+    with pytest.raises(zipfile.BadZipFile):
+        with zipfile.ZipFile(io.BytesIO(mismatched), "r") as zf:
+            for name in zf.namelist():
+                zf.read(name)
+
+    # ... but the converter produces the same output it does for the original.
+    converter = DocxConverterWithOCR()
+    expected = converter.convert(
+        io.BytesIO(original), StreamInfo(extension=".docx"), ocr_service=svc
+    ).markdown
+    actual = converter.convert(
+        io.BytesIO(mismatched), StreamInfo(extension=".docx"), ocr_service=svc
+    ).markdown
+
+    assert _MOCK_BLOCK in actual
+    assert actual == expected

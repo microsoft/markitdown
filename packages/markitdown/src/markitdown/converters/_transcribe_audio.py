@@ -13,6 +13,12 @@ try:
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=DeprecationWarning)
         warnings.filterwarnings("ignore", category=SyntaxWarning)
+        warnings.filterwarnings(
+            "ignore",
+            category=RuntimeWarning,
+            message=".*ffmpeg.*",
+            append=True,
+        )
         import speech_recognition as sr
         import pydub
 except ImportError:
@@ -20,11 +26,16 @@ except ImportError:
     _dependency_exc_info = sys.exc_info()
 
 
-def transcribe_audio(file_stream: BinaryIO, *, audio_format: str = "wav") -> str:
+def transcribe_audio(
+    file_stream: BinaryIO, *, audio_format: str = "wav", language: str = "en-US"
+) -> str:
     # Check for installed dependencies
     if _dependency_exc_info is not None:
         raise MissingDependencyException(
-            "Speech transcription requires installing MarkItdown with the [audio-transcription] optional dependencies. E.g., `pip install markitdown[audio-transcription]` or `pip install markitdown[all]`"
+            "Speech transcription requires installing MarkItDown with the "
+            "[audio-transcription] optional dependencies. E.g., "
+            "`pip install 'markitdown[audio-transcription]'` or "
+            "`pip install 'markitdown[all]'`"
         ) from _dependency_exc_info[
             1
         ].with_traceback(  # type: ignore[union-attr]
@@ -45,5 +56,5 @@ def transcribe_audio(file_stream: BinaryIO, *, audio_format: str = "wav") -> str
     recognizer = sr.Recognizer()
     with sr.AudioFile(audio_source) as source:
         audio = recognizer.record(source)
-        transcript = recognizer.recognize_google(audio).strip()
+        transcript = recognizer.recognize_google(audio, language=language).strip()
         return "[No speech detected]" if transcript == "" else transcript
