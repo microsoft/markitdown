@@ -92,7 +92,48 @@ def test_html_href_does_not_quote_query_or_fragment() -> None:
 
     markdown = _convert_html(f'<a href="{href}">example</a>')
 
-    assert f"[example]({expected_href})" in markdown
+    # The URL is still not re-encoded. The angle brackets are what CommonMark
+    # provides for a destination that holds a space, so the URL above survives
+    # a round trip through a Markdown parser instead of being cut at the space.
+    assert f"[example](<{expected_href}>)" in markdown
+
+
+def test_html_href_with_an_unbalanced_parenthesis_is_delimited() -> None:
+    """A bare destination ends at an unbalanced `)`, truncating the URL."""
+    href = "https://example.com/s?q=a)b"
+
+    markdown = _convert_html(f'<a href="{href}">result</a>')
+
+    assert f"[result](<{href}>)" in markdown
+
+
+def test_html_href_without_anything_to_delimit_stays_bare() -> None:
+    """Guard: an ordinary URL is not wrapped."""
+    href = "https://example.com/a/b?x=1&y=2"
+
+    markdown = _convert_html(f'<a href="{href}">ok</a>')
+
+    assert f"[ok]({href})" in markdown
+
+
+def test_img_src_is_quoted_like_an_href() -> None:
+    """An image destination is parsed exactly like a link destination."""
+    markdown = _convert_html('<img src="https://example.com/a b.png" alt="pic">')
+
+    assert "![pic](https://example.com/a%20b.png)" in markdown
+
+
+def test_img_src_with_an_unbalanced_parenthesis_is_quoted() -> None:
+    markdown = _convert_html('<img src="https://example.com/a)b.png" alt="pic">')
+
+    assert "![pic](https://example.com/a%29b.png)" in markdown
+
+
+def test_img_data_uri_is_left_alone() -> None:
+    """Guard: a data URI is a payload, not a path to quote."""
+    markdown = _convert_html('<img src="data:image/png;base64,iVBORw0KGgo" alt="d">')
+
+    assert "![d](data:image/png;base64...)" in markdown
 
 
 def test_img_prefers_data_src_over_placeholder_data_uri() -> None:
