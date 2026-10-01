@@ -94,7 +94,9 @@ class AudioConverter(DocumentConverter):
         # Transcribe
         if audio_format:
             try:
-                transcript = transcribe_audio(file_stream, audio_format=audio_format, language=language)
+                transcript = transcribe_audio(
+                    file_stream, audio_format=audio_format, language=language
+                )
                 if transcript:
                     md_content += "\n\n### Audio Transcript:\n" + transcript
             except MissingDependencyException:

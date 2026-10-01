@@ -26,7 +26,9 @@ except ImportError:
     _dependency_exc_info = sys.exc_info()
 
 
-def transcribe_audio(file_stream: BinaryIO, *, audio_format: str = "wav", language: str = "en-US") -> str:
+def transcribe_audio(
+    file_stream: BinaryIO, *, audio_format: str = "wav", language: str = "en-US"
+) -> str:
     # Check for installed dependencies
     if _dependency_exc_info is not None:
         raise MissingDependencyException(
