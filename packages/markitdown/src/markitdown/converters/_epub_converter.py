@@ -3,7 +3,7 @@ import posixpath
 import zipfile
 from urllib.parse import unquote
 from defusedxml import minidom
-from xml.dom.minidom import Document
+from xml.dom.minidom import Document, Element
 
 from typing import BinaryIO, Any, Dict, List, Set
 
@@ -23,6 +23,10 @@ MIME_TYPE_MAPPING = {
     ".html": "text/html",
     ".xhtml": "application/xhtml+xml",
 }
+
+CONTAINER_NAMESPACE = "urn:oasis:names:tc:opendocument:xmlns:container"
+PACKAGE_NAMESPACE = "http://www.idpf.org/2007/opf"
+DC_NAMESPACE = "http://purl.org/dc/elements/1.1/"
 
 
 class EpubConverter(HtmlConverter):
@@ -63,9 +67,9 @@ class EpubConverter(HtmlConverter):
 
             # Locate content.opf
             container_dom = minidom.parse(z.open("META-INF/container.xml"))
-            opf_path = container_dom.getElementsByTagName("rootfile")[0].getAttribute(
-                "full-path"
-            )
+            opf_path = self._get_package_elements(
+                container_dom, CONTAINER_NAMESPACE, "rootfile"
+            )[0].getAttribute("full-path")
 
             # Parse content.opf
             opf_dom = minidom.parse(z.open(opf_path))
@@ -82,11 +86,15 @@ class EpubConverter(HtmlConverter):
             # Extract manifest items (ID → href mapping)
             manifest = {
                 item.getAttribute("id"): item.getAttribute("href")
-                for item in opf_dom.getElementsByTagName("item")
+                for item in self._get_package_elements(
+                    opf_dom, PACKAGE_NAMESPACE, "item"
+                )
             }
 
             # Extract spine order (ID refs)
-            spine_items = opf_dom.getElementsByTagName("itemref")
+            spine_items = self._get_package_elements(
+                opf_dom, PACKAGE_NAMESPACE, "itemref"
+            )
             spine_order = [item.getAttribute("idref") for item in spine_items]
 
             # Convert spine order to actual file paths
@@ -156,6 +164,16 @@ class EpubConverter(HtmlConverter):
 
         return candidates[0]
 
+    def _get_package_elements(
+        self, dom: Document, namespace: str, local_name: str
+    ) -> List[Element]:
+        # Keep accepting unqualified elements from older, non-conforming files.
+        return [
+            node
+            for node in dom.getElementsByTagNameNS("*", local_name)
+            if node.namespaceURI in (namespace, None)
+        ]
+
     def _get_text_from_node(self, dom: Document, tag_name: str) -> str | None:
         """Convenience function to extract a single occurrence of a tag (e.g., title)."""
         texts = self._get_all_texts_from_nodes(dom, tag_name)
@@ -167,7 +185,9 @@ class EpubConverter(HtmlConverter):
     def _get_all_texts_from_nodes(self, dom: Document, tag_name: str) -> List[str]:
         """Helper function to extract all occurrences of a tag (e.g., multiple authors)."""
         texts: List[str] = []
-        for node in dom.getElementsByTagName(tag_name):
+        for node in dom.getElementsByTagNameNS(
+            DC_NAMESPACE, tag_name.removeprefix("dc:")
+        ):
             text_parts: List[str] = []
             self._collect_node_text(node, text_parts)
             text_val = "".join(text_parts).strip()
