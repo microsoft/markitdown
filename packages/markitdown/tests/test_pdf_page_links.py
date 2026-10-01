@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from pdfminer.pdfparser import PDFSyntaxError
 
 from markitdown import MarkItDown, StreamInfo
 from markitdown.converters import PdfConverter
@@ -89,7 +90,7 @@ def test_stream_requires_source_and_invalid_pdf_still_fails():
     with PDF.open("rb") as stream:
         with pytest.raises(ValueError, match="require a source"):
             PdfConverter().convert(stream, StreamInfo(), pdf_page_links=True)
-    with pytest.raises(Exception):
+    with pytest.raises(PDFSyntaxError):
         PdfConverter().convert(
             io.BytesIO(b"invalid pdf"),
             StreamInfo(local_path="paper.pdf"),
@@ -97,3 +98,32 @@ def test_stream_requires_source_and_invalid_pdf_still_fails():
         )
     with pytest.raises(ValueError, match="local path"):
         _pdf_source_uri("javascript:alert(1)")
+
+
+def test_pdfminer_boundaries_do_not_depend_on_form_feeds():
+    bodies = ["first\finside\f", "\f", "third\f"]
+    with patch(
+        "markitdown.converters._pdf_converter.PDFPage.get_pages",
+        return_value=iter(bodies),
+    ), patch(
+        "markitdown.converters._pdf_converter.PDFPageInterpreter.process_page",
+        autospec=True,
+        side_effect=lambda interpreter, body: interpreter.device.outfp.write(body),
+    ):
+        assert _extract_pdfminer_pages(io.BytesIO()) == ["first\finside", "", "third"]
+
+
+def test_cli_forwards_pdf_options(monkeypatch, capsys):
+    from markitdown import DocumentConverterResult
+    from markitdown.__main__ import main
+
+    convert = MagicMock(return_value=DocumentConverterResult(markdown="linked"))
+    monkeypatch.setattr("markitdown.__main__.MarkItDown.convert", convert)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["markitdown", "--pdf-page-links", "--pdf-source", "paper.pdf", "input.pdf"],
+    )
+    main()
+    assert convert.call_args.kwargs["pdf_page_links"] is True
+    assert convert.call_args.kwargs["pdf_source"] == "paper.pdf"
+    assert capsys.readouterr().out.strip() == "linked"

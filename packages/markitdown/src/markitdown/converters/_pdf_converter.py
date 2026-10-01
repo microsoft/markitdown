@@ -97,8 +97,9 @@ def _extract_pdfminer_pages(stream: BinaryIO) -> list[str]:
     return pages
 
 
-def _pdf_source_uri(source: str) -> str:
+def _pdf_source_uri(source: str | Path) -> str:
     """Encode a source for Markdown links; fragments are reserved for page numbers."""
+    source = str(source)
     parsed = urlsplit(source)
     if parsed.scheme in ("http", "https", "file"):
         return quote(urlunsplit(parsed._replace(fragment="")), safe="/:?=&%+@;$,~-._")
@@ -595,19 +596,20 @@ class PdfConverter(DocumentConverter):
 
             with pdfplumber.open(pdf_bytes) as pdf:
                 for page_idx, page in enumerate(pdf.pages):
-                    page_content = _extract_form_content_from_words(page)
+                    try:
+                        page_content = _extract_form_content_from_words(page)
 
-                    if page_content is not None:
-                        form_page_count += 1
-                        if page_links or page_content.strip():
-                            markdown_chunks.append(page_content)
-                    else:
-                        plain_page_indices.append(page_idx)
-                        text = page.extract_text()
-                        if page_links or (text and text.strip()):
-                            markdown_chunks.append((text or "").strip())
-
-                    page.close()  # Free cached page data immediately
+                        if page_content is not None:
+                            form_page_count += 1
+                            if page_links or page_content.strip():
+                                markdown_chunks.append(page_content)
+                        else:
+                            plain_page_indices.append(page_idx)
+                            text = page.extract_text()
+                            if page_links or (text and text.strip()):
+                                markdown_chunks.append((text or "").strip())
+                    finally:
+                        page.close()  # Free cached page data, including on failure
 
             # If no pages had form-style content, use pdfminer for
             # the whole document (better text spacing for prose).
@@ -631,6 +633,8 @@ class PdfConverter(DocumentConverter):
                 markdown = pdfminer.high_level.extract_text(pdf_bytes)
 
         if page_links:
+            if not markdown_chunks:
+                raise ValueError("PDF contains no pages")
             markdown = "\n\n".join(
                 f"[Page {index}](<{source_uri}#page={index}>)\n\n"
                 + _merge_partial_numbering_lines(body).strip()
