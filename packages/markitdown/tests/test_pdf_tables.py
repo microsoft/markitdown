@@ -1196,3 +1196,20 @@ class TestPdfTableStructureConsistency:
         table_text = str(second_table)
         assert "Electronics" in table_text, "Second table should contain Electronics"
         assert "Hardware" in table_text, "Second table should contain Hardware"
+
+
+def test_pdf_to_markdown_table_unequal_columns() -> None:
+    """Test that _to_markdown_table does not truncate cells when rows have unequal column counts."""
+    from markitdown.converters._pdf_converter import _to_markdown_table
+
+    # Header has 2 columns, second row has 3 columns
+    table_1 = [["Header1", "Header2"], ["Val1", "Val2", "Val3"]]
+    result_1 = _to_markdown_table(table_1)
+    assert "Val3" in result_1, "Cell data 'Val3' from longer data row was truncated"
+
+    # Header has 3 columns, second row has 2 columns
+    table_2 = [["Header1", "Header2", "Header3"], ["Val1", "Val2"]]
+    result_2 = _to_markdown_table(table_2)
+    assert (
+        "Header3" in result_2
+    ), "Header cell 'Header3' from longer header row was truncated"

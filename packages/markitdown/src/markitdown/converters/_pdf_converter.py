@@ -95,6 +95,10 @@ def _to_markdown_table(table: list[list[str]], include_separator: bool = True) -
     if not table:
         return ""
 
+    # Pad rows to the maximum row length so zip(*table) and fmt_row process all columns
+    max_cols = max(len(row) for row in table)
+    table = [row + [""] * (max_cols - len(row)) for row in table]
+
     # Column widths
     col_widths = [max(len(str(cell)) for cell in col) for col in zip(*table)]
 
