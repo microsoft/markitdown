@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "markitdown": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "-v",
+        "/path/to/your/documents:/workdir",
+        "markitdown-mcp:latest"
+      ],
+      "description": "Enhanced MarkItDown MCP Server with context-preserving conversion"
+    }
+  }
+}
