@@ -41,6 +41,62 @@ def test_html_underlined_content_is_preserved(content: str, expected: str) -> No
     assert _convert_html(f"<p>First<u>{content}</u>Last</p>") == expected
 
 
+@pytest.mark.parametrize(
+    "tag",
+    [
+        "b",
+        "code",
+        "del",
+        "em",
+        "i",
+        "kbd",
+        "s",
+        "samp",
+        "strike",
+        "strong",
+        "sub",
+        "sup",
+        "u",
+    ],
+)
+def test_html_whitespace_only_inline_tag_keeps_its_whitespace(tag: str) -> None:
+    assert _convert_html(f"<p>First<{tag}> </{tag}>Last</p>") == "First Last"
+
+
+def test_html_whitespace_only_inline_tag_keeps_the_exact_character() -> None:
+    assert _convert_html("<p>First<b>&#160;</b>Last</p>") == "First\u00a0Last"
+
+
+def test_html_empty_inline_tag_still_adds_nothing() -> None:
+    assert _convert_html("<p>First<b></b>Last</p>") == "FirstLast"
+
+
+def test_html_styled_runs_are_not_glued_together() -> None:
+    """Editors that emit one element per styled run put the space in its own element.
+
+    Losing it merges the two words and joins the emphasis markers into `****`.
+    """
+    assert (
+        _convert_html("<p><b>First</b><b> </b><b>Last</b></p>") == "**First** **Last**"
+    )
+
+
+@pytest.mark.parametrize(
+    ("tag", "expected"),
+    [
+        ("b", "First **word** Last"),
+        ("code", "First `word` Last"),
+        ("em", "First *word* Last"),
+        ("s", "First ~~word~~ Last"),
+        ("u", "First <u>word</u> Last"),
+    ],
+)
+def test_html_inline_tag_with_content_is_still_converted(
+    tag: str, expected: str
+) -> None:
+    assert _convert_html(f"<p>First <{tag}>word</{tag}> Last</p>") == expected
+
+
 def test_preserves_non_utf8_percent_encoded_href_path() -> None:
     href = "https://abc.com/hist/" "%a5%c8%a5%c3%a5%d7%a5%da%a1%bc%a5%b8"
     html = f'<a href="{href}">example</a>'
