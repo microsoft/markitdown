@@ -41,6 +41,20 @@ def test_real_pages_and_pdfminer_fallback_match():
         assert converter.convert(PDF, pdf_page_links=True).markdown == result
 
 
+def test_real_blank_middle_page_keeps_physical_index():
+    path = PDF.with_name("test_pdf_blank_middle.pdf")
+    with path.open("rb") as stream:
+        pages = _extract_pdfminer_pages(stream)
+    assert len(pages) == 3
+    assert pages[0].strip() and not pages[1].strip() and pages[2].strip()
+    result = MarkItDown().convert(path, pdf_page_links=True).markdown
+    sections = result.split("[Page ")[1:]
+    assert len(sections) == 3
+    assert sections[0].startswith("1]") and sections[2].startswith("3]")
+    assert sections[1].startswith("2]")
+    assert not sections[1].split(">)", 1)[1].strip()
+
+
 def test_mixed_pages_keep_blank_page_and_newline_cleanup():
     pages = [MagicMock(), MagicMock(), MagicMock()]
     pdf = MagicMock()
