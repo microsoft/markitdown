@@ -46,7 +46,7 @@ def test_real_blank_middle_page_keeps_physical_index():
     with path.open("rb") as stream:
         pages = _extract_pdfminer_pages(stream)
     assert len(pages) == 3
-    assert pages[0].strip() and not pages[1].strip() and pages[2].strip()
+    assert [page.strip() for page in pages] == ["First page", "", "Third page"]
     result = MarkItDown().convert(path, pdf_page_links=True).markdown
     sections = result.split("[Page ")[1:]
     assert len(sections) == 3
