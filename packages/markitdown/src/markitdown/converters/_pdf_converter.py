@@ -93,7 +93,7 @@ def _extract_pdfminer_pages(stream: BinaryIO) -> list[str]:
             output.seek(0)
             output.truncate(0)
             interpreter.process_page(page)
-            pages.append(output.getvalue().rstrip("\f"))
+            pages.append(output.getvalue().removesuffix("\f"))
     return pages
 
 

@@ -101,7 +101,7 @@ def test_stream_requires_source_and_invalid_pdf_still_fails():
 
 
 def test_pdfminer_boundaries_do_not_depend_on_form_feeds():
-    bodies = ["first\finside\f", "\f", "third\f"]
+    bodies = ["first\finside\f\f", "\f", "third\f"]
     with patch(
         "markitdown.converters._pdf_converter.PDFPage.get_pages",
         return_value=iter(bodies),
@@ -110,7 +110,7 @@ def test_pdfminer_boundaries_do_not_depend_on_form_feeds():
         autospec=True,
         side_effect=lambda interpreter, body: interpreter.device.outfp.write(body),
     ):
-        assert _extract_pdfminer_pages(io.BytesIO()) == ["first\finside", "", "third"]
+        assert _extract_pdfminer_pages(io.BytesIO()) == ["first\finside\f", "", "third"]
 
 
 def test_cli_forwards_pdf_options(monkeypatch, capsys):
