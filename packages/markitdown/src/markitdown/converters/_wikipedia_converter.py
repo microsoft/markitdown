@@ -34,7 +34,7 @@ class WikipediaConverter(DocumentConverter):
         mimetype = (stream_info.mimetype or "").lower()
         extension = (stream_info.extension or "").lower()
 
-        if not re.search(r"^https?:\/\/[a-zA-Z]{2,3}\.wikipedia.org\/", url):
+        if not re.search(r"^https?:\/\/[a-zA-Z]{2,3}(\.m)?\.wikipedia.org\/", url):
             # Not a Wikipedia URL
             return False
 
@@ -74,10 +74,14 @@ class WikipediaConverter(DocumentConverter):
             if title_elm and isinstance(title_elm, bs4.Tag):
                 main_title = title_elm.string
 
+            # Treat whitespace-only titles as if they were absent
+            if main_title:
+                main_title = main_title.strip() or None
+
             # Convert the page
-            webpage_text = f"# {main_title}\n\n" + _CustomMarkdownify(
-                **kwargs
-            ).convert_soup(body_elm)
+            webpage_text = (
+                f"# {main_title}\n\n" if main_title else ""
+            ) + _CustomMarkdownify(**kwargs).convert_soup(body_elm)
         else:
             webpage_text = _CustomMarkdownify(**kwargs).convert_soup(soup)
 
