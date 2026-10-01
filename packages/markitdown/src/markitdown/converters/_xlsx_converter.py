@@ -249,13 +249,13 @@ class XlsConverter(DocumentConverter):
         for s in sheets:
             md_content += f"## {s}\n"
             html_content = sheets[s].to_html(
-                    index=False,
-                    # pandas defaults large/small floats to 6-significant-digit
-                    # scientific notation, silently dropping digits the user
-                    # entered (123456789.123 -> 1.234568e+08). repr gives the
-                    # shortest string that round-trips the exact stored value.
-                    float_format=lambda value: repr(float(value)),
-                )
+                index=False,
+                # pandas defaults large/small floats to 6-significant-digit
+                # scientific notation, silently dropping digits the user
+                # entered (123456789.123 -> 1.234568e+08). repr gives the
+                # shortest string that round-trips the exact stored value.
+                float_format=lambda value: repr(float(value)),
+            )
             md_content += (
                 self._html_converter.convert_string(
                     html_content, **kwargs

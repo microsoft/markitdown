@@ -2,6 +2,8 @@
 import io
 from pathlib import Path
 
+import numpy as np
+import pandas as pd
 from openpyxl import Workbook
 
 from markitdown import MarkItDown, StreamInfo
@@ -38,3 +40,16 @@ def test_xls_float_precision_preserved():
     assert "123456789.123" in cells
     assert "0.1" in cells
     assert "1e-10" in cells
+
+
+def test_float_format_handles_numpy_scalars():
+    # pandas hands float_format numpy scalars, and with numpy >= 2 a bare
+    # repr(value) would render "np.float64(0.1)" in the table. The float()
+    # cast inside the converter's lambda is what prevents that.
+    df = pd.DataFrame({"money": [np.float64(0.1)]})
+    buf = io.BytesIO()
+    df.to_excel(buf, index=False)
+    buf.seek(0)
+    result = MarkItDown().convert_stream(buf, stream_info=StreamInfo(extension=".xlsx"))
+    assert "np.float64" not in result.markdown
+    assert "| 0.1 |" in result.markdown
