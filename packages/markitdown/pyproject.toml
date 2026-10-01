@@ -28,13 +28,14 @@ dependencies = [
   "beautifulsoup4",
   "requests",
   "markdownify",
-  "magika~=0.6.1",
   "charset-normalizer",
   "defusedxml",
 ]
 
 [project.optional-dependencies]
+magika = ["magika~=0.6.1"]
 all = [
+  "magika~=0.6.1",
   "python-pptx",
   "mammoth~=1.11.0",
   "pandas",

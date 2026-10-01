@@ -14,7 +14,13 @@ from pathlib import Path
 from urllib.parse import urlparse
 from warnings import warn
 import requests
-import magika
+
+try:
+    import magika
+except ModuleNotFoundError as exc:
+    if exc.name != "magika":
+        raise
+    magika = None
 import charset_normalizer
 import codecs
 
@@ -165,7 +171,7 @@ class MarkItDown:
         else:
             self._requests_session = requests_session
 
-        self._magika = magika.Magika()
+        self._magika = magika.Magika() if magika is not None else None
 
         # TODO - remove these (see enable_builtins)
         self._llm_client: Any = None
@@ -690,9 +696,14 @@ class MarkItDown:
             raise FileConversionException(attempts=failed_attempts)
 
         # Nothing can handle it!
-        raise UnsupportedFormatException(
-            "Could not convert stream to Markdown. No converter attempted a conversion, suggesting that the filetype is simply not supported."
-        )
+        message = "Could not convert stream to Markdown. No converter attempted a conversion, suggesting that the filetype is simply not supported."
+        if self._magika is None:
+            message += (
+                " Content-based file detection is unavailable. Install markitdown[magika]"
+                " or provide StreamInfo(extension=..., mimetype=...)"
+                " (CLI: --extension or --mime-type)."
+            )
+        raise UnsupportedFormatException(message)
 
     def register_page_converter(self, converter: DocumentConverter) -> None:
         """DEPRECATED: Use register_converter instead."""
@@ -758,6 +769,22 @@ class MarkItDown:
             _e = mimetypes.guess_all_extensions(base_guess.mimetype, strict=False)
             if len(_e) > 0:
                 enhanced_guess = enhanced_guess.copy_and_update(extension=_e[0])
+
+        if self._magika is None:
+            if enhanced_guess.charset is None and PlainTextConverter().accepts(
+                file_stream, enhanced_guess
+            ):
+                cur_pos = file_stream.tell()
+                try:
+                    sample = _read_charset_sample(file_stream)
+                    detected = charset_normalizer.from_bytes(sample).best()
+                    if detected is not None:
+                        enhanced_guess = enhanced_guess.copy_and_update(
+                            charset=self._normalize_charset(detected.encoding)
+                        )
+                finally:
+                    file_stream.seek(cur_pos)
+            return [enhanced_guess]
 
         # Call magika to guess from the stream
         cur_pos = file_stream.tell()
