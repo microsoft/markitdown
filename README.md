@@ -87,6 +87,21 @@ You can also pipe content:
 cat path-to-file.pdf | markitdown
 ```
 
+To link extracted text back to each physical PDF page:
+
+```bash
+markitdown --pdf-page-links path-to-file.pdf -o document.md
+cat path-to-file.pdf | markitdown --extension pdf --pdf-page-links --pdf-source https://example.org/paper.pdf
+```
+
+The Python equivalent is `convert(path, pdf_page_links=True)`. For streams,
+provide `pdf_source="https://example.org/paper.pdf"` or a source in `StreamInfo`.
+Each page begins with `[Page N](<source#page=N>)`, including blank pages.
+Page numbers are physical positions (starting at 1), not printed page labels.
+Local links contain encoded absolute file paths; use `pdf_source` to override
+them before sharing Markdown. Following `#page=N` depends on your PDF viewer.
+The option is off by default and does not extract figure images or add OCR.
+
 ### Optional Dependencies
 MarkItDown has optional dependencies for activating various file formats. Earlier in this document, we installed all optional dependencies with the `[all]` option. However, you can also install them individually for more control. For example:
 
