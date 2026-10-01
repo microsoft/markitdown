@@ -151,3 +151,32 @@ def test_img_keeps_embedded_data_uri_over_data_src_when_keeping_data_uris() -> N
 
     assert f"![A photo]({embedded})" in markdown
     assert other_src not in markdown
+
+
+@pytest.mark.parametrize(
+    ("alt", "expected_alt"),
+    [
+        ("Photo ] 1", r"Photo \] 1"),
+        ("Photo [1", r"Photo \[1"),
+        ("Quarterly [Q3] Report", r"Quarterly \[Q3\] Report"),
+        ("Click [here](https://example.com)", r"Click \[here\](https://example.com)"),
+        (r"C:\images\photo [1]", r"C:\\images\\photo \[1\]"),
+    ],
+)
+def test_img_escapes_brackets_in_alt_text(alt: str, expected_alt: str) -> None:
+    html = f'<img src="https://example.com/photo.jpg" alt="{alt}">'
+    markdown = _convert_html(html)
+
+    assert f"![{expected_alt}](https://example.com/photo.jpg)" in markdown
+
+
+def test_img_inline_preserves_raw_alt_text() -> None:
+    converter = _CustomMarkdownify()
+    soup = BeautifulSoup(
+        '<a href="https://example.com"><img src="photo.jpg" alt="Photo [Q1]"></a>',
+        "html.parser",
+    )
+    img_element = soup.img
+    result = converter.convert_img(img_element, "", convert_as_inline=True)
+
+    assert result == "Photo [Q1]"
