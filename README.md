@@ -110,6 +110,15 @@ At the moment, the following optional dependencies are available:
 * `[audio-transcription]` Installs dependencies for audio transcription of wav and mp3 files
 * `[youtube-transcription]` Installs dependencies for fetching YouTube video transcription
 
+For PDFs containing bottom-to-top rotated text, pass the direction expected by
+pdfplumber when converting the document:
+
+```python
+from markitdown import MarkItDown
+
+result = MarkItDown().convert("rotated.pdf", pdf_char_dir_rotated="btt")
+```
+
 ### Plugins
 
 MarkItDown also supports 3rd-party plugins. Plugins are disabled by default. To list installed plugins:

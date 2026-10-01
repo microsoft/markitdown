@@ -117,7 +117,9 @@ def _to_markdown_table(table: list[list[str]], include_separator: bool = True) -
     return "\n".join(md)
 
 
-def _extract_form_content_from_words(page: Any) -> str | None:
+def _extract_form_content_from_words(
+    page: Any, *, char_dir_rotated: str | None = None
+) -> str | None:
     """
     Extract form-style content from a PDF page by analyzing word positions.
     This handles borderless forms/tables where words are aligned in columns.
@@ -129,7 +131,14 @@ def _extract_form_content_from_words(page: Any) -> str | None:
     Returns None if the page doesn't appear to be a form-style document,
     indicating that pdfminer should be used instead for better text spacing.
     """
-    words = page.extract_words(keep_blank_chars=True, x_tolerance=3, y_tolerance=3)
+    extract_words_kwargs: dict[str, Any] = {
+        "keep_blank_chars": True,
+        "x_tolerance": 3,
+        "y_tolerance": 3,
+    }
+    if char_dir_rotated is not None:
+        extract_words_kwargs["char_dir_rotated"] = char_dir_rotated
+    words = page.extract_words(**extract_words_kwargs)
     if not words:
         return None
 
@@ -395,7 +404,9 @@ def _extract_form_content_from_words(page: Any) -> str | None:
     return "\n".join(result_lines)
 
 
-def _extract_tables_from_words(page: Any) -> list[list[list[str]]]:
+def _extract_tables_from_words(
+    page: Any, *, char_dir_rotated: str | None = None
+) -> list[list[list[str]]]:
     """
     Extract tables from a PDF page by analyzing word positions.
     This handles borderless tables where words are aligned in columns.
@@ -403,7 +414,14 @@ def _extract_tables_from_words(page: Any) -> list[list[list[str]]]:
     This function is designed for structured tabular data (like invoices),
     not for multi-column text layouts in scientific documents.
     """
-    words = page.extract_words(keep_blank_chars=True, x_tolerance=3, y_tolerance=3)
+    extract_words_kwargs: dict[str, Any] = {
+        "keep_blank_chars": True,
+        "x_tolerance": 3,
+        "y_tolerance": 3,
+    }
+    if char_dir_rotated is not None:
+        extract_words_kwargs["char_dir_rotated"] = char_dir_rotated
+    words = page.extract_words(**extract_words_kwargs)
     if not words:
         return []
 
@@ -536,6 +554,11 @@ class PdfConverter(DocumentConverter):
 
         assert isinstance(file_stream, io.IOBase)
 
+        char_dir_rotated = kwargs.get("pdf_char_dir_rotated")
+        extract_text_kwargs: dict[str, Any] = {}
+        if char_dir_rotated is not None:
+            extract_text_kwargs["char_dir_rotated"] = char_dir_rotated
+
         # Read file stream into BytesIO for compatibility with pdfplumber
         pdf_bytes = io.BytesIO(file_stream.read())
 
@@ -551,7 +574,9 @@ class PdfConverter(DocumentConverter):
 
             with pdfplumber.open(pdf_bytes) as pdf:
                 for page_idx, page in enumerate(pdf.pages):
-                    page_content = _extract_form_content_from_words(page)
+                    page_content = _extract_form_content_from_words(
+                        page, char_dir_rotated=char_dir_rotated
+                    )
 
                     if page_content is not None:
                         form_page_count += 1
@@ -559,7 +584,7 @@ class PdfConverter(DocumentConverter):
                             markdown_chunks.append(page_content)
                     else:
                         plain_page_indices.append(page_idx)
-                        text = page.extract_text()
+                        text = page.extract_text(**extract_text_kwargs)
                         if text and text.strip():
                             markdown_chunks.append(text.strip())
 

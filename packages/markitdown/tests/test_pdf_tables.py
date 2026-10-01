@@ -1196,3 +1196,15 @@ class TestPdfTableStructureConsistency:
         table_text = str(second_table)
         assert "Electronics" in table_text, "Second table should contain Electronics"
         assert "Hardware" in table_text, "Second table should contain Hardware"
+
+    def test_rotated_text_direction_can_be_configured(self, markitdown):
+        """Test that bottom-to-top rotated text can use pdfplumber's direction option."""
+        pdf_path = os.path.join(TEST_FILES_DIR, "rotated_table.pdf")
+
+        default_result = markitdown.convert(pdf_path)
+        assert "noitalupoP" in default_result.text_content
+
+        result = markitdown.convert(pdf_path, pdf_char_dir_rotated="btt")
+        assert "Projected" in result.text_content
+        assert "Population" in result.text_content
+        assert "noitalupoP" not in result.text_content
