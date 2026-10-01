@@ -9,6 +9,12 @@ from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 
 # Pattern for MasterFormat-style partial numbering (e.g., ".1", ".2", ".10")
 PARTIAL_NUMBERING_PATTERN = re.compile(r"^\.\d+$")
+LONG_ASCII_WORD_PATTERN = re.compile(r"[A-Za-z]{30,}")
+
+# pdfplumber's default x_tolerance can merge adjacent positioned words in PDFs
+# that omit literal space glyphs. A smaller tolerance preserves those spaces
+# while still allowing table/form detection to operate on word-level positions.
+PDFPLUMBER_TEXT_X_TOLERANCE = 1
 
 
 def _merge_partial_numbering_lines(text: str) -> str:
@@ -55,6 +61,50 @@ def _merge_partial_numbering_lines(text: str) -> str:
             i += 1
 
     return "\n".join(result_lines)
+
+
+def _has_space_starved_text(text: str) -> bool:
+    """
+    Return True when extracted text appears to have lost most word boundaries.
+
+    Some PDFs position words separately instead of storing literal space glyphs.
+    pdfminer can then produce long alphabetic runs such as
+    "NaturalLanguageProcessing" throughout the document. This intentionally
+    uses a conservative threshold so ordinary identifiers/URLs do not trigger
+    a fallback choice by themselves.
+    """
+    ascii_letters = sum(1 for char in text if char.isascii() and char.isalpha())
+    if ascii_letters < 500:
+        return False
+
+    whitespace_ratio = sum(1 for char in text if char.isspace()) / ascii_letters
+    long_word_count = len(LONG_ASCII_WORD_PATTERN.findall(text))
+
+    return whitespace_ratio < 0.03 and long_word_count >= 5
+
+
+def _has_space_starved_words(words: list[dict]) -> bool:
+    alpha_word_count = sum(
+        1
+        for word in words
+        if any(char.isascii() and char.isalpha() for char in word.get("text", ""))
+    )
+    if alpha_word_count < 50:
+        return False
+
+    long_word_count = sum(
+        1 for word in words if LONG_ASCII_WORD_PATTERN.search(word.get("text", ""))
+    )
+
+    return long_word_count >= 5 and long_word_count / alpha_word_count >= 0.025
+
+
+def _select_plain_text_extraction(pdfminer_text: str, pdfplumber_text: str) -> str:
+    """Choose the better plain-text PDF extraction result."""
+    if pdfplumber_text.strip() and _has_space_starved_text(pdfminer_text):
+        return pdfplumber_text
+
+    return pdfminer_text
 
 
 # Load dependencies
@@ -117,7 +167,9 @@ def _to_markdown_table(table: list[list[str]], include_separator: bool = True) -
     return "\n".join(md)
 
 
-def _extract_form_content_from_words(page: Any) -> str | None:
+def _extract_form_content_from_words(
+    page: Any, words: list[dict] | None = None
+) -> str | None:
     """
     Extract form-style content from a PDF page by analyzing word positions.
     This handles borderless forms/tables where words are aligned in columns.
@@ -129,8 +181,12 @@ def _extract_form_content_from_words(page: Any) -> str | None:
     Returns None if the page doesn't appear to be a form-style document,
     indicating that pdfminer should be used instead for better text spacing.
     """
-    words = page.extract_words(keep_blank_chars=True, x_tolerance=3, y_tolerance=3)
+    if words is None:
+        words = page.extract_words(keep_blank_chars=True, x_tolerance=3, y_tolerance=3)
     if not words:
+        return None
+
+    if _has_space_starved_words(words):
         return None
 
     # Group words by their Y position (rows)
@@ -548,10 +604,17 @@ class PdfConverter(DocumentConverter):
             markdown_chunks: list[str] = []
             form_page_count = 0
             plain_page_indices: list[int] = []
+            space_starved_page_count = 0
 
             with pdfplumber.open(pdf_bytes) as pdf:
                 for page_idx, page in enumerate(pdf.pages):
-                    page_content = _extract_form_content_from_words(page)
+                    words = page.extract_words(
+                        keep_blank_chars=True, x_tolerance=3, y_tolerance=3
+                    )
+                    if _has_space_starved_words(words):
+                        space_starved_page_count += 1
+
+                    page_content = _extract_form_content_from_words(page, words=words)
 
                     if page_content is not None:
                         form_page_count += 1
@@ -559,19 +622,33 @@ class PdfConverter(DocumentConverter):
                             markdown_chunks.append(page_content)
                     else:
                         plain_page_indices.append(page_idx)
-                        text = page.extract_text()
+                        text = page.extract_text(
+                            x_tolerance=PDFPLUMBER_TEXT_X_TOLERANCE
+                        )
                         if text and text.strip():
                             markdown_chunks.append(text.strip())
 
                     page.close()  # Free cached page data immediately
 
             # If no pages had form-style content, use pdfminer for
-            # the whole document (better text spacing for prose).
-            if form_page_count == 0:
+            # the whole document when it has good spacing. Some PDFs
+            # encode words by position without literal spaces; in that
+            # case pdfplumber with a tight x_tolerance preserves word
+            # boundaries better.
+            pdfplumber_markdown = "\n\n".join(markdown_chunks).strip()
+            force_plain_text = (
+                space_starved_page_count >= 2
+                and space_starved_page_count > form_page_count
+            )
+
+            if form_page_count == 0 or force_plain_text:
                 pdf_bytes.seek(0)
-                markdown = pdfminer.high_level.extract_text(pdf_bytes)
+                pdfminer_markdown = pdfminer.high_level.extract_text(pdf_bytes)
+                markdown = _select_plain_text_extraction(
+                    pdfminer_markdown, pdfplumber_markdown
+                )
             else:
-                markdown = "\n\n".join(markdown_chunks).strip()
+                markdown = pdfplumber_markdown
 
         except Exception:
             # Fallback if pdfplumber fails
