@@ -89,14 +89,28 @@ def _extract_images_from_page(page: Any) -> list[dict]:
                     y0 = img_dict.get("top", 0)
                     x1 = img_dict.get("x1", 0)
                     y1 = img_dict.get("bottom", 0)
+
+                    page_bbox = getattr(page, "bbox", None)
+                    if page_bbox is not None:
+                        try:
+                            page_x0, page_y0, page_x1, page_y1 = page_bbox
+                        except (TypeError, ValueError):
+                            pass
+                        else:
+                            x0 = max(x0, page_x0)
+                            y0 = max(y0, page_y0)
+                            x1 = min(x1, page_x1)
+                            y1 = min(y1, page_y1)
+
                     y_pos = y0
 
-                    # Check if dimensions are valid
+                    # Check if dimensions are valid after clamping to the page bounds.
                     if x1 <= x0 or y1 <= y0:
                         continue
 
-                    # Use pdfplumber's within_bbox to crop, then render
-                    # This preserves coordinate system correctly
+                    # Use pdfplumber's within_bbox to crop, then render.
+                    # This preserves coordinate system correctly while tolerating
+                    # tiny bbox overflows reported by some scanned/image-only PDFs.
                     bbox = (x0, y0, x1, y1)
                     cropped_page = page.within_bbox(bbox)
 
