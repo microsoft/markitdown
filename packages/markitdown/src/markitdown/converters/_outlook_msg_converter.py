@@ -1,4 +1,5 @@
 import codecs
+import re
 import struct
 import sys
 from typing import Any, Dict, Union, BinaryIO
@@ -62,8 +63,8 @@ CODEPAGE_CODECS = {
     10079: "mac_iceland",
     10081: "mac_turkish",
     50220: "iso2022_jp",
-    50221: "iso2022_jp",
-    50222: "iso2022_jp",
+    50221: "iso2022_jp_ext",  # Supports ESC ( I for halfwidth Katakana.
+    50222: "iso2022_jp_ext",  # SO/SI also need normalization before decoding.
     50225: "iso2022_kr",
     51932: "euc_jp",
     51936: "gb2312",
@@ -277,11 +278,16 @@ class OutlookMsgConverter(DocumentConverter):
         except Exception:
             return None
 
+        # Some writers include trailing NUL terminators or padding. Remove them
+        # before charset detection as well as decoding; str.strip() keeps NULs.
+        data = data.rstrip(b"\x00")
         if not data:
             return None
 
         if encoding is not None:
             try:
+                if encoding == "iso2022_jp_ext":
+                    return self._decode_iso2022_jp(data).strip()
                 return data.decode(encoding).strip()
             except (UnicodeDecodeError, LookupError):
                 pass  # The declared code page does not fit; fall back to detection
@@ -290,6 +296,33 @@ class OutlookMsgConverter(DocumentConverter):
         if detected is not None:
             return str(detected).strip()
         return data.decode("utf-8", errors="ignore").strip()
+
+    def _decode_iso2022_jp(self, data: bytes) -> str:
+        """Decode Katakana in Windows code pages 50221 and 50222.
+
+        Python's extended codec supports 50221's ESC ( I designation, but leaves
+        50222's SO/SI controls untouched. Translate those controls to equivalent
+        designations, retaining the preceding mode so SI can restore it even
+        when it is JIS Roman or double-byte Japanese rather than ASCII.
+        """
+        mode = b"\x1b(B"
+
+        def replace_control(match: re.Match[bytes]) -> bytes:
+            nonlocal mode
+            control = match.group()
+            if control == b"\x0e":  # SO: temporarily select halfwidth Katakana.
+                return b"\x1b(I"
+            if control == b"\x0f":  # SI: restore the preceding designation.
+                return mode
+            mode = control
+            return control
+
+        normalized = re.sub(
+            rb"\x1b(?:\([BJI]|\$[@B]|\$\(D)|[\x0e\x0f]",
+            replace_control,
+            data,
+        )
+        return normalized.decode("iso2022_jp_ext")
 
     def _get_stream_data(self, msg: Any, stream_path: str) -> Union[str, None]:
         """Helper to safely extract and decode stream data from the MSG file."""
