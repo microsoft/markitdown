@@ -107,9 +107,41 @@ def test_parent_relative_href_resolves() -> None:
     assert "SHARED_BODY" in _convert(stream)
 
 
+def test_epub_without_metadata_has_no_leading_blank_lines() -> None:
+    """An EPUB lacking metadata tags should not output leading empty blank lines."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as z:
+        z.writestr("mimetype", "application/epub+zip")
+        z.writestr("META-INF/container.xml", CONTAINER_XML)
+        z.writestr(
+            "OEBPS/content.opf",
+            """<?xml version="1.0"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="id">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+  </metadata>
+  <manifest>
+    <item id="c1" href="c1.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine>
+    <itemref idref="c1"/>
+  </spine>
+</package>""",
+        )
+        z.writestr("OEBPS/c1.xhtml", CHAPTER_XHTML.format(title="Title", body="Content"))
+    buffer.seek(0)
+
+    result = EpubConverter().convert(
+        buffer, StreamInfo(mimetype="application/epub+zip", extension=".epub")
+    )
+    assert not result.markdown.startswith("\n")
+    assert result.title is None
+    assert "Content" in result.markdown
+
+
 if __name__ == "__main__":
     test_percent_encoded_href_resolves_to_zip_entry()
     test_non_ascii_percent_encoded_href_resolves()
     test_literally_encoded_zip_entry_still_resolves()
     test_parent_relative_href_resolves()
+    test_epub_without_metadata_has_no_leading_blank_lines()
     print("All tests passed")
