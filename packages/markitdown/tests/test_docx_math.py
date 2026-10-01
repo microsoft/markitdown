@@ -1,4 +1,11 @@
 from markitdown.converter_utils.docx.math.omml import load_string
+from markitdown.converter_utils.docx.pre_process import _pre_process_math
+
+
+def test_pre_process_math_preserves_non_math_xml():
+    content = b'<w:document xmlns:w="urn:w"><w:body>  <w:t>hello</w:t>\n</w:body></w:document>'
+
+    assert _pre_process_math(content) == content
 
 
 def test_omml_known_function():
