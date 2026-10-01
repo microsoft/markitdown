@@ -31,7 +31,9 @@ _UNDERLINE_STYLE_MAP = "u => u"
 
 # Mammoth's default style map covers Word's Heading 1-6, by style id and by
 # style name. Word goes up to Heading 9, and Markdown has no level past 6, so
-# clamp the rest rather than let them fall through as plain paragraphs.
+# clamp the rest rather than let them fall through as plain paragraphs. This is
+# lossy on purpose: Heading 6-9 all come out as h6. A caller's style_map or the
+# document's embedded one is applied first, so either can map them differently.
 _DEEP_HEADING_STYLE_MAP = """\
 p.Heading7 => h6:fresh
 p.Heading8 => h6:fresh
