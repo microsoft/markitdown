@@ -1,5 +1,4 @@
-#!/usr/bin/env python3 -m pytest
-"""Tests for .msg files saved in the legacy non-Unicode format."""
+"""Outlook MSG conversion and property encodings."""
 
 import io
 import os
@@ -9,15 +8,20 @@ from unittest.mock import patch
 import olefile
 import pytest
 
-from markitdown import DocumentConverterResult, MarkItDown
-from markitdown._stream_info import StreamInfo
+from markitdown import DocumentConverterResult, MarkItDown, StreamInfo
 from markitdown.converters._outlook_msg_converter import OutlookMsgConverter
+
+
+# Message encodings
 
 TEST_FILES_DIR = os.path.join(os.path.dirname(__file__), "test_files")
 
 SENDER = "ana.lopez@example.com"
+
 RECIPIENT = "carlos.ruiz@example.com"
+
 SUBJECT = "Confirmación de la reunión del martes"
+
 BODY = (
     "Hola Carlos,\r\n\r\n"
     "Te confirmo la reunión del martes a las diez en la oficina de Bilbao. "
@@ -31,15 +35,20 @@ BODY = (
 # picks the wrong codec: charset_normalizer reads the first as UTF-16BE
 # ("勩獵淩") and the second as CP1125 ("╧ЁштхҐ ьшЁ").
 AMBIGUOUS_LATIN = "Résumé"
+
 AMBIGUOUS_CYRILLIC = "Привет мир"
 
 PR_MESSAGE_CODEPAGE = 0x3FFD
+
 PR_INTERNET_CPID = 0x3FDE
 
 # Property ids of the string properties the converter reads.
 SENDER_TAG = "0C1F"
+
 RECIPIENT_TAG = "0E04"
+
 SUBJECT_TAG = "0037"
+
 BODY_TAG = "1000"
 
 
@@ -391,4 +400,4 @@ def test_real_unicode_fixture_still_converts() -> None:
 
 
 if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+    raise SystemExit(pytest.main([__file__]))
