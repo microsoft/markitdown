@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<page>
+  <title>API Guidelines</title>
+  <body>
+    <h1>API Guidelines</h1>
+    <p>Follow these guidelines when building internal APIs.</p>
+
+    <!-- Code block macro -->
+    <ac:structured-macro ac:name="code">
+      <ac:parameter ac:name="language">python</ac:parameter>
+      <ac:plain-text-body>def get_user(user_id: int) -> dict:
+    return db.query(User).filter_by(id=user_id).first()</ac:plain-text-body>
+    </ac:structured-macro>
+
+    <!-- Info panel macro -->
+    <ac:structured-macro ac:name="info">
+      <ac:rich-text-body>
+        <p>Always version your API endpoints with <code>/v1/</code> prefix.</p>
+      </ac:rich-text-body>
+    </ac:structured-macro>
+
+    <!-- Note panel macro -->
+    <ac:structured-macro ac:name="note">
+      <ac:rich-text-body>
+        <p>Rate limiting is required on all public endpoints.</p>
+      </ac:rich-text-body>
+    </ac:structured-macro>
+
+    <!-- Warning panel macro -->
+    <ac:structured-macro ac:name="warning">
+      <ac:rich-text-body>
+        <p>Never expose internal IDs in public responses.</p>
+      </ac:rich-text-body>
+    </ac:structured-macro>
+
+    <!-- TOC macro - should be removed -->
+    <ac:structured-macro ac:name="toc"/>
+
+    <!-- ac:link to another page -->
+    <p>See also: <ac:link><ri:page ri:content-title="Authentication Docs"/></ac:link></p>
+
+    <!-- ac:image with attachment -->
+    <ac:image>
+      <ri:attachment ri:filename="architecture-diagram.png"/>
+    </ac:image>
+
+    <!-- ac:emoticon - should be removed silently -->
+    <p>Status: <ac:emoticon ac:name="tick"/> Done</p>
+
+    <!-- Task list -->
+    <ac:task-list>
+      <ac:task>
+        <ac:task-status>complete</ac:task-status>
+        <ac:task-body>Write API spec</ac:task-body>
+      </ac:task>
+      <ac:task>
+        <ac:task-status>incomplete</ac:task-status>
+        <ac:task-body>Add pagination support</ac:task-body>
+      </ac:task>
+    </ac:task-list>
+  </body>
+</page>
