@@ -1,12 +1,17 @@
-"""PPTX image hooks share native slide traversal and HTML rendering."""
+"""PowerPoint conversion, titles, notes, charts, and image hooks."""
 
 import base64
 import inspect
 import io
+import os
 from pathlib import Path
 from typing import Any, BinaryIO, Callable, Optional
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock
 
+import pptx
+import pptx.shapes.autoshape
+import pptx.slide
+import pytest
 from bs4 import BeautifulSoup
 from lxml import etree
 from pptx import Presentation
@@ -14,7 +19,6 @@ from pptx.chart.data import CategoryChartData
 from pptx.enum.chart import XL_CHART_TYPE
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 from pptx.util import Inches
-import pytest
 
 from markitdown import (
     FileConversionException,
@@ -22,16 +26,299 @@ from markitdown import (
     MissingDependencyException,
     StreamInfo,
 )
-from markitdown.converters import HtmlConverter, PptxConverter
-from markitdown.converters import _pptx_converter
+from markitdown.converters import HtmlConverter, PptxConverter, _pptx_converter
 
+
+# Slide titles
+
+BODY_TEXT = "Some body text on the slide."
+
+
+def _build_pptx_with_title(title: str | None) -> io.BytesIO:
+    """Build a one-slide "Title and Content" deck, optionally filling the title.
+
+    Passing None leaves the title placeholder as PowerPoint creates it: present
+    on the slide, showing "Click to add title", and carrying no text.
+    """
+    prs = pptx.Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[1])
+    if title is not None:
+        slide.shapes.title.text = title
+    slide.placeholders[1].text = BODY_TEXT
+    buf = io.BytesIO()
+    prs.save(buf)
+    buf.seek(0)
+    return buf
+
+
+def _convert_title_slide(title: str | None) -> str:
+    return (
+        MarkItDown()
+        .convert_stream(
+            _build_pptx_with_title(title), stream_info=StreamInfo(extension=".pptx")
+        )
+        .markdown
+    )
+
+
+def _heading_lines(markdown: str) -> list[str]:
+    return [line for line in markdown.splitlines() if line.startswith("#")]
+
+
+def test_untouched_title_placeholder_produces_no_heading() -> None:
+    markdown = _convert_title_slide(None)
+
+    assert BODY_TEXT in markdown
+    assert _heading_lines(markdown) == []
+
+
+def test_empty_title_produces_no_heading() -> None:
+    markdown = _convert_title_slide("")
+
+    assert BODY_TEXT in markdown
+    assert _heading_lines(markdown) == []
+
+
+def test_whitespace_only_title_produces_no_heading() -> None:
+    markdown = _convert_title_slide("   ")
+
+    assert BODY_TEXT in markdown
+    assert _heading_lines(markdown) == []
+
+
+def test_title_with_text_is_still_emitted() -> None:
+    markdown = _convert_title_slide("Quarterly Results")
+
+    assert "# Quarterly Results" in markdown
+    assert BODY_TEXT in markdown
+
+
+# Speaker notes
+
+
+def _build_pptx_with_optional_notes(notes: str | None) -> io.BytesIO:
+    """Build a one-slide deck in memory, optionally attaching a notes slide."""
+    prs = pptx.Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[5])
+    slide.shapes.title.text = "Slide title"
+    if notes is not None:
+        # Touching notes_slide creates the part, which is what PowerPoint does
+        # for a deck whose notes pane has been opened.
+        slide.notes_slide.notes_text_frame.text = notes
+    buf = io.BytesIO()
+    prs.save(buf)
+    buf.seek(0)
+    return buf
+
+
+def _convert_notes_slide(notes: str | None) -> str:
+    return (
+        MarkItDown()
+        .convert_stream(
+            _build_pptx_with_optional_notes(notes),
+            stream_info=StreamInfo(extension=".pptx"),
+        )
+        .markdown
+    )
+
+
+def test_empty_notes_slide_produces_no_notes_heading() -> None:
+    markdown = _convert_notes_slide("")
+
+    assert "Slide title" in markdown
+    assert "### Notes:" not in markdown
+
+
+def test_whitespace_only_notes_produce_no_notes_heading() -> None:
+    markdown = _convert_notes_slide("   \n\n  ")
+
+    assert "Slide title" in markdown
+    assert "### Notes:" not in markdown
+
+
+def test_slide_without_a_notes_slide_produces_no_notes_heading() -> None:
+    markdown = _convert_notes_slide(None)
+
+    assert "Slide title" in markdown
+    assert "### Notes:" not in markdown
+
+
+def test_notes_with_text_are_still_emitted() -> None:
+    markdown = _convert_notes_slide("Remember to mention the budget.")
+
+    assert "### Notes:\nRemember to mention the budget." in markdown
+
+
+# Missing text
+
+# Regression test for #1808: PptxConverter must not crash when ``shape.text``
+# or ``notes_text_frame.text`` returns ``None`` (e.g. an ``<a:r>`` run with no
+# ``<a:t>`` child, or certain third-party-generated decks).
+
+TEST_FILES_DIR = os.path.join(os.path.dirname(__file__), "test_files")
+
+PPTX_FIXTURE = os.path.join(TEST_FILES_DIR, "test.pptx")
+
+
+def _build_pptx_with_notes() -> io.BytesIO:
+    """Build a minimal pptx with a notes slide attached, in memory."""
+    prs = pptx.Presentation()
+    blank = prs.slide_layouts[6]
+    slide = prs.slides.add_slide(blank)
+    slide.notes_slide.notes_text_frame.text = "some notes"
+    buf = io.BytesIO()
+    prs.save(buf)
+    buf.seek(0)
+    return buf
+
+
+def test_pptx_converter_handles_none_shape_text(monkeypatch):
+    """``shape.text`` returning None must not blow up the title / body paths."""
+    monkeypatch.setattr(
+        pptx.shapes.autoshape.Shape,
+        "text",
+        property(lambda self: None),
+        raising=True,
+    )
+
+    result = MarkItDown().convert(PPTX_FIXTURE)
+    assert result.markdown is not None
+
+
+def test_pptx_converter_handles_none_notes_text(monkeypatch):
+    """``notes_text_frame.text`` returning None must not blow up the notes path."""
+    real_notes = pptx.slide.NotesSlide.notes_text_frame
+
+    class _NoneText:
+        text = None
+
+    def fake_notes(self):
+        frame = real_notes.fget(self)
+        if frame is None:
+            return None
+        return _NoneText()
+
+    monkeypatch.setattr(
+        pptx.slide.NotesSlide,
+        "notes_text_frame",
+        property(fake_notes),
+        raising=True,
+    )
+
+    buf = _build_pptx_with_notes()
+    result = MarkItDown().convert_stream(buf, file_extension=".pptx")
+    assert result.markdown is not None
+
+
+# SVG pictures
+
+# Tests for PPTX SVG images that lack a rasterized fallback.
+#
+# PowerPoint stores an SVG picture as an ``<a:blip>`` whose ``r:embed`` points to
+# a rasterized PNG fallback, plus an ``<asvg:svgBlip>`` extension that points to
+# the SVG. When a picture has no raster fallback the ``<a:blip>`` has no
+# ``r:embed`` at all, so python-pptx's ``shape.image`` raises
+# ``ValueError("no embedded image")``. The converter must handle this gracefully
+# (resolving the SVG blip directly) instead of failing the whole conversion.
+
+# A tiny synthetic PPTX whose only picture is an SVG without a rasterized
+# fallback: the <a:blip> has no r:embed, only an <asvg:svgBlip> extension
+# pointing to an embedded SVG. Its alt text is "Red square SVG".
+SVG_NO_FALLBACK_PPTX = os.path.join(TEST_FILES_DIR, "test_svg_no_fallback.pptx")
+
+_SVG_NS = "http://schemas.microsoft.com/office/drawing/2016/SVG/main"
+
+
+def _first_picture_shape(pptx_path):
+    presentation = Presentation(pptx_path)
+    converter = PptxConverter()
+    for slide in presentation.slides:
+        for shape in slide.shapes:
+            if converter._is_picture(shape):
+                return converter, shape
+    raise AssertionError(f"No picture shape found in {pptx_path}")
+
+
+def test_pptx_svg_without_raster_fallback() -> None:
+    md = MarkItDown()
+
+    # Default conversion should not raise and should emit the image alt text.
+    result = md.convert(SVG_NO_FALLBACK_PPTX)
+    assert "Red square SVG" in result.markdown
+
+    # keep_data_uris used to crash with ValueError("no embedded image"). It
+    # should now embed the SVG as a data URI.
+    result = md.convert(SVG_NO_FALLBACK_PPTX, keep_data_uris=True)
+    assert "data:image/svg+xml;base64," in result.markdown
+
+
+def test_get_image_info_resolves_svg_blip_without_fallback() -> None:
+    # Unit-level check: _get_image_info must resolve the raw SVG blob directly
+    # from the <asvg:svgBlip> extension when shape.image raises because there is
+    # no rasterized fallback (no r:embed on the <a:blip>).
+    converter, shape = _first_picture_shape(SVG_NO_FALLBACK_PPTX)
+
+    blob, content_type, _filename = converter._get_image_info(shape)
+
+    assert blob is not None and len(blob) > 0
+    assert content_type == "image/svg+xml"
+    assert b"<svg" in blob[:512].lower()
+
+
+class _FakePart:
+    """Minimal part whose related_part always resolves to a truthy object."""
+
+    def related_part(self, rid):
+        return object()
+
+
+class _FakeSvgPlaceholderShape:
+    """A placeholder shape whose ``image`` raises like an SVG-only placeholder.
+
+    ``_is_picture`` used to rely on ``hasattr(shape, "image")`` which only
+    swallows ``AttributeError`` and let this ``ValueError`` propagate, failing
+    even the default conversion.
+    """
+
+    shape_type = MSO_SHAPE_TYPE.PLACEHOLDER
+
+    def __init__(self):
+        xml = (
+            '<p:pic xmlns:p="http://schemas.openxmlformats.org/'
+            'presentationml/2006/main" xmlns:a="http://schemas.'
+            'openxmlformats.org/drawingml/2006/main" xmlns:r="http://'
+            'schemas.openxmlformats.org/officeDocument/2006/relationships" '
+            'xmlns:asvg="%s"><a:blip><a:extLst><a:ext uri="{96DAC541-7B7A-'
+            '43D3-8B79-37D633B846F1}"><asvg:svgBlip r:embed="rId9"/></a:ext>'
+            "</a:extLst></a:blip></p:pic>" % _SVG_NS
+        )
+        self._element = etree.fromstring(xml)
+        self.part = _FakePart()
+
+    @property
+    def image(self):
+        raise ValueError("no embedded image")
+
+
+def test_is_picture_true_for_svg_placeholder() -> None:
+    # _is_picture must not let shape.image's ValueError propagate for SVG
+    # placeholders lacking a raster fallback; it should still report a picture
+    # because an embedded SVG blip is present.
+    converter = PptxConverter()
+    assert converter._is_picture(_FakeSvgPlaceholderShape()) is True
+
+
+# Image hooks
 
 _PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAM"
     "BAQDJ/pLvAAAAAElFTkSuQmCC"
 )
+
 _GIF = base64.b64decode("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBTAA7")
+
 _INFO = StreamInfo(extension=".pptx")
+
 _FILES = Path(__file__).parent / "test_files"
 
 
@@ -500,3 +787,143 @@ def test_missing_optional_dependencies_fail_before_hook(
         _ImageConverter(render).convert(io.BytesIO(b""), _INFO)
     assert caught.value.__cause__ is error
     render.assert_not_called()
+
+
+# Conversion regressions
+
+
+def test_pptx_chart_multi_series_conversion() -> None:
+    """Charts with multiple series and many categories must convert correctly.
+
+    Regression test for the slow path in PptxConverter._convert_chart_to_markdown,
+    where ``series.values[idx]`` was evaluated inside the (category x series) loop.
+    In python-pptx each ``series.values`` access rescans the cached points via
+    XPath (O(n) per lookup), so the old code was O(n^2) per series (and rebuilt
+    the whole tuple for every category), making large charts extremely slow.
+
+    The values are now materialized once per series. This test builds a chart
+    with enough categories that the regressed code path would be pathologically
+    slow, and verifies the resulting Markdown table is correct across series.
+    """
+    pptx = pytest.importorskip("pptx")
+    from pptx.util import Inches
+    from pptx.chart.data import CategoryChartData
+    from pptx.enum.chart import XL_CHART_TYPE
+
+    n_categories = 200
+    categories = [f"C{i}" for i in range(n_categories)]
+    series_a = [float(i) for i in range(n_categories)]
+    series_b = [float(i * 2) for i in range(n_categories)]
+
+    presentation = pptx.Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[5])
+    chart_data = CategoryChartData()
+    chart_data.categories = categories
+    chart_data.add_series("Series A", series_a)
+    chart_data.add_series("Series B", series_b)
+    slide.shapes.add_chart(
+        XL_CHART_TYPE.COLUMN_CLUSTERED,
+        Inches(1),
+        Inches(1),
+        Inches(8),
+        Inches(5),
+        chart_data,
+    )
+
+    buffer = io.BytesIO()
+    presentation.save(buffer)
+    buffer.seek(0)
+
+    result = MarkItDown().convert_stream(buffer, file_extension=".pptx")
+    md = result.markdown
+
+    # Both series headers are present
+    assert "Series A" in md
+    assert "Series B" in md
+    # First and last categories are present (nothing truncated)
+    assert "| C0 |" in md
+    assert f"| C{n_categories - 1} |" in md
+    # A representative row carries the correct value for each series
+    assert "| C10 | 10.0 | 20.0 |" in md
+
+
+def test_pptx_converter_treats_none_llm_caption_as_empty(monkeypatch) -> None:
+    from markitdown.converters import _pptx_converter
+
+    calls = 0
+
+    def none_caption(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return None
+
+    monkeypatch.setattr(_pptx_converter, "llm_caption", none_caption)
+
+    result = MarkItDown().convert(
+        os.path.join(TEST_FILES_DIR, "test.pptx"),
+        llm_client=MagicMock(),
+        llm_model="test-model",
+    )
+
+    assert calls > 0
+    assert (
+        "![This phrase of the caption is Human-written.](Picture4.jpg)"
+        in result.markdown
+    )
+
+
+def test_pptx_chart_no_title_text_frame() -> None:
+    from markitdown.converters._pptx_converter import PptxConverter
+
+    # python-pptx's ChartTitle.text_frame is destructive -- it creates a text
+    # frame if one isn't already present, so it never returns None.
+    # has_text_frame is the property that actually reflects presence/absence,
+    # which is what the has_title=True-but-no-text-frame case looks like
+    # against the real library.
+    mock_chart = MagicMock()
+    mock_chart.has_title = True
+    mock_chart.chart_title.has_text_frame = False
+
+    mock_category = MagicMock()
+    mock_category.label = "Cat 1"
+    mock_chart.plots = [MagicMock(categories=[mock_category])]
+
+    mock_series = MagicMock()
+    mock_series.name = "Series 1"
+    mock_series.values = [10.0]
+    mock_chart.series = [mock_series]
+
+    converter = PptxConverter()
+    result = converter._convert_chart_to_markdown(mock_chart)
+
+    assert "### Chart" in result
+    assert "Cat 1" in result
+    assert "Series 1" in result
+    assert ":" not in result
+
+
+def test_pptx_chart_with_title_text_frame() -> None:
+    from markitdown.converters._pptx_converter import PptxConverter
+
+    mock_chart = MagicMock()
+    mock_chart.has_title = True
+    mock_chart.chart_title.has_text_frame = True
+    mock_chart.chart_title.text_frame.text = "Revenue"
+
+    mock_category = MagicMock()
+    mock_category.label = "Cat 1"
+    mock_chart.plots = [MagicMock(categories=[mock_category])]
+
+    mock_series = MagicMock()
+    mock_series.name = "Series 1"
+    mock_series.values = [10.0]
+    mock_chart.series = [mock_series]
+
+    converter = PptxConverter()
+    result = converter._convert_chart_to_markdown(mock_chart)
+
+    assert "### Chart: Revenue" in result
+
+
+if __name__ == "__main__":
+    raise SystemExit(pytest.main([__file__]))

@@ -1,10 +1,17 @@
+"""Image conversion, captions, and media metadata."""
+
 import io
+import os
+import re
+import shutil
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, BinaryIO, Optional
 from unittest.mock import MagicMock
 
 import pytest
 
+import markitdown.converters._image_converter as image_module
 from markitdown import (
     DocumentConverterResult,
     FileConversionException,
@@ -12,7 +19,9 @@ from markitdown import (
     StreamInfo,
 )
 from markitdown.converters import ImageConverter
-import markitdown.converters._image_converter as image_module
+
+
+# Image captions
 
 IMAGE_FILE = Path(__file__).parent / "test_files" / "test.jpg"
 
@@ -135,3 +144,114 @@ def test_image_without_llm_is_unchanged(
 
     assert result.markdown == ("Title: Image title\n" if metadata else "")
     description.assert_not_called()
+
+
+# Conversion regressions
+
+# Skip exiftool tests if not installed
+skip_exiftool = shutil.which("exiftool") is None
+
+TEST_FILES_DIR = os.path.join(os.path.dirname(__file__), "test_files")
+
+JPG_TEST_EXIFTOOL = {
+    "Author": "AutoGen Authors",
+    "Title": "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation",
+    "Description": "AutoGen enables diverse LLM-based applications",
+    "ImageSize": "1615x1967",
+    "DateTimeOriginal": "2024:03:14 22:10:00",
+}
+
+MP3_TEST_EXIFTOOL = {
+    "Title": "f67a499e-a7d0-4ca3-a49b-358bd934ae3e",
+    "Artist": "Artist Name Test String",
+    "Album": "Album Name Test String",
+    "SampleRate": "48000",
+}
+
+
+@pytest.mark.skipif(
+    skip_exiftool,
+    reason="do not run if exiftool is not installed",
+)
+def test_markitdown_exiftool() -> None:
+    which_exiftool = shutil.which("exiftool")
+    assert which_exiftool is not None
+
+    # Test explicitly setting the location of exiftool
+    markitdown = MarkItDown(exiftool_path=which_exiftool)
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.jpg"))
+    for key in JPG_TEST_EXIFTOOL:
+        target = f"{key}: {JPG_TEST_EXIFTOOL[key]}"
+        assert target in result.text_content
+
+    # Test setting the exiftool path through an environment variable
+    os.environ["EXIFTOOL_PATH"] = which_exiftool
+    markitdown = MarkItDown()
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.jpg"))
+    for key in JPG_TEST_EXIFTOOL:
+        target = f"{key}: {JPG_TEST_EXIFTOOL[key]}"
+        assert target in result.text_content
+
+    # Test some other media types
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.mp3"))
+    for key in MP3_TEST_EXIFTOOL:
+        target = f"{key}: {MP3_TEST_EXIFTOOL[key]}"
+        assert target in result.text_content
+
+
+# ---------------------------------------------------------------------------
+# Regression test for issue #1960:
+# exiftool_path pointing to a nonexistent binary used to leak a raw
+# FileNotFoundError. It should now be wrapped in RuntimeError with a
+# message that includes the path.
+# ---------------------------------------------------------------------------
+
+
+def test_exiftool_metadata_with_nonexistent_binary():
+    """#1960: nonexistent exiftool_path raises RuntimeError, not FileNotFoundError."""
+    from markitdown.converters._exiftool import exiftool_metadata
+
+    exiftool_path = "/this/does/not/exist/exiftool"
+    with pytest.raises(
+        RuntimeError,
+        match=re.escape(f"Failed to invoke exiftool at {exiftool_path}"),
+    ):
+        exiftool_metadata(io.BytesIO(b""), exiftool_path=exiftool_path)
+
+
+def test_exiftool_metadata_with_no_path():
+    """Sanity check: exiftool_path=None still returns {} (early return)."""
+    from markitdown.converters._exiftool import exiftool_metadata
+
+    assert exiftool_metadata(io.BytesIO(b""), exiftool_path=None) == {}
+
+
+def test_exiftool_metadata_invocation_oserror():
+    """#1960: an OSError while running exiftool is wrapped, and the stream is restored."""
+    from unittest.mock import patch
+
+    from markitdown.converters._exiftool import exiftool_metadata
+
+    def fake_run(args, **kwargs):
+        # The version check succeeds ...
+        if "-ver" in args:
+            return SimpleNamespace(stdout="12.24\n")
+        # ... but the actual metadata invocation fails.
+        raise OSError("exiftool vanished")
+
+    exiftool_path = "/usr/bin/exiftool"
+    file_stream = io.BytesIO(b"0123456789")
+    file_stream.seek(4)
+
+    with patch("markitdown.converters._exiftool.subprocess.run", side_effect=fake_run):
+        with pytest.raises(
+            RuntimeError,
+            match=re.escape(f"Failed to invoke exiftool at {exiftool_path}"),
+        ):
+            exiftool_metadata(file_stream, exiftool_path=exiftool_path)
+
+    assert file_stream.tell() == 4
+
+
+if __name__ == "__main__":
+    raise SystemExit(pytest.main([__file__]))
