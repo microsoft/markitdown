@@ -25,6 +25,14 @@ try:
 except ImportError:
     _xls_dependency_exc_info = sys.exc_info()
 
+# pandas' default missing-value handling rewrites the sheet contents: literal
+# strings such as "NA", "NULL" or "None" are read as missing values, and a
+# column that contains a missing value is promoted to float64 so that whole
+# numbers render as "2.0" and blanks render as the text "NaN". A converter has
+# to reproduce the stored values, so read the raw cells instead. See #2484 and
+# #2498.
+_READ_EXCEL_KWARGS: dict[str, Any] = {"sheet_name": None, "keep_default_na": False}
+
 ACCEPTED_XLSX_MIME_TYPE_PREFIXES = [
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 ]
@@ -52,12 +60,14 @@ def _read_xlsx_sheets(
     repaired_stream = None
     try:
         try:
-            sheets = pd.read_excel(file_stream, sheet_name=None, engine="openpyxl")
+            sheets = pd.read_excel(file_stream, engine="openpyxl", **_READ_EXCEL_KWARGS)
         except TypeError as exc:
             if "showZeroes" not in str(exc):
                 raise
             repaired_stream = _repair_sheetview_show_zeroes(file_stream, start_pos)
-            sheets = pd.read_excel(repaired_stream, sheet_name=None, engine="openpyxl")
+            sheets = pd.read_excel(
+                repaired_stream, engine="openpyxl", **_READ_EXCEL_KWARGS
+            )
         yield sheets, repaired_stream if repaired_stream is not None else file_stream
     finally:
         if repaired_stream is not None:
@@ -237,7 +247,7 @@ class XlsConverter(DocumentConverter):
                 _xls_dependency_exc_info[2]
             )
 
-        sheets = pd.read_excel(file_stream, sheet_name=None, engine="xlrd")
+        sheets = pd.read_excel(file_stream, engine="xlrd", **_READ_EXCEL_KWARGS)
         md_content = ""
         for s in sheets:
             md_content += f"## {s}\n"
