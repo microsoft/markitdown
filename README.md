@@ -271,6 +271,17 @@ result = md.convert("test.xlsx")
 print(result.markdown)
 ```
 
+Hidden and very hidden worksheets are excluded by default. To include them, pass
+`include_hidden_sheets=True` to `convert`, or run the CLI with:
+
+```python
+result = md.convert("test.xlsx", include_hidden_sheets=True)
+```
+
+```bash
+markitdown test.xlsx --include-hidden-sheets
+```
+
 Document Intelligence conversion in Python:
 
 ```python
