@@ -4,6 +4,12 @@ import io
 from unittest.mock import MagicMock, patch
 
 import pytest
+from azure.ai.contentunderstanding.models import (
+    AnalysisResult,
+    AudioVisualContent,
+    DocumentContent,
+    StringField,
+)
 
 from markitdown import StreamInfo
 from markitdown.converters._cu_converter import (
@@ -273,18 +279,14 @@ class TestDetectFileType:
         conv = _make_converter()
         conv._client = MagicMock()
         mock_poller = MagicMock()
-        mock_poller.result.return_value = MagicMock(contents=[])
+        mock_poller.result.return_value = AnalysisResult(contents=[])
         conv._client.begin_analyze_binary.return_value = mock_poller
 
-        with patch(
-            "markitdown.converters._cu_converter.to_llm_input",
-            return_value="ok",
-        ):
-            conv.convert(
-                io.BytesIO(b"fake"),
-                # .pdf extension but bogus audio mimetype
-                StreamInfo(extension=".pdf", mimetype="audio/mpeg"),
-            )
+        conv.convert(
+            io.BytesIO(b"fake"),
+            # .pdf extension but bogus audio mimetype
+            StreamInfo(extension=".pdf", mimetype="audio/mpeg"),
+        )
 
         call_kwargs = conv._client.begin_analyze_binary.call_args.kwargs
         # Routed by extension: document modality → prebuilt-documentSearch
@@ -317,18 +319,16 @@ class TestSmartRouting:
             analyzer_modality="document",
         )
         conv._client = MagicMock()
-        mock_result = MagicMock()
-        mock_result.contents = []
+        mock_result = AnalysisResult(contents=[])
         mock_poller = MagicMock()
         mock_poller.result.return_value = mock_result
 
         conv._client.begin_analyze_binary.return_value = mock_poller
 
-        with patch("markitdown.converters._cu_converter.to_llm_input", return_value=""):
-            conv.convert(
-                io.BytesIO(b"fake pdf"),
-                StreamInfo(extension=".pdf", mimetype="application/pdf"),
-            )
+        conv.convert(
+            io.BytesIO(b"fake pdf"),
+            StreamInfo(extension=".pdf", mimetype="application/pdf"),
+        )
 
         # Should use the custom analyzer for PDF (document modality)
         call_args = conv._client.begin_analyze_binary.call_args
@@ -341,18 +341,16 @@ class TestSmartRouting:
             analyzer_modality="document",
         )
         conv._client = MagicMock()
-        mock_result = MagicMock()
-        mock_result.contents = []
+        mock_result = AnalysisResult(contents=[])
         mock_poller = MagicMock()
         mock_poller.result.return_value = mock_result
 
         conv._client.begin_analyze_binary.return_value = mock_poller
 
-        with patch("markitdown.converters._cu_converter.to_llm_input", return_value=""):
-            conv.convert(
-                io.BytesIO(b"fake audio"),
-                StreamInfo(extension=".mp3", mimetype="audio/mpeg"),
-            )
+        conv.convert(
+            io.BytesIO(b"fake audio"),
+            StreamInfo(extension=".mp3", mimetype="audio/mpeg"),
+        )
 
         call_args = conv._client.begin_analyze_binary.call_args
         assert call_args.kwargs["analyzer_id"] == "prebuilt-audioSearch"
@@ -364,18 +362,16 @@ class TestSmartRouting:
             analyzer_modality="document",
         )
         conv._client = MagicMock()
-        mock_result = MagicMock()
-        mock_result.contents = []
+        mock_result = AnalysisResult(contents=[])
         mock_poller = MagicMock()
         mock_poller.result.return_value = mock_result
 
         conv._client.begin_analyze_binary.return_value = mock_poller
 
-        with patch("markitdown.converters._cu_converter.to_llm_input", return_value=""):
-            conv.convert(
-                io.BytesIO(b"fake video"),
-                StreamInfo(extension=".mp4", mimetype="video/mp4"),
-            )
+        conv.convert(
+            io.BytesIO(b"fake video"),
+            StreamInfo(extension=".mp4", mimetype="video/mp4"),
+        )
 
         call_args = conv._client.begin_analyze_binary.call_args
         assert call_args.kwargs["analyzer_id"] == "prebuilt-videoSearch"
@@ -384,18 +380,16 @@ class TestSmartRouting:
         """Without analyzer_id, PDF should auto-route to prebuilt-documentSearch."""
         conv = _make_converter(analyzer_id=None, analyzer_modality=None)
         conv._client = MagicMock()
-        mock_result = MagicMock()
-        mock_result.contents = []
+        mock_result = AnalysisResult(contents=[])
         mock_poller = MagicMock()
         mock_poller.result.return_value = mock_result
 
         conv._client.begin_analyze_binary.return_value = mock_poller
 
-        with patch("markitdown.converters._cu_converter.to_llm_input", return_value=""):
-            conv.convert(
-                io.BytesIO(b"fake pdf"),
-                StreamInfo(extension=".pdf", mimetype="application/pdf"),
-            )
+        conv.convert(
+            io.BytesIO(b"fake pdf"),
+            StreamInfo(extension=".pdf", mimetype="application/pdf"),
+        )
 
         call_args = conv._client.begin_analyze_binary.call_args
         assert call_args.kwargs["analyzer_id"] == "prebuilt-documentSearch"
@@ -404,18 +398,16 @@ class TestSmartRouting:
         """Default image routing should still use prebuilt-documentSearch."""
         conv = _make_converter(analyzer_id=None, analyzer_modality=None)
         conv._client = MagicMock()
-        mock_result = MagicMock()
-        mock_result.contents = []
+        mock_result = AnalysisResult(contents=[])
         mock_poller = MagicMock()
         mock_poller.result.return_value = mock_result
 
         conv._client.begin_analyze_binary.return_value = mock_poller
 
-        with patch("markitdown.converters._cu_converter.to_llm_input", return_value=""):
-            conv.convert(
-                io.BytesIO(b"fake image"),
-                StreamInfo(extension=".jpg", mimetype="image/jpeg"),
-            )
+        conv.convert(
+            io.BytesIO(b"fake image"),
+            StreamInfo(extension=".jpg", mimetype="image/jpeg"),
+        )
 
         call_args = conv._client.begin_analyze_binary.call_args
         assert call_args.kwargs["analyzer_id"] == "prebuilt-documentSearch"
@@ -427,18 +419,16 @@ class TestSmartRouting:
             analyzer_modality="document",
         )
         conv._client = MagicMock()
-        mock_result = MagicMock()
-        mock_result.contents = []
+        mock_result = AnalysisResult(contents=[])
         mock_poller = MagicMock()
         mock_poller.result.return_value = mock_result
 
         conv._client.begin_analyze_binary.return_value = mock_poller
 
-        with patch("markitdown.converters._cu_converter.to_llm_input", return_value=""):
-            conv.convert(
-                io.BytesIO(b"fake image"),
-                StreamInfo(extension=".jpg", mimetype="image/jpeg"),
-            )
+        conv.convert(
+            io.BytesIO(b"fake image"),
+            StreamInfo(extension=".jpg", mimetype="image/jpeg"),
+        )
 
         call_args = conv._client.begin_analyze_binary.call_args
         assert call_args.kwargs["analyzer_id"] == "my-doc-analyzer"
@@ -450,18 +440,16 @@ class TestSmartRouting:
             analyzer_modality="image",
         )
         conv._client = MagicMock()
-        mock_result = MagicMock()
-        mock_result.contents = []
+        mock_result = AnalysisResult(contents=[])
         mock_poller = MagicMock()
         mock_poller.result.return_value = mock_result
 
         conv._client.begin_analyze_binary.return_value = mock_poller
 
-        with patch("markitdown.converters._cu_converter.to_llm_input", return_value=""):
-            conv.convert(
-                io.BytesIO(b"fake image"),
-                StreamInfo(extension=".jpg", mimetype="image/jpeg"),
-            )
+        conv.convert(
+            io.BytesIO(b"fake image"),
+            StreamInfo(extension=".jpg", mimetype="image/jpeg"),
+        )
 
         call_args = conv._client.begin_analyze_binary.call_args
         assert call_args.kwargs["analyzer_id"] == "my-image-analyzer"
@@ -473,18 +461,16 @@ class TestSmartRouting:
             analyzer_modality="image",
         )
         conv._client = MagicMock()
-        mock_result = MagicMock()
-        mock_result.contents = []
+        mock_result = AnalysisResult(contents=[])
         mock_poller = MagicMock()
         mock_poller.result.return_value = mock_result
 
         conv._client.begin_analyze_binary.return_value = mock_poller
 
-        with patch("markitdown.converters._cu_converter.to_llm_input", return_value=""):
-            conv.convert(
-                io.BytesIO(b"fake pdf"),
-                StreamInfo(extension=".pdf", mimetype="application/pdf"),
-            )
+        conv.convert(
+            io.BytesIO(b"fake pdf"),
+            StreamInfo(extension=".pdf", mimetype="application/pdf"),
+        )
 
         call_args = conv._client.begin_analyze_binary.call_args
         assert call_args.kwargs["analyzer_id"] == "prebuilt-documentSearch"
@@ -502,15 +488,13 @@ class TestSmartRouting:
         """MIME-only streams should route to the matching modality analyzer."""
         conv = _make_converter(analyzer_id=None, analyzer_modality=None)
         conv._client = MagicMock()
-        mock_result = MagicMock()
-        mock_result.contents = []
+        mock_result = AnalysisResult(contents=[])
         mock_poller = MagicMock()
         mock_poller.result.return_value = mock_result
 
         conv._client.begin_analyze_binary.return_value = mock_poller
 
-        with patch("markitdown.converters._cu_converter.to_llm_input", return_value=""):
-            conv.convert(io.BytesIO(b"fake content"), StreamInfo(mimetype=mimetype))
+        conv.convert(io.BytesIO(b"fake content"), StreamInfo(mimetype=mimetype))
 
         call_args = conv._client.begin_analyze_binary.call_args
         assert call_args.kwargs["analyzer_id"] == expected_analyzer
@@ -519,15 +503,13 @@ class TestSmartRouting:
         """Alias MIME types should be sent to CU as canonical content types."""
         conv = _make_converter(analyzer_id=None, analyzer_modality=None)
         conv._client = MagicMock()
-        mock_result = MagicMock()
-        mock_result.contents = []
+        mock_result = AnalysisResult(contents=[])
         mock_poller = MagicMock()
         mock_poller.result.return_value = mock_result
 
         conv._client.begin_analyze_binary.return_value = mock_poller
 
-        with patch("markitdown.converters._cu_converter.to_llm_input", return_value=""):
-            conv.convert(io.BytesIO(b"fake video"), StreamInfo(mimetype="video/x-m4v"))
+        conv.convert(io.BytesIO(b"fake video"), StreamInfo(mimetype="video/x-m4v"))
 
         call_args = conv._client.begin_analyze_binary.call_args
         assert call_args.kwargs["analyzer_id"] == "prebuilt-videoSearch"
@@ -537,15 +519,13 @@ class TestSmartRouting:
         """Extension-only inputs should send CU a matching content type."""
         conv = _make_converter(analyzer_id=None, analyzer_modality=None)
         conv._client = MagicMock()
-        mock_result = MagicMock()
-        mock_result.contents = []
+        mock_result = AnalysisResult(contents=[])
         mock_poller = MagicMock()
         mock_poller.result.return_value = mock_result
 
         conv._client.begin_analyze_binary.return_value = mock_poller
 
-        with patch("markitdown.converters._cu_converter.to_llm_input", return_value=""):
-            conv.convert(io.BytesIO(b"fake pdf"), StreamInfo(extension=".pdf"))
+        conv.convert(io.BytesIO(b"fake pdf"), StreamInfo(extension=".pdf"))
 
         call_args = conv._client.begin_analyze_binary.call_args
         assert call_args.kwargs["analyzer_id"] == "prebuilt-documentSearch"
@@ -657,60 +637,79 @@ class TestGetModality:
 
 
 # ---------------------------------------------------------------------------
-# convert() mock tests
+# Conversion with real SDK results and local formatting
 # ---------------------------------------------------------------------------
 
 
-class TestConvertMock:
-    """Test convert() with mocked CU SDK."""
+class TestConvert:
+    """Mock the Azure call while formatting real SDK result objects."""
 
-    def _run_convert(self, extension, mimetype, expected_output="mock output"):
+    def _run_convert(self, extension, mimetype, contents):
         conv = _make_converter()
         conv._client = MagicMock()
-
-        mock_result = MagicMock()
-        mock_result.contents = []
-        mock_poller = MagicMock()
-        mock_poller.result.return_value = mock_result
-        conv._client.begin_analyze_binary.return_value = mock_poller
-
-        with patch(
-            "markitdown.converters._cu_converter.to_llm_input",
-            return_value=expected_output,
-        ):
-            result = conv.convert(
-                io.BytesIO(b"fake content"),
-                StreamInfo(extension=extension, mimetype=mimetype),
-            )
+        poller = conv._client.begin_analyze_binary.return_value
+        poller.result.return_value = AnalysisResult(contents=contents)
+        payload = b"service input"
+        result = conv.convert(
+            io.BytesIO(payload), StreamInfo(extension=extension, mimetype=mimetype)
+        )
+        conv._client.begin_analyze_binary.assert_called_once()
+        assert (
+            conv._client.begin_analyze_binary.call_args.kwargs["binary_input"]
+            == payload
+        )
+        poller.result.assert_called_once_with()
         return result
 
     def test_pdf_returns_markdown(self):
+        body = "# Test\n\n| Item | Qty |\n| --- | --- |\n| Pen | 2 |"
         result = self._run_convert(
-            ".pdf", "application/pdf", "---\ncontentType: document\n---\n# Test"
+            ".pdf",
+            "application/pdf",
+            [
+                DocumentContent(
+                    mime_type="application/pdf",
+                    start_page_number=1,
+                    end_page_number=1,
+                    markdown=body,
+                    fields={"Customer": StringField(value_string="Ada")},
+                )
+            ],
         )
-        assert "contentType: document" in result.markdown
+        assert "mimeType: application/pdf" in result.markdown
+        assert "Customer: Ada" in result.markdown
+        assert body in result.markdown
 
     def test_mp4_returns_markdown(self):
         result = self._run_convert(
-            ".mp4", "video/mp4", "---\ncontentType: audioVisual\n---\nSpeaker 1: Hello"
+            ".mp4",
+            "video/mp4",
+            [AudioVisualContent(mime_type="video/mp4", markdown="Speaker 1: Hello")],
         )
-        assert "contentType: audioVisual" in result.markdown
+        assert "mimeType: video/mp4" in result.markdown
+        assert "Speaker 1: Hello" in result.markdown
 
     def test_wav_returns_markdown(self):
         result = self._run_convert(
-            ".wav", "audio/wav", "---\ncontentType: audioVisual\n---\nSpeaker 1: Hi"
+            ".wav",
+            "audio/wav",
+            [AudioVisualContent(mime_type="audio/wav", markdown="Speaker 1: Hi")],
         )
-        assert "audioVisual" in result.markdown
+        assert "mimeType: audio/wav" in result.markdown
+        assert "Speaker 1: Hi" in result.markdown
 
     def test_empty_result(self):
-        result = self._run_convert(".pdf", "application/pdf", "")
+        result = self._run_convert(".pdf", "application/pdf", [])
         assert result.markdown == ""
 
     def test_jpeg_returns_markdown(self):
         result = self._run_convert(
-            ".jpg", "image/jpeg", "---\ncontentType: document\n---\n# Photo"
+            ".jpg",
+            "image/jpeg",
+            [DocumentContent(mime_type="image/jpeg", markdown="# Photo")],
         )
-        assert "contentType: document" in result.markdown
+        assert "mimeType: image/jpeg" in result.markdown
+        assert "# Photo" in result.markdown
 
 
 # ---------------------------------------------------------------------------
