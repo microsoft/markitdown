@@ -1,6 +1,6 @@
 """Rebuild copied PDF fixtures with PyMuPDF (already used by the OCR package).
 
-Run from any directory with: python generate_pdf_cleanup_fixtures.py
+Run from packages/markitdown with: python tests/test_files/generate_pdf_cleanup_fixtures.py
 The existing source PDFs are opened read-only; only pdf_cleanup_*.pdf is written.
 """
 
