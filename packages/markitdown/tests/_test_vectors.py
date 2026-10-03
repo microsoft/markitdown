@@ -224,7 +224,11 @@ GENERAL_TEST_VECTORS = [
             "```python",
             'print("markitdown")',
             "```",
+            "**Output:**",
+            "```text\nmarkitdown\n```",
             "## Code Cell Below",
+            "**Output:**",
+            "```text\n42\n```",
         ],
         must_not_include=[
             "nbformat",
