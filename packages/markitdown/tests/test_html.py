@@ -13,6 +13,26 @@ from markitdown.converters._markdownify import _CustomMarkdownify
 # HTML rendering
 
 
+@pytest.mark.parametrize("query", ["q=rag&form=QBLH", "form=QBLH&q=rag"])
+def test_bing_search_query_parameter_order(query: str) -> None:
+    html = (
+        '<html><body><nav>Navigation noise</nav><li class="b_algo">'
+        '<h2><a href="https://example.com">Useful result</a></h2>'
+        "<p>Result summary</p></li></body></html>"
+    )
+    result = MarkItDown().convert_stream(
+        io.BytesIO(html.encode("utf-8")),
+        stream_info=StreamInfo(
+            mimetype="text/html", url=f"https://www.bing.com/search?{query}"
+        ),
+    )
+
+    assert result.markdown.startswith("## A Bing search for 'rag'")
+    assert "[Useful result](https://example.com)" in result.markdown
+    assert "Result summary" in result.markdown
+    assert "Navigation noise" not in result.markdown
+
+
 def _convert_html(html: str, **kwargs) -> str:
     result = MarkItDown().convert_stream(
         io.BytesIO(html.encode("utf-8")),

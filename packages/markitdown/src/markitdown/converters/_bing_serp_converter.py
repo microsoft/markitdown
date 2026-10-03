@@ -40,7 +40,13 @@ class BingSerpConverter(DocumentConverter):
         mimetype = (stream_info.mimetype or "").lower()
         extension = (stream_info.extension or "").lower()
 
-        if not re.search(r"^https://www\.bing\.com/search\?q=", url):
+        parsed_url = urlparse(url)
+        if not (
+            parsed_url.scheme == "https"
+            and parsed_url.netloc == "www.bing.com"
+            and parsed_url.path == "/search"
+            and "q" in parse_qs(parsed_url.query, keep_blank_values=True)
+        ):
             # Not a Bing SERP URL
             return False
 
