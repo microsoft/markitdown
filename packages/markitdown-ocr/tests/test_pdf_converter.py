@@ -232,6 +232,92 @@ def test_pdf_scanned_fallback_format() -> None:
     assert markdown == "## Page 1\n\n\n" + _OCR_BLOCK
 
 
+def test_scanned_page_uses_full_page_ocr(svc: MockOCRService) -> None:
+    """An empty-text page is rendered instead of OCRing embedded decorations."""
+    converter = PdfConverterWithOCR()
+    page = MagicMock()
+    page.extract_text.return_value = ""
+    page.to_image.return_value.original = MagicMock()
+
+    pdf = MagicMock()
+    pdf.pages = [page]
+    pdf.__enter__.return_value = pdf
+
+    with (
+        patch("pdfplumber.open", return_value=pdf) as open_pdf,
+        patch.object(converter, "_extract_page_images") as extract_images,
+    ):
+        result = converter.convert(
+            io.BytesIO(b"pdf"),
+            StreamInfo(extension=".pdf"),
+            ocr_service=svc,
+        )
+
+    assert _OCR_BLOCK in result.text_content
+    page.to_image.assert_called_once_with(resolution=300)
+    extract_images.assert_not_called()
+    open_pdf.assert_called_once()
+
+
+def test_scanned_page_falls_back_to_embedded_image_ocr_when_rendering_fails(
+    svc: MockOCRService,
+) -> None:
+    """A render failure must not discard a decodable embedded scan."""
+    converter = PdfConverterWithOCR()
+    page = MagicMock()
+    page.extract_text.return_value = ""
+    page.to_image.side_effect = RuntimeError("render failed")
+
+    pdf = MagicMock()
+    pdf.pages = [page]
+    pdf.__enter__.return_value = pdf
+    image_stream = io.BytesIO(b"embedded scan")
+
+    with (
+        patch("pdfplumber.open", return_value=pdf),
+        patch.object(
+            converter,
+            "_extract_page_images",
+            return_value=[{"stream": image_stream, "y_pos": 0, "name": "scan"}],
+        ) as extract_images,
+    ):
+        result = converter.convert(
+            io.BytesIO(b"pdf"),
+            StreamInfo(extension=".pdf"),
+            ocr_service=svc,
+        )
+
+    assert _OCR_BLOCK in result.text_content
+    extract_images.assert_called_once_with(page)
+
+
+def test_convert_reuses_open_page_for_image_extraction(svc: MockOCRService) -> None:
+    """Embedded-image extraction must not reopen and reparse the PDF."""
+    converter = PdfConverterWithOCR()
+    page = MagicMock()
+    page.extract_text.return_value = "body"
+    page.chars = []
+
+    pdf = MagicMock()
+    pdf.pages = [page]
+    pdf.__enter__.return_value = pdf
+
+    with (
+        patch("pdfplumber.open", return_value=pdf) as open_pdf,
+        patch.object(
+            converter, "_extract_page_images", return_value=[]
+        ) as extract_images,
+    ):
+        converter.convert(
+            io.BytesIO(b"pdf"),
+            StreamInfo(extension=".pdf"),
+            ocr_service=svc,
+        )
+
+    extract_images.assert_called_once_with(page)
+    open_pdf.assert_called_once()
+
+
 # ---------------------------------------------------------------------------
 # No OCR service — no OCR tags emitted
 # ---------------------------------------------------------------------------
