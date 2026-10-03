@@ -24,26 +24,26 @@ class IpynbConverter(DocumentConverter):
         mimetype = (stream_info.mimetype or "").lower()
         extension = (stream_info.extension or "").lower()
 
-        if extension in ACCEPTED_FILE_EXTENSIONS:
-            return True
-
         for prefix in CANDIDATE_MIME_TYPE_PREFIXES:
             if mimetype.startswith(prefix):
-                # Read further to see if it's a notebook
+                # Check the JSON structure, not just mentions of notebook fields.
                 cur_pos = file_stream.tell()
                 try:
                     encoding = stream_info.charset or "utf-8"
                     notebook_content = file_stream.read().decode(encoding)
+                    notebook = json.loads(notebook_content.lstrip("\ufeff"))
                     return (
-                        "nbformat" in notebook_content
-                        and "nbformat_minor" in notebook_content
+                        isinstance(notebook, dict)
+                        and type(notebook.get("nbformat")) is int
+                        and type(notebook.get("nbformat_minor")) is int
+                        and isinstance(notebook.get("cells"), list)
                     )
-                except (ValueError, LookupError):
+                except (ValueError, LookupError, RecursionError):
                     return False
                 finally:
                     file_stream.seek(cur_pos)
 
-        return False
+        return extension in ACCEPTED_FILE_EXTENSIONS
 
     def convert(
         self,
