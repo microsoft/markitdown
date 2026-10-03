@@ -7,6 +7,21 @@ from urllib.parse import quote, urlparse, urlunparse
 
 _PERCENT_ENCODED_OCTET = re.compile(r"%[0-9A-Fa-f]{2}")
 
+# A run of backslashes that is not itself escaped, followed by the pipe it would
+# otherwise escape. Matching the run is what keeps a cell's own backslash from
+# consuming the escape we add.
+_TABLE_CELL_PIPE = re.compile(r"(?<!\\)(\\*)\|")
+
+
+def _escape_table_cell(text: str) -> str:
+    """Escape the pipes in a table cell so the cell cannot add a column.
+
+    A Markdown table row is split on every unescaped pipe, so a cell holding one
+    -- `USB-A|USB-C`, a shell command, a regex alternation -- pushes the rest of
+    the row into columns the header does not have.
+    """
+    return _TABLE_CELL_PIPE.sub(lambda match: match.group(1) * 2 + r"\|", text)
+
 
 def _quote_path_preserving_percent_encoded_octets(path: str) -> str:
     """Quote a URL path while preserving existing %HH byte encodings."""
@@ -142,6 +157,14 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
             src = src.split(",")[0] + "..."
 
         return "![%s](%s%s)" % (alt, src, title_part)
+
+    def convert_td(self, el: Any, text: str, *args: Any, **kwargs: Any) -> str:
+        """Same as usual converter, but a pipe in the cell stays inside the cell."""
+        return super().convert_td(el, _escape_table_cell(text), *args, **kwargs)  # type: ignore
+
+    def convert_th(self, el: Any, text: str, *args: Any, **kwargs: Any) -> str:
+        """Same as usual converter, but a pipe in the cell stays inside the cell."""
+        return super().convert_th(el, _escape_table_cell(text), *args, **kwargs)  # type: ignore
 
     def convert_input(
         self,
