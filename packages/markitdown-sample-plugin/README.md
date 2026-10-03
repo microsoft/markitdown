@@ -99,7 +99,7 @@ from markitdown import MarkItDown
 
 md = MarkItDown(enable_plugins=True)
 result = md.convert("path-to-file.rtf")
-print(result.text_content)
+print(result.markdown)
 ```
 
 ## Trademarks
