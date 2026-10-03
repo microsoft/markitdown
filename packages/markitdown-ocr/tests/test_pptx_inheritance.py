@@ -17,7 +17,6 @@ from markitdown import FileConversionException, MarkItDown, StreamInfo
 from markitdown.converters import PptxConverter
 from markitdown.converters import _pptx_converter
 import markitdown._markitdown as markitdown_module
-from markitdown_ocr import _plugin
 from markitdown_ocr._ocr_service import LLMVisionOCRService, OCRResult
 from markitdown_ocr._pptx_converter_with_ocr import PptxConverterWithOCR
 
@@ -245,10 +244,7 @@ def test_svg_metadata_reaches_bundled_vision_request() -> None:
 def test_plugin_full_trip_with_mocked_model_only(
     monkeypatch: pytest.MonkeyPatch, caption_succeeds: bool
 ) -> None:
-    entry_point = Mock()
-    entry_point.load.return_value = _plugin
-    entry_points = Mock(return_value=[entry_point])
-    monkeypatch.setattr(markitdown_module, "entry_points", entry_points)
+    # Reset the cache so discovery reads the installed package entry points.
     monkeypatch.setattr(markitdown_module, "_plugins", None)
     client = Mock()
     response = Mock(choices=[Mock(message=Mock(content="Recognized_text"))])
@@ -282,7 +278,6 @@ def test_plugin_full_trip_with_mocked_model_only(
         + expected_image
         + "\n\n### Notes:\nSpeaker notes"
     )
-    entry_points.assert_called_once_with(group="markitdown.plugin")
     assert client.chat.completions.create.call_count == (1 if caption_succeeds else 2)
     for call in client.chat.completions.create.call_args_list:
         request = call.kwargs
