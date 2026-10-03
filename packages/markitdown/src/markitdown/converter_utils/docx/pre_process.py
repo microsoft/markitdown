@@ -1,3 +1,4 @@
+import re
 import struct
 import zipfile
 from io import BytesIO
@@ -247,6 +248,122 @@ def _pre_process_styles(content: bytes) -> bytes:
     return etree.tostring(root.getroottree(), encoding="utf-8", xml_declaration=True)
 
 
+def _pre_process_fields(content: bytes) -> bytes:
+    """
+    Preserves the display text of Word fields, which Mammoth otherwise drops.
+
+    Mammoth has no handler for ``w:fldSimple``, so the element is ignored along
+    with the child runs holding its cached result. It also never emits field
+    instructions (``w:instrText``), which loses MACROBUTTON fields entirely:
+    their display text is the trailing argument of the instruction and they
+    have no result runs (issue #1247, common in standards-body templates for
+    "Proposal N:"/"Observation N:" lines).
+
+    ``w:fldSimple`` elements are unwrapped so their cached result runs are
+    converted like ordinary content. MACROBUTTON instructions — in a
+    ``w:fldSimple`` with no cached result, or in the ``w:instrText`` runs of a
+    complex field with no "separate" marker — are rewritten as text runs
+    holding only the display-text argument. Other instructions are never
+    emitted, and complex fields with a separator are left untouched: Mammoth
+    already converts their result runs.
+
+    Args:
+        content (bytes): The XML content of the DOCX file as bytes.
+
+    Returns:
+        bytes: The processed content with field display text preserved, encoded as bytes.
+    """
+    from lxml import etree
+
+    # Parsing/reserializing the XML is expensive on large documents, so skip
+    # the round-trip when the document contains no fields.
+    if b"fldSimple" not in content and b"instrText" not in content:
+        return content
+
+    namespace = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+    xml_space = "{http://www.w3.org/XML/1998/namespace}space"
+    macrobutton = re.compile(r"\s*MACROBUTTON\s+\S+\s(.*)", re.DOTALL)
+    parser = etree.XMLParser(resolve_entities=False, no_network=True)
+    root = etree.fromstring(content, parser=parser)
+    changed = False
+
+    def make_text_run(text: str) -> "etree._Element":
+        run = etree.Element(namespace + "r")
+        t_element = etree.SubElement(run, namespace + "t")
+        t_element.set(xml_space, "preserve")
+        t_element.text = text
+        return run
+
+    # Rewrite the instruction text of complex MACROBUTTON fields (no
+    # "separate" marker, hence no result runs) as ordinary text runs holding
+    # only the display-text argument. A stack tracks nested fields; the
+    # instruction of any other field is simply left for Mammoth to ignore.
+    # Each entry holds a "separate" marker flag and the instrText elements.
+    field_stack: list[list] = []
+    for element in root.iter(namespace + "fldChar", namespace + "instrText"):
+        if element.tag == namespace + "instrText":
+            if field_stack and not field_stack[-1][0]:
+                field_stack[-1][1].append(element)
+            continue
+        fld_char_type = element.get(namespace + "fldCharType")
+        if fld_char_type == "begin":
+            field_stack.append([False, []])
+        elif fld_char_type == "separate" and field_stack:
+            field_stack[-1][0] = True
+        elif fld_char_type == "end" and field_stack:
+            has_separator, instr_elements = field_stack.pop()
+            if has_separator:
+                continue
+            instruction = "".join(instr.text or "" for instr in instr_elements)
+            match = macrobutton.match(instruction)
+            if match is None:
+                continue
+            # Convert the instrText elements overlapping the display-text
+            # argument to w:t elements, preserving their runs' formatting,
+            # and drop the ones covering only the instruction prefix.
+            position = 0
+            for instr in instr_elements:
+                text = instr.text or ""
+                keep = text[max(match.start(1) - position, 0) :]
+                position += len(text)
+                if keep:
+                    instr.tag = namespace + "t"
+                    instr.set(xml_space, "preserve")
+                    instr.text = keep
+                else:
+                    instr.getparent().remove(instr)
+                changed = True
+
+    # Unwrap simple fields so their cached result runs are converted like
+    # ordinary content. A MACROBUTTON field with no cached result gets a text
+    # run synthesized from its instruction's display-text argument.
+    for field in reversed(list(root.iter(namespace + "fldSimple"))):
+        if not "".join(field.itertext()):
+            match = macrobutton.match(field.get(namespace + "instr", ""))
+            if match is not None and match.group(1):
+                field.append(make_text_run(match.group(1)))
+        parent = field.getparent()
+        index = parent.index(field)
+        children = list(field)
+        for offset, child in enumerate(children):
+            parent.insert(index + offset, child)
+        if field.tail:
+            if children:
+                children[-1].tail = (children[-1].tail or "") + field.tail
+            elif index > 0:
+                previous = parent[index - 1]
+                previous.tail = (previous.tail or "") + field.tail
+            else:
+                parent.text = (parent.text or "") + field.tail
+        parent.remove(field)
+        changed = True
+
+    if not changed:
+        return content
+
+    return etree.tostring(root.getroottree(), encoding="utf-8", xml_declaration=True)
+
+
 def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
     """
     Pre-processes a DOCX file with provided steps.
@@ -267,9 +384,21 @@ def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
     output_docx = BytesIO()
     # The pre-processing steps to apply to each file in the .docx
     pre_process_enable_files = {
-        "word/document.xml": (_pre_process_strike, _pre_process_math),
-        "word/footnotes.xml": (_pre_process_strike, _pre_process_math),
-        "word/endnotes.xml": (_pre_process_strike, _pre_process_math),
+        "word/document.xml": (
+            _pre_process_strike,
+            _pre_process_math,
+            _pre_process_fields,
+        ),
+        "word/footnotes.xml": (
+            _pre_process_strike,
+            _pre_process_math,
+            _pre_process_fields,
+        ),
+        "word/endnotes.xml": (
+            _pre_process_strike,
+            _pre_process_math,
+            _pre_process_fields,
+        ),
         "word/styles.xml": (_pre_process_styles,),
     }
     with zipfile.ZipFile(input_docx, mode="r") as zip_input:
