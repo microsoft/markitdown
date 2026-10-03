@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+import requests
 from charset_normalizer import from_bytes
 
 import markitdown._uri_utils as uri_utils
@@ -273,19 +274,19 @@ def test_input_as_strings() -> None:
     assert "# Test" in result.text_content
 
 
-def _mock_response(content_disposition: str) -> MagicMock:
-    response = MagicMock()
-    response.headers = {"content-disposition": content_disposition}
+def _response(content_disposition: str) -> requests.Response:
+    response = requests.Response()
+    response.status_code = 200
+    response.headers["content-disposition"] = content_disposition
     response.url = "https://example.com/download"
-    response.iter_content.return_value = [b"name,value\nalpha,beta\n"]
-    response.raise_for_status.return_value = None
+    response.raw = io.BytesIO(b"name,value\nalpha,beta\n")
     return response
 
 
 def test_convert_response_uses_rfc5987_content_disposition_filename() -> None:
     markitdown = MarkItDown()
     result = markitdown.convert_response(
-        _mock_response("attachment; filename*=UTF-8''data.csv")
+        _response("attachment; filename*=UTF-8''data.csv")
     )
 
     assert result.markdown == "\n".join(
@@ -300,7 +301,7 @@ def test_convert_response_uses_rfc5987_content_disposition_filename() -> None:
 def test_convert_response_prefers_extended_content_disposition_filename() -> None:
     markitdown = MarkItDown()
     result = markitdown.convert_response(
-        _mock_response("attachment; filename=fallback.txt; filename*=UTF-8''data.csv")
+        _response("attachment; filename=fallback.txt; filename*=UTF-8''data.csv")
     )
 
     assert result.markdown == "\n".join(
