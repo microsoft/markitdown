@@ -541,5 +541,54 @@ def test_xlsx_show_zeroes_rename_is_scoped_to_sheet_view_tags() -> None:
     assert b'<customSheetView showZeroes="0"/>' in repaired
 
 
+_MULTILINE_ROWS = [
+    ["id", "note", "ok"],
+    [1, "line1\nline2", True],
+    [2, "crlf1\r\ncrlf2", False],
+    [3, "cr1\rcr2", True],
+    [4, "para1\n\npara2", False],
+]
+
+
+def _assert_newlines_collapsed(markdown: str) -> None:
+    assert "| 1 | line1 line2 | True |" in markdown
+    assert "| 2 | crlf1 crlf2 | False |" in markdown
+    assert "| 3 | cr1 cr2 | True |" in markdown
+    assert "| 4 | para1 para2 | False |" in markdown
+    assert "\\n" not in markdown
+    assert "\\r" not in markdown
+
+
+def test_xlsx_newlines_in_cells_collapse_to_space() -> None:
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    for row in _MULTILINE_ROWS:
+        sheet.append(row)
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+
+    result = MarkItDown().convert_stream(
+        io.BytesIO(buffer.getvalue()), stream_info=StreamInfo(extension=".xlsx")
+    )
+
+    _assert_newlines_collapsed(result.markdown)
+
+
+def test_xls_newlines_in_cells_collapse_to_space(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # No .xls writer is available, so feed XlsConverter the frame xlrd would produce
+    frame = _xlsx_converter.pd.DataFrame(
+        _MULTILINE_ROWS[1:], columns=_MULTILINE_ROWS[0]
+    )
+    monkeypatch.setattr(
+        _xlsx_converter.pd, "read_excel", lambda *args, **kwargs: {"Sheet1": frame}
+    )
+
+    result = XlsConverter().convert(io.BytesIO(), StreamInfo(extension=".xls"))
+
+    _assert_newlines_collapsed(result.markdown)
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
