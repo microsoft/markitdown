@@ -2,6 +2,8 @@
 
 import io
 import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -79,6 +81,39 @@ def test_atom_without_namespace_is_still_supported() -> None:
     assert result.title == "Example feed"
     assert "## Example entry" in result.markdown
     assert "Entry content." in result.markdown
+
+
+class _SynchronizedRssConverter(RssConverter):
+    """Pause both conversions after their call-specific options are received."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._barrier = threading.Barrier(2)
+
+    def _parse_content(self, content: str, **kwargs) -> str:
+        self._barrier.wait(timeout=5)
+        return super()._parse_content(content, **kwargs)
+
+
+def test_concurrent_conversions_keep_call_specific_markdown_options() -> None:
+    embedded = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///w=="
+    feed = _feed_with_body("atom-content", f'<img src="{embedded}" alt="Pixel"/>')
+    converter = _SynchronizedRssConverter()
+    stream_info = StreamInfo(extension=".atom")
+
+    def convert(keep_data_uris: bool) -> str:
+        return converter.convert(
+            io.BytesIO(feed),
+            stream_info,
+            keep_data_uris=keep_data_uris,
+        ).markdown
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        kept = pool.submit(convert, True)
+        truncated = pool.submit(convert, False)
+
+    assert f"![Pixel]({embedded})" in kept.result()
+    assert "![Pixel](data:image/gif;base64...)" in truncated.result()
 
 
 def test_atom_ignores_elements_from_other_namespaces() -> None:

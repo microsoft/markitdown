@@ -86,7 +86,6 @@ class RssConverter(DocumentConverter):
 
     def __init__(self):
         super().__init__()
-        self._kwargs = {}
 
     def accepts(
         self,
@@ -147,20 +146,23 @@ class RssConverter(DocumentConverter):
         # Pop our own keyword before forwarding the rest to markdownify.
         # strict=True raises RecursionError instead of falling back to plain text.
         strict: bool = kwargs.pop("strict", False)
-        self._kwargs = kwargs
         doc = minidom.parse(file_stream)
         doc.documentURI = stream_info.url or kwargs.get("url")
         feed_type = self._feed_type(doc)
 
         if feed_type == "rss":
-            return self._parse_rss_type(doc, strict=strict)
+            return self._parse_rss_type(doc, strict=strict, markdown_options=kwargs)
         elif feed_type == "atom":
-            return self._parse_atom_type(doc, strict=strict)
+            return self._parse_atom_type(doc, strict=strict, markdown_options=kwargs)
         else:
             raise ValueError("Unknown feed type")
 
     def _parse_atom_type(
-        self, doc: Document, *, strict: bool = False
+        self,
+        doc: Document,
+        *,
+        strict: bool = False,
+        markdown_options: dict[str, Any] | None = None,
     ) -> DocumentConverterResult:
         """Parse the type of an Atom feed.
 
@@ -191,6 +193,7 @@ class RssConverter(DocumentConverter):
                     is_markup=is_markup,
                     base_url=self._get_field_base_url(entry, tag_name),
                     strict=strict,
+                    markdown_options=markdown_options,
                 )
                 for value, is_markup, tag_name in (
                     (entry_summary, summary_is_markup, "summary"),
@@ -242,14 +245,25 @@ class RssConverter(DocumentConverter):
         return text.strip(), False
 
     def _render_atom_content(
-        self, value: str, *, is_markup: bool, base_url: str = "", strict: bool = False
+        self,
+        value: str,
+        *,
+        is_markup: bool,
+        base_url: str = "",
+        strict: bool = False,
+        markdown_options: dict[str, Any] | None = None,
     ) -> str:
         """Render one Atom summary or content value as markdown."""
         if not is_markup:
             # Plain text is returned verbatim: routing it through the HTML
             # parser drops tag-shaped text such as ``<job_id>`` entirely.
             return value
-        return self._parse_content(value, base_url=base_url, strict=strict)
+        return self._parse_content(
+            value,
+            base_url=base_url,
+            strict=strict,
+            markdown_options=markdown_options,
+        )
 
     def _get_flattened_text(
         self, element: Element, tag_name: str, *, atom_text: bool = False
@@ -282,7 +296,11 @@ class RssConverter(DocumentConverter):
         return " ".join(part for part in parts if part) or None
 
     def _parse_rss_type(
-        self, doc: Document, *, strict: bool = False
+        self,
+        doc: Document,
+        *,
+        strict: bool = False,
+        markdown_options: dict[str, Any] | None = None,
     ) -> DocumentConverterResult:
         """Parse the type of an RSS feed.
 
@@ -318,6 +336,7 @@ class RssConverter(DocumentConverter):
                     value,
                     base_url=self._get_field_base_url(item, tag_name),
                     strict=strict,
+                    markdown_options=markdown_options,
                 )
                 for value, tag_name in (
                     (description, "description"),
@@ -336,14 +355,19 @@ class RssConverter(DocumentConverter):
         )
 
     def _parse_content(
-        self, content: str, *, base_url: str = "", strict: bool = False
+        self,
+        content: str,
+        *,
+        base_url: str = "",
+        strict: bool = False,
+        markdown_options: dict[str, Any] | None = None,
     ) -> str:
         """Parse the content of an RSS feed item"""
         try:
             # using bs4 because many RSS feeds have HTML-styled content
             soup = BeautifulSoup(content, "html.parser")
             self._resolve_content_links(soup, base_url)
-            return _CustomMarkdownify(**self._kwargs).convert_soup(soup)
+            return _CustomMarkdownify(**(markdown_options or {})).convert_soup(soup)
         except RecursionError:
             if strict:
                 raise
