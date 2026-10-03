@@ -3,7 +3,7 @@ import ntpath
 import os
 from typing import Tuple, Dict
 from urllib.request import url2pathname
-from urllib.parse import urlparse, unquote_to_bytes
+from urllib.parse import urlparse, unquote, unquote_to_bytes
 
 
 def _is_unc_or_device_path(path: str) -> bool:
@@ -66,7 +66,8 @@ def parse_data_uri(uri: str) -> Tuple[str | None, Dict[str, str], bytes]:
         # Handle key=value pairs in the middle
         if "=" in part:
             key, value = part.split("=", 1)
-            attributes[key.lower()] = value
+            # Decode after splitting so escaped delimiters stay in the parameter.
+            attributes[unquote(key).lower()] = unquote(value)
         elif len(part) > 0:
             attributes[part.lower()] = ""
 
