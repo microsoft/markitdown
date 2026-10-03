@@ -149,23 +149,35 @@ class XlsxConverter(DocumentConverter):
                 images = _XlsxImages(workbook_stream)
 
             for s in sheets:
-                md_content += f"## {s}\n"
-                html_content = sheets[s].to_html(index=False)
-                md_content += (
-                    self._html_converter.convert_string(
-                        html_content, **kwargs
-                    ).markdown.strip()
-                    + "\n\n"
+                image_content = (
+                    images.to_html(s, self._image_to_html, kwargs)
+                    if images is not None
+                    else None
                 )
-                if images is not None:
-                    image_content = images.to_html(s, self._image_to_html, kwargs)
-                    if image_content:
-                        md_content += (
-                            self._html_converter.convert_string(
-                                image_content, **kwargs
-                            ).markdown.strip()
-                            + "\n\n"
-                        )
+                # A completely empty sheet has no columns. pandas then emits a
+                # column-less HTML table that markdownify turns into broken syntax
+                # ("|\n|  |"). Skip the table, and the sheet when it has no images
+                # either. A header-only sheet still has columns and already renders
+                # as a well-formed empty table.
+                has_table = not sheets[s].columns.empty
+                if not has_table and not image_content:
+                    continue
+                md_content += f"## {s}\n"
+                if has_table:
+                    html_content = sheets[s].to_html(index=False)
+                    md_content += (
+                        self._html_converter.convert_string(
+                            html_content, **kwargs
+                        ).markdown.strip()
+                        + "\n\n"
+                    )
+                if image_content:
+                    md_content += (
+                        self._html_converter.convert_string(
+                            image_content, **kwargs
+                        ).markdown.strip()
+                        + "\n\n"
+                    )
 
         return DocumentConverterResult(markdown=md_content.strip())
 
@@ -240,6 +252,10 @@ class XlsConverter(DocumentConverter):
         sheets = pd.read_excel(file_stream, sheet_name=None, engine="xlrd")
         md_content = ""
         for s in sheets:
+            # Same empty-sheet guard as XlsxConverter: no columns means pandas
+            # would emit a column-less table that is not valid Markdown.
+            if sheets[s].columns.empty:
+                continue
             md_content += f"## {s}\n"
             html_content = sheets[s].to_html(index=False)
             md_content += (
