@@ -288,8 +288,33 @@ def test_inherited_repairs_and_native_table_fixes_reach_ocr(
     assert "Future shared fix" in result and "<native>" not in result
     assert result.count("[Image OCR]") == 2
     repair.assert_called_once()
-    assert calls == [{"sheet_name": None, "engine": "openpyxl"}] * 2
+    assert calls == [{"sheet_name": None, "engine": "openpyxl", "dtype": object}] * 2
     service.extract_text.assert_called_once()
+
+
+def test_blank_cell_stays_blank_and_keeps_its_column_native() -> None:
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = "Cells"
+    sheet.append(["Units", "Shipped"])
+    sheet.append([12, True])
+    sheet.append([None, None])
+    sheet.append([7, False])
+    sheet.add_image(SheetImage(io.BytesIO(_RED)), "D1")
+    stream = io.BytesIO()
+    workbook.save(stream)
+    workbook.close()
+
+    assert _convert(XlsxConverterWithOCR(_service()), stream.getvalue()) == (
+        "## Cells\n"
+        "| Units | Shipped |\n"
+        "| --- | --- |\n"
+        "| 12 | True |\n"
+        "|  |  |\n"
+        "| 7 | False |\n\n"
+        "### Images in this sheet:\n\n"
+        "*[Image OCR]  \nrecognized  \n[End OCR]*"
+    )
 
 
 def test_reported_ocr_error_warns_once_and_keeps_native_output() -> None:
