@@ -1,0 +1,15 @@
+From: test.sender@example.com
+To: test.recipient@example.com
+Cc: test.cc@example.com
+Subject: Test Email Message
+Date: Fri, 21 Mar 2026 10:00:00 -0700
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 7bit
+
+This is the body of the test email message.
+
+It has multiple paragraphs with some content for testing.
+
+Best regards,
+Test Sender
