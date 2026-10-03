@@ -29,12 +29,14 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install ExifTool
+      - name: Install media tools
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libimage-exiftool-perl
+          sudo apt-get install -y --no-install-recommends libimage-exiftool-perl ffmpeg
           exiftool -ver
+          ffmpeg -version
+          ffprobe -version
 
       - name: Install Hatch
         run: pipx install hatch

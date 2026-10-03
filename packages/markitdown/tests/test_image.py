@@ -173,7 +173,11 @@ MP3_TEST_EXIFTOOL = {
     skip_exiftool,
     reason="do not run if exiftool is not installed",
 )
-def test_markitdown_exiftool() -> None:
+def test_markitdown_exiftool(monkeypatch: pytest.MonkeyPatch) -> None:
+    import speech_recognition as sr
+
+    # Decode audio locally, but avoid the remote speech service in metadata tests.
+    monkeypatch.setattr(sr.Recognizer, "recognize_google", lambda *args, **kwargs: "")
     which_exiftool = shutil.which("exiftool")
     assert which_exiftool is not None
 
@@ -185,7 +189,7 @@ def test_markitdown_exiftool() -> None:
         assert target in result.text_content
 
     # Test setting the exiftool path through an environment variable
-    os.environ["EXIFTOOL_PATH"] = which_exiftool
+    monkeypatch.setenv("EXIFTOOL_PATH", which_exiftool)
     markitdown = MarkItDown()
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.jpg"))
     for key in JPG_TEST_EXIFTOOL:
