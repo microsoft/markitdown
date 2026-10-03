@@ -150,7 +150,9 @@ class XlsxConverter(DocumentConverter):
 
             for s in sheets:
                 md_content += f"## {s}\n"
-                html_content = sheets[s].to_html(index=False)
+                # A line break inside a cell would end the table row, so collapse it
+                df = sheets[s].replace(r"(?:\r\n|\r|\n)+", " ", regex=True)
+                html_content = df.to_html(index=False)
                 md_content += (
                     self._html_converter.convert_string(
                         html_content, **kwargs
@@ -241,7 +243,9 @@ class XlsConverter(DocumentConverter):
         md_content = ""
         for s in sheets:
             md_content += f"## {s}\n"
-            html_content = sheets[s].to_html(index=False)
+            # A line break inside a cell would end the table row, so collapse it
+            df = sheets[s].replace(r"(?:\r\n|\r|\n)+", " ", regex=True)
+            html_content = df.to_html(index=False)
             md_content += (
                 self._html_converter.convert_string(
                     html_content, **kwargs
