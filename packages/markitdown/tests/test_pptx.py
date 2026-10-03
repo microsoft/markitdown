@@ -872,57 +872,48 @@ def test_pptx_converter_treats_none_llm_caption_as_empty(monkeypatch) -> None:
     )
 
 
-def test_pptx_chart_no_title_text_frame() -> None:
-    from markitdown.converters._pptx_converter import PptxConverter
+def _chart_presentation(title: str | None) -> io.BytesIO:
+    # Modify an in-memory copy of an existing deck; keep its fixture intact.
+    presentation = Presentation(Path(PPTX_FIXTURE))
+    slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    data = CategoryChartData()
+    data.categories = ["Cat 1"]
+    data.add_series("Series 1", [10.0])
+    chart = slide.shapes.add_chart(
+        XL_CHART_TYPE.COLUMN_CLUSTERED,
+        Inches(1),
+        Inches(1),
+        Inches(5),
+        Inches(3),
+        data,
+    ).chart
+    chart.has_title = True
+    if title is not None:
+        chart.chart_title.text_frame.text = title
+    assert chart.chart_title.has_text_frame is (title is not None)
+    stream = io.BytesIO()
+    presentation.save(stream)
+    stream.seek(0)
+    return stream
 
-    # python-pptx's ChartTitle.text_frame is destructive -- it creates a text
-    # frame if one isn't already present, so it never returns None.
-    # has_text_frame is the property that actually reflects presence/absence,
-    # which is what the has_title=True-but-no-text-frame case looks like
-    # against the real library.
-    mock_chart = MagicMock()
-    mock_chart.has_title = True
-    mock_chart.chart_title.has_text_frame = False
 
-    mock_category = MagicMock()
-    mock_category.label = "Cat 1"
-    mock_chart.plots = [MagicMock(categories=[mock_category])]
-
-    mock_series = MagicMock()
-    mock_series.name = "Series 1"
-    mock_series.values = [10.0]
-    mock_chart.series = [mock_series]
-
+@pytest.mark.parametrize("title", [None, "Revenue"])
+def test_pptx_chart_title_text_frame(title: str | None) -> None:
+    stream = _chart_presentation(title)
+    # Reload the serialized package so the real parser reads title XML.
+    chart = Presentation(stream).slides[-1].shapes[-1].chart
     converter = PptxConverter()
-    result = converter._convert_chart_to_markdown(mock_chart)
-
-    assert "### Chart" in result
+    result = converter._convert_chart_to_markdown(chart)
+    heading = "### Chart" if title is None else "### Chart: Revenue"
+    assert result.strip().splitlines()[0] == heading
     assert "Cat 1" in result
     assert "Series 1" in result
-    assert ":" not in result
-
-
-def test_pptx_chart_with_title_text_frame() -> None:
-    from markitdown.converters._pptx_converter import PptxConverter
-
-    mock_chart = MagicMock()
-    mock_chart.has_title = True
-    mock_chart.chart_title.has_text_frame = True
-    mock_chart.chart_title.text_frame.text = "Revenue"
-
-    mock_category = MagicMock()
-    mock_category.label = "Cat 1"
-    mock_chart.plots = [MagicMock(categories=[mock_category])]
-
-    mock_series = MagicMock()
-    mock_series.name = "Series 1"
-    mock_series.values = [10.0]
-    mock_chart.series = [mock_series]
-
-    converter = PptxConverter()
-    result = converter._convert_chart_to_markdown(mock_chart)
-
-    assert "### Chart: Revenue" in result
+    assert "10.0" in result
+    # Accessing a title without a text frame must not create one.
+    assert chart.chart_title.has_text_frame is (title is not None)
+    stream.seek(0)
+    markdown = converter.convert(stream, StreamInfo(extension=".pptx")).markdown
+    assert result.strip() in markdown
 
 
 if __name__ == "__main__":

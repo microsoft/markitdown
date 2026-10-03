@@ -29,6 +29,13 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Install ExifTool
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libimage-exiftool-perl
+          exiftool -ver
+
       - name: Install Hatch
         run: pipx install hatch
       - name: Run tests

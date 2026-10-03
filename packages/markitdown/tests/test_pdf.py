@@ -1,9 +1,8 @@
 """PDF conversion, table extraction, numbering, and page cleanup."""
 
-import io
 import os
 import re
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -1207,217 +1206,100 @@ class TestMasterFormatPartialNumbering:
 # - Mixed PDFs use form extraction only on form-style pages
 
 
-def _make_form_page():
-    """Create a mock page with 3-column table-like word positions."""
-    page = MagicMock()
-    page.width = 612
-    page.close = MagicMock()
-    page.extract_words.return_value = [
-        {"text": "Name", "x0": 50, "x1": 100, "top": 10, "bottom": 20},
-        {"text": "Value", "x0": 250, "x1": 300, "top": 10, "bottom": 20},
-        {"text": "Unit", "x0": 450, "x1": 500, "top": 10, "bottom": 20},
-        {"text": "Alpha", "x0": 50, "x1": 100, "top": 30, "bottom": 40},
-        {"text": "100", "x0": 250, "x1": 280, "top": 30, "bottom": 40},
-        {"text": "kg", "x0": 450, "x1": 470, "top": 30, "bottom": 40},
-        {"text": "Beta", "x0": 50, "x1": 100, "top": 50, "bottom": 60},
-        {"text": "200", "x0": 250, "x1": 280, "top": 50, "bottom": 60},
-        {"text": "lb", "x0": 450, "x1": 470, "top": 50, "bottom": 60},
-    ]
-    return page
+@pytest.fixture
+def pdf_activity(monkeypatch):
+    """Record parser activity while executing every real library operation."""
+    import pdfplumber
+    from markitdown.converters import _pdf_converter
+
+    events = []
+    original_open = pdfplumber.open
+    original_page_close = pdfplumber.page.Page.close
+    original_extract_text = _pdf_converter.pdfminer.high_level.extract_text
+    original_form_extraction = _pdf_converter._extract_form_content_from_words
+
+    def open_pdf(*args, **kwargs):
+        events.append(("open", None))
+        return original_open(*args, **kwargs)
+
+    def close_page(page):
+        events.append(("close", page.page_number))
+        return original_page_close(page)
+
+    def extract_text(*args, **kwargs):
+        events.append(("pdfminer", None))
+        return original_extract_text(*args, **kwargs)
+
+    def extract_form(page):
+        result = original_form_extraction(page)
+        events.append(("form" if result is not None else "plain", page.page_number))
+        return result
+
+    monkeypatch.setattr(pdfplumber, "open", open_pdf)
+    monkeypatch.setattr(pdfplumber.page.Page, "close", close_page)
+    monkeypatch.setattr(
+        _pdf_converter.pdfminer.high_level, "extract_text", extract_text
+    )
+    monkeypatch.setattr(
+        _pdf_converter, "_extract_form_content_from_words", extract_form
+    )
+    return events
 
 
-def _make_plain_page():
-    """Create a mock page with single-line paragraph (no table structure)."""
-    page = MagicMock()
-    page.width = 612
-    page.close = MagicMock()
-    page.extract_words.return_value = [
-        {
-            "text": "This is a long paragraph of plain text.",
-            "x0": 50,
-            "x1": 550,
-            "top": 10,
-            "bottom": 20,
-        },
-    ]
-    page.extract_text.return_value = "This is a long paragraph of plain text."
-    return page
-
-
-def _mock_pdfplumber_open(pages):
-    """Return a mock pdfplumber.open that yields the given pages."""
-
-    def mock_open(stream):
-        mock_pdf = MagicMock()
-        mock_pdf.pages = pages
-        mock_pdf.__enter__ = MagicMock(return_value=mock_pdf)
-        mock_pdf.__exit__ = MagicMock(return_value=False)
-        return mock_pdf
-
-    return mock_open
+def _convert_cleanup_fixture(kind):
+    return (
+        MarkItDown()
+        .convert(os.path.join(TEST_FILES_DIR, f"pdf_cleanup_{kind}.pdf"))
+        .markdown
+    )
 
 
 class TestPdfMemoryOptimization:
-    """Test that PDF conversion cleans up per-page caches to limit memory."""
+    """Exercise page cleanup and fallback using copied, real PDF packages."""
 
-    def test_page_close_called_on_every_page(self):
-        """Verify page.close() is called on every page during conversion.
+    def test_page_close_called_on_every_page(self, pdf_activity):
+        markdown = _convert_cleanup_fixture("form")
+        assert markdown.count("ZAVA AUTO REPAIR") == 3
+        for page in (1, 2, 3):
+            extracted = pdf_activity.index(("form", page))
+            closed = pdf_activity.index(("close", page))
+            assert extracted < closed
+            if page < 3:
+                assert closed < pdf_activity.index(("form", page + 1))
 
-        This ensures cached word/layout data is freed after each page,
-        preventing O(n) memory growth with page count.
-        """
-        num_pages = 20
-        pages = [_make_form_page() for _ in range(num_pages)]
-
-        with patch(
-            "markitdown.converters._pdf_converter.pdfplumber"
-        ) as mock_pdfplumber:
-            mock_pdfplumber.open.side_effect = _mock_pdfplumber_open(pages)
-
-            md = MarkItDown()
-            buf = io.BytesIO(b"fake pdf content")
-            from markitdown import StreamInfo
-
-            md.convert_stream(
-                buf,
-                stream_info=StreamInfo(extension=".pdf", mimetype="application/pdf"),
-            )
-
-        # page.close() must be called on ALL pages
-        for i, page in enumerate(pages):
-            assert page.close.called, (
-                f"page.close() was NOT called on page {i} — "
-                "this would cause memory to accumulate"
-            )
-
-    def test_plain_text_pdf_falls_back_to_pdfminer(self):
-        """Verify all-plain-text PDFs fall back to pdfminer.
-
-        When no page has form-style content, the converter should discard
-        pdfplumber results and use pdfminer for the whole document (better
-        text spacing for prose).
-        """
-        num_pages = 50
-        pages = [_make_plain_page() for _ in range(num_pages)]
-
-        with patch(
-            "markitdown.converters._pdf_converter.pdfplumber"
-        ) as mock_pdfplumber, patch(
-            "markitdown.converters._pdf_converter.pdfminer"
-        ) as mock_pdfminer:
-            mock_pdfplumber.open.side_effect = _mock_pdfplumber_open(pages)
-            mock_pdfminer.high_level.extract_text.return_value = "Plain text content"
-
-            md = MarkItDown()
-            buf = io.BytesIO(b"fake pdf content")
-            from markitdown import StreamInfo
-
-            result = md.convert_stream(
-                buf,
-                stream_info=StreamInfo(extension=".pdf", mimetype="application/pdf"),
-            )
-
-        # pdfminer should be used for the final text extraction
-        assert mock_pdfminer.high_level.extract_text.called, (
-            "pdfminer.high_level.extract_text was not called — "
-            "plain-text PDFs should fall back to pdfminer"
-        )
-        assert result.text_content is not None
-
-    def test_plain_text_pdf_still_closes_all_pages(self):
-        """Even for plain-text PDFs, page.close() must be called on every page."""
-        num_pages = 30
-        pages = [_make_plain_page() for _ in range(num_pages)]
-
-        with patch(
-            "markitdown.converters._pdf_converter.pdfplumber"
-        ) as mock_pdfplumber, patch(
-            "markitdown.converters._pdf_converter.pdfminer"
-        ) as mock_pdfminer:
-            mock_pdfplumber.open.side_effect = _mock_pdfplumber_open(pages)
-            mock_pdfminer.high_level.extract_text.return_value = "text"
-
-            md = MarkItDown()
-            buf = io.BytesIO(b"fake pdf content")
-            from markitdown import StreamInfo
-
-            md.convert_stream(
-                buf,
-                stream_info=StreamInfo(extension=".pdf", mimetype="application/pdf"),
-            )
-
-        for i, page in enumerate(pages):
-            assert (
-                page.close.called
-            ), f"page.close() was NOT called on plain-text page {i}"
-
-    def test_mixed_pdf_uses_form_extraction_per_page(self):
-        """In a mixed PDF, form pages get table extraction while plain pages don't.
-
-        Ensures we don't miss form-style pages and don't waste work
-        running form extraction on plain-text pages.
-        """
-        # Pages 0,2,4 are form-style; pages 1,3 are plain text
-        pages = [
-            _make_form_page(),  # 0 - form
-            _make_plain_page(),  # 1 - plain
-            _make_form_page(),  # 2 - form
-            _make_plain_page(),  # 3 - plain
-            _make_form_page(),  # 4 - form
+    def test_plain_text_pdf_falls_back_to_pdfminer(self, pdf_activity):
+        markdown = _convert_cleanup_fixture("plain")
+        assert pdf_activity.count(("pdfminer", None)) == 1
+        assert [(kind, page) for kind, page in pdf_activity if kind == "plain"] == [
+            ("plain", 1),
+            ("plain", 2),
+            ("plain", 3),
         ]
+        assert markdown.count("While there is contemporaneous exploration") == 3
 
-        with patch(
-            "markitdown.converters._pdf_converter.pdfplumber"
-        ) as mock_pdfplumber:
-            mock_pdfplumber.open.side_effect = _mock_pdfplumber_open(pages)
+    def test_plain_text_pdf_still_closes_all_pages(self, pdf_activity):
+        _convert_cleanup_fixture("plain")
+        fallback = pdf_activity.index(("pdfminer", None))
+        for page in (1, 2, 3):
+            extracted = pdf_activity.index(("plain", page))
+            closed = pdf_activity.index(("close", page))
+            assert extracted < closed < fallback
+            if page < 3:
+                assert closed < pdf_activity.index(("plain", page + 1))
 
-            md = MarkItDown()
-            buf = io.BytesIO(b"fake pdf content")
-            from markitdown import StreamInfo
+    def test_mixed_pdf_uses_form_extraction_per_page(self, pdf_activity):
+        markdown = _convert_cleanup_fixture("mixed")
+        assert [
+            (kind, page) for kind, page in pdf_activity if kind in ("form", "plain")
+        ] == [("form", 1), ("plain", 2), ("form", 3)]
+        assert ("pdfminer", None) not in pdf_activity
+        assert markdown.count("ZAVA AUTO REPAIR") == 2
+        assert "While there is contemporaneous exploration" in markdown
+        assert "|" in markdown
 
-            result = md.convert_stream(
-                buf,
-                stream_info=StreamInfo(extension=".pdf", mimetype="application/pdf"),
-            )
-
-        # All pages should have close() called
-        for i, page in enumerate(pages):
-            assert page.close.called, f"page.close() not called on page {i}"
-
-        # Form pages (0,2,4) should have extract_words called
-        for i in [0, 2, 4]:
-            assert pages[
-                i
-            ].extract_words.called, f"extract_words not called on form page {i}"
-
-        # Result should contain table content from form pages
-        assert result.text_content is not None
-        assert (
-            "|" in result.text_content
-        ), "Expected markdown table pipes in output from form-style pages"
-
-    def test_only_one_pdfplumber_open_call(self):
-        """Verify pdfplumber.open is called exactly once (single pass)."""
-        pages = [_make_form_page() for _ in range(10)]
-
-        with patch(
-            "markitdown.converters._pdf_converter.pdfplumber"
-        ) as mock_pdfplumber:
-            mock_pdfplumber.open.side_effect = _mock_pdfplumber_open(pages)
-
-            md = MarkItDown()
-            buf = io.BytesIO(b"fake pdf content")
-            from markitdown import StreamInfo
-
-            md.convert_stream(
-                buf,
-                stream_info=StreamInfo(extension=".pdf", mimetype="application/pdf"),
-            )
-
-        assert mock_pdfplumber.open.call_count == 1, (
-            f"Expected 1 pdfplumber.open call (single pass), "
-            f"got {mock_pdfplumber.open.call_count}"
-        )
+    def test_only_one_pdfplumber_open_call(self, pdf_activity):
+        _convert_cleanup_fixture("form")
+        assert pdf_activity.count(("open", None)) == 1
 
     @pytest.mark.skipif(
         not os.path.exists(
