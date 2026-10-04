@@ -1,9 +1,11 @@
 """HTML conversion, link handling, and Wikipedia pages."""
 
+import html
 import io
 
 import pytest
 from bs4 import BeautifulSoup
+from markdown_it import MarkdownIt
 
 from markitdown import MarkItDown, StreamInfo
 from markitdown.converters import WikipediaConverter
@@ -20,6 +22,43 @@ def _convert_html(html: str, **kwargs) -> str:
         **kwargs,
     )
     return result.markdown
+
+
+@pytest.mark.parametrize("kind", ["a", "img"])
+@pytest.mark.parametrize(
+    "title",
+    [
+        None,
+        "ordinary",
+        'quoted "label"',
+        "日本語",
+        r"path\_one",
+        "C:\\work\\",
+        r"two\\slashes",
+        'C:\\work\\"quoted"',
+    ],
+)
+def test_html_resource_title_round_trips(kind: str, title: str | None) -> None:
+    attributes = "" if title is None else f' title="{html.escape(title, quote=True)}"'
+    source = (
+        f'<a href="https://example.com/resource"{attributes}>read</a>'
+        if kind == "a"
+        else f'<img src="https://example.com/resource" alt="diagram"{attributes}>'
+    )
+
+    markdown = _convert_html(source)
+    rendered = BeautifulSoup(MarkdownIt("commonmark").render(markdown), "html.parser")
+    resource = rendered.find(kind)
+
+    assert resource is not None
+    assert resource.get("title") == title
+    assert (
+        resource.get("href" if kind == "a" else "src") == "https://example.com/resource"
+    )
+    if kind == "a":
+        assert resource.get_text() == "read"
+    else:
+        assert resource.get("alt") == "diagram"
 
 
 @pytest.mark.parametrize(

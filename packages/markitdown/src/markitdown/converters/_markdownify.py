@@ -98,7 +98,9 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
             return "<%s>" % href
         if self.options["default_title"] and not title:
             title = href
-        title_part = ' "%s"' % title.replace('"', r"\"") if title else ""
+        title_part = (
+            ' "%s"' % title.replace("\\", "\\\\").replace('"', r"\"") if title else ""
+        )
         return (
             "%s[%s](%s%s)%s" % (prefix, text, href, title_part, suffix)
             if href
@@ -128,7 +130,9 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         ):
             src = data_src
         title = el.attrs.get("title", None) or ""
-        title_part = ' "%s"' % title.replace('"', r"\"") if title else ""
+        title_part = (
+            ' "%s"' % title.replace("\\", "\\\\").replace('"', r"\"") if title else ""
+        )
         # Remove all line breaks from alt
         alt = alt.replace("\n", " ")
         if (
