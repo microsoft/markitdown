@@ -1292,7 +1292,8 @@ class TestPdfMemoryOptimization:
         assert [
             (kind, page) for kind, page in pdf_activity if kind in ("form", "plain")
         ] == [("form", 1), ("plain", 2), ("form", 3)]
-        assert ("pdfminer", None) not in pdf_activity
+        # Plain pages are re-extracted with pdfminer to preserve multi-column reading order
+        assert pdf_activity.count(("pdfminer", None)) == 1
         assert markdown.count("ZAVA AUTO REPAIR") == 2
         assert "While there is contemporaneous exploration" in markdown
         assert "|" in markdown
@@ -1382,6 +1383,66 @@ def test_markitdown_remote() -> None:
     result = markitdown.convert(PDF_TEST_URL)
     for test_string in PDF_TEST_STRINGS:
         assert test_string in result.text_content
+
+
+def test_mixed_pdf_multicolumn_reading_order() -> None:
+    """Issue 2580: Ensure multi-column plain pages in mixed PDFs maintain correct reading order."""
+    import io
+    import re
+    from reportlab.lib.pagesizes import A4
+    from reportlab.pdfgen import canvas
+
+    w, h = A4
+    filler = (
+        "This paragraph is long enough to wrap across several lines of "
+        "its column so that the two columns run side by side on the page."
+    )
+
+    def draw_column(c, x, y, first, last):
+        for n in range(first, last + 1):
+            c.setFont("Helvetica-Bold", 10)
+            c.drawString(x, y, f"Article {n}.")
+            y -= 14
+            c.setFont("Helvetica", 9)
+            words, line = filler.split(), ""
+            for word in words:
+                if c.stringWidth(line + " " + word, "Helvetica", 9) > 200:
+                    c.drawString(x, y, line.strip())
+                    y -= 12
+                    line = ""
+                line += " " + word
+            c.drawString(x, y, line.strip())
+            y -= 22
+
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    # Page 1: 2-column plain text
+    draw_column(c, 50, h - 60, 1, 6)
+    draw_column(c, 320, h - 67, 7, 12)
+    c.showPage()
+    # Page 2: form-like table page
+    c.setFont("Helvetica", 10)
+    for r in range(12):
+        for k, x in enumerate((50, 200, 350, 470)):
+            c.drawString(x, h - 80 - r * 18, f"{'Field' if k == 0 else 'Value'}{r}-{k}")
+    c.showPage()
+    # Page 3: 2-column plain text
+    draw_column(c, 50, h - 60, 13, 18)
+    draw_column(c, 320, h - 67, 19, 24)
+    c.showPage()
+    c.save()
+    buf.seek(0)
+
+    result = MarkItDown().convert(buf)
+    articles = [int(m) for m in re.findall(r"Article (\d+)\.", result.markdown)]
+    # Filter duplicates while preserving order
+    seen = []
+    for a in articles:
+        if a not in seen:
+            seen.append(a)
+
+    expected = list(range(1, 25))
+    assert seen == expected, f"Reading order was interleaved: {seen}"
 
 
 if __name__ == "__main__":
