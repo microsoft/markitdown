@@ -347,3 +347,29 @@ def test_deeply_nested_html_fallback() -> None:
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
+
+
+@pytest.mark.parametrize(
+    "language", ["en", "simple", "be-tarask", "zh-min-nan", "roa-rup"]
+)
+@pytest.mark.parametrize("mobile", [False, True])
+def test_wikipedia_language_domains_keep_article_only(language, mobile):
+    domain = language + (".m" if mobile else "")
+    info = StreamInfo(
+        mimetype="text/html", url=f"https://{domain}.wikipedia.org/wiki/Example"
+    )
+    page = (
+        b"<html><body><nav>Navigation noise</nav>"
+        b'<h1 id="firstHeading">Article title</h1>'
+        b'<div id="mw-content-text">Article content</div></body></html>'
+    )
+    assert WikipediaConverter().accepts(io.BytesIO(page), info)
+    result = MarkItDown().convert_stream(io.BytesIO(page), stream_info=info)
+    assert "Article content" in result.markdown
+    assert "Navigation noise" not in result.markdown
+
+
+@pytest.mark.parametrize("domain", ["en.wikipediaXorg", "en.wikipedia.org.example.com"])
+def test_wikipedia_language_domains_reject_other_hosts(domain):
+    info = StreamInfo(mimetype="text/html", url=f"https://{domain}/wiki/Example")
+    assert not WikipediaConverter().accepts(io.BytesIO(b""), info)
