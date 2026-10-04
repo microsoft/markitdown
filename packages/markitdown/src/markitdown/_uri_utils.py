@@ -1,4 +1,5 @@
 import base64
+import binascii
 import ntpath
 import os
 from typing import Tuple, Dict
@@ -70,6 +71,22 @@ def parse_data_uri(uri: str) -> Tuple[str | None, Dict[str, str], bytes]:
         elif len(part) > 0:
             attributes[part.lower()] = ""
 
-    content = base64.b64decode(data) if is_base64 else unquote_to_bytes(data)
+    if is_base64:
+        # The payload is percent-encoded data, so "%3D" and "%2B" are "=" and
+        # "+" once unquoted, and the WHATWG forgiving-base64 decoder accepts
+        # whitespace and a missing final padding. Do both here so that only a
+        # genuinely malformed payload reaches the strict decoder below.
+        payload = b"".join(unquote_to_bytes(data).split())
+        payload += b"=" * (-len(payload) % 4)
+        try:
+            # validate=True: without it, non-alphabet characters are silently
+            # discarded and malformed payloads decode to empty/truncated bytes.
+            content = base64.b64decode(payload, validate=True)
+        except binascii.Error as e:
+            raise ValueError(
+                f"Malformed base64 payload in data URI: {payload!r}"
+            ) from e
+    else:
+        content = unquote_to_bytes(data)
 
     return mime_type, attributes, content
