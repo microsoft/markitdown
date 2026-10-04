@@ -132,7 +132,7 @@ class Tag2Method(object):
 class Pr(Tag2Method):
     text = ""
 
-    __val_tags = ("chr", "pos", "begChr", "endChr", "type")
+    __val_tags = ("chr", "pos", "begChr", "endChr", "sepChr", "type")
 
     __innerdict = None  # can't use the __dict__
 
@@ -168,6 +168,7 @@ class Pr(Tag2Method):
         "pos": do_common,
         "begChr": do_common,
         "endChr": do_common,
+        "sepChr": do_common,
         "type": do_common,
     }
 
@@ -227,14 +228,20 @@ class oMath2Latex(Tag2Method):
         """
         the delimiter object
         """
-        c_dict = self.process_children_dict(elm)
+        c_dict = {}
+        args = []
+        for stag, t, _e in self.process_children_list(elm):
+            c_dict[stag] = t
+            if stag == "e":
+                args.append(t)
         pr = c_dict["dPr"]
         null = D_DEFAULT.get("null")
         s_val = get_char(pr.begChr, default=D_DEFAULT.get("left"), store=T)
         e_val = get_char(pr.endChr, default=D_DEFAULT.get("right"), store=T)
+        sep = get_char(pr.sepChr, default=D_DEFAULT.get("sep"), store=T)
         return pr.text + D.format(
             left=null if not s_val else escape_latex(s_val),
-            text=c_dict["e"],
+            text=escape_latex(sep).join(args) if sep else BLANK.join(args),
             right=null if not e_val else escape_latex(e_val),
         )
 
