@@ -878,3 +878,20 @@ def test_a_declared_charset_still_wins() -> None:
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
+
+
+def test_parse_data_uri_rejects_malformed_base64():
+    # non-alphabet characters used to be silently discarded, decoding
+    # "!!!" to empty content and yielding an empty conversion
+    import pytest as _pytest
+
+    with _pytest.raises(ValueError, match="base64"):
+        parse_data_uri("data:text/plain;base64,!!!")
+    with _pytest.raises(ValueError, match="base64"):
+        parse_data_uri("data:text/plain;base64,SGVsbG8*")
+    # valid base64 keeps decoding
+    _, _, content = parse_data_uri("data:text/plain;base64,SGVsbG8=")
+    assert content == b"Hello"
+    # url-encoded (non-base64) payloads are unaffected
+    _, _, content = parse_data_uri("data:,a%20b")
+    assert content == b"a b"
