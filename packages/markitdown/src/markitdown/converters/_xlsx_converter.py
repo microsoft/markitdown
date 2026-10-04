@@ -47,21 +47,37 @@ _SHOW_ZEROES_ATTRIBUTE = re.compile(rb"(?<=[\s])showZeroes(\s*=)")
 @contextmanager
 def _read_xlsx_sheets(
     file_stream: BinaryIO,
+    *,
+    include_hidden_sheets: bool = True,
 ) -> Iterator[tuple[dict[str, Any], BinaryIO]]:
+    def read_sheets(stream: BinaryIO) -> dict[str, Any]:
+        if include_hidden_sheets:
+            return pd.read_excel(stream, sheet_name=None, engine="openpyxl")
+
+        with pd.ExcelFile(stream, engine="openpyxl") as workbook:
+            visible_sheets = [
+                sheet.title
+                for sheet in workbook.book.worksheets
+                if sheet.sheet_state == "visible"
+            ]
+            # Select before parsing, so only visible sheets become DataFrames.
+            return pd.read_excel(workbook, sheet_name=visible_sheets)
+
     start_pos = file_stream.tell()
     repaired_stream = None
     try:
         try:
-            sheets = pd.read_excel(file_stream, sheet_name=None, engine="openpyxl")
+            sheets = read_sheets(file_stream)
         except TypeError as exc:
             if "showZeroes" not in str(exc):
                 raise
             repaired_stream = _repair_sheetview_show_zeroes(file_stream, start_pos)
-            sheets = pd.read_excel(repaired_stream, sheet_name=None, engine="openpyxl")
+            sheets = read_sheets(repaired_stream)
         yield sheets, repaired_stream if repaired_stream is not None else file_stream
     finally:
         if repaired_stream is not None:
             repaired_stream.close()
+
 
 
 def _rename_show_zeroes_attribute(data: bytes) -> bytes:
@@ -96,6 +112,9 @@ def _repair_sheetview_show_zeroes(
 class XlsxConverter(DocumentConverter):
     """
     Converts XLSX files to Markdown, with each sheet presented as a separate Markdown table.
+
+    Pass ``include_hidden_sheets=False`` to convert only visible worksheets.
+    Hidden and veryHidden worksheets are included by default.
     """
 
     def __init__(self):
@@ -141,7 +160,10 @@ class XlsxConverter(DocumentConverter):
             )
 
         md_content = ""
-        with _read_xlsx_sheets(file_stream) as (sheets, workbook_stream):
+        with _read_xlsx_sheets(
+            file_stream,
+            include_hidden_sheets=kwargs.get("include_hidden_sheets", True),
+        ) as (sheets, workbook_stream):
             images = None
             if type(self)._image_to_html is not XlsxConverter._image_to_html:
                 from ..converter_utils._xlsx_images import _XlsxImages

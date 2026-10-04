@@ -53,3 +53,12 @@ trademarks or logos is subject to and must follow
 [Microsoft's Trademark & Brand Guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks/usage/general).
 Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship.
 Any use of third-party trademarks or logos are subject to those third-party's policies.
+
+To exclude hidden and veryHidden worksheets using the built-in XLSX converter:
+
+```sh
+markitdown --exclude-hidden-sheets workbook.xlsx
+cat workbook.xlsx | markitdown --exclude-hidden-sheets -x xlsx
+```
+
+The default still includes all worksheets. This option applies to XLSX, not XLS.
