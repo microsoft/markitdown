@@ -136,7 +136,7 @@ def _pre_process_math(content: bytes) -> bytes:
     Returns:
         bytes: The processed content with OMML elements replaced by their LaTeX equivalents, encoded as bytes.
     """
-    soup = BeautifulSoup(content.decode(), features="xml")
+    soup = BeautifulSoup(content, features="xml")
     for tag in soup.find_all("oMathPara"):
         _replace_equations(tag)
     for tag in soup.find_all("oMath"):

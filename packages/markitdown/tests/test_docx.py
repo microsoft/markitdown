@@ -1485,5 +1485,38 @@ def test_convert_docx_with_style_missing_type(tmp_path):
     assert "# Abstract" in result.markdown
 
 
+@pytest.mark.parametrize("encoding", ["utf-8", "utf-16-le", "utf-16-be"])
+def test_docx_math_preserves_xml_encoding(encoding):
+    """XML's declared encoding must not determine whether equations survive."""
+    document = (
+        '<?xml version="1.0" encoding="'
+        + ("utf-8" if encoding == "utf-8" else "utf-16")
+        + '"?>'
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
+        'xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">'
+        "<w:body><w:p><w:r><w:t>Before中文😀</w:t></w:r>"
+        "<m:oMath><m:r><m:t>x</m:t></m:r></m:oMath>"
+        "<w:r><w:t>After</w:t></w:r></w:p></w:body></w:document>"
+    )
+    stream = io.BytesIO()
+    fixture = Path(__file__).parent / "test_files" / "test.docx"
+    with zipfile.ZipFile(fixture) as source, zipfile.ZipFile(stream, "w") as target:
+        for item in source.infolist():
+            content = (
+                (
+                    {"utf-8": b"", "utf-16-le": b"\xff\xfe", "utf-16-be": b"\xfe\xff"}[
+                        encoding
+                    ]
+                    + document.encode(encoding)
+                )
+                if item.filename == "word/document.xml"
+                else source.read(item.filename)
+            )
+            target.writestr(item, content)
+    stream.seek(0)
+    result = DocxConverter().convert(stream, StreamInfo(extension=".docx"))
+    assert result.markdown == "Before中文😀$x$After"
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
