@@ -27,6 +27,8 @@ from ._cu_converter import (
 )
 from ._epub_converter import EpubConverter
 from ._csv_converter import CsvConverter
+from ._doc_converter import DocConverter
+from ._chm_converter import ChmConverter
 
 __all__ = [
     "PlainTextConverter",
@@ -51,4 +53,6 @@ __all__ = [
     "ContentUnderstandingFileType",
     "EpubConverter",
     "CsvConverter",
+    "DocConverter",
+    "ChmConverter",
 ]
