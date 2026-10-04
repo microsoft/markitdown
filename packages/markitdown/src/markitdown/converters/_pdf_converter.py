@@ -9,6 +9,7 @@ from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 
 # Pattern for MasterFormat-style partial numbering (e.g., ".1", ".2", ".10")
 PARTIAL_NUMBERING_PATTERN = re.compile(r"^\.\d+$")
+TABLE_PIPE_PATTERN = re.compile(r"(?<!\\)(\\*)\|")
 
 
 def _merge_partial_numbering_lines(text: str) -> str:
@@ -318,7 +319,10 @@ def _extract_form_content_from_words(page: Any) -> str | None:
                 cells[assigned_col] += " " + word["text"]
             else:
                 cells[assigned_col] = word["text"]
-        return cells
+        return [
+            TABLE_PIPE_PATTERN.sub(lambda match: match.group(1) * 2 + r"\|", cell)
+            for cell in cells
+        ]
 
     # Process rows, collecting table data for proper formatting
     idx = 0
