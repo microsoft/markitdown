@@ -81,6 +81,7 @@ features = ["all"]
 features = ["all"]
 extra-dependencies = [
   "openai",
+  "markdown-it-py>=3",
 ]
 
 [tool.hatch.envs.types]
