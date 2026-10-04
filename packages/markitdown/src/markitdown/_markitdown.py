@@ -481,7 +481,7 @@ class MarkItDown:
         # File URIs
         if scheme == "file":
             netloc, path = file_uri_to_path(uri)
-            if netloc and netloc != "localhost":
+            if netloc and netloc.lower() != "localhost":
                 raise ValueError(
                     f"Unsupported file URI: {uri}. Netloc must be empty or localhost."
                 )

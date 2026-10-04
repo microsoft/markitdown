@@ -869,3 +869,20 @@ def test_a_declared_charset_still_wins() -> None:
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
+
+
+@pytest.mark.parametrize("host", ["localhost", "LOCALHOST", "LocalHost"])
+def test_file_uri_localhost_host_is_case_insensitive(tmp_path, host):
+    path = tmp_path / "local.txt"
+    path.write_text("Local document text", encoding="utf-8")
+    uri = path.as_uri().replace("file:///", f"file://{host}/")
+    assert MarkItDown().convert_uri(uri).markdown == "Local document text"
+
+
+@pytest.mark.parametrize("host", ["other-host", "localhost.example.com"])
+def test_file_uri_rejects_other_hosts(tmp_path, host):
+    path = tmp_path / "local.txt"
+    path.write_text("Local document text", encoding="utf-8")
+    uri = path.as_uri().replace("file:///", f"file://{host}/")
+    with pytest.raises(ValueError, match="Netloc must be empty or localhost"):
+        MarkItDown().convert_uri(uri)
