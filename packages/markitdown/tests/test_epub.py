@@ -221,3 +221,105 @@ def test_epub_metadata_and_text_are_unchanged() -> None:
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
+
+
+@pytest.mark.parametrize("container_prefix", ["", "c:"])
+@pytest.mark.parametrize("package_prefix", ["", "opf:"])
+@pytest.mark.parametrize("metadata_prefix", ["dc:", "metadata:"])
+def test_epub_namespace_prefixes_preserve_chapters_and_metadata(
+    container_prefix, package_prefix, metadata_prefix
+):
+    stream = _build_epub(
+        [("c1", "chapter.xhtml")],
+        ["c1"],
+        {"OEBPS/chapter.xhtml": ("Chapter", "NAMESPACEBODY")},
+    )
+    archive = io.BytesIO()
+    with zipfile.ZipFile(stream) as source, zipfile.ZipFile(archive, "w") as target:
+        for member in source.namelist():
+            content = source.read(member)
+            if member == "META-INF/container.xml" and container_prefix:
+                xml = content.decode().replace(
+                    'xmlns="urn:oasis:names:tc:opendocument:xmlns:container"',
+                    'xmlns:c="urn:oasis:names:tc:opendocument:xmlns:container"',
+                )
+                for name in ("container", "rootfiles", "rootfile"):
+                    xml = xml.replace(f"<{name}", f"<{container_prefix}{name}")
+                    xml = xml.replace(f"</{name}", f"</{container_prefix}{name}")
+                content = xml.encode()
+            elif member == "OEBPS/content.opf":
+                xml = (
+                    content.decode().replace("xmlns:dc=", "xmlns:metadata=")
+                    if metadata_prefix == "metadata:"
+                    else content.decode()
+                )
+                if metadata_prefix == "metadata:":
+                    xml = xml.replace("<dc:", "<metadata:").replace(
+                        "</dc:", "</metadata:"
+                    )
+                if package_prefix:
+                    xml = xml.replace(
+                        'xmlns="http://www.idpf.org/2007/opf"',
+                        'xmlns:opf="http://www.idpf.org/2007/opf"',
+                    )
+                    for name in (
+                        "package",
+                        "metadata",
+                        "manifest",
+                        "itemref",
+                        "item",
+                        "spine",
+                    ):
+                        xml = xml.replace(f"<{name} ", f"<{package_prefix}{name} ")
+                        xml = xml.replace(f"<{name}>", f"<{package_prefix}{name}>")
+                        xml = xml.replace(f"</{name}>", f"</{package_prefix}{name}>")
+                content = xml.encode()
+            target.writestr(member, content)
+    archive.seek(0)
+    result = EpubConverter().convert(archive, StreamInfo(extension=".epub"))
+    assert result.title == "Encoded Hrefs"
+    assert "NAMESPACEBODY" in result.markdown
+
+
+def test_epub_legacy_unqualified_xml_preserves_chapter_and_title():
+    archive = io.BytesIO()
+    with zipfile.ZipFile(archive, "w") as z:
+        z.writestr(
+            "META-INF/container.xml",
+            '<container><rootfiles><rootfile full-path="book.opf"/></rootfiles></container>',
+        )
+        z.writestr(
+            "book.opf",
+            '<package><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Legacy title</dc:title></metadata>'
+            '<manifest><item id="c" href="chapter.xhtml"/></manifest>'
+            '<spine><itemref idref="c"/></spine></package>',
+        )
+        z.writestr("chapter.xhtml", "<html><body>Legacy chapter</body></html>")
+    archive.seek(0)
+    result = EpubConverter().convert(archive, StreamInfo(extension=".epub"))
+    assert result.title == "Legacy title"
+    assert "Legacy chapter" in result.markdown
+
+
+def test_epub_foreign_namespace_names_do_not_override_metadata_or_chapters():
+    archive = io.BytesIO()
+    with zipfile.ZipFile(archive, "w") as z:
+        z.writestr("META-INF/container.xml", CONTAINER_XML)
+        z.writestr(
+            "OEBPS/content.opf",
+            '<package xmlns="http://www.idpf.org/2007/opf" '
+            'xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:foreign="urn:foreign">'
+            "<metadata><foreign:title>Foreign title</foreign:title>"
+            "<dc:title>Real title</dc:title></metadata><manifest>"
+            '<item id="c" href="chapter.xhtml"/>'
+            '<foreign:item id="c" href="foreign.xhtml"/></manifest>'
+            '<spine><itemref idref="c"/><foreign:itemref idref="bad"/></spine>'
+            "</package>",
+        )
+        z.writestr("OEBPS/chapter.xhtml", "<html><body>Real chapter</body></html>")
+        z.writestr("OEBPS/foreign.xhtml", "<html><body>Foreign chapter</body></html>")
+    archive.seek(0)
+    result = EpubConverter().convert(archive, StreamInfo(extension=".epub"))
+    assert result.title == "Real title"
+    assert "Real chapter" in result.markdown
+    assert "Foreign" not in result.markdown
