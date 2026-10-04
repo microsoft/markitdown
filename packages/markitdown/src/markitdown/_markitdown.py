@@ -52,7 +52,6 @@ from ._exceptions import (
     FailedConversionAttempt,
 )
 
-
 # A fence may follow block-quote markers. Its indentation is measured inside
 # the container, rather than from the start of the Markdown line.
 _CONTAINER_PREFIX_RE = re.compile(r"^(?P<quotes>(?: {0,3}>[ \t]?)*)(?P<rest>.*)$")
@@ -72,7 +71,7 @@ class _FenceMarker:
 
 
 def _is_code_fence(
-    line: str, list_indent: Optional[int] = None
+    line: str, list_indent: Optional[int] = None, *, allow_list_marker: bool = False
 ) -> Optional[_FenceMarker]:
     """Match a fence with at most three spaces inside its container."""
     container = _CONTAINER_PREFIX_RE.match(line)
@@ -82,6 +81,12 @@ def _is_code_fence(
     candidates = [rest]
     if list_indent is not None and rest.startswith(" " * list_indent):
         candidates.append(rest[list_indent:])
+    if allow_list_marker and list_indent is not None:
+        list_item = _LIST_ITEM_RE.match(rest)
+        if list_item is not None and list_item.end() == list_indent:
+            # A fenced block may be the first block of a list item, directly
+            # following its marker. A closing fence cannot carry that marker.
+            candidates.append(rest[list_item.end() :])
 
     for candidate in candidates:
         match = _CODE_FENCE_RE.match(candidate)
@@ -204,7 +209,7 @@ def _normalize_whitespace_outside_code_fences(text: str) -> str:
             ),
             None,
         )
-        match = _is_code_fence(line, active_list_indent)
+        match = _is_code_fence(line, active_list_indent, allow_list_marker=True)
         if match is not None:
             flushed_prose = bool(segment)
             nested_fence = match.quote_depth > 0 or active_list_indent is not None
