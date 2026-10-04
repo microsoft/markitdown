@@ -347,3 +347,33 @@ def test_deeply_nested_html_fallback() -> None:
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
+
+
+def test_html_table_cell_pipes_are_escaped():
+    # a pipe in cell content used to act as a column separator, silently
+    # splitting cells (plain text, emphasis, image alt text, links)
+    html = (
+        "<table>" "<tr><th>Head|1</th></tr>" "<tr><td>plain|pipe</td></tr>" "</table>"
+    )
+    result = _convert_html(html)
+    assert "Head\\|1" in result
+    assert "plain\\|pipe" in result
+
+
+def test_html_table_cell_inline_pipes_are_escaped():
+    html = (
+        "<table><tr><th>H</th></tr>"
+        '<tr><td><img src="http://x.com/i.png" alt="a|b"></td></tr>'
+        "<tr><td><strong>bold|pipe</strong></td></tr>"
+        '<tr><td><a href="/x|y">link|text</a></td></tr>'
+        "</table>"
+    )
+    result = _convert_html(html)
+    assert "![a\\|b](http://x.com/i.png)" in result
+    assert "**bold\\|pipe**" in result
+    assert "[link\\|text](/x%7Cy)" in result
+
+
+def test_html_pipe_outside_table_not_escaped():
+    result = _convert_html("<p>a|b</p>")
+    assert "a|b" in result

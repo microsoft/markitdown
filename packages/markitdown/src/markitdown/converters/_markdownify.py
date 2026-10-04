@@ -7,6 +7,10 @@ from urllib.parse import quote, urlparse, urlunparse
 
 _PERCENT_ENCODED_OCTET = re.compile(r"%[0-9A-Fa-f]{2}")
 
+# Matches a pipe together with the (possibly empty) run of backslashes in
+# front of it, so that run can be doubled before the pipe is escaped.
+_PIPE_ESCAPE_RE = re.compile(r"(?<!\\)(\\*)\|")
+
 
 def _quote_path_preserving_percent_encoded_octets(path: str) -> str:
     """Quote a URL path while preserving existing %HH byte encodings."""
@@ -20,6 +24,12 @@ def _quote_path_preserving_percent_encoded_octets(path: str) -> str:
 
     parts.append(quote(path[last_end:]))
     return "".join(parts)
+
+
+def _escape_cell_pipes(value: str) -> str:
+    r"""Escape pipes (and any backslash run in front of them) so they do not
+    act as markdown table column separators inside a cell."""
+    return _PIPE_ESCAPE_RE.sub(lambda m: m.group(1) * 2 + r"\|", value)
 
 
 class _CustomMarkdownify(markdownify.MarkdownConverter):
@@ -37,6 +47,19 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         options["keep_data_uris"] = options.get("keep_data_uris", False)
         # Explicitly cast options to the expected type if necessary
         super().__init__(**options)
+
+    def convert_td(self, el: Any, text: str, parent_tags: Any) -> str:
+        # A pipe is the markdown table column separator, so it must be
+        # escaped inside cell content; the CsvConverter does the same for
+        # CSV cells. The base implementation escapes nothing.
+        colspan = 1
+        if "colspan" in el.attrs and el["colspan"].isdigit():
+            colspan = max(1, min(1000, int(el["colspan"])))
+        content = _escape_cell_pipes(text.strip().replace("\n", " "))
+        return " " + content + " |" * colspan
+
+    def convert_th(self, el: Any, text: str, parent_tags: Any) -> str:
+        return self.convert_td(el, text, parent_tags)
 
     def convert_hn(
         self,
