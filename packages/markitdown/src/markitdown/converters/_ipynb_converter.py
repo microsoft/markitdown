@@ -84,7 +84,7 @@ class IpynbConverter(DocumentConverter):
                     # and a list entry holding several lines would hide a heading
                     # that is not on its first one.
                     if title is None:
-                        for line in source_text.splitlines():
+                        for line in source_text.split("\n"):
                             if line.startswith("# "):
                                 title = line.removeprefix("# ").strip()
                                 break

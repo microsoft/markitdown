@@ -2006,3 +2006,23 @@ def test_ipynb_heading_below_the_first_line_of_a_source_entry() -> None:
     }
 
     assert IpynbConverter()._convert(notebook).title == "My Notebook"
+
+
+def test_ipynb_heading_only_counts_at_the_start_of_a_line() -> None:
+    """A "# " after a line separator other than a newline is not a heading."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    notebook = {
+        "nbformat": 4,
+        "nbformat_minor": 5,
+        "metadata": {},
+        "cells": [
+            {
+                "cell_type": "markdown",
+                "source": ["pasted text # not a title\n"],
+                "metadata": {},
+            }
+        ],
+    }
+
+    assert IpynbConverter()._convert(notebook).title is None
