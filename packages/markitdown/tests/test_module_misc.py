@@ -192,6 +192,31 @@ def test_data_uris() -> None:
     assert data == b"Hello, World!"
 
 
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "SGVs\nbG8=",  # wrapped across lines
+        "SGVs bG8=",  # space separated
+        "SGVs\tbG8=",  # tab separated
+    ],
+)
+def test_data_uri_base64_payload_may_contain_whitespace(payload: str) -> None:
+    # Whitespace is not part of the base64 alphabet, but decoders skip it and
+    # data URIs copied out of HTML or email are often wrapped; they decoded
+    # before data URI payloads were validated, so they must keep decoding.
+    _, _, data = parse_data_uri(f"data:text/plain;base64,{payload}")
+    assert data == b"Hello"
+
+
+@pytest.mark.parametrize("payload", ["!!!", "SGVsbG8*"])
+def test_data_uri_base64_payload_rejects_malformed_input(payload: str) -> None:
+    # Non-alphabet characters used to be discarded silently, decoding "!!!" to
+    # empty content and yielding an empty conversion.
+    with pytest.raises(ValueError, match="base64") as exc_info:
+        parse_data_uri(f"data:text/plain;base64,{payload}")
+    assert payload in str(exc_info.value)
+
+
 def test_file_uris() -> None:
     expected_path = os.path.abspath("/path/to/file.txt")
 
