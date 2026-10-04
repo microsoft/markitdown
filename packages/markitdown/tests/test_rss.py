@@ -466,6 +466,71 @@ def test_feed_body_fields_are_separated(extension: str) -> None:
 
 @pytest.mark.parametrize("extension", [".rss", ".atom"])
 @pytest.mark.parametrize(
+    "title, separator",
+    [
+        ("", "\n\n"),
+        ("<title/>", "\n\n"),
+        ("<title> \n </title>", "\n\n"),
+        ("<title>Second</title>", "\n## Second\n"),
+    ],
+    ids=["missing-title", "empty-title", "blank-title", "titled"],
+)
+@pytest.mark.parametrize("include_dates", [False, True], ids=["undated", "dated"])
+@pytest.mark.parametrize(
+    "first_body",
+    ["First body.", "<![CDATA[<p>First body.</p>]]>"],
+    ids=["inline-body", "paragraph-body"],
+)
+def test_feed_entry_dates_are_separated_from_previous_body(
+    extension: str, title: str, separator: str, include_dates: bool, first_body: str
+) -> None:
+    if extension == ".rss":
+        start, end = '<rss version="2.0"><channel>', "</channel></rss>"
+        entry_tag, date_tag, body_tag = "item", "pubDate", "description"
+        label = "Published on"
+        first_date, second_date = (
+            "Mon, 01 Jan 2024 00:00:00 GMT",
+            "Tue, 02 Jan 2024 00:00:00 GMT",
+        )
+    else:
+        start, end = '<feed xmlns="http://www.w3.org/2005/Atom">', "</feed>"
+        entry_tag, date_tag, body_tag = "entry", "updated", 'content type="html"'
+        label = "Updated on"
+        first_date, second_date = "2024-01-01T00:00:00Z", "2024-01-02T00:00:00Z"
+
+    body_end_tag = body_tag.split()[0]
+    dates = [
+        f"<{date_tag}>{date}</{date_tag}>" if include_dates else ""
+        for date in (first_date, second_date)
+    ]
+    feed = (
+        f"{start}<title>Feed</title>"
+        f"<{entry_tag}><title>First</title>{dates[0]}"
+        f"<{body_tag}>{first_body}</{body_end_tag}></{entry_tag}>"
+        f"<{entry_tag}>{title}{dates[1]}"
+        f"<{body_tag}>Second body.</{body_end_tag}></{entry_tag}>{end}"
+    ).encode()
+    expected = (
+        "# Feed\n\n## First\n"
+        + (f"{label}: {first_date}\n" if include_dates else "")
+        + "First body."
+        + separator
+        + (f"{label}: {second_date}\n" if include_dates else "")
+        + "Second body."
+    )
+    stream_info = StreamInfo(extension=extension)
+
+    direct = RssConverter().convert(io.BytesIO(feed), stream_info)
+    public = MarkItDown(enable_plugins=False).convert_stream(
+        io.BytesIO(feed), stream_info=stream_info
+    )
+
+    assert direct.markdown == expected
+    assert public.markdown == expected
+
+
+@pytest.mark.parametrize("extension", [".rss", ".atom"])
+@pytest.mark.parametrize(
     "summary, content, expected",
     [("<b/>", "Body.", "Body."), ("Summary.", "<b/>", "Summary."), ("<b/>", "", "")],
 )
