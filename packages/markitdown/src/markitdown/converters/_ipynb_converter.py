@@ -12,6 +12,23 @@ CANDIDATE_MIME_TYPE_PREFIXES = [
 ACCEPTED_FILE_EXTENSIONS = [".ipynb"]
 
 
+def _iter_cells(notebook_content: dict):
+    """Yield a notebook's cells, whichever nbformat version it uses.
+
+    nbformat 4 keeps a flat ``cells`` list at the top level. nbformat 3 (IPython 3
+    and Jupyter 4.0, still common in archives) nests them under
+    ``worksheets[*].cells`` instead, so reading only the top level silently yielded
+    nothing and the whole notebook converted to an empty document.
+    """
+    cells = notebook_content.get("cells")
+    if cells is not None:
+        yield from cells
+        return
+
+    for worksheet in notebook_content.get("worksheets", []):
+        yield from worksheet.get("cells", [])
+
+
 class IpynbConverter(DocumentConverter):
     """Converts Jupyter Notebook (.ipynb) files to Markdown."""
 
@@ -67,9 +84,14 @@ class IpynbConverter(DocumentConverter):
             md_output = []
             title = None
 
-            for cell in notebook_content.get("cells", []):
+            for cell in _iter_cells(notebook_content):
                 cell_type = cell.get("cell_type", "")
-                source_lines = cell.get("source", [])
+                # nbformat 3 stores code cell text under "input"; nbformat 4 uses
+                # "source" for every cell type. Reading only "source" dropped the
+                # content of every code cell in an nbformat 3 notebook.
+                source_lines = cell.get("source")
+                if source_lines is None:
+                    source_lines = cell.get("input", [])
 
                 if cell_type == "markdown":
                     md_output.append("".join(source_lines))
