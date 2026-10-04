@@ -255,6 +255,19 @@ GENERAL_TEST_VECTORS = [
         must_not_include=[],
     ),
     FileTestVector(
+        # Copy of test.json with an ASCII prefix longer than 8 KiB.
+        filename="json_late_non_ascii.json",
+        mimetype="application/json",
+        charset="utf-8",
+        url=None,
+        must_include=[
+            "5b64c88c-b3c3-4510-bcb8-da0b200602d8",
+            "9700dc99-6685-40b4-9a3a-5e406dcb37f3",
+            '"notes": "Late Unicode: café, 日本語, 😀"',
+        ],
+        must_not_include=["\ufffd", "cafÃ©"],
+    ),
+    FileTestVector(
         filename="test_rss.xml",
         mimetype="text/xml",
         charset="utf-8",
