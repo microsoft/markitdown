@@ -1384,5 +1384,21 @@ def test_markitdown_remote() -> None:
         assert test_string in result.text_content
 
 
+def test_pdf_table_literal_pipes_stay_in_their_cells():
+    """Literal pipes and their preceding backslashes must preserve column values."""
+    result = MarkItDown().convert(
+        os.path.join(TEST_FILES_DIR, "pdf_table_literal_pipes.pdf")
+    )
+    rows = [line for line in result.markdown.splitlines() if line.startswith("|")]
+    assert len(rows) == 9
+    assert r"Item\|Alias" in rows[0]
+    for count in range(6):
+        expected = "left" + "\\" * (2 * count + 1) + "|right"
+        assert expected in rows[count + 2]
+    assert r"path\segment" in rows[-1]
+    # Count only unescaped delimiters, including pipes after even backslash runs.
+    assert all(len(re.findall(r"(?<!\\)(?:\\\\)*\|", row)) == 4 for row in rows)
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
