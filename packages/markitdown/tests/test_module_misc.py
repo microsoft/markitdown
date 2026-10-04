@@ -684,6 +684,15 @@ def test_windows_local_drive_uri(authority: str, uri_path: str, expected: str) -
 
 # Charset sampling
 
+
+def test_json_fixture_has_late_non_ascii_character() -> None:
+    data = (Path(TEST_FILES_DIR) / "json_late_non_ascii.json").read_bytes()
+    # Guard the regression setup: an 8 KiB sample must miss the first Unicode
+    # character, while the current 64 KiB sample must include it.
+    first_non_ascii = next(i for i, value in enumerate(data) if value >= 128)
+    assert 8192 < first_non_ascii < 65536
+
+
 _SAMPLE_SIZE = 65536
 
 _SPLIT_CHARACTERS = [
