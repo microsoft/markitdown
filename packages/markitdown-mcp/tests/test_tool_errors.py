@@ -1,6 +1,7 @@
 import asyncio
 import errno
 import os
+from pathlib import Path
 from unittest.mock import Mock
 
 import httpx2 as httpx
@@ -36,26 +37,34 @@ def original_cause(exc):
 
 
 @pytest.mark.parametrize(
-    "error",
+    "uri, error_type, expected_message",
     [
-        UnsupportedFormatException("No converter supports this format."),
-        ValueError(
+        (
+            (
+                Path(__file__).resolve().parents[2]
+                / "markitdown/tests/test_files/random.bin"
+            ).as_uri(),
+            UnsupportedFormatException,
+            "No converter attempted a conversion",
+        ),
+        (
+            "gopher://example.com/sample.pdf",
+            ValueError,
             "Unsupported URI scheme: gopher. Supported schemes are: "
-            "file:, data:, http:, https:"
+            "file:, data:, http:, https:",
         ),
     ],
 )
-def test_client_input_failures_reach_the_sdk(monkeypatch, error):
+def test_client_input_failures_reach_the_sdk(uri, error_type, expected_message):
     """Diagnoses that only restate the client's own input are returned verbatim."""
-    converter = Mock()
-    converter.convert_uri.side_effect = error
-    monkeypatch.setattr(server, "MarkItDown", Mock(return_value=converter))
-
     with pytest.raises(ToolError) as raised:
-        call_convert()
+        call_convert(uri)
 
     assert not isinstance(raised.value, UnexpectedToolError)
-    assert str(error) in str(raised.value)
+    cause = original_cause(raised.value)
+    assert isinstance(cause, error_type)
+    assert expected_message in str(raised.value)
+    assert str(cause) in str(raised.value)
 
 
 def test_http_status_is_returned_without_transport_details(monkeypatch):
