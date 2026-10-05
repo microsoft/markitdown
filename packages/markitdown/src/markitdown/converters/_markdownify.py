@@ -38,21 +38,6 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         # Explicitly cast options to the expected type if necessary
         super().__init__(**options)
 
-    def convert_hn(
-        self,
-        n: int,
-        el: Any,
-        text: str,
-        convert_as_inline: Optional[bool] = False,
-        **kwargs,
-    ) -> str:
-        """Same as usual, but be sure to start with a new line"""
-        if not convert_as_inline:
-            if not re.search(r"^\n", text):
-                return "\n" + super().convert_hn(n, el, text, convert_as_inline)  # type: ignore
-
-        return super().convert_hn(n, el, text, convert_as_inline)  # type: ignore
-
     def convert_a(
         self,
         el: Any,
