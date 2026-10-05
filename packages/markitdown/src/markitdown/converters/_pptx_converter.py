@@ -303,19 +303,20 @@ class PptxConverter(DocumentConverter):
         return False
 
     def _convert_table_to_markdown(self, table, **kwargs):
-        # Write the table as HTML, then convert it to Markdown
-        html_table = "<html><body><table>"
-        first_row = True
-        for row in table.rows:
-            html_table += "<tr>"
+        # Build rows incrementally to avoid repeated quadratic string concatenation
+        # when large PPTX tables are converted to Markdown.
+        row_html: list[str] = []
+        for row_index, row in enumerate(table.rows):
+            cells_html: list[str] = []
             for cell in row.cells:
-                if first_row:
-                    html_table += "<th>" + html.escape(cell.text) + "</th>"
+                escaped_text = html.escape(cell.text)
+                if row_index == 0:
+                    cells_html.append(f"<th>{escaped_text}</th>")
                 else:
-                    html_table += "<td>" + html.escape(cell.text) + "</td>"
-            html_table += "</tr>"
-            first_row = False
-        html_table += "</table></body></html>"
+                    cells_html.append(f"<td>{escaped_text}</td>")
+            row_html.append("<tr>" + "".join(cells_html) + "</tr>")
+
+        html_table = "<html><body><table>" + "".join(row_html) + "</table></body></html>"
 
         return (
             self._html_converter.convert_string(html_table, **kwargs).markdown.strip()
