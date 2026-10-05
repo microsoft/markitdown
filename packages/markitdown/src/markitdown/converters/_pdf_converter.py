@@ -10,6 +10,12 @@ from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 # Pattern for MasterFormat-style partial numbering (e.g., ".1", ".2", ".10")
 PARTIAL_NUMBERING_PATTERN = re.compile(r"^\.\d+$")
 
+# Horizontal tolerance (in points) used when grouping glyphs into words.
+# pdfplumber's default of 3 merges adjacent words in documents with tight
+# inter-word spacing (e.g. fully-justified two-column papers), silently
+# dropping the whitespace between them.
+_WORD_X_TOLERANCE = 2
+
 
 def _merge_partial_numbering_lines(text: str) -> str:
     """
@@ -62,7 +68,13 @@ _dependency_exc_info = None
 try:
     import pdfminer
     import pdfminer.high_level
+    import pdfminer.layout
     import pdfplumber
+
+    # Analyze text inside Form XObjects (LTFigure) too: without this, pdfminer
+    # concatenates every glyph in a figure with no word spacing, silently
+    # dropping all whitespace for PDFs that store body text in figures.
+    _PDFMINER_LAPARAMS = pdfminer.layout.LAParams(all_texts=True)
 except ImportError:
     _dependency_exc_info = sys.exc_info()
 
@@ -129,7 +141,9 @@ def _extract_form_content_from_words(page: Any) -> str | None:
     Returns None if the page doesn't appear to be a form-style document,
     indicating that pdfminer should be used instead for better text spacing.
     """
-    words = page.extract_words(keep_blank_chars=True, x_tolerance=3, y_tolerance=3)
+    words = page.extract_words(
+        keep_blank_chars=True, x_tolerance=_WORD_X_TOLERANCE, y_tolerance=3
+    )
     if not words:
         return None
 
@@ -559,7 +573,7 @@ class PdfConverter(DocumentConverter):
                             markdown_chunks.append(page_content)
                     else:
                         plain_page_indices.append(page_idx)
-                        text = page.extract_text()
+                        text = page.extract_text(x_tolerance=_WORD_X_TOLERANCE)
                         if text and text.strip():
                             markdown_chunks.append(text.strip())
 
@@ -569,19 +583,25 @@ class PdfConverter(DocumentConverter):
             # the whole document (better text spacing for prose).
             if form_page_count == 0:
                 pdf_bytes.seek(0)
-                markdown = pdfminer.high_level.extract_text(pdf_bytes)
+                markdown = pdfminer.high_level.extract_text(
+                    pdf_bytes, laparams=_PDFMINER_LAPARAMS
+                )
             else:
                 markdown = "\n\n".join(markdown_chunks).strip()
 
         except Exception:
             # Fallback if pdfplumber fails
             pdf_bytes.seek(0)
-            markdown = pdfminer.high_level.extract_text(pdf_bytes)
+            markdown = pdfminer.high_level.extract_text(
+                pdf_bytes, laparams=_PDFMINER_LAPARAMS
+            )
 
         # Fallback if still empty
         if not markdown:
             pdf_bytes.seek(0)
-            markdown = pdfminer.high_level.extract_text(pdf_bytes)
+            markdown = pdfminer.high_level.extract_text(
+                pdf_bytes, laparams=_PDFMINER_LAPARAMS
+            )
 
         # Post-process to merge MasterFormat-style partial numbering with following text
         markdown = _merge_partial_numbering_lines(markdown)

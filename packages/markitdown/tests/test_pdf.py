@@ -1371,6 +1371,19 @@ PDF_TEST_STRINGS = [
 ]
 
 
+def test_tight_spacing_figure_text_keeps_whitespace() -> None:
+    """Whitespace survives tight inter-word spacing inside a Form XObject.
+
+    Regression test for issue #120: the fixture stores its body text in a
+    Form XObject with purely positional 2.5pt word gaps and no space glyphs.
+    Conversion must keep the space between the words.
+    """
+    pdf_path = os.path.join(TEST_FILES_DIR, "tight_spacing_figure_text.pdf")
+    result = MarkItDown().convert(pdf_path)
+    assert "Hello World" in result.text_content
+    assert "HelloWorld" not in result.text_content
+
+
 @pytest.mark.skipif(
     skip_remote,
     reason="do not run tests that query external urls",
