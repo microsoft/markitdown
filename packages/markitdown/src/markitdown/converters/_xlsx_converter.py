@@ -43,6 +43,106 @@ ACCEPTED_XLS_FILE_EXTENSIONS = [".xls"]
 _SHEET_VIEW_START_TAG = re.compile(rb"<sheetView(?=[\s/>])[^>]*>")
 _SHOW_ZEROES_ATTRIBUTE = re.compile(rb"(?<=[\s])showZeroes(\s*=)")
 
+# Currency symbols and ISO 4217 codes recognized in Excel number formats.
+_CURRENCY_SYMBOLS = "$€£¥₹₩₽₺₴₫₪₸"
+_CURRENCY_CODES = frozenset(
+    "USD EUR GBP JPY CNY INR AUD CAD CHF SEK NOK DKK PLN CZK HUF ILS MXN BRL ARS "
+    "CLP COP PEN ZAR NGN KES EGP SAR AED QAR KWD TRY RUB UAH SGD HKD TWD THB MYR "
+    "IDR PHP VND KRW NZD".split()
+)
+_CURRENCY_FORMAT_RE = re.compile(
+    r'\[\$([^\]-]+)[^\]]*\]|"([^"]+)"|(?<!\[)(['
+    + re.escape(_CURRENCY_SYMBOLS)
+    + r"])|\b([A-Z]{3})\b"
+)
+
+
+def _format_currency(value: float, number_format: str) -> Optional[str]:
+    """Render a number using an Excel currency number format.
+
+    Returns None when the format carries no recognizable currency, so the
+    caller keeps the value pandas produced.
+    """
+    section = (number_format or "General").split(";")[0]
+    symbol = None
+    symbol_pos = 0
+    for match in _CURRENCY_FORMAT_RE.finditer(section):
+        candidate = next(g for g in match.groups() if g is not None).strip()
+        if (len(candidate) == 1 and candidate in _CURRENCY_SYMBOLS) or (
+            len(candidate) == 3 and candidate.upper() in _CURRENCY_CODES
+        ):
+            symbol = candidate if len(candidate) == 1 else candidate.upper()
+            symbol_pos = match.start()
+            break
+    if symbol is None:
+        return None
+    # The first digit placeholder decides symbol placement. Locale tags like
+    # [$-409] (or quoted literals) can contain digit characters, so a
+    # placeholder inside [...] or "..." must not count.
+    masked = [m.span() for m in re.finditer(r'\[[^\]]*\]|"[^"]*"', section)]
+    placeholder = next(
+        (
+            m
+            for m in re.finditer(r"[#0?]", section)
+            if not any(start <= m.start() < end for start, end in masked)
+        ),
+        None,
+    )
+    if placeholder is None:
+        return None
+    decimals = re.search(r"\.([0?]+)", section)
+    digits = decimals.group(1) if decimals else ""
+    mandatory = len(digits.replace("?", ""))
+    max_decimals = len(digits)
+    grouped = "," in section.split(".")[0]
+    amount = (
+        f"{abs(value):,.{max_decimals}f}"
+        if grouped
+        else f"{abs(value):.{max_decimals}f}"
+    )
+    if max_decimals > mandatory:
+        # Optional "?" digit slots show the value's own digits but no padding.
+        integer, _, fraction = amount.partition(".")
+        fraction = fraction.rstrip("0")
+        fraction = fraction + "0" * (mandatory - len(fraction))
+        amount = integer if not fraction else f"{integer}.{fraction}"
+    sign = "-" if value < 0 else ""
+    if symbol_pos < placeholder.start():
+        sep = "" if len(symbol) == 1 else " "
+        return f"{sign}{symbol}{sep}{amount}"
+    return f"{sign}{amount} {symbol}"
+
+
+def _apply_currency_formats(dataframe: Any, worksheet: Any) -> None:
+    """Rewrite currency-formatted numeric cells as text carrying the currency.
+
+    pandas only sees cell values, never number formats, so currency-formatted
+    cells would otherwise render as bare numbers. Only cells holding a number
+    whose format names a currency are touched; everything else keeps the
+    value pandas produced.
+    """
+    if not len(dataframe) or not len(dataframe.columns):
+        return
+    replacements = {}
+    rows = worksheet.iter_rows(
+        min_row=2, max_row=len(dataframe) + 1, max_col=len(dataframe.columns)
+    )
+    for i, row in enumerate(rows):
+        for j, cell in enumerate(row):
+            value = cell.value
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                continue
+            text = _format_currency(value, cell.number_format)
+            if text is not None:
+                replacements[(i, j)] = text
+    if not replacements:
+        return
+    for j in {j for _, j in replacements}:
+        name = dataframe.columns[j]
+        dataframe[name] = dataframe[name].astype(object)
+    for (i, j), text in replacements.items():
+        dataframe.iat[i, j] = text
+
 
 @contextmanager
 def _read_xlsx_sheets(
@@ -148,24 +248,31 @@ class XlsxConverter(DocumentConverter):
 
                 images = _XlsxImages(workbook_stream)
 
-            for s in sheets:
-                md_content += f"## {s}\n"
-                html_content = sheets[s].to_html(index=False)
-                md_content += (
-                    self._html_converter.convert_string(
-                        html_content, **kwargs
-                    ).markdown.strip()
-                    + "\n\n"
-                )
-                if images is not None:
-                    image_content = images.to_html(s, self._image_to_html, kwargs)
-                    if image_content:
-                        md_content += (
-                            self._html_converter.convert_string(
-                                image_content, **kwargs
-                            ).markdown.strip()
-                            + "\n\n"
-                        )
+            workbook_stream.seek(0)
+            workbook = openpyxl.load_workbook(workbook_stream, read_only=True)
+            try:
+                for s in sheets:
+                    if s in workbook.sheetnames:
+                        _apply_currency_formats(sheets[s], workbook[s])
+                    md_content += f"## {s}\n"
+                    html_content = sheets[s].to_html(index=False)
+                    md_content += (
+                        self._html_converter.convert_string(
+                            html_content, **kwargs
+                        ).markdown.strip()
+                        + "\n\n"
+                    )
+                    if images is not None:
+                        image_content = images.to_html(s, self._image_to_html, kwargs)
+                        if image_content:
+                            md_content += (
+                                self._html_converter.convert_string(
+                                    image_content, **kwargs
+                                ).markdown.strip()
+                                + "\n\n"
+                            )
+            finally:
+                workbook.close()
 
         return DocumentConverterResult(markdown=md_content.strip())
 

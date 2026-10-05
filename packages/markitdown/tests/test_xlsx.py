@@ -470,6 +470,62 @@ def test_missing_dependencies_and_legacy_xls_stay_separate(
 # Conversion regressions
 
 
+def test_xlsx_currency_number_formats_keep_currency_label() -> None:
+    """Currency-formatted cells keep their currency label (issue #53)."""
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = "Prices"
+    sheet.append(["Item", "Cost", "Total"])
+    sheet.append(["Apples", 5, 100])
+    sheet.append(["Oranges", 1199.5, 2399])
+    sheet["B2"].number_format = '"$"#,##0.00'
+    sheet["B3"].number_format = '"$"#,##0.00'
+    sheet["C2"].number_format = "EUR #,##0.00"
+    sheet["C3"].number_format = "[$€-407]#,##0.00"
+    stream = io.BytesIO()
+    workbook.save(stream)
+    workbook.close()
+
+    result = _convert(XlsxConverter(), stream.getvalue())
+
+    assert "$5.00" in result
+    assert "$1,199.50" in result
+    assert "EUR 100.00" in result
+    assert "€2,399.00" in result
+    # Non-currency cells keep pandas' native rendering.
+    assert "| Apples | $5.00 | EUR 100.00 |" in result
+    assert "## Prices" in result
+
+
+@pytest.mark.parametrize(
+    ("value", "number_format", "expected"),
+    [
+        (5, '"$"#,##0.00', "$5.00"),
+        (1199, '"$"#,##0.00', "$1,199.00"),
+        (-42.5, '"$"#,##0.00', "-$42.50"),
+        (100, "EUR #,##0.00", "EUR 100.00"),
+        (5, "#,##0.00 €", "5.00 €"),
+        (5, "[$€-407]#,##0.00", "€5.00"),
+        (5, "_($* #,##0_)", "$5"),
+        (5, "0.00", None),
+        (5, "General", None),
+        (5, "0%", None),
+        (5, '"Total" #,##0', None),
+        (5, '#,##0" items"', None),
+        (1234.5, "[$-407]#,##0.00", None),
+        (1234.5, "[$-409]#,##0.00", None),
+        (1234.5, "[$-en-US]#,##0.00", None),
+        (5.5, '"$"#,##0.??', "$5.5"),
+        (5.5, '"$"#,##0.0?', "$5.5"),
+        (5, '"$"#,##0.0?', "$5.0"),
+    ],
+)
+def test_format_currency(
+    value: float, number_format: str, expected: str | None
+) -> None:
+    assert _xlsx_converter._format_currency(value, number_format) == expected
+
+
 def test_xlsx_legacy_show_zeroes_sheetview(tmp_path) -> None:
     from openpyxl import Workbook
 
