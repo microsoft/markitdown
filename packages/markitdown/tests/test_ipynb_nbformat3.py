@@ -129,3 +129,61 @@ def test_nbformat_4_is_unchanged() -> None:
 
     assert "```python\nprint('hello')" in result.markdown
     assert result.title == "Quarterly notes"
+
+
+def test_nbformat_3_heading_cells_are_kept_as_markdown_headings() -> None:
+    """v3 heading cells must not vanish; they map to the '#' form that v4 uses."""
+    notebook = {
+        "metadata": {},
+        "nbformat": 3,
+        "nbformat_minor": 0,
+        "worksheets": [
+            {
+                "cells": [
+                    {
+                        "cell_type": "heading",
+                        "level": 1,
+                        "source": ["Quarterly notes\n"],
+                    },
+                    {"cell_type": "code", "input": ["print('hello')\n"], "outputs": []},
+                ]
+            }
+        ],
+    }
+
+    result = _convert(notebook)
+
+    assert "# Quarterly notes" in result.markdown
+    assert result.title == "Quarterly notes"
+
+
+def test_nbformat_3_single_string_source_still_yields_title() -> None:
+    notebook = {
+        "metadata": {},
+        "nbformat": 3,
+        "nbformat_minor": 0,
+        "worksheets": [
+            {
+                "cells": [
+                    {
+                        "cell_type": "markdown",
+                        "source": "# Quarterly notes\n\nRevenue grew.\n",
+                    }
+                ]
+            }
+        ],
+    }
+
+    result = _convert(notebook)
+
+    assert result.title == "Quarterly notes"
+    assert "Revenue grew." in result.markdown
+
+
+def test_null_cells_fall_back_to_worksheets() -> None:
+    notebook = dict(_NBFORMAT_3, cells=None)
+
+    result = _convert(notebook)
+
+    assert "print('hello')" in result.markdown
+    assert "Revenue grew." in result.markdown
