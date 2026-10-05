@@ -142,6 +142,15 @@ def main():
         help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
     )
 
+    parser.add_argument(
+        "--pdf-page-links",
+        action="store_true",
+        help="Add links to physical PDF pages. Local files expose their absolute path.",
+    )
+    parser.add_argument(
+        "--pdf-source",
+        help="Source path or URL used with --pdf-page-links (required for stdin).",
+    )
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
 
@@ -248,16 +257,24 @@ def main():
     else:
         markitdown = MarkItDown(enable_plugins=args.use_plugins)
 
+    pdf_kwargs = {}
+    if args.pdf_page_links:
+        pdf_kwargs = {"pdf_page_links": True, "pdf_source": args.pdf_source}
+
     if args.filename is None:
         # Windows pipe-backed stdin can report seekable() even though it cannot rewind.
         result = markitdown.convert_stream(
             io.BytesIO(sys.stdin.buffer.read()),
             stream_info=stream_info,
             keep_data_uris=args.keep_data_uris,
+            **pdf_kwargs,
         )
     else:
         result = markitdown.convert(
-            args.filename, stream_info=stream_info, keep_data_uris=args.keep_data_uris
+            args.filename,
+            stream_info=stream_info,
+            keep_data_uris=args.keep_data_uris,
+            **pdf_kwargs,
         )
 
     _handle_output(args, result)

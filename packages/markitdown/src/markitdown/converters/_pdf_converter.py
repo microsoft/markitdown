@@ -1,6 +1,8 @@
 import sys
 import io
 import re
+from pathlib import Path
+from urllib.parse import quote, urlsplit, urlunsplit
 from typing import BinaryIO, Any
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
@@ -62,6 +64,10 @@ _dependency_exc_info = None
 try:
     import pdfminer
     import pdfminer.high_level
+    from pdfminer.converter import TextConverter
+    from pdfminer.layout import LAParams
+    from pdfminer.pdfinterp import PDFPageInterpreter, PDFResourceManager
+    from pdfminer.pdfpage import PDFPage
     import pdfplumber
 except ImportError:
     _dependency_exc_info = sys.exc_info()
@@ -73,6 +79,45 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 ]
 
 ACCEPTED_FILE_EXTENSIONS = [".pdf"]
+
+
+def _extract_pdfminer_pages(stream: BinaryIO) -> list[str]:
+    """Use pdfminer's text extraction, retaining physical page boundaries."""
+    pages = []
+    resources = PDFResourceManager()
+    with io.StringIO() as output, TextConverter(
+        resources, output, laparams=LAParams()
+    ) as device:
+        interpreter = PDFPageInterpreter(resources, device)
+        for page in PDFPage.get_pages(stream):
+            output.seek(0)
+            output.truncate(0)
+            interpreter.process_page(page)
+            # Remove the page terminator, not form feeds within the page text.
+            pages.append(output.getvalue().removesuffix("\f"))
+    return pages
+
+
+def _pdf_source_uri(source: str | Path) -> str:
+    """Encode a source for Markdown links; fragments are reserved for page numbers."""
+    if isinstance(source, Path):
+        return source.resolve().as_uri()
+    source = str(source)
+    parsed = urlsplit(source)
+    if parsed.scheme in ("http", "https", "file"):
+        safe = "/:?=&%+@;$,~-._"
+        return urlunsplit(
+            (
+                parsed.scheme,
+                quote(parsed.netloc, safe=safe + "[]"),
+                quote(parsed.path, safe=safe),
+                quote(parsed.query, safe=safe),
+                "",
+            )
+        )
+    if parsed.scheme and ("://" in source or not Path(source).drive):
+        raise ValueError("PDF source must be a local path or an HTTP(S)/file URL")
+    return Path(source).resolve().as_uri()
 
 
 def _to_markdown_table(table: list[list[str]], include_separator: bool = True) -> str:
@@ -536,6 +581,20 @@ class PdfConverter(DocumentConverter):
 
         assert isinstance(file_stream, io.IOBase)
 
+        page_links = kwargs.get("pdf_page_links", False)
+        source_uri = None
+        if page_links:
+            source = (
+                kwargs.get("pdf_source")
+                or stream_info.url
+                or (Path(stream_info.local_path) if stream_info.local_path else None)
+            )
+            if not source:
+                raise ValueError(
+                    "PDF page links require a source path or URL (pdf_source)"
+                )
+            source_uri = _pdf_source_uri(source)
+
         # Read file stream into BytesIO for compatibility with pdfplumber
         pdf_bytes = io.BytesIO(file_stream.read())
 
@@ -551,32 +610,51 @@ class PdfConverter(DocumentConverter):
 
             with pdfplumber.open(pdf_bytes) as pdf:
                 for page_idx, page in enumerate(pdf.pages):
-                    page_content = _extract_form_content_from_words(page)
+                    try:
+                        page_content = _extract_form_content_from_words(page)
 
-                    if page_content is not None:
-                        form_page_count += 1
-                        if page_content.strip():
-                            markdown_chunks.append(page_content)
-                    else:
-                        plain_page_indices.append(page_idx)
-                        text = page.extract_text()
-                        if text and text.strip():
-                            markdown_chunks.append(text.strip())
-
-                    page.close()  # Free cached page data immediately
+                        if page_content is not None:
+                            form_page_count += 1
+                            if page_links or page_content.strip():
+                                markdown_chunks.append(page_content)
+                        else:
+                            plain_page_indices.append(page_idx)
+                            text = page.extract_text()
+                            if page_links or (text and text.strip()):
+                                markdown_chunks.append((text or "").strip())
+                    finally:
+                        page.close()  # Free cached page data, including on failure
 
             # If no pages had form-style content, use pdfminer for
             # the whole document (better text spacing for prose).
             if form_page_count == 0:
                 pdf_bytes.seek(0)
-                markdown = pdfminer.high_level.extract_text(pdf_bytes)
+                if page_links:
+                    markdown_chunks = _extract_pdfminer_pages(pdf_bytes)
+                    markdown = ""
+                else:
+                    markdown = pdfminer.high_level.extract_text(pdf_bytes)
             else:
                 markdown = "\n\n".join(markdown_chunks).strip()
 
         except Exception:
             # Fallback if pdfplumber fails
             pdf_bytes.seek(0)
-            markdown = pdfminer.high_level.extract_text(pdf_bytes)
+            if page_links:
+                markdown_chunks = _extract_pdfminer_pages(pdf_bytes)
+                markdown = ""
+            else:
+                markdown = pdfminer.high_level.extract_text(pdf_bytes)
+
+        if page_links:
+            if not markdown_chunks:
+                raise ValueError("PDF contains no pages")
+            markdown = "\n\n".join(
+                f"[Page {index}](<{source_uri}#page={index}>)\n\n"
+                + _merge_partial_numbering_lines(body).strip()
+                for index, body in enumerate(markdown_chunks, 1)
+            )
+            return DocumentConverterResult(markdown=markdown)
 
         # Fallback if still empty
         if not markdown:
