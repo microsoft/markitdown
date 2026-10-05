@@ -512,9 +512,17 @@ def test_xlsx_currency_number_formats_keep_currency_label() -> None:
         (5, "0%", None),
         (5, '"Total" #,##0', None),
         (5, '#,##0" items"', None),
+        (1234.5, "[$-407]#,##0.00", None),
+        (1234.5, "[$-409]#,##0.00", None),
+        (1234.5, "[$-en-US]#,##0.00", None),
+        (5.5, '"$"#,##0.??', "$5.5"),
+        (5.5, '"$"#,##0.0?', "$5.5"),
+        (5, '"$"#,##0.0?', "$5.0"),
     ],
 )
-def test_format_currency(value: float, number_format: str, expected: str | None) -> None:
+def test_format_currency(
+    value: float, number_format: str, expected: str | None
+) -> None:
     assert _xlsx_converter._format_currency(value, number_format) == expected
 
 

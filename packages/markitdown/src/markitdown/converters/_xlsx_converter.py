@@ -51,7 +51,9 @@ _CURRENCY_CODES = frozenset(
     "IDR PHP VND KRW NZD".split()
 )
 _CURRENCY_FORMAT_RE = re.compile(
-    r'\[\$([^\]-]+)[^\]]*\]|"([^"]+)"|([' + re.escape(_CURRENCY_SYMBOLS) + r"])|\b([A-Z]{3})\b"
+    r'\[\$([^\]-]+)[^\]]*\]|"([^"]+)"|(?<!\[)(['
+    + re.escape(_CURRENCY_SYMBOLS)
+    + r"])|\b([A-Z]{3})\b"
 )
 
 
@@ -74,13 +76,36 @@ def _format_currency(value: float, number_format: str) -> Optional[str]:
             break
     if symbol is None:
         return None
-    placeholder = re.search(r"[#0?]", section)
+    # The first digit placeholder decides symbol placement. Locale tags like
+    # [$-409] (or quoted literals) can contain digit characters, so a
+    # placeholder inside [...] or "..." must not count.
+    masked = [m.span() for m in re.finditer(r'\[[^\]]*\]|"[^"]*"', section)]
+    placeholder = next(
+        (
+            m
+            for m in re.finditer(r"[#0?]", section)
+            if not any(start <= m.start() < end for start, end in masked)
+        ),
+        None,
+    )
     if placeholder is None:
         return None
-    decimals = re.search(r"\.(0+)", section)
-    decimals = len(decimals.group(1)) if decimals else 0
+    decimals = re.search(r"\.([0?]+)", section)
+    digits = decimals.group(1) if decimals else ""
+    mandatory = len(digits.replace("?", ""))
+    max_decimals = len(digits)
     grouped = "," in section.split(".")[0]
-    amount = f"{abs(value):,.{decimals}f}" if grouped else f"{abs(value):.{decimals}f}"
+    amount = (
+        f"{abs(value):,.{max_decimals}f}"
+        if grouped
+        else f"{abs(value):.{max_decimals}f}"
+    )
+    if max_decimals > mandatory:
+        # Optional "?" digit slots show the value's own digits but no padding.
+        integer, _, fraction = amount.partition(".")
+        fraction = fraction.rstrip("0")
+        fraction = fraction + "0" * (mandatory - len(fraction))
+        amount = integer if not fraction else f"{integer}.{fraction}"
     sign = "-" if value < 0 else ""
     if symbol_pos < placeholder.start():
         sep = "" if len(symbol) == 1 else " "
