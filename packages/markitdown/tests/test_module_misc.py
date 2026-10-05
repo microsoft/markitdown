@@ -552,6 +552,124 @@ def test_ipynb_accepts_non_ascii() -> None:
     assert result is True
 
 
+def test_ipynb_string_source_is_read_as_text_not_characters() -> None:
+    """`source` may be a single string, and the title must still be found.
+
+    nbformat's `multiline_string` is a string or a list of lines, and both
+    validate. Walking the raw value iterated a string one character at a time,
+    so no character ever started with "# " and the notebook came out titleless.
+    """
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    notebook = {
+        "nbformat": 4,
+        "nbformat_minor": 5,
+        "metadata": {},
+        "cells": [
+            {
+                "cell_type": "markdown",
+                "source": "# My Notebook\nintro text\n",
+                "metadata": {},
+            },
+            {"cell_type": "code", "source": "print('hello')\n", "metadata": {}},
+        ],
+    }
+
+    result = IpynbConverter()._convert(notebook)
+
+    assert result.title == "My Notebook"
+    assert "# My Notebook" in result.markdown
+    assert "```python\nprint('hello')" in result.markdown
+
+
+def test_ipynb_string_and_list_sources_agree() -> None:
+    """The two spellings of the same notebook convert to the same thing."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    def notebook(markdown_source, code_source):
+        return {
+            "nbformat": 4,
+            "nbformat_minor": 5,
+            "metadata": {},
+            "cells": [
+                {
+                    "cell_type": "markdown",
+                    "source": markdown_source,
+                    "metadata": {},
+                },
+                {"cell_type": "code", "source": code_source, "metadata": {}},
+            ],
+        }
+
+    as_list = IpynbConverter()._convert(
+        notebook(["# Title\n", "body\n"], ["print(1)\n"])
+    )
+    as_string = IpynbConverter()._convert(notebook("# Title\nbody\n", "print(1)\n"))
+
+    assert as_list.title == as_string.title == "Title"
+    assert as_list.markdown == as_string.markdown
+
+
+def test_ipynb_heading_below_the_first_line_of_a_source_entry() -> None:
+    """A list entry can hold several lines; a heading on a later one still counts."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    notebook = {
+        "nbformat": 4,
+        "nbformat_minor": 5,
+        "metadata": {},
+        "cells": [
+            {
+                "cell_type": "markdown",
+                "source": ["intro paragraph\n# My Notebook\n"],
+                "metadata": {},
+            }
+        ],
+    }
+
+    assert IpynbConverter()._convert(notebook).title == "My Notebook"
+
+
+def test_ipynb_heading_only_counts_at_the_start_of_a_line() -> None:
+    """Only \\n, \\r\\n and \\r end a line, so "# " after U+2028 is not a heading."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    notebook = {
+        "nbformat": 4,
+        "nbformat_minor": 5,
+        "metadata": {},
+        "cells": [
+            {
+                "cell_type": "markdown",
+                "source": ["pasted text\u2028# not a title\n"],
+                "metadata": {},
+            }
+        ],
+    }
+
+    assert IpynbConverter()._convert(notebook).title is None
+
+
+def test_ipynb_heading_with_cr_line_endings() -> None:
+    """A source written with \\r line endings still yields just the heading."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    notebook = {
+        "nbformat": 4,
+        "nbformat_minor": 5,
+        "metadata": {},
+        "cells": [
+            {
+                "cell_type": "markdown",
+                "source": ["# My Notebook\r", "intro text\r"],
+                "metadata": {},
+            }
+        ],
+    }
+
+    assert IpynbConverter()._convert(notebook).title == "My Notebook"
+
+
 # File URI validation
 
 UNC_URI_PATHS = [
