@@ -30,11 +30,18 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
     - Removing javascript hyperlinks.
     - Truncating images with large data:uri sources.
     - Ensuring URIs are properly escaped, and do not conflict with Markdown syntax
+    - Reading the first row of a header-less table as its header
     """
 
     def __init__(self, **options: Any):
         options["heading_style"] = options.get("heading_style", markdownify.ATX)
         options["keep_data_uris"] = options.get("keep_data_uris", False)
+        # A Markdown table cannot start with a body row, so markdownify puts an
+        # empty header above a table that has no <th>. Word writes exactly such
+        # a table -- mammoth only emits <thead>/<th> for a row the author marked
+        # as repeating -- and so does a great deal of HTML in the wild, leaving
+        # the column names sitting in the first body row under a blank header.
+        options["table_infer_header"] = options.get("table_infer_header", True)
         # Explicitly cast options to the expected type if necessary
         super().__init__(**options)
 
