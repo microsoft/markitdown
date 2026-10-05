@@ -98,6 +98,53 @@ If you want to mount a directory, adjust it accordingly:
 }
 ```
 
+## Accessing from VS Code
+
+In VS Code, MCP servers are configured in an `mcp.json` file. Open it with **MCP: Open User Configuration** from the Command Palette, or edit it directly:
+
+| Scope | Location |
+| --- | --- |
+| User (Windows) | `%APPDATA%\Code\User\mcp.json` |
+| User (macOS) | `~/Library/Application Support/Code/User/mcp.json` |
+| User (Linux) | `~/.config/Code/User/mcp.json` |
+| Workspace | `.vscode/mcp.json` |
+
+Note that VS Code nests servers under a top-level `servers` key, rather than the `mcpServers` key used by Claude Desktop:
+
+```json
+{
+  "servers": {
+    "markitdown": {
+      "command": "uvx",
+      "args": [
+        "markitdown-mcp"
+      ]
+    }
+  }
+}
+```
+
+To use the Docker image instead, build it as described in [Running in Docker](#running-in-docker), then:
+
+```json
+{
+  "servers": {
+    "markitdown": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "markitdown-mcp:latest"
+      ]
+    }
+  }
+}
+```
+
+> [!NOTE]
+> If the server was added from an MCP gallery or marketplace rather than by hand, the generated entry may pin an older version, for example `"args": ["markitdown-mcp@0.0.1a4"]`. Releases before `0.0.1a7` depend on MCP SDK 1.x, which exits with a validation error on the capability-discovery request that some recent clients send before initialization. Drop the version suffix to track the latest release, or pin `markitdown-mcp@0.0.1a7` or newer.
+
 ## Debugging
 
 To debug the MCP server you can use the `MCP Inspector` tool.
