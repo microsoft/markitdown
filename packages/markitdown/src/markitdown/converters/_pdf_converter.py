@@ -1,6 +1,7 @@
 import sys
 import io
 import re
+import unicodedata
 from typing import BinaryIO, Any
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
@@ -55,6 +56,32 @@ def _merge_partial_numbering_lines(text: str) -> str:
             i += 1
 
     return "\n".join(result_lines)
+
+
+# Arabic Presentation Forms (blocks U+FB50-U+FDFF and U+FE70-U+FEFF) that
+# some PDF producers emit instead of standard Arabic letters. They break
+# downstream text matching and LLM extraction, so they are normalized to
+# their standard forms. Only these two ranges are touched: the rest of the
+# text (including other compatibility characters) is left exactly as is.
+# See https://github.com/microsoft/markitdown/issues/2336.
+_PRESENTATION_FORM_RANGES = ((0xFB50, 0xFDFF), (0xFE70, 0xFEFF))
+
+
+def _normalize_arabic_presentation_forms(text: str) -> str:
+    """Replace Arabic presentation forms with standard Unicode letters.
+
+    Uses NFKC compatibility decomposition per character, restricted to the
+    presentation-form ranges, so ligatures (e.g. U+FEFB) also expand to
+    their letters. Idempotent on text without presentation forms.
+    """
+
+    def _normalize_char(char: str) -> str:
+        code = ord(char)
+        if any(start <= code <= end for start, end in _PRESENTATION_FORM_RANGES):
+            return unicodedata.normalize("NFKC", char)
+        return char
+
+    return "".join(_normalize_char(char) for char in text)
 
 
 # Load dependencies
@@ -585,5 +612,8 @@ class PdfConverter(DocumentConverter):
 
         # Post-process to merge MasterFormat-style partial numbering with following text
         markdown = _merge_partial_numbering_lines(markdown)
+
+        # Post-process Arabic presentation forms into standard letters (#2336)
+        markdown = _normalize_arabic_presentation_forms(markdown)
 
         return DocumentConverterResult(markdown=markdown)
