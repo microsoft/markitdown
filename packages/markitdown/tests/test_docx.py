@@ -1152,6 +1152,39 @@ def test_docx_underlined_whitespace_is_preserved(
     assert MarkItDown().convert(docx_file).markdown == expected
 
 
+@pytest.mark.parametrize("formatting", ["<w:b/>", "<w:i/>", "<w:strike/>"])
+def test_docx_formatted_space_between_words_is_kept(tmp_path, formatting: str) -> None:
+    """A space can carry formatting of its own in a Word document.
+
+    Runs are only merged when their formatting matches, so such a space reaches
+    the Markdown conversion as an element holding nothing but whitespace. Dropping
+    it runs the surrounding words together.
+    """
+    docx_file = _write_underlined_docx(
+        tmp_path / "formatted_space.docx",
+        paragraph_xml=(
+            "<w:r><w:t>First</w:t></w:r>"
+            f'<w:r><w:rPr>{formatting}</w:rPr><w:t xml:space="preserve"> </w:t></w:r>'
+            "<w:r><w:t>Last</w:t></w:r>"
+        ),
+    )
+
+    assert MarkItDown().convert(docx_file).markdown == "First Last"
+
+
+def test_docx_formatted_words_are_still_formatted(tmp_path) -> None:
+    docx_file = _write_underlined_docx(
+        tmp_path / "formatted_words.docx",
+        paragraph_xml=(
+            "<w:r><w:t>First</w:t></w:r>"
+            '<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve"> bold </w:t></w:r>'
+            "<w:r><w:t>Last</w:t></w:r>"
+        ),
+    )
+
+    assert MarkItDown().convert(docx_file).markdown == "First **bold** Last"
+
+
 def test_docx_embedded_style_map_overrides_underline_default(tmp_path) -> None:
     # A style map embedded in the document takes precedence over the default
     # "u => u" mapping that preserves underlines.
