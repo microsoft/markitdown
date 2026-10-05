@@ -1,21 +1,30 @@
 """PDF conversion, table extraction, numbering, and page cleanup."""
 
+import io
 import os
 import re
+import subprocess
+import sys
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from pdfminer.pdfparser import PDFSyntaxError
 
-from markitdown import MarkItDown
+from markitdown import MarkItDown, StreamInfo
+from markitdown.converters import PdfConverter
 from markitdown.converters._pdf_converter import (
     PARTIAL_NUMBERING_PATTERN,
+    _extract_pdfminer_pages,
     _merge_partial_numbering_lines,
+    _pdf_source_uri,
 )
 
 
 # Table extraction
 
 TEST_FILES_DIR = os.path.join(os.path.dirname(__file__), "test_files")
+PDF = Path(TEST_FILES_DIR) / "test.pdf"
 
 
 # --- Helper Functions ---
@@ -1382,6 +1391,162 @@ def test_markitdown_remote() -> None:
     result = markitdown.convert(PDF_TEST_URL)
     for test_string in PDF_TEST_STRINGS:
         assert test_string in result.text_content
+
+
+# Physical page references
+
+
+def test_default_output_is_unchanged():
+    converter = MarkItDown()
+    assert (
+        converter.convert(PDF).markdown
+        == converter.convert(PDF, pdf_page_links=False).markdown
+    )
+
+
+def test_real_pages_and_pdfminer_fallback_match():
+    with PDF.open("rb") as stream:
+        pages = _extract_pdfminer_pages(stream)
+    assert pages
+    converter = MarkItDown()
+    result = converter.convert(PDF, pdf_page_links=True).markdown
+    for index, body in enumerate(pages, 1):
+        assert f"[Page {index}](<{PDF.resolve().as_uri()}#page={index}>)" in result
+        assert body.strip() in result
+    with patch(
+        "markitdown.converters._pdf_converter.pdfplumber.open",
+        side_effect=RuntimeError("open failed"),
+    ):
+        assert converter.convert(PDF, pdf_page_links=True).markdown == result
+
+
+def test_real_blank_middle_page_keeps_physical_index():
+    path = PDF.with_name("test_pdf_blank_middle.pdf")
+    with path.open("rb") as stream:
+        pages = _extract_pdfminer_pages(stream)
+    assert len(pages) == 3
+    assert [page.strip() for page in pages] == ["First page", "", "Third page"]
+    result = MarkItDown().convert(path, pdf_page_links=True).markdown
+    sections = result.split("[Page ")[1:]
+    assert len(sections) == 3
+    assert sections[0].startswith("1]") and sections[2].startswith("3]")
+    assert sections[1].startswith("2]")
+    assert not sections[1].split(">)", 1)[1].strip()
+
+
+def test_linked_mixed_pages_keep_bodies_and_close_pages(pdf_activity):
+    path = Path(TEST_FILES_DIR) / "pdf_cleanup_mixed.pdf"
+    result = MarkItDown().convert(path, pdf_page_links=True).markdown
+    sections = result.split("[Page ")[1:]
+    assert len(sections) == 3
+    assert "ZAVA AUTO REPAIR" in sections[0] and "ZAVA AUTO REPAIR" in sections[2]
+    assert "While there is contemporaneous exploration" in sections[1]
+    for page, kind in [(1, "form"), (2, "plain"), (3, "form")]:
+        assert sections[page - 1].startswith(
+            f"{page}](<{path.resolve().as_uri()}#page={page}>)"
+        )
+        extracted = pdf_activity.index((kind, page))
+        closed = pdf_activity.index(("close", page))
+        assert extracted < closed
+        if page < 3:
+            next_kind = "plain" if page == 1 else "form"
+            assert closed < pdf_activity.index((next_kind, page + 1))
+
+
+def test_encoded_sources_and_override(tmp_path):
+    path = tmp_path / "r\u00e9sum\u00e9 # (1).pdf"
+    assert _pdf_source_uri(str(path)) == path.as_uri()
+    assert _pdf_source_uri("https://example.org/a b.pdf?x=1#old") == (
+        "https://example.org/a%20b.pdf?x=1"
+    )
+    assert _pdf_source_uri("http://[::1]:8000/a[b] c.pdf?x=[]#old") == (
+        "http://[::1]:8000/a%5Bb%5D%20c.pdf?x=%5B%5D"
+    )
+    for source in (
+        "mailto:someone@example.org",
+        "tel:+86000",
+        "ftp://example.org/p.pdf",
+        "x://example.org/p.pdf",
+    ):
+        with pytest.raises(ValueError, match="local path"):
+            _pdf_source_uri(source)
+    if os.name != "nt":
+        colon_path = tmp_path / "notes:paper.pdf"
+        assert _pdf_source_uri(colon_path) == colon_path.as_uri()
+        with PDF.open("rb") as stream:
+            local = (
+                PdfConverter()
+                .convert(
+                    stream, StreamInfo(local_path=colon_path.name), pdf_page_links=True
+                )
+                .markdown
+            )
+        assert f"[Page 1](<{Path(colon_path.name).resolve().as_uri()}#page=1>)" in local
+    result = (
+        MarkItDown()
+        .convert(PDF, pdf_page_links=True, pdf_source="https://example.org/paper.pdf")
+        .markdown
+    )
+    assert "https://example.org/paper.pdf#page=1" in result
+    assert "file:" not in result
+
+
+def test_stream_requires_source_and_invalid_pdf_still_fails():
+    with PDF.open("rb") as stream:
+        with pytest.raises(ValueError, match="require a source"):
+            PdfConverter().convert(stream, StreamInfo(), pdf_page_links=True)
+    with pytest.raises(PDFSyntaxError):
+        PdfConverter().convert(
+            io.BytesIO(b"invalid pdf"),
+            StreamInfo(local_path="paper.pdf"),
+            pdf_page_links=True,
+        )
+    with pytest.raises(ValueError, match="local path"):
+        _pdf_source_uri("javascript:alert(1)")
+
+
+def test_pdfminer_boundaries_do_not_depend_on_form_feeds():
+    bodies = ["first\finside\f\f", "\f", "third\f"]
+    with patch(
+        "markitdown.converters._pdf_converter.PDFPage.get_pages",
+        return_value=iter(bodies),
+    ), patch(
+        "markitdown.converters._pdf_converter.PDFPageInterpreter.process_page",
+        autospec=True,
+        side_effect=lambda interpreter, body: interpreter.device.outfp.write(body),
+    ):
+        assert _extract_pdfminer_pages(io.BytesIO()) == ["first\finside\f", "", "third"]
+
+
+@pytest.mark.skipif(os.name != "nt", reason="native Windows drive paths")
+def test_windows_drive_sources_are_local_paths(tmp_path):
+    for source in (str(tmp_path / "paper.pdf"), f"{tmp_path.drive}paper.pdf"):
+        assert _pdf_source_uri(source) == Path(source).resolve().as_uri()
+
+
+def test_cli_pdf_page_links_for_file_and_stdin(tmp_path):
+    output = tmp_path / "linked.md"
+    flags = ["--pdf-page-links", "--pdf-source", "https://example.org/paper.pdf"]
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    subprocess.run(
+        [sys.executable, "-m", "markitdown", str(PDF), *flags, "-o", str(output)],
+        check=True,
+        capture_output=True,
+        env=env,
+    )
+    markdown = output.read_text(encoding="utf-8")
+    assert "[Page 1](<https://example.org/paper.pdf#page=1>)" in markdown
+    stdin = subprocess.run(
+        [sys.executable, "-m", "markitdown", "--extension", "pdf", *flags],
+        input=PDF.read_bytes(),
+        check=True,
+        capture_output=True,
+        env=env,
+    )
+    assert (
+        stdin.stdout.decode("utf-8").replace("\r\n", "\n").removesuffix("\n")
+        == markdown
+    )
 
 
 if __name__ == "__main__":

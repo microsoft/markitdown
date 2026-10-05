@@ -18,7 +18,8 @@ def main():
         description="Convert various file formats to markdown.",
         prog="markitdown",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        usage=dedent("""
+        usage=dedent(
+            """
             SYNTAX:
 
                 markitdown <OPTIONAL: FILENAME>
@@ -43,7 +44,8 @@ def main():
                 OR
 
                 markitdown example.pdf > example.md
-            """).strip(),
+            """
+        ).strip(),
     )
 
     parser.add_argument(
@@ -147,7 +149,7 @@ def main():
     )
     parser.add_argument(
         "--pdf-source",
-        help="Source path or URL for PDF page links (required for stdin).",
+        help="Source path or URL used with --pdf-page-links (required for stdin).",
     )
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()

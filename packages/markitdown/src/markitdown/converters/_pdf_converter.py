@@ -93,17 +93,29 @@ def _extract_pdfminer_pages(stream: BinaryIO) -> list[str]:
             output.seek(0)
             output.truncate(0)
             interpreter.process_page(page)
+            # Remove the page terminator, not form feeds within the page text.
             pages.append(output.getvalue().removesuffix("\f"))
     return pages
 
 
 def _pdf_source_uri(source: str | Path) -> str:
     """Encode a source for Markdown links; fragments are reserved for page numbers."""
+    if isinstance(source, Path):
+        return source.resolve().as_uri()
     source = str(source)
     parsed = urlsplit(source)
     if parsed.scheme in ("http", "https", "file"):
-        return quote(urlunsplit(parsed._replace(fragment="")), safe="/:?=&%+@;$,~-._")
-    if "://" in source or parsed.scheme in ("javascript", "data"):
+        safe = "/:?=&%+@;$,~-._"
+        return urlunsplit(
+            (
+                parsed.scheme,
+                quote(parsed.netloc, safe=safe + "[]"),
+                quote(parsed.path, safe=safe),
+                quote(parsed.query, safe=safe),
+                "",
+            )
+        )
+    if parsed.scheme and ("://" in source or not Path(source).drive):
         raise ValueError("PDF source must be a local path or an HTTP(S)/file URL")
     return Path(source).resolve().as_uri()
 
@@ -573,7 +585,9 @@ class PdfConverter(DocumentConverter):
         source_uri = None
         if page_links:
             source = (
-                kwargs.get("pdf_source") or stream_info.url or stream_info.local_path
+                kwargs.get("pdf_source")
+                or stream_info.url
+                or (Path(stream_info.local_path) if stream_info.local_path else None)
             )
             if not source:
                 raise ValueError(
