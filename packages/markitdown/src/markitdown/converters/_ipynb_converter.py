@@ -1,5 +1,6 @@
 from typing import BinaryIO, Any
 import json
+import re
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._exceptions import FileConversionException
@@ -70,8 +71,8 @@ class IpynbConverter(DocumentConverter):
             for cell in notebook_content.get("cells", []):
                 cell_type = cell.get("cell_type", "")
                 # nbformat's `multiline_string` is a string *or* a list of lines, and
-                # both are valid; `nbformat.reads` keeps whichever the file used.
-                # Joining the list and taking the string as-is give the same text.
+                # both are valid. Joining the list and taking the string as-is give
+                # the same text.
                 source = cell.get("source", [])
                 source_text = source if isinstance(source, str) else "".join(source)
 
@@ -84,7 +85,7 @@ class IpynbConverter(DocumentConverter):
                     # and a list entry holding several lines would hide a heading
                     # that is not on its first one.
                     if title is None:
-                        for line in source_text.split("\n"):
+                        for line in re.split(r"\r\n|\r|\n", source_text):
                             if line.startswith("# "):
                                 title = line.removeprefix("# ").strip()
                                 break

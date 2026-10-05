@@ -555,10 +555,9 @@ def test_ipynb_accepts_non_ascii() -> None:
 def test_ipynb_string_source_is_read_as_text_not_characters() -> None:
     """`source` may be a single string, and the title must still be found.
 
-    nbformat's `multiline_string` is a string or a list of lines. Both validate,
-    and `nbformat.reads` keeps whichever the file used. Walking the raw value
-    iterated a string one character at a time, so no character ever started with
-    "# " and the notebook came out titleless.
+    nbformat's `multiline_string` is a string or a list of lines, and both
+    validate. Walking the raw value iterated a string one character at a time,
+    so no character ever started with "# " and the notebook came out titleless.
     """
     from markitdown.converters._ipynb_converter import IpynbConverter
 
@@ -632,7 +631,7 @@ def test_ipynb_heading_below_the_first_line_of_a_source_entry() -> None:
 
 
 def test_ipynb_heading_only_counts_at_the_start_of_a_line() -> None:
-    """A "# " after a line separator other than a newline is not a heading."""
+    """Only \\n, \\r\\n and \\r end a line, so "# " after U+2028 is not a heading."""
     from markitdown.converters._ipynb_converter import IpynbConverter
 
     notebook = {
@@ -642,13 +641,33 @@ def test_ipynb_heading_only_counts_at_the_start_of_a_line() -> None:
         "cells": [
             {
                 "cell_type": "markdown",
-                "source": ["pasted text # not a title\n"],
+                "source": ["pasted text\u2028# not a title\n"],
                 "metadata": {},
             }
         ],
     }
 
     assert IpynbConverter()._convert(notebook).title is None
+
+
+def test_ipynb_heading_with_cr_line_endings() -> None:
+    """A source written with \\r line endings still yields just the heading."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    notebook = {
+        "nbformat": 4,
+        "nbformat_minor": 5,
+        "metadata": {},
+        "cells": [
+            {
+                "cell_type": "markdown",
+                "source": ["# My Notebook\r", "intro text\r"],
+                "metadata": {},
+            }
+        ],
+    }
+
+    assert IpynbConverter()._convert(notebook).title == "My Notebook"
 
 
 # File URI validation
