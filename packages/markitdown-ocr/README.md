@@ -14,7 +14,7 @@ Uses the same `llm_client` / `llm_model` pattern that MarkItDown already support
 
 ## Installation
 
-Requires `markitdown>=0.1.8b3`, which introduces the Office image-rendering hooks used by this plugin. Installing the plugin automatically resolves a compatible core version.
+Requires `markitdown>=0.1.8,<0.2.0`, which provides the Office image-rendering hooks used by this plugin. Installing the plugin automatically resolves a compatible core version.
 
 ```bash
 pip install markitdown-ocr

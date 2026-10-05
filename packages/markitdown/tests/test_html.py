@@ -1,10 +1,16 @@
+"""HTML conversion, link handling, and Wikipedia pages."""
+
 import io
 
 import pytest
 from bs4 import BeautifulSoup
 
-from markitdown import MarkItDown
+from markitdown import MarkItDown, StreamInfo
+from markitdown.converters import WikipediaConverter
 from markitdown.converters._markdownify import _CustomMarkdownify
+
+
+# HTML rendering
 
 
 def _convert_html(html: str, **kwargs) -> str:
@@ -239,3 +245,193 @@ def test_table_colgroup_keeps_header_row(columns: str) -> None:
 )
 def test_table_tfoot_rows_are_plain_trailing_rows(html: str, expected: str) -> None:
     assert _convert_html(html) == expected
+
+
+# Wikipedia article titles
+
+STREAM_INFO = StreamInfo(
+    url="https://en.wikipedia.org/wiki/Example",
+    mimetype="text/html",
+    extension=".html",
+)
+
+
+def _page(heading: str, document_title: str) -> io.BytesIO:
+    """Build a page shaped like the article HTML Wikipedia actually serves."""
+    return io.BytesIO(
+        f"""<html><head><title>{document_title} - Wikipedia</title></head><body>
+<h1 id="firstHeading" class="firstHeading mw-first-heading">{heading}</h1>
+<div id="mw-content-text"><p>Body text.</p></div>
+</body></html>""".encode()
+    )
+
+
+def test_plain_title_is_read_from_the_title_span() -> None:
+    """A plain title keeps being read from mw-page-title-main."""
+    page = _page(
+        '<span lang="en" dir="ltr"><span class="mw-page-title-main">Paris</span></span>',
+        "Paris",
+    )
+
+    result = WikipediaConverter().convert(page, STREAM_INFO)
+
+    assert result.title == "Paris"
+    assert result.markdown.lstrip().startswith("# Paris")
+
+
+def test_fully_italicised_title_keeps_its_text() -> None:
+    """Wikipedia drops the title span for italicised titles, e.g. species names."""
+    page = _page("<i>Escherichia coli</i>", "Escherichia coli")
+
+    result = WikipediaConverter().convert(page, STREAM_INFO)
+
+    # Without the first-heading fallback this became "Escherichia coli - Wikipedia".
+    assert result.title == "Escherichia coli"
+    assert result.markdown.lstrip().startswith("# Escherichia coli")
+
+
+def test_title_mixing_markup_and_plain_text_keeps_both_parts() -> None:
+    """A disambiguated italic title spans several children, so .string is None."""
+    page = _page("<i>Titanic</i> (1997 film)", "Titanic (1997 film)")
+
+    result = WikipediaConverter().convert(page, STREAM_INFO)
+
+    assert result.title == "Titanic (1997 film)"
+    assert result.markdown.lstrip().startswith("# Titanic (1997 film)")
+
+
+# Conversion regressions
+
+
+def test_wikipedia_converter_no_title() -> None:
+    """WikipediaConverter should not render '# None' when page has no title."""
+    converter = WikipediaConverter()
+    html = b"<html><body><div id='mw-content-text'><p>Hello</p></div></body></html>"
+    stream_info = StreamInfo(
+        mimetype="text/html", url="https://en.wikipedia.org/wiki/Test"
+    )
+    result = converter.convert(io.BytesIO(html), stream_info)
+    assert "# None" not in result.markdown
+    assert "Hello" in result.markdown
+    assert result.markdown.strip() == "Hello"
+
+
+def test_wikipedia_converter_blank_title() -> None:
+    """WikipediaConverter should not render an empty heading for a blank title."""
+    converter = WikipediaConverter()
+    html = b"<html><head><title>   </title></head><body><div id='mw-content-text'><p>Hello</p></div></body></html>"
+    stream_info = StreamInfo(
+        mimetype="text/html", url="https://en.wikipedia.org/wiki/Test"
+    )
+    result = converter.convert(io.BytesIO(html), stream_info)
+    assert not result.markdown.lstrip().startswith("#")
+    assert result.title is None
+    assert result.text_content.strip() == "Hello"
+
+
+def test_uppercase_data_image_uri_is_truncated_by_default() -> None:
+    markitdown = MarkItDown()
+    html = b'<html><body><img alt="dot" src="DATA:image/png;base64,AAAA"></body></html>'
+    stream_info = StreamInfo(mimetype="text/html", extension=".html")
+
+    result = markitdown.convert_stream(io.BytesIO(html), stream_info=stream_info)
+    assert result.markdown == "![dot](DATA:image/png;base64...)"
+    assert "AAAA" not in result.markdown
+
+    result = markitdown.convert_stream(
+        io.BytesIO(html), stream_info=stream_info, keep_data_uris=True
+    )
+    assert result.markdown == "![dot](DATA:image/png;base64,AAAA)"
+
+
+def test_html_strikethrough_variants(tmp_path) -> None:
+    html = """<!doctype html>
+<html><body>
+<p>Plain <s>s element</s> after.</p>
+<p>Plain <del>del element</del> after.</p>
+<p>Plain <strike>strike element</strike> after.</p>
+<p>Spaces A<strike> B </strike>C.</p>
+<p>Runs D<strike>  E  </strike>F.</p>
+<p>Empty G<strike></strike>H.</p>
+<p>Newline I<strike>J
+K</strike>L.</p>
+<p>Break M<strike>N<br>O</strike>P.</p>
+</body></html>
+"""
+    path = tmp_path / "strike.html"
+    path.write_text(html, encoding="utf-8")
+    markdown = MarkItDown().convert(str(path)).markdown
+
+    assert markdown == "\n\n".join(
+        [
+            # <s>, <del> and the obsolete <strike> all mean strikethrough
+            "Plain ~~s element~~ after.",
+            "Plain ~~del element~~ after.",
+            "Plain ~~strike element~~ after.",
+            # Surrounding whitespace stays outside of the markup ...
+            "Spaces A ~~B~~ C.",
+            # ... and runs of it collapse to a single space
+            "Runs D ~~E~~ F.",
+            # An empty element contributes nothing
+            "Empty GH.",
+            # A line break inside the element is kept, and the markup
+            # survives it because strikethrough may span a single newline
+            "Newline I~~J\nK~~L.",
+            "Break M~~N\nO~~P.",
+        ]
+    )
+
+
+def test_deeply_nested_html_fallback() -> None:
+    """Large, deeply nested HTML should fall back to plain-text extraction
+    instead of silently returning unconverted HTML (issue #1636).
+
+    Note: This test uses sys.setrecursionlimit to guarantee a RecursionError
+    regardless of the host environment's default limit, making it deterministic
+    across different platforms and CI configurations.
+    """
+    import sys
+    import warnings
+
+    markitdown = MarkItDown()
+
+    # Use a small recursion limit so the test is environment-independent.
+    # We restore the original limit in a finally block to avoid side-effects.
+    original_limit = sys.getrecursionlimit()
+    low_limit = 200  # well below markdownify's traversal depth for depth=500
+
+    # Build HTML with nesting deep enough to trigger RecursionError
+    depth = 500
+    html = "<html><body>"
+    for _ in range(depth):
+        html += '<div style="margin-left:10px">'
+    html += "<p>Deep content with <b>bold text</b></p>"
+    for _ in range(depth):
+        html += "</div>"
+    html += "</body></html>"
+
+    try:
+        sys.setrecursionlimit(low_limit)
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = markitdown.convert_stream(
+                io.BytesIO(html.encode("utf-8")),
+                file_extension=".html",
+            )
+
+            # Should have emitted a warning about the fallback
+            recursion_warnings = [x for x in w if "deeply nested" in str(x.message)]
+            assert len(recursion_warnings) > 0
+
+    finally:
+        sys.setrecursionlimit(original_limit)
+
+    # The output should contain the text content, not raw HTML
+    assert "Deep content" in result.markdown
+    assert "bold text" in result.markdown
+    assert "<div" not in result.markdown
+    assert "<p>" not in result.markdown
+
+
+if __name__ == "__main__":
+    raise SystemExit(pytest.main([__file__]))
