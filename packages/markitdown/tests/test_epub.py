@@ -1,10 +1,15 @@
+"""EPUB conversion, archive paths, metadata, and embedded images."""
+
 import io
 import zipfile
 
 import pytest
 
-from markitdown import StreamInfo
+from markitdown import MarkItDown, StreamInfo
 from markitdown.converters import EpubConverter
+
+
+# Archive href resolution
 
 CONTAINER_XML = """<?xml version="1.0"?>
 <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
@@ -158,11 +163,110 @@ def test_a_readable_book_carries_no_failure_note() -> None:
     assert "could not be read" not in markdown
 
 
+# Conversion regressions
+
+
+def test_epub_metadata_nodevalue():
+    from defusedxml.minidom import parseString
+    from markitdown.converters._epub_converter import EpubConverter
+
+    xml_data = (
+        '<package xmlns:dc="http://purl.org/dc/elements/1.1/">'
+        "<dc:title><span>Structured</span> Title</dc:title>"
+        "<dc:creator><name>Author 1</name></dc:creator>"
+        "<dc:creator>Author 2</dc:creator>"
+        "<dc:publisher></dc:publisher>"
+        "<dc:description/>"
+        "</package>"
+    )
+    dom = parseString(xml_data)
+    converter = EpubConverter()
+
+    title = converter._get_text_from_node(dom, "dc:title")
+    assert title == "Structured Title"
+
+    creators = converter._get_all_texts_from_nodes(dom, "dc:creator")
+    assert creators == ["Author 1", "Author 2"]
+
+    publisher = converter._get_text_from_node(dom, "dc:publisher")
+    assert publisher is None
+
+    missing = converter._get_text_from_node(dom, "dc:date")
+    assert missing is None
+
+
+_EPUB_CONTAINER = (
+    '<?xml version="1.0"?>'
+    '<container version="1.0" '
+    'xmlns="urn:oasis:names:tc:opendocument:xmlns:container">'
+    '<rootfiles><rootfile full-path="OEBPS/content.opf" '
+    'media-type="application/oebps-package+xml"/></rootfiles></container>'
+)
+
+_EPUB_OPF = (
+    '<?xml version="1.0"?>'
+    '<package xmlns="http://www.idpf.org/2007/opf" version="2.0" '
+    'unique-identifier="id">'
+    '<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">'
+    "<dc:title>Example book</dc:title></metadata>"
+    '<manifest><item id="c1" href="ch1.xhtml" '
+    'media-type="application/xhtml+xml"/></manifest>'
+    '<spine><itemref idref="c1"/></spine></package>'
+)
+
+_EPUB_CHAPTER = (
+    '<html xmlns="http://www.w3.org/1999/xhtml"><body>'
+    "<p>Chapter text.</p>"
+    '<img alt="diagram" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUg=="/>'
+    "</body></html>"
+)
+
+
+def _build_epub_with_data_uri() -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("mimetype", "application/epub+zip")
+        zf.writestr("META-INF/container.xml", _EPUB_CONTAINER)
+        zf.writestr("OEBPS/content.opf", _EPUB_OPF)
+        zf.writestr("OEBPS/ch1.xhtml", _EPUB_CHAPTER)
+    return buf.getvalue()
+
+
+def test_epub_honors_keep_data_uris() -> None:
+    """EPUB chapters must be converted with the options the caller passed."""
+    result = MarkItDown().convert_stream(
+        io.BytesIO(_build_epub_with_data_uri()),
+        stream_info=StreamInfo(extension=".epub"),
+        keep_data_uris=True,
+    )
+
+    assert (
+        "![diagram](data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==)" in result.markdown
+    )
+
+
+def test_epub_truncates_data_uris_by_default() -> None:
+    """Without the option, the default truncation must still apply."""
+    result = MarkItDown().convert_stream(
+        io.BytesIO(_build_epub_with_data_uri()),
+        stream_info=StreamInfo(extension=".epub"),
+    )
+
+    assert "![diagram](data:image/png;base64...)" in result.markdown
+    assert "iVBORw0KGgo" not in result.markdown
+
+
+def test_epub_metadata_and_text_are_unchanged() -> None:
+    """The rest of the conversion must not move."""
+    result = MarkItDown().convert_stream(
+        io.BytesIO(_build_epub_with_data_uri()),
+        stream_info=StreamInfo(extension=".epub"),
+    )
+
+    assert result.title == "Example book"
+    assert "**Title:** Example book" in result.markdown
+    assert "Chapter text." in result.markdown
+
+
 if __name__ == "__main__":
-    test_percent_encoded_href_resolves_to_zip_entry()
-    test_non_ascii_percent_encoded_href_resolves()
-    test_literally_encoded_zip_entry_still_resolves()
-    test_parent_relative_href_resolves()
-    test_unreadable_spine_item_does_not_cost_the_rest_of_the_book()
-    test_a_readable_book_carries_no_failure_note()
-    print("All tests passed")
+    raise SystemExit(pytest.main([__file__]))
