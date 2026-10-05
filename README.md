@@ -104,11 +104,18 @@ At the moment, the following optional dependencies are available:
 * `[xlsx]` Installs dependencies for Excel files
 * `[xls]` Installs dependencies for older Excel files
 * `[pdf]` Installs dependencies for PDF files
+* `[magika]` Installs content-based file type detection (requires ONNX Runtime)
 * `[outlook]` Installs dependencies for Outlook messages
 * `[az-doc-intel]` Installs dependencies for Azure Document Intelligence
 * `[az-content-understanding]` Installs dependencies for Azure Content Understanding
 * `[audio-transcription]` Installs dependencies for audio transcription of wav and mp3 files
 * `[youtube-transcription]` Installs dependencies for fetching YouTube video transcription
+
+Without `[magika]`, file extensions, HTTP content types, and explicit
+`StreamInfo` hints still select converters. For streams without format metadata,
+provide `StreamInfo(extension=".pdf")` or use `--extension pdf` on the CLI.
+On platforms without ONNX Runtime wheels (such as Alpine/musl), install only
+the format extras you need, e.g. `pip install 'markitdown[pdf]'`, not `[all]`.
 
 ### Plugins
 
