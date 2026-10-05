@@ -52,6 +52,186 @@ from ._exceptions import (
     FailedConversionAttempt,
 )
 
+# A fence may follow block-quote markers. Its indentation is measured inside
+# the container, rather than from the start of the Markdown line.
+_CONTAINER_PREFIX_RE = re.compile(r"^(?P<quotes>(?: {0,3}>[ \t]?)*)(?P<rest>.*)$")
+_CODE_FENCE_RE = re.compile(
+    r"^(?P<quotes>(?: {0,3}>[ \t]?)*)(?P<indent> *)(?P<marker>`{3,}|~{3,})"
+)
+_LIST_ITEM_RE = re.compile(
+    r"^(?P<indent> *)(?P<marker>[-+*]|\d{1,9}[.)])(?P<space> {1,4}|\t)"
+)
+
+
+@dataclass(frozen=True)
+class _FenceMarker:
+    marker: str
+    end: int
+    quote_depth: int
+
+
+def _is_code_fence(
+    line: str, list_indent: Optional[int] = None, *, allow_list_marker: bool = False
+) -> Optional[_FenceMarker]:
+    """Match a fence with at most three spaces inside its container."""
+    container = _CONTAINER_PREFIX_RE.match(line)
+    assert container is not None
+    quote_depth = container.group("quotes").count(">")
+    rest = container.group("rest")
+    candidates = [rest]
+    if list_indent is not None and rest.startswith(" " * list_indent):
+        candidates.append(rest[list_indent:])
+    if allow_list_marker and list_indent is not None:
+        list_item = _LIST_ITEM_RE.match(rest)
+        if list_item is not None and list_item.end() == list_indent:
+            # A fenced block may be the first block of a list item, directly
+            # following its marker. A closing fence cannot carry that marker.
+            candidates.append(rest[list_item.end() :])
+
+    for candidate in candidates:
+        match = _CODE_FENCE_RE.match(candidate)
+        if match is None or len(match.group("indent")) > 3:
+            continue
+        return _FenceMarker(
+            marker=match.group("marker"),
+            end=len(line) - len(candidate) + match.end(),
+            quote_depth=quote_depth + match.group("quotes").count(">"),
+        )
+    return None
+
+
+def _closes_fence(
+    line: str,
+    fence_char: str,
+    fence_len: int,
+    quote_depth: int,
+    list_indent: Optional[int],
+) -> bool:
+    """Whether a line inside a fenced code block closes the fence."""
+    match = _is_code_fence(line, list_indent)
+    if match is None or match.quote_depth != quote_depth:
+        return False
+    marker = match.marker
+    # The closing fence uses the same character, is at least as long, and
+    # carries no info string.
+    return (
+        marker[0] == fence_char
+        and len(marker) >= fence_len
+        and not line[match.end :].strip()
+    )
+
+
+def _normalize_whitespace_outside_code_fences(text: str) -> str:
+    """Normalize whitespace while leaving fenced code blocks untouched.
+
+    Outside code fences, the previous normalization is applied: trailing
+    whitespace is stripped from each line and runs of three or more newlines
+    are collapsed to two. Content inside a fenced code block is
+    whitespace-significant, so it is passed through verbatim apart from
+    CRLF newline normalization.
+    """
+    lines = re.split(r"\r?\n", text)
+    out: list[str] = []
+    segment: list[str] = []
+    fence_char = ""
+    fence_len = 0
+    fence_quote_depth = 0
+    fence_list_indent: Optional[int] = None
+    list_contexts: list[tuple[int, int]] = []  # (quote depth, content indentation)
+
+    def flush_segment(fence_follows: bool, nested_fence: bool = False) -> None:
+        if segment:
+            normalized = re.sub(
+                r"\n{3,}", "\n\n", "\n".join(line.rstrip() for line in segment)
+            )
+            if fence_follows:
+                # The final "\n".join(out) adds one newline before the fence
+                # line. Preserve an existing blank line inside a container,
+                # but do not insert one where the source had none.
+                keep_blank_line = nested_fence and normalized.endswith("\n")
+                normalized = normalized.rstrip("\n")
+                if keep_blank_line:
+                    normalized += "\n"
+            out.append(normalized)
+            segment.clear()
+
+    for line in lines:
+        container = _CONTAINER_PREFIX_RE.match(line)
+        assert container is not None
+        quote_depth = container.group("quotes").count(">")
+        rest = container.group("rest")
+        indent = len(rest) - len(rest.lstrip(" "))
+
+        if fence_char:
+            # A fence also ends when its block quote or list item ends.
+            nested_quote_depth = quote_depth
+            if fence_list_indent is not None and rest.startswith(
+                " " * fence_list_indent
+            ):
+                nested = _CONTAINER_PREFIX_RE.match(rest[fence_list_indent:])
+                assert nested is not None
+                nested_quote_depth += nested.group("quotes").count(">")
+            if nested_quote_depth < fence_quote_depth or (
+                fence_list_indent is not None
+                and rest.strip()
+                and indent < fence_list_indent
+            ):
+                fence_char = ""
+            else:
+                out.append(line)
+                if _closes_fence(
+                    line, fence_char, fence_len, fence_quote_depth, fence_list_indent
+                ):
+                    fence_char = ""
+                continue
+
+        if rest.strip():
+            while list_contexts and (
+                quote_depth < list_contexts[-1][0]
+                or (
+                    quote_depth == list_contexts[-1][0]
+                    and indent < list_contexts[-1][1]
+                )
+            ):
+                list_contexts.pop()
+            list_item = _LIST_ITEM_RE.match(rest)
+            if list_item is not None and (list_contexts or indent <= 3):
+                content_indent = sum(
+                    len(list_item.group(name)) for name in ("indent", "marker", "space")
+                )
+                list_contexts.append((quote_depth, content_indent))
+
+        active_list_indent = next(
+            (
+                content_indent
+                for depth, content_indent in reversed(list_contexts)
+                if depth == quote_depth
+            ),
+            None,
+        )
+        match = _is_code_fence(line, active_list_indent, allow_list_marker=True)
+        if match is not None:
+            flushed_prose = bool(segment)
+            nested_fence = match.quote_depth > 0 or active_list_indent is not None
+            flush_segment(fence_follows=True, nested_fence=nested_fence)
+            # Keep the existing top-level separator behavior. Inside a quote
+            # or list, an extra blank line would change the container layout.
+            if flushed_prose and not nested_fence:
+                out.append("")
+            # An opening fence may carry an info string (e.g. ```python).
+            marker = match.marker
+            fence_char = marker[0]
+            fence_len = len(marker)
+            fence_quote_depth = match.quote_depth
+            fence_list_indent = active_list_indent
+            out.append(line.rstrip())
+            continue
+
+        segment.append(line)
+
+    flush_segment(fence_follows=False)
+    return "\n".join(out)
+
 
 def _get_content_disposition_filename(content_disposition: str) -> Optional[str]:
     message = Message()
@@ -679,10 +859,9 @@ class MarkItDown:
 
                 if res is not None:
                     # Normalize the content
-                    res.text_content = "\n".join(
-                        [line.rstrip() for line in re.split(r"\r?\n", res.text_content)]
+                    res.text_content = _normalize_whitespace_outside_code_fences(
+                        res.text_content
                     )
-                    res.text_content = re.sub(r"\n{3,}", "\n\n", res.text_content)
                     return res
 
         # If we got this far without success, report any exceptions
