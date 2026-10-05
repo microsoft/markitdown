@@ -22,6 +22,37 @@ def _quote_path_preserving_percent_encoded_octets(path: str) -> str:
     return "".join(parts)
 
 
+def _normalize_table_sections(soup: Any) -> None:
+    """
+    Reshape tables so markdownify's header detection sees the right first row.
+
+    markdownify only treats a <tr> as the first row when it has no previous
+    sibling, so a leading <caption>, <colgroup> or <col> hides the header row,
+    and the first row of a <tfoot> gets a second header block.
+    """
+    for table in soup.find_all("table"):
+        # Move the caption in front of the table. It still prints above the
+        # rows, and convert_caption keeps a blank line on both sides of it.
+        for caption in table.find_all("caption", recursive=False):
+            table.insert_before(caption.extract())
+
+        # html.parser doesn't close an unterminated <colgroup>, so it may hold
+        # the rows. Unwrap it instead of dropping it, then drop the <col>s.
+        for colgroup in table.find_all("colgroup", recursive=False):
+            colgroup.unwrap()
+        for col in table.find_all("col", recursive=False):
+            col.decompose()
+
+        # A Markdown table has a single header, so footer rows become plain
+        # trailing rows (browsers also render <tfoot> last).
+        bodies = table.find_all("tbody", recursive=False)
+        last_section = bodies[-1] if bodies else table
+        for tfoot in table.find_all("tfoot", recursive=False):
+            for row in tfoot.find_all("tr", recursive=False):
+                last_section.append(row.extract())
+            tfoot.unwrap()
+
+
 class _CustomMarkdownify(markdownify.MarkdownConverter):
     """
     A custom version of markdownify's MarkdownConverter. Changes include:
@@ -30,6 +61,7 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
     - Removing javascript hyperlinks.
     - Truncating images with large data:uri sources.
     - Ensuring URIs are properly escaped, and do not conflict with Markdown syntax
+    - Keeping <caption>, <colgroup> and <tfoot> from breaking table header rows
     """
 
     def __init__(self, **options: Any):
@@ -175,5 +207,16 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         """Obsolete <strike> is still in the wild; treat it like <s>/<del>."""
         return self.convert_s(el, text, *args, **kwargs)  # type: ignore
 
+    def convert_caption(self, el: Any, text: str, *args, **kwargs) -> str:
+        """
+        Same as usual, but with a blank line before it too.
+        _normalize_table_sections moves the caption in front of its table, so
+        it no longer gets the table's leading blank line and would otherwise
+        join the text before it.
+        """
+        text = text.strip()
+        return "\n\n%s\n\n" % text if text else ""
+
     def convert_soup(self, soup: Any) -> str:
+        _normalize_table_sections(soup)
         return super().convert_soup(soup)  # type: ignore
