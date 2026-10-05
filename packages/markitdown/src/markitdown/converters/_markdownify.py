@@ -11,6 +11,10 @@ _PERCENT_ENCODED_OCTET = re.compile(r"%[0-9A-Fa-f]{2}")
 # inside one, and an angle bracket would close it early.
 _NEEDS_ANGLE_BRACKETS = re.compile(r"[\s()<>]")
 
+# An autolink (`<url>`) cannot hold whitespace, an angle bracket or a control
+# character, so a URL with one of them needs the inline link form instead.
+_NOT_IN_AUTOLINK = re.compile(r"[\s<>\x00-\x1f\x7f]")
+
 
 def _quote_path_preserving_percent_encoded_octets(path: str) -> str:
     """Quote a URL path while preserving existing %HH byte encodings."""
@@ -121,6 +125,7 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
             and text.replace(r"\_", "_") == href
             and not title
             and not self.options["default_title"]
+            and not _NOT_IN_AUTOLINK.search(href)
         ):
             # Shortcut syntax
             return "<%s>" % href

@@ -113,6 +113,24 @@ def test_html_href_with_an_unbalanced_parenthesis_is_delimited() -> None:
     assert f"[result](<{href}>)" in markdown
 
 
+def test_html_url_with_a_space_as_its_own_text_is_not_an_autolink() -> None:
+    """An autolink cannot hold a space, so the inline form has to carry it."""
+    href = "https://example.com/s?q=a b"
+
+    markdown = _convert_html(f'<a href="{href}">{href}</a>')
+
+    assert f"[{href}](<{href}>)" in markdown
+
+
+def test_html_url_as_its_own_text_stays_an_autolink() -> None:
+    """Guard: an ordinary URL shown as its own text keeps the shortcut."""
+    href = "https://example.com/a?b=1"
+
+    markdown = _convert_html(f'<a href="{href}">{href}</a>')
+
+    assert f"<{href}>" in markdown
+
+
 def test_html_href_without_anything_to_delimit_stays_bare() -> None:
     """Guard: an ordinary URL is not wrapped."""
     href = "https://example.com/a/b?x=1&y=2"
