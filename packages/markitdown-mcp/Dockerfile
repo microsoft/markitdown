@@ -15,7 +15,7 @@ RUN apt-get update \
 
 COPY . /app
 
-RUN pip install --no-cache-dir /app
+RUN pip install --no-cache-dir "/app[all]"
 
 WORKDIR /workdir
 
