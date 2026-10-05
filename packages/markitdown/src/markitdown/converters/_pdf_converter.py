@@ -70,13 +70,13 @@ try:
     import pdfminer.high_level
     import pdfminer.layout
     import pdfplumber
+
+    # Analyze text inside Form XObjects (LTFigure) too: without this, pdfminer
+    # concatenates every glyph in a figure with no word spacing, silently
+    # dropping all whitespace for PDFs that store body text in figures.
+    _PDFMINER_LAPARAMS = pdfminer.layout.LAParams(all_texts=True)
 except ImportError:
     _dependency_exc_info = sys.exc_info()
-
-# Analyze text inside Form XObjects (LTFigure) too: without this, pdfminer
-# concatenates every glyph in a figure with no word spacing, silently
-# dropping all whitespace for PDFs that store body text in figures.
-_PDFMINER_LAPARAMS = pdfminer.layout.LAParams(all_texts=True)
 
 
 ACCEPTED_MIME_TYPE_PREFIXES = [
@@ -583,19 +583,25 @@ class PdfConverter(DocumentConverter):
             # the whole document (better text spacing for prose).
             if form_page_count == 0:
                 pdf_bytes.seek(0)
-                markdown = pdfminer.high_level.extract_text(pdf_bytes, laparams=_PDFMINER_LAPARAMS)
+                markdown = pdfminer.high_level.extract_text(
+                    pdf_bytes, laparams=_PDFMINER_LAPARAMS
+                )
             else:
                 markdown = "\n\n".join(markdown_chunks).strip()
 
         except Exception:
             # Fallback if pdfplumber fails
             pdf_bytes.seek(0)
-            markdown = pdfminer.high_level.extract_text(pdf_bytes, laparams=_PDFMINER_LAPARAMS)
+            markdown = pdfminer.high_level.extract_text(
+                pdf_bytes, laparams=_PDFMINER_LAPARAMS
+            )
 
         # Fallback if still empty
         if not markdown:
             pdf_bytes.seek(0)
-            markdown = pdfminer.high_level.extract_text(pdf_bytes, laparams=_PDFMINER_LAPARAMS)
+            markdown = pdfminer.high_level.extract_text(
+                pdf_bytes, laparams=_PDFMINER_LAPARAMS
+            )
 
         # Post-process to merge MasterFormat-style partial numbering with following text
         markdown = _merge_partial_numbering_lines(markdown)
