@@ -1,8 +1,10 @@
 import contextlib
 import logging
+import ntpath
 import os
 import sys
-from collections.abc import AsyncIterator
+from pathlib import Path
+from collections.abc import AsyncIterator, Iterator
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from starlette.applications import Starlette
@@ -16,12 +18,11 @@ logger = logging.getLogger(__name__)
 mcp = MCPServer("markitdown")
 
 
-@mcp.tool()
-async def convert_to_markdown(uri: str) -> str:
-    """Convert a resource described by an http:, https:, file: or data: URI to markdown"""
-    converter = MarkItDown(enable_plugins=check_plugins_enabled())
+@contextlib.contextmanager
+def _tool_errors() -> Iterator[None]:
+    """Translate conversion failures into ToolErrors the client may see."""
     try:
-        return converter.convert_uri(uri).markdown
+        yield
 
     # SDK 2.x only exposes ToolError messages.
     except UnsupportedFormatException as exc:
@@ -42,9 +43,87 @@ async def convert_to_markdown(uri: str) -> str:
         )
         raise ToolError(f"Could not read the resource: {detail}.") from exc
     except ValueError as exc:
-        # URI validation failures raised by convert_uri itself, which only
-        # restate the URI the client supplied.
+        # URI and path validation failures, which only restate the URI or
+        # path the client supplied.
         raise ToolError(str(exc)) from exc
+
+
+def _is_unc_or_device_path(path: str) -> bool:
+    """Recognize Windows UNC and device namespace prefixes on any platform."""
+    drive, _ = ntpath.splitdrive(path)
+    return drive.replace("\\", "/").startswith("//")
+
+
+def _resolve_local_path(path: str) -> Path:
+    """Resolve a client-supplied filesystem path, rejecting UNC and device paths.
+
+    The check runs before resolution, since resolving a UNC path already opens
+    a connection to the remote host, and again after it, to catch relative
+    paths below a UNC working directory.
+    """
+    expanded = os.path.expanduser(path)
+    if _is_unc_or_device_path(expanded):
+        raise ValueError(
+            f"Unsupported path: {path}. UNC and Windows device paths are not supported."
+        )
+    resolved = Path(expanded).resolve(strict=True)
+    if _is_unc_or_device_path(str(resolved)):
+        raise ValueError(
+            f"Unsupported path: {path}. UNC and Windows device paths are not supported."
+        )
+    return resolved
+
+
+@mcp.tool()
+async def convert_to_markdown(uri: str) -> str:
+    """Convert a resource described by an http:, https:, file: or data: URI to markdown"""
+    converter = MarkItDown(enable_plugins=check_plugins_enabled())
+    with _tool_errors():
+        return converter.convert_uri(uri).markdown
+
+
+@mcp.tool()
+async def convert_file(file_path: str) -> str:
+    """Convert a local file (given as an absolute or relative filesystem path) to markdown.
+
+    This is a convenience wrapper around ``convert_to_markdown`` for callers that already
+    have a plain path rather than a ``file:`` URI. Paths are resolved against the current
+    working directory. UNC and Windows device paths are rejected.
+    """
+    converter = MarkItDown(enable_plugins=check_plugins_enabled())
+    with _tool_errors():
+        resolved = _resolve_local_path(file_path)
+        return converter.convert_local(str(resolved)).markdown
+
+
+@mcp.tool()
+async def convert_directory(dir_path: str, recursive: bool = True) -> dict[str, str]:
+    """Convert every file in a directory to markdown.
+
+    Returns a mapping of ``relative_path`` to converted markdown. Unreadable or
+    unsupported files are skipped silently so a single bad file does not abort
+    the batch; their paths simply don't appear in the result dictionary.
+    ``recursive=True`` descends into sub-directories, ``False`` processes only
+    the immediate directory. UNC and Windows device paths are rejected.
+    """
+    with _tool_errors():
+        base = _resolve_local_path(dir_path)
+        if not base.is_dir():
+            raise ValueError(f"Not a directory: {dir_path}")
+
+    md = MarkItDown(enable_plugins=check_plugins_enabled())
+    files = base.rglob("*") if recursive else base.iterdir()
+
+    result: dict[str, str] = {}
+    for path in files:
+        if not path.is_file():
+            continue
+        try:
+            result[str(path.relative_to(base))] = md.convert_local(str(path)).markdown
+        except Exception:
+            # Best-effort batch: skip files that fail individually.
+            continue
+    return result
 
 
 def check_plugins_enabled() -> bool:
