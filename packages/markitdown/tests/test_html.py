@@ -345,5 +345,45 @@ def test_deeply_nested_html_fallback() -> None:
     assert "<p>" not in result.markdown
 
 
+def test_html_resolves_relative_links_and_images_with_base_url() -> None:
+    from markitdown.converters import HtmlConverter
+
+    html = (
+        '<base href="../assets/">'
+        '<a href="guide.html">Guide</a>'
+        '<img src="chart.png" alt="Chart">'
+        '<img data-src="lazy.png" alt="Lazy">'
+    )
+    result = HtmlConverter().convert_string(
+        html,
+        url="https://example.com/docs/page.html",
+    )
+    assert "[Guide](https://example.com/assets/guide.html)" in result.markdown
+    assert "![Chart](https://example.com/assets/chart.png)" in result.markdown
+    assert "![Lazy](https://example.com/assets/lazy.png)" in result.markdown
+
+
+def test_html_resolves_relative_links_without_base_tag() -> None:
+    from markitdown.converters import HtmlConverter
+
+    html = '<a href="guide.html">Guide</a><img src="chart.png" alt="Chart">'
+    result = HtmlConverter().convert_string(
+        html,
+        url="https://example.com/docs/page.html",
+    )
+    assert "[Guide](https://example.com/docs/guide.html)" in result.markdown
+    assert "![Chart](https://example.com/docs/chart.png)" in result.markdown
+
+
+def test_html_keeps_relative_links_without_url_or_base() -> None:
+    from markitdown.converters import HtmlConverter
+
+    html = '<a href="guide.html">Guide</a><img src="chart.png" alt="Chart">'
+    result = HtmlConverter().convert_string(html)
+    assert "[Guide](guide.html)" in result.markdown
+    assert "![Chart](chart.png)" in result.markdown
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
+
