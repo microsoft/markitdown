@@ -97,23 +97,44 @@ class _SynchronizedRssConverter(RssConverter):
 
 def test_concurrent_conversions_keep_call_specific_markdown_options() -> None:
     embedded = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///w=="
-    feed = _feed_with_body("atom-content", f'<img src="{embedded}" alt="Pixel"/>')
+    feed = _feed_with_body(
+        "atom-content",
+        f'<h2>Section</h2><ul><li>item</li></ul><img src="{embedded}" alt="Pixel"/>',
+    )
     converter = _SynchronizedRssConverter()
     stream_info = StreamInfo(extension=".atom")
 
-    def convert(keep_data_uris: bool) -> str:
+    def convert(keep_data_uris: bool, heading_style: str, bullets: str) -> str:
         return converter.convert(
             io.BytesIO(feed),
             stream_info,
             keep_data_uris=keep_data_uris,
+            heading_style=heading_style,
+            bullets=bullets,
         ).markdown
 
     with ThreadPoolExecutor(max_workers=2) as pool:
-        kept = pool.submit(convert, True)
-        truncated = pool.submit(convert, False)
+        a = pool.submit(convert, True, "atx", "+")
+        b = pool.submit(convert, False, "underlined", "*")
 
-    assert f"![Pixel]({embedded})" in kept.result()
-    assert "![Pixel](data:image/gif;base64...)" in truncated.result()
+    a_md = a.result()
+    b_md = b.result()
+
+    # Dimensions are asserted together so a leak in any one of them fails the test,
+    # not just keep_data_uris (see the PR review note about single-dimension coverage).
+
+    # keep_data_uris
+    assert f"![Pixel]({embedded})" in a_md
+    assert "![Pixel](data:image/gif;base64...)" in b_md
+
+    # heading_style: atx ("##") on A, setext/underlined on B
+    assert "## Section" in a_md
+    assert "## Section" not in b_md
+    assert "Section\n------" in b_md
+
+    # bullets: "+" on A, "*" on B
+    assert "+ item" in a_md
+    assert "* item" in b_md and "+ item" not in b_md
 
 
 def test_atom_ignores_elements_from_other_namespaces() -> None:
