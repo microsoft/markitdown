@@ -541,5 +541,27 @@ def test_xlsx_show_zeroes_rename_is_scoped_to_sheet_view_tags() -> None:
     assert b'<customSheetView showZeroes="0"/>' in repaired
 
 
+def test_xlsx_float_precision_preserved(tmp_path: Path) -> None:
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Sheet1"
+    ws["A1"] = "money"
+    ws["A2"] = 123456789.123
+    ws["A3"] = 0.1
+    ws["A4"] = 42.0
+
+    xlsx_path = tmp_path / "floats.xlsx"
+    wb.save(xlsx_path)
+
+    result = MarkItDown().convert(str(xlsx_path))
+    assert "| 123456789.123 |" in result.markdown
+    assert "| 0.1 |" in result.markdown
+    assert "| 42.0 |" in result.markdown
+    assert "1.234568e+08" not in result.markdown
+    assert "1.000000e-01" not in result.markdown
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
