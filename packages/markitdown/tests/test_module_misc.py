@@ -878,3 +878,97 @@ def test_a_declared_charset_still_wins() -> None:
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
+
+
+@pytest.mark.parametrize("extension", [".txt", ".html"])
+@pytest.mark.parametrize("format_hint", [False, True])
+@pytest.mark.parametrize("offset", [0, 7])
+def test_convert_raw_file_stream_preserves_position_and_ownership(
+    tmp_path, extension, format_hint, offset
+):
+    content = (
+        b"Plain text from a raw binary stream.\n"
+        if extension == ".txt"
+        else b"<html><body><h1>Raw stream</h1><p>content</p></body></html>"
+    )
+    fixture = tmp_path / ("raw_stream" + extension)
+    fixture.write_bytes(b"prefix "[:offset] + content)
+    info = StreamInfo(extension=extension) if format_hint else None
+    sdk = MarkItDown()
+    with open(fixture, "rb") as buffered:
+        buffered.seek(offset)
+        expected = sdk.convert_stream(buffered, stream_info=info).markdown
+        assert buffered.tell() == offset
+        assert not buffered.closed
+    assert (
+        "Plain text" in expected if extension == ".txt" else "# Raw stream" in expected
+    )
+    with open(fixture, "rb", buffering=0) as raw:
+        assert isinstance(raw, io.FileIO)
+        raw.seek(offset)
+        assert sdk.convert(raw, stream_info=info).markdown == expected
+        assert not raw.closed
+        assert raw.tell() == offset
+        assert raw.read() == content
+
+
+def test_convert_raw_file_stream_preserves_ownership_after_conversion_error(tmp_path):
+    from markitdown import DocumentConverter
+
+    class FailingConverter(DocumentConverter):
+        def accepts(self, stream, info, **kwargs):
+            return info.extension == ".raw-failure"
+
+        def convert(self, stream, info, **kwargs):
+            stream.read(3)
+            raise ValueError("conversion failed")
+
+    fixture = tmp_path / "raw_failure.txt"
+    fixture.write_bytes(b"prefix content from a raw stream")
+    sdk = MarkItDown(enable_builtins=False)
+    sdk.register_converter(FailingConverter())
+    with open(fixture, "rb", buffering=0) as raw:
+        raw.seek(7)
+        with pytest.raises(FileConversionException, match="conversion failed"):
+            sdk.convert_stream(raw, stream_info=StreamInfo(extension=".raw-failure"))
+        assert not raw.closed
+        assert raw.tell() == 7
+        assert raw.read() == b"content from a raw stream"
+
+
+@pytest.mark.parametrize("filename", ["test.pdf", "test.xlsx"])
+def test_convert_raw_file_stream_detects_binary_formats(filename):
+    fixture = Path(__file__).parent / "test_files" / filename
+    sdk = MarkItDown()
+    with open(fixture, "rb") as buffered:
+        expected = sdk.convert_stream(buffered).markdown
+    assert expected
+    with open(fixture, "rb", buffering=0) as raw:
+        assert sdk.convert_stream(raw).markdown == expected
+        assert not raw.closed
+        assert raw.tell() == 0
+
+
+def test_convert_raw_file_stream_preserves_ownership_when_unsupported(tmp_path):
+    fixture = tmp_path / "unsupported.txt"
+    fixture.write_bytes(b"unsupported content")
+    sdk = MarkItDown(enable_builtins=False)
+    with open(fixture, "rb", buffering=0) as raw:
+        with pytest.raises(UnsupportedFormatException):
+            sdk.convert_stream(raw)
+        assert not raw.closed
+        assert raw.tell() == 0
+        assert raw.read() == b"unsupported content"
+
+
+def test_convert_nonseekable_raw_file_stream_preserves_ownership():
+    read_fd, write_fd = os.pipe()
+    with io.FileIO(read_fd, "r") as raw, io.FileIO(write_fd, "w") as writer:
+        writer.write(b"Plain text from a nonseekable raw stream.\n")
+        writer.close()
+        assert not raw.seekable()
+        result = MarkItDown().convert_stream(
+            raw, stream_info=StreamInfo(extension=".txt")
+        )
+        assert result.markdown == "Plain text from a nonseekable raw stream.\n"
+        assert not raw.closed
