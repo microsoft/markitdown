@@ -22,6 +22,41 @@ def _convert_html(html: str, **kwargs) -> str:
     return result.markdown
 
 
+@pytest.mark.parametrize("level", range(1, 7))
+def test_html_headings_are_separated_from_surrounding_text(level: int) -> None:
+    html = f"Before<h{level}>Heading</h{level}>After"
+
+    assert _convert_html(html) == f"Before\n\n{'#' * level} Heading\n\nAfter"
+
+
+@pytest.mark.parametrize(
+    ("heading_style", "expected"),
+    [
+        ("ATX", "# First\n\n## Second"),
+        ("ATX_CLOSED", "# First #\n\n## Second ##"),
+        ("UNDERLINED", "First\n=====\n\nSecond\n------"),
+    ],
+)
+def test_html_heading_style_is_preserved(heading_style: str, expected: str) -> None:
+    assert (
+        _convert_html("<h1>First</h1><h2>Second</h2>", heading_style=heading_style)
+        == expected
+    )
+
+
+def test_html_heading_preserves_inline_formatting() -> None:
+    assert _convert_html("<h2>A <em>formatted</em> heading</h2>") == (
+        "## A *formatted* heading"
+    )
+
+
+@pytest.mark.parametrize("tag", ["hn", "HN"])
+def test_html_literal_hn_tag_does_not_trigger_plain_text_fallback(tag: str) -> None:
+    html = f"<p>Before</p><{tag}>Literal hn</{tag}><p>After</p>"
+
+    assert _convert_html(html) == "Before\n\nLiteral hn\n\nAfter"
+
+
 @pytest.mark.parametrize(
     "whitespace", ["", " ", "  ", "\t", "\n", "\r\n", "\u00a0", " \t\n\u00a0 "]
 )
