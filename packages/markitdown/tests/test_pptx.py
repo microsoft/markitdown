@@ -894,5 +894,30 @@ def test_pptx_chart_title_text_frame(title: str | None) -> None:
     assert result.strip() in markdown
 
 
+def test_pptx_chart_hierarchical_categories() -> None:
+    prs = Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    data = CategoryChartData()
+    for year in ("2024", "2025"):
+        data.add_category(year).add_sub_category("Q1")
+    data.add_series("Sales", (10.0, 20.0))
+    slide.shapes.add_chart(
+        XL_CHART_TYPE.COLUMN_CLUSTERED,
+        Inches(1),
+        Inches(1),
+        Inches(8),
+        Inches(5),
+        data,
+    )
+    stream = io.BytesIO()
+    prs.save(stream)
+    stream.seek(0)
+    markdown = PptxConverter().convert(stream, StreamInfo(extension=".pptx")).markdown
+    assert "2024 / Q1" in markdown
+    assert "2025 / Q1" in markdown
+    assert "| 2024 / Q1 | 10.0 |" in markdown
+    assert "| 2025 / Q1 | 20.0 |" in markdown
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
