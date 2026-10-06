@@ -1,6 +1,7 @@
 import re
 import markdownify
 
+from bs4 import Comment
 from typing import Any, Optional
 from urllib.parse import quote, urlparse, urlunparse
 
@@ -22,11 +23,25 @@ def _quote_path_preserving_percent_encoded_octets(path: str) -> str:
     return "".join(parts)
 
 
+def _shows_content(nodes: Any) -> bool:
+    """Whether any of these sibling nodes shows text or an image."""
+    for node in nodes:
+        if isinstance(node, Comment):
+            continue
+        if isinstance(node, str):
+            if node.strip():
+                return True
+        elif node.name == "img" or node.get_text(strip=True) or node.find("img"):
+            return True
+    return False
+
+
 class _CustomMarkdownify(markdownify.MarkdownConverter):
     """
     A custom version of markdownify's MarkdownConverter. Changes include:
 
     - Altering the default heading style to use '#', '##', etc.
+    - Writing hard line breaks as backslashes, which survive whitespace normalization.
     - Removing javascript hyperlinks.
     - Truncating images with large data:uri sources.
     - Ensuring URIs are properly escaped, and do not conflict with Markdown syntax
@@ -142,6 +157,30 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
             src = src.split(",")[0] + "..."
 
         return "![%s](%s%s)" % (alt, src, title_part)
+
+    def convert_br(
+        self,
+        el: Any,
+        text: str,
+        parent_tags: Any = None,
+        **kwargs,
+    ) -> str:
+        """Write a hard line break as a backslash rather than two trailing spaces.
+
+        MarkItDown strips trailing whitespace from every output line, which removes
+        markdownify's two-space hard breaks. A break with text or an image on both sides
+        of it in its parent element is written as a backslash, which survives. Other
+        breaks, and those in table cells, headings, and preformatted text, keep
+        markdownify's handling.
+        """
+        if (
+            isinstance(parent_tags, (set, frozenset))
+            and not parent_tags & {"_inline", "_noformat"}
+            and _shows_content(el.previous_siblings)
+            and _shows_content(el.next_siblings)
+        ):
+            return "\\\n" + text
+        return super().convert_br(el, text, parent_tags, **kwargs)  # type: ignore
 
     def convert_input(
         self,

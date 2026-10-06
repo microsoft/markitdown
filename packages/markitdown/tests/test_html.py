@@ -101,6 +101,50 @@ def test_html_href_does_not_quote_query_or_fragment() -> None:
     assert f"[example]({expected_href})" in markdown
 
 
+@pytest.mark.parametrize(
+    ("html", "expected"),
+    [
+        ("<p>Line one<br>Line two</p>", "Line one\\\nLine two"),
+        ("<p>Line one<br><br>Line two</p>", "Line one\\\n\\\nLine two"),
+        ("<p><strong>Bold<br>text</strong></p>", "**Bold\\\ntext**"),
+        ("<ul><li>Item<br>continued</li></ul>", "* Item\\\n  continued"),
+        ("<p>Before<br><img src='a.png' alt='x'></p>", "Before\\\n![x](a.png)"),
+    ],
+)
+def test_html_line_breaks_survive_whitespace_normalization(
+    html: str, expected: str
+) -> None:
+    assert expected in _convert_html(html)
+
+
+@pytest.mark.parametrize(
+    ("html", "expected"),
+    [
+        ("<p>Trailing<br></p>", "Trailing"),
+        ("<p><br>Leading</p>", "Leading"),
+        ("<p>First<u><br></u>Last</p>", "First\nLast"),
+        ("<p>Text<br><!-- note --></p>", "Text"),
+    ],
+)
+def test_html_line_breaks_at_element_edges_are_unchanged(
+    html: str, expected: str
+) -> None:
+    assert _convert_html(html) == expected
+
+
+def test_html_line_breaks_in_cells_headings_and_code_are_unchanged() -> None:
+    markdown = _convert_html(
+        "<table><tr><td>a<br>b</td></tr></table>"
+        "<h2>Head<br>ing</h2>"
+        "<pre>one<br>two</pre>"
+    )
+
+    assert "| a b |" in markdown
+    assert "## Head ing" in markdown
+    assert "```\none\ntwo\n```" in markdown
+    assert "\\" not in markdown
+
+
 def test_img_prefers_data_src_over_placeholder_data_uri() -> None:
     placeholder = (
         "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBTAA7"
@@ -287,9 +331,10 @@ K</strike>L.</p>
             # An empty element contributes nothing
             "Empty GH.",
             # A line break inside the element is kept, and the markup
-            # survives it because strikethrough may span a single newline
+            # survives it because strikethrough may span a single newline;
+            # a <br> stays a hard line break
             "Newline I~~J\nK~~L.",
-            "Break M~~N\nO~~P.",
+            "Break M~~N\\\nO~~P.",
         ]
     )
 

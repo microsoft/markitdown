@@ -107,8 +107,8 @@ def test_plugin_full_trip_uses_native_cells_and_original_image(
         "| --- | --- |\n"
         "| <native> & \\*value\\* | 12 |\n\n"
         "### Images in this sheet:\n\n"
-        "*[Image OCR]\nRecognized\\_text\n[End OCR]*\n\n"
-        "*[Image OCR]\nRecognized\\_text\n[End OCR]*\n\n"
+        "*[Image OCR]\\\nRecognized\\_text\\\n[End OCR]*\n\n"
+        "*[Image OCR]\\\nRecognized\\_text\\\n[End OCR]*\n\n"
         "## Other\n| Last |\n| --- |\n| Final |"
     )
     client.chat.completions.create.assert_called_once()
@@ -149,8 +149,8 @@ def test_cache_is_document_local_and_per_call_service_overrides_work() -> None:
     overridden = _convert(converter, data, ocr_service=second)
     again = _convert(converter, data)
 
-    assert default.count("*[Image OCR]  \nfirst  \n[End OCR]*") == 4
-    assert overridden.count("*[Image OCR]  \nsecond  \n[End OCR]*") == 4
+    assert default.count("*[Image OCR]\\\nfirst\\\n[End OCR]*") == 4
+    assert overridden.count("*[Image OCR]\\\nsecond\\\n[End OCR]*") == 4
     assert again == default
     assert first.extract_text.call_count == 2
     second.extract_text.assert_called_once()
@@ -172,7 +172,7 @@ def test_recognition_identity_and_blank_images_preserve_anchor_order() -> None:
     assert calls == [_RED, _BLUE]
     assert result.count("[Image OCR]") == 2
     assert "Image at " not in result
-    assert result.count("*[Image OCR]  \nblue  \n[End OCR]*") == 2
+    assert result.count("*[Image OCR]\\\nblue\\\n[End OCR]*") == 2
 
 
 def test_mixed_anchor_recognition_keeps_legacy_openpyxl_order() -> None:
@@ -222,7 +222,7 @@ def test_mixed_anchor_recognition_keeps_legacy_openpyxl_order() -> None:
         data,
     )
     assert calls == legacy_order
-    blocks = [f"*[Image OCR]  \n{label}  \n[End OCR]*" for label in legacy_order]
+    blocks = [f"*[Image OCR]\\\n{label}\\\n[End OCR]*" for label in legacy_order]
     assert "\n\n".join(blocks) in result
 
 
@@ -242,7 +242,7 @@ def test_ocr_html_is_escaped_and_existing_html_options_are_forwarded(
         "<br/>final<br/>[End OCR]</em></p>"
     ) in convert_html.call_args_list[1].args[0]
     assert (
-        "*[Image OCR]  \nA_B \\*literal\\*  \n<tag> & value  \nfinal  \n[End OCR]*"
+        "*[Image OCR]\\\nA_B \\*literal\\*\\\n<tag> & value\\\nfinal\\\n[End OCR]*"
         in result
     )
     assert "| Header_one | Unnamed: 1 |" in result

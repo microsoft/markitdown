@@ -28,7 +28,7 @@ from markitdown import StreamInfo  # noqa: E402
 TEST_DATA_DIR = Path(__file__).parent / "ocr_test_data"
 
 _MOCK_TEXT = "MOCK_OCR_TEXT_12345"
-_MOCK_BLOCK = "*[Image OCR]  \nMOCK\\_OCR\\_TEXT\\_12345  \n[End OCR]*"
+_MOCK_BLOCK = "*[Image OCR]\\\nMOCK\\_OCR\\_TEXT\\_12345\\\n[End OCR]*"
 
 
 class MockOCRService:
