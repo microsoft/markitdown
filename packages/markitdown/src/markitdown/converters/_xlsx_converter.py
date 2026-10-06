@@ -44,6 +44,11 @@ _SHEET_VIEW_START_TAG = re.compile(rb"<sheetView(?=[\s/>])[^>]*>")
 _SHOW_ZEROES_ATTRIBUTE = re.compile(rb"(?<=[\s])showZeroes(\s*=)")
 
 
+def _escape_sheet_name(name: str) -> str:
+    # Worksheet names are literal text, not Markdown or HTML.
+    return re.sub(r"([\\`*_<>#&~])", r"\\\1", name)
+
+
 @contextmanager
 def _read_xlsx_sheets(
     file_stream: BinaryIO,
@@ -149,7 +154,7 @@ class XlsxConverter(DocumentConverter):
                 images = _XlsxImages(workbook_stream)
 
             for s in sheets:
-                md_content += f"## {s}\n"
+                md_content += f"## {_escape_sheet_name(s)}\n"
                 html_content = sheets[s].to_html(index=False)
                 md_content += (
                     self._html_converter.convert_string(
@@ -240,7 +245,7 @@ class XlsConverter(DocumentConverter):
         sheets = pd.read_excel(file_stream, sheet_name=None, engine="xlrd")
         md_content = ""
         for s in sheets:
-            md_content += f"## {s}\n"
+            md_content += f"## {_escape_sheet_name(s)}\n"
             html_content = sheets[s].to_html(index=False)
             md_content += (
                 self._html_converter.convert_string(

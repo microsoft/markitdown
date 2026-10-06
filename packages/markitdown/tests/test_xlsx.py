@@ -470,6 +470,49 @@ def test_missing_dependencies_and_legacy_xls_stay_separate(
 # Conversion regressions
 
 
+@pytest.mark.parametrize(
+    ("title", "heading"),
+    [
+        ("Budget", "## Budget"),
+        ("_Budget_", r"## \_Budget\_"),
+        ("<Budget>", r"## \<Budget\>"),
+        ("`Budget`", r"## \`Budget\`"),
+        ("Budget #", r"## Budget \#"),
+        ("Budget &amp;", r"## Budget \&amp;"),
+    ],
+)
+def test_xlsx_sheet_heading_preserves_literal_title(title: str, heading: str) -> None:
+    workbook = openpyxl.Workbook()
+    workbook.active.title = title
+    workbook.active.append(["Header"])
+    workbook.active.append(["Value"])
+    stream = io.BytesIO()
+    workbook.save(stream)
+    stream.seek(0)
+
+    markdown = MarkItDown().convert(stream, file_extension=".xlsx").markdown
+
+    assert markdown.splitlines()[0] == heading
+    assert "| Value |" in markdown
+
+
+def test_xls_sheet_heading_preserves_literal_title() -> None:
+    import olefile
+
+    path = Path(__file__).parent / "test_files" / "test.xls"
+    stream = io.BytesIO(path.read_bytes())
+    with olefile.OleFileIO(stream, write_mode=True) as workbook:
+        data = workbook.openstream("Workbook").read()
+        assert data.count(b"Sheet1") == 1
+        workbook.write_stream("Workbook", data.replace(b"Sheet1", b"_Data_"))
+    stream.seek(0)
+
+    markdown = MarkItDown().convert(stream, file_extension=".xls").markdown
+
+    assert markdown.startswith(r"## \_Data\_" + "\n")
+    assert "affc7dad-52dc-4b98-9b5d-51e65d8a8ad0" in markdown
+
+
 def test_xlsx_legacy_show_zeroes_sheetview(tmp_path) -> None:
     from openpyxl import Workbook
 
