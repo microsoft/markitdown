@@ -7,18 +7,21 @@ from urllib.parse import quote, urlparse, urlunparse
 
 _PERCENT_ENCODED_OCTET = re.compile(r"%[0-9A-Fa-f]{2}")
 
+# Link schemes that are kept; others, such as javascript:, keep only their text.
+_KEPT_SCHEMES = ("http", "https", "file", "mailto", "tel")
 
-def _quote_path_preserving_percent_encoded_octets(path: str) -> str:
+
+def _quote_path_preserving_percent_encoded_octets(path: str, safe: str = "/") -> str:
     """Quote a URL path while preserving existing %HH byte encodings."""
     parts: list[str] = []
     last_end = 0
 
     for match in _PERCENT_ENCODED_OCTET.finditer(path):
-        parts.append(quote(path[last_end : match.start()]))
+        parts.append(quote(path[last_end : match.start()], safe=safe))
         parts.append(match.group(0))
         last_end = match.end()
 
-    parts.append(quote(path[last_end:]))
+    parts.append(quote(path[last_end:], safe=safe))
     return "".join(parts)
 
 
@@ -27,7 +30,8 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
     A custom version of markdownify's MarkdownConverter. Changes include:
 
     - Altering the default heading style to use '#', '##', etc.
-    - Removing javascript hyperlinks.
+    - Removing hyperlinks other than http, https, file, mailto, and tel, such as
+      javascript links.
     - Truncating images with large data:uri sources.
     - Ensuring URIs are properly escaped, and do not conflict with Markdown syntax
     """
@@ -71,16 +75,19 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         href = el.get("href")
         title = el.get("title")
 
-        # Escape URIs and skip non-http or file schemes
+        # Escape URIs and skip schemes that are not kept
         if href:
             try:
                 parsed_url = urlparse(href)  # type: ignore
-                if parsed_url.scheme and parsed_url.scheme.lower() not in ["http", "https", "file"]:  # type: ignore
+                scheme = parsed_url.scheme.lower()  # type: ignore
+                if scheme and scheme not in _KEPT_SCHEMES:
                     return "%s%s%s" % (prefix, text, suffix)
+                # An e-mail address or phone number keeps its "@" and "+".
+                safe = "/@+" if scheme in ("mailto", "tel") else "/"
                 href = urlunparse(
                     parsed_url._replace(
                         path=_quote_path_preserving_percent_encoded_octets(
-                            parsed_url.path
+                            parsed_url.path, safe
                         )
                     )
                 )  # type: ignore

@@ -101,6 +101,24 @@ def test_html_href_does_not_quote_query_or_fragment() -> None:
     assert f"[example]({expected_href})" in markdown
 
 
+@pytest.mark.parametrize(
+    "href",
+    [
+        "mailto:team@example.com",
+        "mailto:team@example.com?subject=Weekly%20report",
+        "tel:+1-555-0100",
+    ],
+)
+def test_html_keeps_mailto_and_tel_links(href: str) -> None:
+    markdown = _convert_html(f'<a href="{href}">the team</a>')
+
+    assert markdown == f"[the team]({href})"
+
+
+def test_html_still_drops_javascript_links() -> None:
+    assert _convert_html('<a href="javascript:alert(1)">Script</a>') == "Script"
+
+
 def test_img_prefers_data_src_over_placeholder_data_uri() -> None:
     placeholder = (
         "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBTAA7"
