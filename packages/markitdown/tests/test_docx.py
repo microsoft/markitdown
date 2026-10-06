@@ -1485,5 +1485,22 @@ def test_convert_docx_with_style_missing_type(tmp_path):
     assert "# Abstract" in result.markdown
 
 
+def test_word_mailto_links_are_kept() -> None:
+    field = (
+        '<w:r><w:fldChar w:fldCharType="begin"/></w:r>'
+        '<w:r><w:instrText xml:space="preserve"> HYPERLINK "mailto:team@example.com" '
+        "</w:instrText></w:r>"
+        '<w:r><w:fldChar w:fldCharType="separate"/></w:r>'
+        + _text("the team")
+        + '<w:r><w:fldChar w:fldCharType="end"/></w:r>'
+    )
+
+    result = DocxConverter().convert(
+        _docx(_paragraph(_text("Contact ") + field)), _INFO
+    )
+
+    assert result.markdown.strip() == "Contact [the team](mailto:team@example.com)"
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
