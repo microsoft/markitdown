@@ -1485,5 +1485,18 @@ def test_convert_docx_with_style_missing_type(tmp_path):
     assert "# Abstract" in result.markdown
 
 
+@pytest.mark.parametrize("kind", ["separate", "end"])
+def test_unmatched_field_marks_do_not_stop_conversion(kind: str) -> None:
+    body = _paragraph(
+        _text("Reset value ")
+        + f'<w:r><w:fldChar w:fldCharType="{kind}"/></w:r>'
+        + _text("is 0x0.")
+    )
+
+    result = DocxConverter().convert(_docx(body), _INFO)
+
+    assert result.markdown.strip() == "Reset value is 0x0."
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
