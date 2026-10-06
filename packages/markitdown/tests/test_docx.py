@@ -1485,5 +1485,13 @@ def test_convert_docx_with_style_missing_type(tmp_path):
     assert "# Abstract" in result.markdown
 
 
+def test_word_line_breaks_are_kept() -> None:
+    body = _paragraph(_text("Line one") + "<w:r><w:br/></w:r>" + _text("Line two"))
+
+    result = MarkItDown().convert_stream(_docx(body), stream_info=_INFO)
+
+    assert result.markdown == "Line one\\\nLine two"
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))

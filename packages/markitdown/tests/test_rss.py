@@ -384,7 +384,7 @@ def _feed_with_body(field: str, payload: str, *, atom_type: str = "html") -> byt
         ("<b>nested</b> trailing", "**nested** trailing"),
         ("leading <b>nested</b> trailing", "leading **nested** trailing"),
         ("leading <b>nested</b>", "leading **nested**"),
-        ("First<br/>Second", "First  \nSecond"),
+        ("First<br/>Second", "First\\\nSecond"),
         ("<pre>line 1\n  line 2</pre>", "```\nline 1\n  line 2\n```"),
         (
             "\n <!--ignore--><?instruction ignore?><b>nested<!--ignore--></b> trailing",

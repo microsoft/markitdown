@@ -103,8 +103,8 @@ def test_ocr_cache_is_document_local_and_honors_service_override() -> None:
     overridden = _convert(converter, data, ocr_service=second)
     again = _convert(converter, data)
 
-    assert original.count("*[Image OCR]  \nfirst  \n[End OCR]*") == 12
-    assert overridden.count("*[Image OCR]  \nsecond  \n[End OCR]*") == 12
+    assert original.count("*[Image OCR]\\\nfirst\\\n[End OCR]*") == 12
+    assert overridden.count("*[Image OCR]\\\nsecond\\\n[End OCR]*") == 12
     assert again == original
     assert first.extract_text.call_count == 2
     second.extract_text.assert_called_once()
@@ -148,7 +148,7 @@ def test_ocr_text_is_escaped_with_normalized_html_breaks_and_html_options(
         "<br/>final<br/>[End OCR]</em></p>",
     )
     assert (
-        "*[Image OCR]  \nA\\_B \\*literal\\*  \n" "<tag> & value  \nfinal  \n[End OCR]*"
+        "*[Image OCR]\\\nA\\_B \\*literal\\*\\\n" "<tag> & value\\\nfinal\\\n[End OCR]*"
     ) in result
     assert "*literal*" in _convert(
         converter, data, escape_asterisks=False, escape_underscores=False
@@ -213,7 +213,7 @@ def test_svg_only_images_use_inherited_resolution_and_ocr() -> None:
     )
 
     assert len(seen) == 1 and b"<svg" in seen[0]
-    assert "*[Image OCR]  \nSVG text  \n[End OCR]*" in result
+    assert "*[Image OCR]\\\nSVG text\\\n[End OCR]*" in result
     assert "data:image" not in result
 
 
@@ -231,7 +231,7 @@ def test_svg_metadata_reaches_bundled_vision_request() -> None:
 
     result = _convert(PptxConverterWithOCR(service), data)
 
-    assert "*[Image OCR]  \nSVG text  \n[End OCR]*" in result
+    assert "*[Image OCR]\\\nSVG text\\\n[End OCR]*" in result
     client.chat.completions.create.assert_called_once()
     request = client.chat.completions.create.call_args.kwargs
     assert request["model"] == "vision-model"
@@ -271,7 +271,7 @@ def test_plugin_full_trip_with_mocked_model_only(
     expected_image = (
         "![Recognized_text](Picture1.jpg)"
         if caption_succeeds
-        else "*[Image OCR]\nRecognized\\_text\n[End OCR]*"
+        else "*[Image OCR]\\\nRecognized\\_text\\\n[End OCR]*"
     )
     assert result.markdown == (
         "<!-- Slide number: 1 -->\n# Heading\n\n"

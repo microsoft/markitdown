@@ -196,7 +196,7 @@ def test_hook_receives_original_images_metadata_options_and_legacy_anchor_order(
     [
         ("<strong>{}</strong>", "**one**\n\n**two**\n\n**three**"),
         ("{}", "one\n\ntwo\n\nthree"),
-        ("{}<br>line", "one  \nline\n\ntwo  \nline\n\nthree  \nline"),
+        ("{}<br>line", "one\\\nline\n\ntwo\\\nline\n\nthree\\\nline"),
         (
             "<p>{}</p><p>paragraph</p>",
             "one\n\nparagraph\n\ntwo\n\nparagraph\n\nthree\n\nparagraph",

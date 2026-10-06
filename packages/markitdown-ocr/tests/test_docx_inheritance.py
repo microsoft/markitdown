@@ -104,7 +104,7 @@ def test_plugin_registration_full_trip(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert result.markdown == (
         "# Heading\n\nBefore\n\n"
-        "*[Image OCR]\nRecognized\\_text\n[End OCR]*\n\n"
+        "*[Image OCR]\\\nRecognized\\_text\\\n[End OCR]*\n\n"
         "After\n\n**Native content**"
     )
     client.chat.completions.create.assert_called_once()
@@ -145,8 +145,8 @@ def test_recognition_cache_is_local_and_service_override_is_preserved() -> None:
     overridden = _convert(converter, data, ocr_service=second)
     again = _convert(converter, data)
 
-    assert default.count("*[Image OCR]  \nfirst  \n[End OCR]*") == 12
-    assert overridden.count("*[Image OCR]  \nsecond  \n[End OCR]*") == 12
+    assert default.count("*[Image OCR]\\\nfirst\\\n[End OCR]*") == 12
+    assert overridden.count("*[Image OCR]\\\nsecond\\\n[End OCR]*") == 12
     assert again == default
     assert first.extract_text.call_count == 2
     second.extract_text.assert_called_once()
@@ -189,7 +189,7 @@ def test_ocr_text_is_escaped_and_line_endings_are_preserved_as_html_breaks(
         "<br/>final<br/>[End OCR]</em></p>"
     ) in convert_html.call_args.args[0]
     assert (
-        "*[Image OCR]  \nA\\_B \\*literal\\*  \n" "<tag> & value  \nfinal  \n[End OCR]*"
+        "*[Image OCR]\\\nA\\_B \\*literal\\*\\\n" "<tag> & value\\\nfinal\\\n[End OCR]*"
     ) in result
     assert "data-markitdown-image-" not in convert_html.call_args.args[0]
 
