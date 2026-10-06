@@ -50,6 +50,13 @@ def test_html_heading_preserves_inline_formatting() -> None:
     )
 
 
+@pytest.mark.parametrize("tag", ["hn", "HN"])
+def test_html_literal_hn_tag_does_not_trigger_plain_text_fallback(tag: str) -> None:
+    html = f"<p>Before</p><{tag}>Literal hn</{tag}><p>After</p>"
+
+    assert _convert_html(html) == "Before\n\nLiteral hn\n\nAfter"
+
+
 @pytest.mark.parametrize(
     "whitespace", ["", " ", "  ", "\t", "\n", "\r\n", "\u00a0", " \t\n\u00a0 "]
 )
