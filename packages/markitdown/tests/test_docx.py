@@ -302,6 +302,31 @@ def test_subscript_with_missing_text_run_does_not_crash():
     assert "1" in result.latex
 
 
+def test_delimiter_multiple_arguments_with_sepchr():
+    element = _parse_omath(
+        "<m:r><m:t>f</m:t></m:r>"
+        "<m:d>"
+        '<m:dPr><m:sepChr m:val=","/></m:dPr>'
+        "<m:e><m:r><m:t>x</m:t></m:r></m:e>"
+        "<m:e><m:r><m:t>y</m:t></m:r></m:e>"
+        "</m:d>"
+    )
+    result = oMath2Latex(element)
+    assert result.latex == r"f\left(x,y\right)"
+
+
+def test_delimiter_multiple_arguments_default_separator():
+    element = _parse_omath(
+        "<m:d>"
+        '<m:dPr><m:begChr m:val="{"/><m:endChr m:val="}"/></m:dPr>'
+        "<m:e><m:r><m:t>x</m:t></m:r></m:e>"
+        "<m:e><m:r><m:t>x&gt;0</m:t></m:r></m:e>"
+        "</m:d>"
+    )
+    result = oMath2Latex(element)
+    assert result.latex == r"\left\{x|x>0\right\}"
+
+
 # Stylesheet repair
 
 WORD_NAMESPACE = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"

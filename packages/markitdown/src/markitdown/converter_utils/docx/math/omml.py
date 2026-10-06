@@ -132,7 +132,7 @@ class Tag2Method(object):
 class Pr(Tag2Method):
     text = ""
 
-    __val_tags = ("chr", "pos", "begChr", "endChr", "type")
+    __val_tags = ("chr", "pos", "begChr", "endChr", "sepChr", "type")
 
     __innerdict = None  # can't use the __dict__
 
@@ -159,7 +159,7 @@ class Pr(Tag2Method):
         stag = elm.tag.replace(OMML_NS, "")
         if stag in self.__val_tags:
             t = elm.get("{0}val".format(OMML_NS))
-            self.__innerdict[stag] = t
+            self.__innerdict[stag] = t if t is not None else ""
         return None
 
     tag2meth = {
@@ -168,6 +168,7 @@ class Pr(Tag2Method):
         "pos": do_common,
         "begChr": do_common,
         "endChr": do_common,
+        "sepChr": do_common,
         "type": do_common,
     }
 
@@ -228,13 +229,21 @@ class oMath2Latex(Tag2Method):
         the delimiter object
         """
         c_dict = self.process_children_dict(elm)
-        pr = c_dict["dPr"]
+        pr = c_dict.get("dPr")
         null = D_DEFAULT.get("null")
-        s_val = get_char(pr.begChr, default=D_DEFAULT.get("left"), store=T)
-        e_val = get_char(pr.endChr, default=D_DEFAULT.get("right"), store=T)
-        return pr.text + D.format(
+        pr_text = pr.text if pr else ""
+        s_val = get_char(pr.begChr if pr else None, default=D_DEFAULT.get("left"), store=T)
+        e_val = get_char(pr.endChr if pr else None, default=D_DEFAULT.get("right"), store=T)
+        args = [t for stag, t, e in self.process_children_list(elm, include=("e",))]
+        if pr and pr.sepChr is not None:
+            sep_val = get_char(pr.sepChr, default=pr.sepChr, store=T)
+            sep = escape_latex(sep_val) if sep_val else ""
+        else:
+            sep = "|"
+        text = sep.join(args)
+        return pr_text + D.format(
             left=null if not s_val else escape_latex(s_val),
-            text=c_dict["e"],
+            text=text,
             right=null if not e_val else escape_latex(e_val),
         )
 
