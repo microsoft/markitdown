@@ -894,5 +894,31 @@ def test_pptx_chart_title_text_frame(title: str | None) -> None:
     assert result.strip() in markdown
 
 
+def test_unrecognized_shape_type_does_not_abort_conversion(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A shape whose shape_type raises NotImplementedError should be tolerated and not fail conversion."""
+    prs = Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[6])  # blank layout
+    txBox = slide.shapes.add_textbox(Inches(1), Inches(1), Inches(2), Inches(1))
+    txBox.text_frame.text = "Valid text"
+
+    stream = io.BytesIO()
+    prs.save(stream)
+    stream.seek(0)
+
+    # Patch BaseShape.shape_type to raise NotImplementedError for an unrecognized shape
+    from pptx.shapes.base import BaseShape
+
+    original_fget = BaseShape.shape_type.fget
+
+    def mock_shape_type(self):
+        raise NotImplementedError("Shape instance of unrecognized shape type")
+
+    monkeypatch.setattr(BaseShape, "shape_type", property(mock_shape_type))
+
+    converter = PptxConverter()
+    result = converter.convert(stream, StreamInfo(extension=".pptx"))
+    assert "Valid text" in result.markdown
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
