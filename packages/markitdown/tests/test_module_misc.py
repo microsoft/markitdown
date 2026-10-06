@@ -876,5 +876,27 @@ def test_a_declared_charset_still_wins() -> None:
     assert "浦发银行" in result.markdown
 
 
+def test_fenced_code_block_preserves_whitespace_and_blank_lines() -> None:
+    code = (
+        "Here is text.\n\n"
+        "```python\n"
+        "def a():\n"
+        "    pass   \n"
+        "\n"
+        "\n"
+        "def b():\n"
+        "    pass\n"
+        "```\n\n"
+        "Trailing prose   \n"
+    )
+    markitdown = MarkItDown()
+    result = markitdown.convert_stream(io.BytesIO(code.encode("utf-8")), file_extension=".md")
+
+    # Inside the fence, trailing space and consecutive blank lines are preserved
+    assert "def a():\n    pass   \n\n\ndef b():" in result.markdown
+    # Outside the fence, trailing spaces are trimmed
+    assert "Trailing prose\n" in result.markdown
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
