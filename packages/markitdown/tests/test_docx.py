@@ -302,6 +302,47 @@ def test_subscript_with_missing_text_run_does_not_crash():
     assert "1" in result.latex
 
 
+# Math border box
+
+# Regression tests for <m:borderBox>, which Word writes for its "Boxed Formula"
+# structure. The converter handled <m:box> but had no handler for <m:borderBox>,
+# so the element fell through ``process_unknow`` and was skipped together with
+# its contents: a boxed E = mc^2 was rendered as an empty equation.
+
+E_MC2 = (
+    "<m:r><m:t>E=m</m:t></m:r>"
+    "<m:sSup>"
+    "<m:e><m:r><m:t>c</m:t></m:r></m:e>"
+    "<m:sup><m:r><m:t>2</m:t></m:r></m:sup>"
+    "</m:sSup>"
+)
+
+
+def test_border_box_keeps_its_content():
+    element = _parse_omath(
+        "<m:borderBox>"
+        "<m:borderBoxPr><m:ctrlPr/></m:borderBoxPr>"
+        f"<m:e>{E_MC2}</m:e>"
+        "</m:borderBox>"
+    )
+    assert oMath2Latex(element).latex == "\\boxed{E=mc^{2}}"
+
+
+def test_border_box_without_properties():
+    # <m:borderBoxPr> is optional in the schema.
+    element = _parse_omath(f"<m:borderBox><m:e>{E_MC2}</m:e></m:borderBox>")
+    assert oMath2Latex(element).latex == "\\boxed{E=mc^{2}}"
+
+
+def test_border_box_inside_expression():
+    element = _parse_omath(
+        "<m:r><m:t>a+</m:t></m:r>"
+        "<m:borderBox><m:e><m:r><m:t>b</m:t></m:r></m:e></m:borderBox>"
+        "<m:r><m:t>=c</m:t></m:r>"
+    )
+    assert oMath2Latex(element).latex == "a+\\boxed{b}=c"
+
+
 # Stylesheet repair
 
 WORD_NAMESPACE = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
