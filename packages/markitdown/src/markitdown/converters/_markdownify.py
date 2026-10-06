@@ -175,5 +175,54 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         """Obsolete <strike> is still in the wild; treat it like <s>/<del>."""
         return self.convert_s(el, text, *args, **kwargs)  # type: ignore
 
+    def convert_tr(self, el: Any, text: str, parent_tags: Any, *args, **kwargs) -> str:
+        cells = el.find_all(["td", "th"])
+        table_el = el.find_parent("table")
+        if table_el is not None:
+            first_tr = table_el.find("tr")
+            is_first_row = first_tr == el
+        else:
+            is_first_row = el.find_previous_sibling("tr") is None
+
+        is_headrow = (
+            all([cell.name == "th" for cell in cells])
+            or (el.parent.name == "thead" and len(el.parent.find_all("tr")) == 1)
+        )
+        is_head_row_missing = (
+            (is_first_row and el.parent.name != "tbody")
+            or (
+                is_first_row
+                and el.parent.name == "tbody"
+                and (table_el is None or len(table_el.find_all("thead")) < 1)
+            )
+        )
+        overline = ""
+        underline = ""
+        full_colspan = 0
+        for cell in cells:
+            if "colspan" in cell.attrs and cell["colspan"].isdigit():
+                full_colspan += max(1, min(1000, int(cell["colspan"])))
+            else:
+                full_colspan += 1
+
+        if (
+            is_headrow
+            or (is_head_row_missing and self.options["table_infer_header"])
+        ) and is_first_row:
+            underline += "| " + " | ".join(["---"] * full_colspan) + " |\n"
+        elif (
+            (is_head_row_missing and not self.options["table_infer_header"])
+            or (
+                is_first_row
+                and (
+                    el.parent.name == "table"
+                    or (el.parent.name == "tbody" and not el.parent.find_previous_sibling())
+                )
+            )
+        ):
+            overline += "| " + " | ".join([""] * full_colspan) + " |\n"
+            overline += "| " + " | ".join(["---"] * full_colspan) + " |\n"
+        return overline + "|" + text + "\n" + underline
+
     def convert_soup(self, soup: Any) -> str:
         return super().convert_soup(soup)  # type: ignore
