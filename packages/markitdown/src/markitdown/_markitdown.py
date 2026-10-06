@@ -411,6 +411,23 @@ class MarkItDown:
         url: Optional[str] = None,  # Deprecated -- use stream_info
         **kwargs: Any,
     ) -> DocumentConverterResult:
+        # Magika requires a buffered binary stream. Keep a caller-owned raw
+        # stream open and at its original position when the adapter is released.
+        if isinstance(stream, io.RawIOBase) and stream.seekable():
+            position = stream.tell()
+            buffered = io.BufferedReader(stream)
+            try:
+                return self.convert_stream(
+                    buffered,
+                    stream_info=stream_info,
+                    file_extension=file_extension,
+                    url=url,
+                    **kwargs,
+                )
+            finally:
+                buffered.detach()
+                stream.seek(position)
+
         guesses: List[StreamInfo] = []
 
         # Do we have anything on which to base a guess?
