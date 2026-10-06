@@ -278,6 +278,8 @@ RAD_DEFAULT = "\\sqrt{{{text}}}"
 
 ARR = "\\begin{{array}}{{c}}{text}\\end{{array}}"
 
+BORDER_BOX = "\\boxed{{{text}}}"
+
 LIM_FUNC = {
     "lim": "\\lim_{{{lim}}}",
     "max": "\\max_{{{lim}}}",

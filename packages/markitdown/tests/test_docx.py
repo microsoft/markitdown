@@ -97,6 +97,41 @@ def test_omml_known_function_split_across_runs():
     assert str(results[0]) == r"\sin(x)"
 
 
+def test_omml_borderbox_boxed_formula():
+    # Boxed formula with borderBoxPr
+    omml_xml = """<m:oMathPara xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">
+        <m:oMath>
+            <m:borderBox>
+                <m:borderBoxPr><m:ctrlPr/></m:borderBoxPr>
+                <m:e>
+                    <m:r><m:t>E=m</m:t></m:r>
+                    <m:sSup>
+                        <m:e><m:r><m:t>c</m:t></m:r></m:e>
+                        <m:sup><m:r><m:t>2</m:t></m:r></m:sup>
+                    </m:sSup>
+                </m:e>
+            </m:borderBox>
+        </m:oMath>
+    </m:oMathPara>"""
+    results = list(load_string(omml_xml))
+    assert len(results) == 1
+    assert str(results[0]) == r"\boxed{E=mc^{2}}"
+
+    # Inlined borderBox inside equation
+    omml_xml_inline = """<m:oMathPara xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">
+        <m:oMath>
+            <m:r><m:t>a+</m:t></m:r>
+            <m:borderBox>
+                <m:e><m:r><m:t>b</m:t></m:r></m:e>
+            </m:borderBox>
+            <m:r><m:t>=c</m:t></m:r>
+        </m:oMath>
+    </m:oMathPara>"""
+    results_inline = list(load_string(omml_xml_inline))
+    assert len(results_inline) == 1
+    assert str(results_inline[0]) == r"a+\boxed{b}=c"
+
+
 # Math accents
 
 # Tests for DOCX math accent templates.

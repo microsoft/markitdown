@@ -26,6 +26,7 @@ from .latex_dict import (
     RAD,
     RAD_DEFAULT,
     ARR,
+    BORDER_BOX,
     LIM_FUNC,
     LIM_TO,
     LIM_UPP,
@@ -244,6 +245,13 @@ class oMath2Latex(Tag2Method):
         """
         pass
 
+    def do_borderbox(self, elm):
+        """
+        the border box (boxed formula) object
+        """
+        c_dict = self.process_children_dict(elm)
+        return BORDER_BOX.format(text=c_dict.get("e", ""))
+
     def do_sub(self, elm):
         text = self.process_children(elm)
         return SUB.format(text)
@@ -414,4 +422,5 @@ class oMath2Latex(Tag2Method):
         "m": do_m,
         "mr": do_mr,
         "nary": do_nary,
+        "borderBox": do_borderbox,
     }
