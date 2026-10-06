@@ -1485,5 +1485,25 @@ def test_convert_docx_with_style_missing_type(tmp_path):
     assert "# Abstract" in result.markdown
 
 
+@pytest.mark.parametrize(
+    ("style_id", "heading_text"),
+    [
+        ("Heading7", "Heading Seven"),
+        ("Heading8", "Heading Eight"),
+        ("Heading9", "Heading Nine"),
+    ],
+)
+def test_docx_deep_headings_7_to_9_preserved(tmp_path, style_id: str, heading_text: str) -> None:
+    docx_file = _write_underlined_docx(
+        tmp_path / f"{style_id}.docx",
+        paragraph_xml=(
+            f"<w:pPr><w:pStyle w:val=\"{style_id}\"/></w:pPr>"
+            f"<w:r><w:t>{heading_text}</w:t></w:r>"
+        ),
+    )
+    result = MarkItDown().convert(docx_file)
+    assert f"###### {heading_text}" in result.markdown
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
