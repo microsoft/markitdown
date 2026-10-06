@@ -177,3 +177,59 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
 
     def convert_soup(self, soup: Any) -> str:
         return super().convert_soup(soup)  # type: ignore
+
+    def convert_tr(self, el: Any, text: str, parent_tags: Any) -> str:
+        cells = el.find_all(["td", "th"])
+        table = el.find_parent("table")
+        if table:
+            first_tr = table.find("tr")
+            is_first_row = el is first_tr
+        else:
+            is_first_row = el.find_previous_sibling("tr") is None
+
+        is_headrow = (
+            all(cell.name == "th" for cell in cells)
+            or (el.parent.name == "thead" and len(el.parent.find_all("tr")) == 1)
+        )
+        if is_first_row:
+            if table:
+                is_head_row_missing = len(table.find_all("thead")) < 1
+            elif el.parent.name == "tbody":
+                is_head_row_missing = len(el.parent.parent.find_all("thead")) < 1
+            else:
+                is_head_row_missing = el.parent.name != "tbody"
+        else:
+            is_head_row_missing = False
+
+        overline = ""
+        underline = ""
+        full_colspan = 0
+        for cell in cells:
+            if "colspan" in cell.attrs and cell["colspan"].isdigit():
+                full_colspan += max(1, min(1000, int(cell["colspan"])))
+            else:
+                full_colspan += 1
+
+        if (
+            is_headrow
+            or (is_head_row_missing and self.options.get("table_infer_header"))
+        ) and is_first_row:
+            underline += "| " + " | ".join(["---"] * full_colspan) + " |\n"
+        elif (
+            (is_head_row_missing and not self.options.get("table_infer_header"))
+            or (
+                is_first_row
+                and (
+                    el.parent.name == "table"
+                    or (
+                        el.parent.name == "tbody"
+                        and not el.parent.find_previous_sibling("tbody")
+                    )
+                )
+            )
+        ):
+            overline += "| " + " | ".join([""] * full_colspan) + " |\n"
+            overline += "| " + " | ".join(["---"] * full_colspan) + " |\n"
+
+        return overline + "|" + text + "\n" + underline
+

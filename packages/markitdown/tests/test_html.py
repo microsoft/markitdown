@@ -345,5 +345,42 @@ def test_deeply_nested_html_fallback() -> None:
     assert "<p>" not in result.markdown
 
 
+def test_html_table_with_caption_or_colgroup_preserves_delimiter() -> None:
+    html_caption = (
+        "<table><caption>Stock</caption><tr><th>Name</th><th>Qty</th></tr>"
+        "<tr><td>Apple</td><td>3</td></tr></table>"
+    )
+    md_caption = _convert_html(html_caption)
+    assert "| Name | Qty |" in md_caption
+    assert "| --- | --- |" in md_caption
+    assert "| Apple | 3 |" in md_caption
+
+    html_colgroup = (
+        "<table><colgroup><col></colgroup><tr><th>Name</th><th>Qty</th></tr>"
+        "<tr><td>Apple</td><td>3</td></tr></table>"
+    )
+    md_colgroup = _convert_html(html_colgroup)
+    assert "| Name | Qty |" in md_colgroup
+    assert "| --- | --- |" in md_colgroup
+    assert "| Apple | 3 |" in md_colgroup
+
+
+def test_html_table_with_tfoot_does_not_add_fake_header() -> None:
+    html = (
+        "<table><thead><tr><th>Item</th><th>Cost</th></tr></thead>"
+        "<tbody><tr><td>A</td><td>1</td></tr></tbody>"
+        "<tfoot><tr><td>Total</td><td>1</td></tr></tfoot></table>"
+    )
+    md = _convert_html(html)
+    assert "| Item | Cost |" in md
+    assert "| --- | --- |" in md
+    assert "| A | 1 |" in md
+    assert "| Total | 1 |" in md
+    # tfoot should not introduce an empty header row or duplicate delimiter
+    assert "|  |  |" not in md
+    assert md.count("| --- | --- |") == 1
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
+
