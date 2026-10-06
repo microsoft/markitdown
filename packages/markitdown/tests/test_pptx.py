@@ -825,6 +825,51 @@ def test_pptx_chart_multi_series_conversion() -> None:
     assert "| C10 | 10.0 | 20.0 |" in md
 
 
+@pytest.mark.parametrize(
+    "label,escaped",
+    [
+        ("Windows | Linux", r"Windows \| Linux"),
+        (r"left\|right", r"left\\\|right"),
+        (r"left\\|right", r"left\\\\\|right"),
+        ("first\nsecond", "first second"),
+        ("first\r\nsecond", "first second"),
+        ("first\rsecond", "first second"),
+        (r"literal\nline", r"literal\nline"),
+        ("plain", "plain"),
+    ],
+)
+def test_pptx_chart_labels_stay_in_their_table_cells(label: str, escaped: str) -> None:
+    presentation = pptx.Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    chart_data = CategoryChartData()
+    chart_data.categories = [label, "Control"]
+    chart_data.add_series(label, (0, -2.5))
+    chart_data.add_series("Series B", (1.25, 10))
+    slide.shapes.add_chart(
+        XL_CHART_TYPE.COLUMN_CLUSTERED,
+        Inches(1),
+        Inches(1),
+        Inches(8),
+        Inches(5),
+        chart_data,
+    )
+    buffer = io.BytesIO()
+    presentation.save(buffer)
+    buffer.seek(0)
+
+    result = MarkItDown().convert_stream(
+        buffer, stream_info=StreamInfo(extension=".pptx")
+    )
+
+    assert result.markdown == (
+        "<!-- Slide number: 1 -->\n\n### Chart\n\n"
+        f"| Category | {escaped} | Series B |\n"
+        "|---|---|---|\n"
+        f"| {escaped} | 0.0 | 1.25 |\n"
+        "| Control | -2.5 | 10.0 |"
+    )
+
+
 def test_pptx_converter_treats_none_llm_caption_as_empty(monkeypatch) -> None:
     from markitdown.converters import _pptx_converter
 
