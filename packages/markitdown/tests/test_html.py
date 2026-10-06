@@ -345,5 +345,23 @@ def test_deeply_nested_html_fallback() -> None:
     assert "<p>" not in result.markdown
 
 
+def test_html_document_without_body_does_not_leak_head() -> None:
+    from markitdown.converters import HtmlConverter
+
+    html = "<html><head><title>Page Title</title><meta name='desc' content='xyz'><noscript>Enable JS</noscript></head><p>hello</p></html>"
+    result = HtmlConverter().convert_string(html)
+    assert result.title == "Page Title"
+    assert result.markdown == "hello"
+
+
+def test_html_preserves_stray_content_outside_body() -> None:
+    from markitdown.converters import HtmlConverter
+
+    html = "before<body><p>in body</p></body>after"
+    result = HtmlConverter().convert_string(html)
+    assert result.markdown == "before\n\nin body\n\nafter"
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
+
