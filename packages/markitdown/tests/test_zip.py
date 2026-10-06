@@ -1,3 +1,5 @@
+"""ZIP conversion and forwarding options to nested converters."""
+
 import io
 import os
 import zipfile
@@ -12,6 +14,9 @@ from markitdown import (
     StreamInfo,
 )
 from markitdown.converters._zip_converter import ZipConverter
+
+
+# Nested conversion
 
 TEST_FILES_DIR = os.path.join(os.path.dirname(__file__), "test_files")
 
@@ -134,3 +139,48 @@ def test_zip_member_docx_converts_as_docx(archive_url: Optional[str]) -> None:
     # ... and it was not unpacked as a nested archive
     assert "word/document.xml" not in result
     assert "[Content_Types].xml" not in result
+
+
+# Conversion regressions
+
+
+def test_zip_duplicate_filenames_preserve_each_entry() -> None:
+    """Same-named ZIP entries must retain their own content and archive order."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as archive:
+        archive.writestr("notes.txt", "First archived entry.")
+        with pytest.warns(UserWarning, match="Duplicate name"):
+            archive.writestr("notes.txt", "Second archived entry.")
+    buf.seek(0)
+
+    result = MarkItDown().convert_stream(
+        buf, stream_info=StreamInfo(extension=".zip", filename="duplicate.zip")
+    )
+
+    assert result.markdown == (
+        "Content from the zip file `duplicate.zip`:\n\n"
+        "## File: notes.txt\n\nFirst archived entry.\n\n"
+        "## File: notes.txt\n\nSecond archived entry."
+    )
+
+
+def test_zip_stream_no_filename_header() -> None:
+    """Regression test: ZipConverter must not render the literal string 'None'
+    in the output header when the stream has no associated URL, local path, or
+    filename (e.g. when called via convert_stream() without stream_info)."""
+    markitdown = MarkItDown()
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("hello.txt", "Hello world")
+    buf.seek(0)
+
+    result = markitdown.convert_stream(
+        buf, stream_info=StreamInfo(mimetype="application/zip")
+    )
+    assert result.markdown.startswith("Content from the zip file `(unknown)`:\n\n")
+    assert "Hello world" in result.markdown
+
+
+if __name__ == "__main__":
+    raise SystemExit(pytest.main([__file__]))
