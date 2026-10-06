@@ -345,5 +345,39 @@ def test_deeply_nested_html_fallback() -> None:
     assert "<p>" not in result.markdown
 
 
+def test_html_table_with_caption_or_colgroup_preserves_header_delimiter() -> None:
+    html_caption = (
+        "<table><caption>Stock</caption>"
+        "<tr><th>Name</th><th>Qty</th></tr>"
+        "<tr><td>Apple</td><td>3</td></tr></table>"
+    )
+    result_caption = _convert_html(html_caption)
+    assert "| Name | Qty |" in result_caption
+    assert "| --- | --- |" in result_caption
+    assert "| Apple | 3 |" in result_caption
+
+    html_colgroup = (
+        "<table><colgroup><col></colgroup>"
+        "<tr><th>Name</th><th>Qty</th></tr>"
+        "<tr><td>Apple</td><td>3</td></tr></table>"
+    )
+    result_colgroup = _convert_html(html_colgroup)
+    assert "| Name | Qty |" in result_colgroup
+    assert "| --- | --- |" in result_colgroup
+    assert "| Apple | 3 |" in result_colgroup
+
+
+def test_html_table_with_tfoot_does_not_add_fake_header() -> None:
+    html = (
+        "<table><thead><tr><th>Item</th><th>Cost</th></tr></thead>"
+        "<tbody><tr><td>A</td><td>1</td></tr></tbody>"
+        "<tfoot><tr><td>Total</td><td>1</td></tr></tfoot></table>"
+    )
+    result = _convert_html(html)
+    assert result.count("| --- | --- |") == 1
+    assert "|  |  |" not in result
+    assert "| Total | 1 |" in result
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
