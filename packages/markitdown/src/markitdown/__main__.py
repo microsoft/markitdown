@@ -143,6 +143,14 @@ def main():
     )
 
     parser.add_argument("filename", nargs="?")
+    parser.add_argument(
+        "--sub-symbol",
+        help="Wrap subscripts in this marker (e.g., '<sub>' or '~') for HTML-based conversion, including DOCX. Defaults to no marker.",
+    )
+    parser.add_argument(
+        "--sup-symbol",
+        help="Wrap superscripts in this marker (e.g., '<sup>' or '^') for HTML-based conversion, including DOCX. Defaults to no marker.",
+    )
     args = parser.parse_args()
 
     # Parse the extension hint
@@ -248,16 +256,22 @@ def main():
     else:
         markitdown = MarkItDown(enable_plugins=args.use_plugins)
 
+    conversion_options: Dict[str, Any] = {"keep_data_uris": args.keep_data_uris}
+    if args.sub_symbol is not None:
+        conversion_options["sub_symbol"] = args.sub_symbol
+    if args.sup_symbol is not None:
+        conversion_options["sup_symbol"] = args.sup_symbol
+
     if args.filename is None:
         # Windows pipe-backed stdin can report seekable() even though it cannot rewind.
         result = markitdown.convert_stream(
             io.BytesIO(sys.stdin.buffer.read()),
             stream_info=stream_info,
-            keep_data_uris=args.keep_data_uris,
+            **conversion_options,
         )
     else:
         result = markitdown.convert(
-            args.filename, stream_info=stream_info, keep_data_uris=args.keep_data_uris
+            args.filename, stream_info=stream_info, **conversion_options
         )
 
     _handle_output(args, result)
