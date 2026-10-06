@@ -230,11 +230,29 @@ def test_csv_plain_values_are_unchanged() -> None:
 
 
 def test_csv_backslash_without_a_pipe_is_left_alone() -> None:
-    # Only backslashes that guard a pipe are doubled; a Windows path stays
-    # readable.
+    # A single backslash before a letter is already literal in Markdown.
     result = _convert_csv(b"name,path\nWidget,C:\\temp\\file.txt\n")
 
     assert r"| Widget | C:\temp\file.txt |" in result
+
+
+@pytest.mark.parametrize(
+    "value,escaped",
+    [
+        (r"\\server\share", r"\\\\server\share"),
+        (r"left\\right", r"left\\\\right"),
+        (r"\*literal\*", r"\\\*literal\\\*"),
+        (r"\[label\]", r"\\\[label\\\]"),
+        (r"\\*literal\\*", r"\\\\\*literal\\\\\*"),
+        (r"\`code\`", r"\\\`code\\\`"),
+        ("tail\\", "tail\\"),
+        (r"left\|right", r"left\\\|right"),
+    ],
+)
+def test_csv_literal_backslashes_in_headers_and_cells(value: str, escaped: str) -> None:
+    result = _convert_csv(f"{value},control\n{value},ok\n".encode("utf-8"), "utf-8")
+
+    assert result == f"| {escaped} | control |\n| --- | --- |\n| {escaped} | ok |"
 
 
 @pytest.mark.parametrize(
@@ -244,7 +262,7 @@ def test_csv_backslash_without_a_pipe_is_left_alone() -> None:
 def test_csv_long_backslash_runs(suffix: str, escaped_suffix: str) -> None:
     backslashes = "\\" * 65_536
     value = backslashes + suffix
-    expected = backslashes * (2 if suffix == "|" else 1) + escaped_suffix
+    expected = backslashes * 2 + escaped_suffix
 
     result = _convert_csv(f"{value}\n{value}\n".encode("utf-8"), charset="utf-8")
 
