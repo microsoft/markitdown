@@ -29,6 +29,18 @@ ACCEPTED_FILE_EXTENSIONS = [".docx"]
 
 _UNDERLINE_STYLE_MAP = "u => u"
 
+_HEADING_STYLE_MAP = """
+p.Heading7 => h6:fresh
+p.Heading8 => h6:fresh
+p.Heading9 => h6:fresh
+p[style-name='Heading 7'] => h6:fresh
+p[style-name='Heading 8'] => h6:fresh
+p[style-name='Heading 9'] => h6:fresh
+p[style-name='heading 7'] => h6:fresh
+p[style-name='heading 8'] => h6:fresh
+p[style-name='heading 9'] => h6:fresh
+""".strip()
+
 
 def _read_embedded_style_map(file_stream: BinaryIO) -> Optional[str]:
     """Read the style map embedded in a .docx, if it has one."""
@@ -98,6 +110,7 @@ class DocxConverter(HtmlConverter):
                 caller_style_map,
                 embedded_style_map,
                 _UNDERLINE_STYLE_MAP,
+                _HEADING_STYLE_MAP,
             )
             if part
         )
