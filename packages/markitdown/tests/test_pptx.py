@@ -894,5 +894,33 @@ def test_pptx_chart_title_text_frame(title: str | None) -> None:
     assert result.strip() in markdown
 
 
+def test_pptx_chart_missing_data_point_rendered_as_empty_cell() -> None:
+    data = CategoryChartData()
+    data.categories = ["Q1", "Q2", "Q3"]
+    data.add_series("Sales", (1.0, None, 3.0))
+
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    slide.shapes.add_chart(
+        XL_CHART_TYPE.COLUMN_CLUSTERED,
+        Inches(1),
+        Inches(1),
+        Inches(5),
+        Inches(3),
+        data,
+    )
+    stream = io.BytesIO()
+    presentation.save(stream)
+    stream.seek(0)
+
+    converter = PptxConverter()
+    markdown = converter.convert(stream, StreamInfo(extension=".pptx")).markdown
+
+    assert "| None |" not in markdown
+    assert "| Q2 |  |" in markdown
+    assert "| Q1 | 1.0 |" in markdown
+    assert "| Q3 | 3.0 |" in markdown
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
