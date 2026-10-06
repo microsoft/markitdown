@@ -1485,5 +1485,31 @@ def test_convert_docx_with_style_missing_type(tmp_path):
     assert "# Abstract" in result.markdown
 
 
+def test_convert_docx_heading_7_to_9(tmp_path):
+    """Headings 7, 8, and 9 should map to h6 rather than degrading to plain paragraphs."""
+    source_path = os.path.join(TEST_FILES_DIR, "test.docx")
+    target_path = tmp_path / "headings_7_9.docx"
+
+    with zipfile.ZipFile(source_path, mode="r") as zip_in:
+        with zipfile.ZipFile(target_path, mode="w") as zip_out:
+            for item in zip_in.infolist():
+                content = zip_in.read(item.filename)
+                if item.filename == "word/document.xml":
+                    xml = content.decode("utf-8")
+                    p_extra = """
+                    <w:p><w:pPr><w:pStyle w:val="Heading7"/></w:pPr><w:r><w:t>Heading Seven Title</w:t></w:r></w:p>
+                    <w:p><w:pPr><w:pStyle w:val="Heading8"/></w:pPr><w:r><w:t>Heading Eight Title</w:t></w:r></w:p>
+                    <w:p><w:pPr><w:pStyle w:val="Heading9"/></w:pPr><w:r><w:t>Heading Nine Title</w:t></w:r></w:p>
+                    """
+                    xml = xml.replace("</w:body>", p_extra + "</w:body>")
+                    content = xml.encode("utf-8")
+                zip_out.writestr(item, content)
+
+    result = MarkItDown().convert(str(target_path))
+    assert "###### Heading Seven Title" in result.markdown
+    assert "###### Heading Eight Title" in result.markdown
+    assert "###### Heading Nine Title" in result.markdown
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
