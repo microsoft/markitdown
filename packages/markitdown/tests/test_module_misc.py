@@ -878,3 +878,230 @@ def test_a_declared_charset_still_wins() -> None:
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
+
+
+def test_concurrent_plugin_discovery_publishes_complete_cache(tmp_path, monkeypatch):
+    """Both SDK instances discover a real plugin while its import is pending."""
+    import sys
+    import threading
+    import types
+
+    import markitdown._markitdown as engine
+
+    module_name = "markitdown_test_pending_plugin"
+    control_name = "markitdown_test_pending_control"
+    control = types.ModuleType(control_name)
+    control.started = threading.Event()
+    control.release = threading.Event()
+    metadata = tmp_path / "markitdown_test_pending_plugin-1.0.dist-info"
+    metadata.mkdir()
+    (metadata / "METADATA").write_text(
+        "Metadata-Version: 2.1\nName: markitdown-test-pending-plugin\nVersion: 1.0\n"
+    )
+    (metadata / "entry_points.txt").write_text(
+        f"[markitdown.plugin]\npending = {module_name}\n"
+    )
+    (tmp_path / f"{module_name}.py").write_text(
+        f"from {control_name} import started, release\n"
+        "from markitdown import DocumentConverter, DocumentConverterResult\n"
+        "started.set()\n"
+        "if not release.wait(15):\n"
+        "    raise RuntimeError('plugin import timed out')\n"
+        "class Converter(DocumentConverter):\n"
+        "    def accepts(self, stream, info, **kwargs):\n"
+        "        return info.extension == '.pending-plugin'\n"
+        "    def convert(self, stream, info, **kwargs):\n"
+        "        return DocumentConverterResult(markdown=stream.read().decode())\n"
+        "def register_converters(markitdown, **kwargs):\n"
+        "    markitdown.register_converter(Converter())\n"
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.setitem(sys.modules, control_name, control)
+    monkeypatch.setattr(engine, "_plugins", None)
+    outcomes = {}
+    second_progress = threading.Event()
+
+    def convert(name):
+        try:
+            sdk = MarkItDown(enable_builtins=False, enable_plugins=True)
+            outcomes[name] = sdk.convert_stream(
+                io.BytesIO(b"plugin content"),
+                stream_info=StreamInfo(extension=".pending-plugin"),
+            ).markdown
+        except Exception as exc:
+            outcomes[name] = exc
+        finally:
+            if name == "second":
+                second_progress.set()
+
+    first = threading.Thread(target=convert, args=("first",))
+    second = threading.Thread(target=convert, args=("second",))
+    real_entry_points = engine.entry_points
+
+    def observed_entry_points(*args, **kwargs):
+        if threading.current_thread() is second:
+            second_progress.set()
+        return real_entry_points(*args, **kwargs)
+
+    monkeypatch.setattr(engine, "entry_points", observed_entry_points)
+    try:
+        first.start()
+        assert control.started.wait(10)
+        second.start()
+        # Wait for actual discovery, or completion if a partial cache caused
+        # discovery to be skipped. No scheduling delay determines the result.
+        assert second_progress.wait(10)
+    finally:
+        control.release.set()
+        first.join(20)
+        if second.ident is not None:
+            second.join(20)
+        sys.modules.pop(module_name, None)
+    assert not first.is_alive()
+    assert not second.is_alive()
+    assert outcomes == {"first": "plugin content", "second": "plugin content"}
+
+
+def test_plugin_discovery_skips_failures_and_reuses_ordered_cache(
+    tmp_path, monkeypatch
+):
+    import sys
+
+    import markitdown._markitdown as engine
+
+    names = ["markitdown_test_first_plugin", "markitdown_test_second_plugin"]
+    metadata = tmp_path / "markitdown_test_plugins-1.0.dist-info"
+    metadata.mkdir()
+    (metadata / "METADATA").write_text(
+        "Metadata-Version: 2.1\nName: markitdown-test-plugins\nVersion: 1.0\n"
+    )
+    entry_points_file = metadata / "entry_points.txt"
+    entry_points_file.write_text(
+        "[markitdown.plugin]\n"
+        "broken = markitdown_test_nonexistent_plugin\n"
+        f"first = {names[0]}\nsecond = {names[1]}\n"
+    )
+    for name in names:
+        (tmp_path / f"{name}.py").write_text(
+            "from markitdown import DocumentConverter, DocumentConverterResult\n"
+            "class Converter(DocumentConverter):\n"
+            "    def accepts(self, stream, info, **kwargs):\n"
+            "        return info.extension == '.ordered-plugin'\n"
+            "    def convert(self, stream, info, **kwargs):\n"
+            f"        return DocumentConverterResult(markdown='{name}')\n"
+            "def register_converters(markitdown, **kwargs):\n"
+            "    markitdown.register_converter(Converter())\n"
+        )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.setattr(engine, "_plugins", None)
+    try:
+        with pytest.warns(UserWarning, match="Plugin 'broken' failed to load"):
+            first = MarkItDown(enable_builtins=False, enable_plugins=True)
+        assert [p.__name__ for p in engine._plugins if p.__name__ in names] == names
+        result = first.convert_stream(
+            io.BytesIO(b"content"),
+            stream_info=StreamInfo(extension=".ordered-plugin"),
+        )
+        assert result.markdown == names[1]
+        cache = engine._plugins
+        entry_points_file.unlink()
+        second = MarkItDown(enable_builtins=False, enable_plugins=True)
+        assert engine._plugins is cache
+        assert (
+            second.convert_stream(
+                io.BytesIO(b"content"),
+                stream_info=StreamInfo(extension=".ordered-plugin"),
+            ).markdown
+            == result.markdown
+        )
+    finally:
+        for name in names:
+            sys.modules.pop(name, None)
+
+
+@pytest.mark.parametrize("warnings_as_errors", [False, True])
+@pytest.mark.parametrize("prior_plugin", [False, True])
+def test_plugin_import_can_construct_reentrant_sdk(
+    tmp_path, monkeypatch, warnings_as_errors, prior_plugin
+):
+    import sys
+    import warnings
+
+    import markitdown._markitdown as engine
+
+    name = "markitdown_test_reentrant_plugin"
+    early_name = "markitdown_test_early_plugin"
+    metadata = tmp_path / "markitdown_test_reentrant_plugin-1.0.dist-info"
+    metadata.mkdir()
+    (metadata / "METADATA").write_text(
+        "Metadata-Version: 2.1\nName: markitdown-test-reentrant-plugin\nVersion: 1.0\n"
+    )
+    (metadata / "entry_points.txt").write_text(
+        "[markitdown.plugin]\n"
+        + (f"early = {early_name}\n" if prior_plugin else "")
+        + f"reentrant = {name}\n"
+    )
+    (tmp_path / f"{early_name}.py").write_text(
+        "from markitdown import DocumentConverter, DocumentConverterResult\n"
+        "class Converter(DocumentConverter):\n"
+        "    def accepts(self, stream, info, **kwargs):\n"
+        "        return info.extension == '.early-plugin'\n"
+        "    def convert(self, stream, info, **kwargs):\n"
+        "        return DocumentConverterResult(markdown='early content')\n"
+        "def register_converters(markitdown, **kwargs):\n"
+        "    markitdown.register_converter(Converter())\n"
+    )
+    (tmp_path / f"{name}.py").write_text(
+        "from markitdown import MarkItDown, DocumentConverter, DocumentConverterResult\n"
+        "from markitdown import StreamInfo\nimport io\n"
+        "inner = MarkItDown(enable_builtins=False, enable_plugins=True)\n"
+        + (
+            "assert inner.convert_stream(io.BytesIO(b'early'), "
+            "stream_info=StreamInfo(extension='.early-plugin')).markdown == 'early content'\n"
+            if prior_plugin
+            else ""
+        )
+        + "class Converter(DocumentConverter):\n"
+        "    def accepts(self, stream, info, **kwargs):\n"
+        "        return info.extension == '.reentrant-plugin'\n"
+        "    def convert(self, stream, info, **kwargs):\n"
+        "        return DocumentConverterResult(markdown=stream.read().decode())\n"
+        "def register_converters(markitdown, **kwargs):\n"
+        "    markitdown.register_converter(Converter())\n"
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.setattr(engine, "_plugins", None)
+    try:
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("error" if warnings_as_errors else "always")
+            sdk = MarkItDown(enable_builtins=False, enable_plugins=True)
+            assert (
+                sdk.convert_stream(
+                    io.BytesIO(b"reentrant plugin content"),
+                    stream_info=StreamInfo(extension=".reentrant-plugin"),
+                ).markdown
+                == "reentrant plugin content"
+            )
+            assert not caught
+        if not prior_plugin:
+            assert not sys.modules[name].inner._converters
+    finally:
+        sys.modules.pop(name, None)
+        sys.modules.pop(early_name, None)
+
+
+def test_plugin_discovery_clears_reentrant_guard_after_error(monkeypatch):
+    import markitdown._markitdown as engine
+
+    monkeypatch.setattr(engine, "_plugins", None)
+    real_entry_points = engine.entry_points
+
+    def fail_discovery(*args, **kwargs):
+        raise RuntimeError("discovery failed")
+
+    monkeypatch.setattr(engine, "entry_points", fail_discovery)
+    with pytest.raises(RuntimeError, match="discovery failed"):
+        MarkItDown(enable_builtins=False, enable_plugins=True)
+    assert getattr(engine._plugin_loading, "plugins", None) is None
+    monkeypatch.setattr(engine, "entry_points", real_entry_points)
+    assert engine._load_plugins() is not None
