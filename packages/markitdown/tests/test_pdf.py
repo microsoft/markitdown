@@ -1,8 +1,9 @@
 """PDF conversion, table extraction, numbering, and page cleanup."""
 
+import io
 import os
 import re
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -10,6 +11,9 @@ from markitdown import MarkItDown
 from markitdown.converters._pdf_converter import (
     PARTIAL_NUMBERING_PATTERN,
     _merge_partial_numbering_lines,
+    _extract_form_content_from_words,
+    _has_space_starved_words,
+    _select_plain_text_extraction,
 )
 
 
@@ -1230,8 +1234,10 @@ def pdf_activity(monkeypatch):
         events.append(("pdfminer", None))
         return original_extract_text(*args, **kwargs)
 
-    def extract_form(page):
-        result = original_form_extraction(page)
+    def extract_form(page, words=None, *, space_starved=False):
+        result = original_form_extraction(
+            page, words=words, space_starved=space_starved
+        )
         events.append(("form" if result is not None else "plain", page.page_number))
         return result
 
@@ -1386,3 +1392,307 @@ def test_markitdown_remote() -> None:
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
+
+
+# Positioned word boundaries
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Ordinary prose with spaces between words. " * 100,
+        "https://example.com/" + "a" * 600,
+        "This single identifier is " + "a" * 600,
+        "这是没有空格的正常中文文本。" * 100,
+        "",
+    ],
+)
+def test_ordinary_text_keeps_pdfminer_output(text):
+    assert _select_plain_text_extraction(text, "different extraction") == text
+
+
+def test_empty_alternative_does_not_replace_collapsed_text():
+    collapsed = "\n".join(["NaturalLanguageProcessingResearch"] * 20)
+    assert _select_plain_text_extraction(collapsed, " \n") == collapsed
+
+
+def test_collapsed_prose_is_not_a_borderless_table():
+    page = MagicMock(width=612)
+    # Three aligned columns would otherwise look like a form. Repeated long
+    # runs reveal that the word extraction has joined neighbouring words.
+    words = [
+        {
+            "text": "NaturalLanguageProcessingResearch",
+            "x0": 50 + column * 60,
+            "x1": 140 + column * 60,
+            "top": row * 12,
+            "bottom": row * 12 + 10,
+        }
+        for row in range(20)
+        for column in range(3)
+    ]
+    page.extract_words.return_value = words
+    assert _extract_form_content_from_words(page) is None
+
+
+def test_one_long_identifier_does_not_reclassify_a_page():
+    words = [{"text": "short"}] * 100 + [{"text": "a" * 600}]
+    assert not _has_space_starved_words(words)
+
+
+def _make_form_page():
+    """Create a mock page with 3-column table-like word positions."""
+    page = MagicMock()
+    page.width = 612
+    page.close = MagicMock()
+    page.extract_words.return_value = [
+        {"text": "Name", "x0": 50, "x1": 100, "top": 10, "bottom": 20},
+        {"text": "Value", "x0": 250, "x1": 300, "top": 10, "bottom": 20},
+        {"text": "Unit", "x0": 450, "x1": 500, "top": 10, "bottom": 20},
+        {"text": "Alpha", "x0": 50, "x1": 100, "top": 30, "bottom": 40},
+        {"text": "100", "x0": 250, "x1": 280, "top": 30, "bottom": 40},
+        {"text": "kg", "x0": 450, "x1": 470, "top": 30, "bottom": 40},
+        {"text": "Beta", "x0": 50, "x1": 100, "top": 50, "bottom": 60},
+        {"text": "200", "x0": 250, "x1": 280, "top": 50, "bottom": 60},
+        {"text": "lb", "x0": 450, "x1": 470, "top": 50, "bottom": 60},
+    ]
+    return page
+
+
+def _make_plain_page():
+    """Create a mock page with single-line paragraph (no table structure)."""
+    page = MagicMock()
+    page.width = 612
+    page.close = MagicMock()
+    page.extract_words.return_value = [
+        {
+            "text": "This is a long paragraph of plain text.",
+            "x0": 50,
+            "x1": 550,
+            "top": 10,
+            "bottom": 20,
+        },
+    ]
+    page.extract_text.return_value = "This is a long paragraph of plain text."
+    return page
+
+
+def _make_positioned_plain_page():
+    """Create a mock page that needs tight x_tolerance to preserve spaces."""
+    page = MagicMock()
+    page.width = 612
+    page.close = MagicMock()
+    words = []
+    for index in range(50):
+        text = "NaturalLanguageProcessingResearch" if index < 5 else f"word{index}"
+        words.append(
+            {
+                "text": text,
+                "x0": 50,
+                "x1": 90,
+                "top": index * 12,
+                "bottom": index * 12 + 10,
+            }
+        )
+    page.extract_words.return_value = words
+
+    def extract_text(*args, **kwargs):
+        if kwargs.get("x_tolerance") == 1:
+            return "Natural Language Processing research uses positioned text."
+        return "NaturalLanguageProcessingresearchusespositionedtext."
+
+    page.extract_text.side_effect = extract_text
+    return page
+
+
+def _mock_pdfplumber_open(pages):
+    """Return a mock pdfplumber.open that yields the given pages."""
+
+    def mock_open(stream):
+        mock_pdf = MagicMock()
+        mock_pdf.pages = pages
+        mock_pdf.__enter__ = MagicMock(return_value=mock_pdf)
+        mock_pdf.__exit__ = MagicMock(return_value=False)
+        return mock_pdf
+
+    return mock_open
+
+
+def test_space_starved_pdfminer_output_uses_pdfplumber_text():
+    """Use pdfplumber text when pdfminer loses positioned word boundaries."""
+    pages = [_make_positioned_plain_page(), _make_positioned_plain_page()]
+    collapsed_text = "\n".join(["NaturalLanguageProcessingResearch"] * 20)
+
+    with patch(
+        "markitdown.converters._pdf_converter.pdfplumber"
+    ) as mock_pdfplumber, patch(
+        "markitdown.converters._pdf_converter.pdfminer"
+    ) as mock_pdfminer:
+        mock_pdfplumber.open.side_effect = _mock_pdfplumber_open(pages)
+        mock_pdfminer.high_level.extract_text.return_value = collapsed_text
+
+        md = MarkItDown()
+        buf = io.BytesIO(b"fake pdf content")
+        from markitdown import StreamInfo
+
+        result = md.convert_stream(
+            buf,
+            stream_info=StreamInfo(extension=".pdf", mimetype="application/pdf"),
+        )
+
+    for page in pages:
+        page.extract_words.assert_called_with(
+            keep_blank_chars=True,
+            x_tolerance=1,
+            y_tolerance=3,
+        )
+        page.extract_text.assert_called_with(x_tolerance=1)
+    assert "Natural Language Processing" in result.text_content
+    assert "NaturalLanguageProcessingResearch" not in result.text_content
+
+
+def test_positioned_pages_do_not_discard_a_real_table():
+    """Two problematic prose pages must not force a real table to plain text."""
+    pages = [
+        _make_positioned_plain_page(),
+        _make_form_page(),
+        _make_plain_page(),
+        _make_positioned_plain_page(),
+    ]
+    with patch("markitdown.converters._pdf_converter.pdfplumber") as plumber, patch(
+        "markitdown.converters._pdf_converter.pdfminer"
+    ) as miner:
+        plumber.open.side_effect = _mock_pdfplumber_open(pages)
+        miner.high_level.extract_text.return_value = "Plain text without the table"
+        from markitdown import StreamInfo
+
+        result = (
+            MarkItDown()
+            .convert_stream(
+                io.BytesIO(b"fake pdf content"),
+                stream_info=StreamInfo(extension=".pdf", mimetype="application/pdf"),
+            )
+            .markdown
+        )
+
+    assert result.count("Natural Language Processing") == 2
+    assert "| Name" in result and "| Alpha" in result
+    assert result.index("Natural Language Processing") < result.index("| Name")
+    assert result.index("| Name") < result.rindex("Natural Language Processing")
+    miner.high_level.extract_text.assert_not_called()
+    pages[2].extract_text.assert_called_once_with()
+    for page in pages:
+        page.close.assert_called_once_with()
+
+
+@pytest.mark.parametrize("row_count", [16, 17, 20])
+def test_long_cell_tables_keep_markup_across_old_word_threshold(row_count):
+    page = MagicMock(width=612)
+    words = [
+        {
+            "text": "a" * 30,
+            "x0": 50 + column * 60,
+            "x1": 80 + column * 60,
+            "top": row * 12,
+            "bottom": row * 12 + 10,
+        }
+        for row in range(row_count)
+        for column in range(3)
+    ]
+    assert not _has_space_starved_words(words)
+    table = _extract_form_content_from_words(page, words=words)
+    assert table is not None
+    assert len(table.splitlines()) == row_count + 1
+    assert table.count("a" * 30) == row_count * 3
+
+
+def test_consistent_wide_gutters_keep_multicolumn_layout_out_of_starvation_gate():
+    words = [
+        {
+            "text": "NaturalLanguageProcessingResearch",
+            "x0": 50 + column * 250,
+            "x1": 220 + column * 250,
+            "top": row * 12,
+            "bottom": row * 12 + 10,
+        }
+        for row in range(25)
+        for column in range(2)
+    ]
+    assert not _has_space_starved_words(words)
+
+
+def test_sparse_positioned_page_uses_tight_words_and_text():
+    from markitdown import StreamInfo
+
+    page = _make_positioned_plain_page()
+    page.extract_words.return_value = page.extract_words.return_value[:40]
+    with patch("markitdown.converters._pdf_converter.pdfplumber") as plumber, patch(
+        "markitdown.converters._pdf_converter.pdfminer"
+    ) as miner:
+        plumber.open.side_effect = _mock_pdfplumber_open([page])
+        miner.high_level.extract_text.return_value = "\n".join(
+            ["NaturalLanguageProcessingResearch"] * 20
+        )
+        result = (
+            MarkItDown()
+            .convert_stream(
+                io.BytesIO(b"fake pdf content"),
+                stream_info=StreamInfo(extension=".pdf"),
+            )
+            .markdown
+        )
+    assert "Natural Language Processing" in result
+    assert page.extract_words.call_args_list[0].kwargs["x_tolerance"] == 3
+    assert page.extract_words.call_args_list[1].kwargs["x_tolerance"] == 1
+    page.extract_text.assert_called_once_with(x_tolerance=1)
+    page.close.assert_called_once_with()
+
+
+def _make_sparse_positioned_pdf():
+    """Forty lines with 1.1pt word gaps and no literal space glyphs."""
+    words = " -91.6667 ".join(["(abcdefghijk)"] * 12)
+    stream = "\n".join(
+        f"BT /F1 12 Tf 30 {740 - row * 14} Td [{words}] TJ ET" for row in range(40)
+    ).encode("ascii")
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 1200 800] "
+        b"/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>",
+        b"<< /Length "
+        + str(len(stream)).encode()
+        + b" >>\nstream\n"
+        + stream
+        + b"\nendstream",
+    ]
+    data = b"%PDF-1.4\n"
+    offsets = []
+    for number, obj in enumerate(objects, 1):
+        offsets.append(len(data))
+        data += f"{number} 0 obj\n".encode() + obj + b"\nendobj\n"
+    xref = len(data)
+    data += b"xref\n0 6\n0000000000 65535 f \n"
+    data += b"".join(f"{offset:010d} 00000 n \n".encode() for offset in offsets)
+    data += f"trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode()
+    return data
+
+
+def test_sparse_real_pdf_recovers_positioned_word_boundaries():
+    from markitdown import StreamInfo
+    import pdfplumber
+    import pdfminer.high_level
+
+    data = _make_sparse_positioned_pdf()
+    with pdfplumber.open(io.BytesIO(data)) as pdf:
+        assert len(pdf.pages[0].extract_words(x_tolerance=3)) == 40
+        assert len(pdf.pages[0].extract_words(x_tolerance=1)) == 480
+    collapsed = pdfminer.high_level.extract_text(io.BytesIO(data))
+    assert "abcdefghijkabcdefghijk" in collapsed
+    markdown = (
+        MarkItDown()
+        .convert_stream(io.BytesIO(data), stream_info=StreamInfo(extension=".pdf"))
+        .markdown
+    )
+    assert "abcdefghijkabcdefghijk" not in markdown
+    assert markdown.split() == ["abcdefghijk"] * 480
