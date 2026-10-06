@@ -345,5 +345,16 @@ def test_deeply_nested_html_fallback() -> None:
     assert "<p>" not in result.markdown
 
 
+def test_html_mailto_and_tel_links() -> None:
+    markitdown = MarkItDown()
+    html = '<p>Contact <a href="mailto:team@example.com">the team</a> or call <a href="tel:+1234567890">support</a>.</p>'
+    result = markitdown.convert_stream(
+        io.BytesIO(html.encode("utf-8")),
+        file_extension=".html",
+    )
+    assert "[the team](mailto:team@example.com)" in result.markdown
+    assert "[support](tel:+1234567890)" in result.markdown
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
