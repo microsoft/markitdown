@@ -5,7 +5,11 @@ from typing import BinaryIO, Any
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
-from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+from .._exceptions import (
+    MissingDependencyException,
+    MISSING_DEPENDENCY_MESSAGE,
+    UnsupportedFormatException,
+)
 
 # Pattern for MasterFormat-style partial numbering (e.g., ".1", ".2", ".10")
 PARTIAL_NUMBERING_PATTERN = re.compile(r"^\.\d+$")
@@ -498,6 +502,34 @@ class PdfConverter(DocumentConverter):
     Supports extracting tables into aligned Markdown format (via pdfplumber).
     Falls back to pdfminer if pdfplumber is missing or fails.
     """
+
+    @staticmethod
+    def reject_cad_pdf(file_stream: BinaryIO) -> None:
+        """Reject known CAD exporters; metadata is not a fidelity assessment."""
+        if _dependency_exc_info is not None:
+            raise MissingDependencyException(
+                "CAD PDF detection requires the PDF dependencies. "
+                "Install 'markitdown[pdf]'."
+            ) from _dependency_exc_info[1]
+
+        position = file_stream.tell()
+        try:
+            with pdfplumber.open(file_stream) as pdf:
+                metadata = pdf.metadata or {}
+                for field in ("Creator", "Producer"):
+                    value = metadata.get(field)
+                    if isinstance(value, str) and re.search(
+                        r"\b(?:AutoCAD|Revit|SolidWorks|MicroStation)\b", value, re.I
+                    ):
+                        raise UnsupportedFormatException(
+                            "CAD-generated PDF rejected: Creator or Producer metadata "
+                            "identifies a known CAD exporter. Text extraction cannot "
+                            "preserve drawing geometry, dimensions, or spatial relationships. "
+                            "Inspect the original PDF. Omit reject_cad_pdfs / "
+                            "--reject-cad-pdfs only if partial text extraction is acceptable."
+                        )
+        finally:
+            file_stream.seek(position)
 
     def accepts(
         self,
