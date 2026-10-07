@@ -333,28 +333,46 @@ class PptxConverter(DocumentConverter):
                 md += f": {chart.chart_title.text_frame.text}"
             md += "\n\n"
             data = []
-            category_names = [c.label for c in chart.plots[0].categories]
+            categories = chart.plots[0].categories
+            # Use flattened_labels to preserve multi-level (hierarchical)
+            # category labels (e.g. Year/Quarter). For flat (single-level)
+            # categories this returns 1-tuples equivalent to c.label.
+            flat_labels = list(categories.flattened_labels)
+            # Multi-level headers: one column per level plus "Category".
+            depth = max((len(lbl) for lbl in flat_labels), default=1)
+            if depth <= 1:
+                header = ["Category"]
+            else:
+                header = [f"Category (L{i+1})" for i in range(depth)]
             series_list = list(chart.series)
             series_names = [s.name for s in series_list]
-            data.append(["Category"] + series_names)
+            data.append(header + series_names)
 
             # Materialize each series' values once. Accessing series.values[idx]
             # inside the nested loop is O(n^2) in python-pptx (each lookup does an
             # XPath scan of all points), which is extremely slow on large charts.
             series_values = [list(s.values) for s in series_list]
 
-            for idx, category in enumerate(category_names):
-                row = [category]
+            for idx, label_tuple in enumerate(flat_labels):
+                row = list(label_tuple)
+                # Pad to depth in case some labels are shorter.
+                while len(row) < depth:
+                    row.append("")
                 for sv in series_values:
                     row.append(sv[idx] if idx < len(sv) else None)
                 data.append(row)
 
+            def _fmt(v):
+                if v is None:
+                    return ""
+                return str(v)
+
             markdown_table = []
             for row in data:
-                markdown_table.append("| " + " | ".join(map(str, row)) + " |")
-            header = markdown_table[0]
+                markdown_table.append("| " + " | ".join(_fmt(v) for v in row) + " |")
+            md_header = markdown_table[0]
             separator = "|" + "|".join(["---"] * len(data[0])) + "|"
-            return md + "\n".join([header, separator] + markdown_table[1:])
+            return md + "\n".join([md_header, separator] + markdown_table[1:])
         except ValueError as e:
             # Handle the specific error for unsupported chart types
             if "unsupported plot type" in str(e):
