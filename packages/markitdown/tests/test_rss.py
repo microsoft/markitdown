@@ -996,6 +996,79 @@ def test_rss_channel_description_and_date_preserve_complete_text() -> None:
 # Conversion regressions
 
 
+@pytest.mark.parametrize("exception_type", [KeyboardInterrupt, SystemExit])
+def test_xml_detection_propagates_control_exceptions(
+    exception_type: type[BaseException],
+) -> None:
+    error = exception_type()
+
+    class InterruptedStream(io.BytesIO):
+        def read(self, size: int = -1) -> bytes:
+            super().read(size)
+            raise error
+
+    stream = InterruptedStream(b"prefix<rss><channel/></rss>")
+    stream.seek(6)
+
+    with pytest.raises(exception_type) as caught:
+        RssConverter().accepts(stream, StreamInfo(extension=".xml"))
+
+    assert caught.value is error
+    assert stream.tell() == 6
+
+
+def test_xml_detection_rejects_malformed_xml_and_restores_position() -> None:
+    stream = io.BytesIO(b"prefix<rss>")
+    stream.seek(6)
+
+    assert not RssConverter().accepts(stream, StreamInfo(extension=".xml"))
+    assert stream.tell() == 6
+
+
+@pytest.mark.parametrize("field", ["rss-description", "atom-content"])
+@pytest.mark.parametrize("exception_type", [KeyboardInterrupt, SystemExit])
+def test_feed_conversion_propagates_control_exceptions(
+    field: str,
+    exception_type: type[BaseException],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    error = exception_type()
+
+    def interrupt_rendering(*args, **kwargs):
+        raise error
+
+    monkeypatch.setattr(
+        "markitdown.converters._rss_converter._CustomMarkdownify.convert_soup",
+        interrupt_rendering,
+    )
+    feed = _feed_with_body(field, "<p>Body.</p>")
+    stream_info = StreamInfo(extension=".rss" if field.startswith("rss-") else ".atom")
+
+    with pytest.raises(exception_type) as caught:
+        RssConverter().convert(io.BytesIO(feed), stream_info)
+
+    assert caught.value is error
+
+
+@pytest.mark.parametrize("field", ["rss-description", "atom-content"])
+def test_feed_conversion_preserves_content_on_rendering_error(
+    field: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fail_rendering(*args, **kwargs):
+        raise ValueError("Cannot render content")
+
+    monkeypatch.setattr(
+        "markitdown.converters._rss_converter._CustomMarkdownify.convert_soup",
+        fail_rendering,
+    )
+    feed = _feed_with_body(field, "<p>Body.</p>")
+    stream_info = StreamInfo(extension=".rss" if field.startswith("rss-") else ".atom")
+
+    result = RssConverter().convert(io.BytesIO(feed), stream_info)
+
+    assert result.markdown.split("## Entry\n", 1)[1] == "<p>Body.</p>"
+
+
 def test_deeply_nested_rss_item_fallback() -> None:
     """Deeply nested HTML inside an RSS item should fall back to plain-text
     extraction instead of silently embedding raw unconverted HTML in the
