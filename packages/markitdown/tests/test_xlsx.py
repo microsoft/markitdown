@@ -541,5 +541,24 @@ def test_xlsx_show_zeroes_rename_is_scoped_to_sheet_view_tags() -> None:
     assert b'<customSheetView showZeroes="0"/>' in repaired
 
 
+def test_xlsx_float_format_preserves_digits() -> None:
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    ws["A1"] = "money"
+    ws["A2"] = 123456789.123
+    ws["A3"] = 0.1
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    result = MarkItDown().convert_stream(buf, stream_info=StreamInfo(extension=".xlsx")).markdown
+    assert "123456789.123" in result
+    assert "0.1" in result
+    assert "1.234568e+08" not in result
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))

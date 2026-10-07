@@ -894,5 +894,49 @@ def test_pptx_chart_title_text_frame(title: str | None) -> None:
     assert result.strip() in markdown
 
 
+def test_unrecognized_shape_type_is_tolerated() -> None:
+    """When a shape has an unrecognized shape_type (raising NotImplementedError in python-pptx),
+    PptxConverter should tolerate it, extract any available text, and not abort conversion."""
+    converter = PptxConverter()
+
+    class _UnrecognizedShape:
+        @property
+        def shape_type(self):
+            raise NotImplementedError("Shape instance of unrecognized shape type")
+
+        has_text_frame = True
+        text = "Text in unrecognized shape"
+        has_chart = False
+        top = 10
+        left = 10
+
+    shape = _UnrecognizedShape()
+    assert converter._shape_type(shape) is None
+    assert converter._is_picture(shape) is False
+    assert converter._is_table(shape) is False
+
+
+def test_pptx_chart_missing_datapoints() -> None:
+    """Missing data points in charts (None) should render as empty cells rather than 'None'."""
+    presentation = Presentation(Path(PPTX_FIXTURE))
+    slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    data = CategoryChartData()
+    data.categories = ["Q1", "Q2", "Q3"]
+    data.add_series("Sales", (1.0, None, 3.0))
+    chart = slide.shapes.add_chart(
+        XL_CHART_TYPE.COLUMN_CLUSTERED,
+        Inches(1),
+        Inches(1),
+        Inches(5),
+        Inches(3),
+        data,
+    ).chart
+
+    converter = PptxConverter()
+    result = converter._convert_chart_to_markdown(chart)
+    assert "| Q2 |  |" in result or "| Q2 | |" in result
+    assert "None" not in result
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
