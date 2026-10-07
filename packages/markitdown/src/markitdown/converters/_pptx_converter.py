@@ -358,7 +358,8 @@ class PptxConverter(DocumentConverter):
 
             markdown_table = []
             for row in data:
-                markdown_table.append("| " + " | ".join(map(str, row)) + " |")
+                cells = ["" if cell is None else str(cell) for cell in row]
+                markdown_table.append("| " + " | ".join(cells) + " |")
             header = markdown_table[0]
             separator = "|" + "|".join(["---"] * len(data[0])) + "|"
             return md + "\n".join([header, separator] + markdown_table[1:])
