@@ -894,5 +894,27 @@ def test_pptx_chart_title_text_frame(title: str | None) -> None:
     assert result.strip() in markdown
 
 
+def test_unrecognized_shape_type_is_tolerated() -> None:
+    """When a shape has an unrecognized shape_type (raising NotImplementedError in python-pptx),
+    PptxConverter should tolerate it, extract any available text, and not abort conversion."""
+    converter = PptxConverter()
+
+    class _UnrecognizedShape:
+        @property
+        def shape_type(self):
+            raise NotImplementedError("Shape instance of unrecognized shape type")
+
+        has_text_frame = True
+        text = "Text in unrecognized shape"
+        has_chart = False
+        top = 10
+        left = 10
+
+    shape = _UnrecognizedShape()
+    assert converter._shape_type(shape) is None
+    assert converter._is_picture(shape) is False
+    assert converter._is_table(shape) is False
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
