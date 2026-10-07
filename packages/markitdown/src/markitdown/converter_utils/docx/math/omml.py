@@ -132,7 +132,7 @@ class Tag2Method(object):
 class Pr(Tag2Method):
     text = ""
 
-    __val_tags = ("chr", "pos", "begChr", "endChr", "type")
+    __val_tags = ("chr", "pos", "begChr", "endChr", "sepChr", "type")
 
     __innerdict = None  # can't use the __dict__
 
@@ -159,6 +159,8 @@ class Pr(Tag2Method):
         stag = elm.tag.replace(OMML_NS, "")
         if stag in self.__val_tags:
             t = elm.get("{0}val".format(OMML_NS))
+            if t is None and "{0}val".format(OMML_NS) not in elm.attrib and stag == "sepChr":
+                t = ""
             self.__innerdict[stag] = t
         return None
 
@@ -168,6 +170,7 @@ class Pr(Tag2Method):
         "pos": do_common,
         "begChr": do_common,
         "endChr": do_common,
+        "sepChr": do_common,
         "type": do_common,
     }
 
@@ -227,14 +230,28 @@ class oMath2Latex(Tag2Method):
         """
         the delimiter object
         """
-        c_dict = self.process_children_dict(elm)
-        pr = c_dict["dPr"]
+        pr = None
+        args = []
+        for stag, t, e in self.process_children_list(elm, include=("dPr", "e")):
+            if stag == "dPr":
+                pr = t
+            elif stag == "e":
+                args.append(t)
+
         null = D_DEFAULT.get("null")
-        s_val = get_char(pr.begChr, default=D_DEFAULT.get("left"), store=T)
-        e_val = get_char(pr.endChr, default=D_DEFAULT.get("right"), store=T)
-        return pr.text + D.format(
+        s_val = get_char(pr.begChr, default=D_DEFAULT.get("left"), store=T) if pr else D_DEFAULT.get("left")
+        e_val = get_char(pr.endChr, default=D_DEFAULT.get("right"), store=T) if pr else D_DEFAULT.get("right")
+
+        if pr and pr.sepChr is not None:
+            sep = escape_latex(pr.sepChr)
+        else:
+            sep = "|"
+
+        text = sep.join(args)
+        pr_text = pr.text if pr else ""
+        return pr_text + D.format(
             left=null if not s_val else escape_latex(s_val),
-            text=c_dict["e"],
+            text=text,
             right=null if not e_val else escape_latex(e_val),
         )
 
