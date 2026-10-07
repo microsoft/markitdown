@@ -193,44 +193,39 @@ class PdfConverterWithOCR(DocumentConverter):
                         images_on_page = self._extract_page_images(pdf_bytes, page_num)
 
                         if images_on_page:
-                            # Extract text lines with Y positions
-                            chars = page.chars
-                            if chars:
-                                # Group chars into lines based on Y position
+                            # Extract text lines with Y positions.
+                            # Use pdfplumber.extract_text_lines() which
+                            # preserves inter-word (and inter-column) spacing
+                            # rather than rebuilding lines by joining raw
+                            # chars with "" (which glued adjacent columns
+                            # together on pages containing an image).
+                            lines_with_y = []
+                            try:
+                                raw_lines = page.extract_text_lines(
+                                    strip=False, return_chars=False
+                                )
+                                for line in raw_lines:
+                                    text = line.get("text", "")
+                                    if text and text.strip():
+                                        lines_with_y.append(
+                                            {
+                                                "y": line.get("top", 0),
+                                                "text": text.rstrip(),
+                                            }
+                                        )
+                            except Exception:
                                 lines_with_y = []
-                                current_line = []
-                                current_y = None
 
-                                for char in sorted(
-                                    chars, key=lambda c: (c["top"], c["x0"])
-                                ):
-                                    y = char["top"]
-                                    if current_y is None:
-                                        current_y = y
-                                    elif abs(y - current_y) > 2:  # New line threshold
-                                        if current_line:
-                                            text = "".join(
-                                                [c["text"] for c in current_line]
-                                            )
-                                            lines_with_y.append(
-                                                {"y": current_y, "text": text.strip()}
-                                            )
-                                        current_line = []
-                                        current_y = y
-                                    current_line.append(char)
-
-                                # Add last line
-                                if current_line:
-                                    text = "".join([c["text"] for c in current_line])
-                                    lines_with_y.append(
-                                        {"y": current_y, "text": text.strip()}
-                                    )
-                            else:
-                                # Fallback: use simple text extraction
+                            if not lines_with_y:
+                                # Fallback: use simple text extraction split
+                                # into lines.
                                 text_content = page.extract_text() or ""
                                 lines_with_y = [
-                                    {"y": i * 10, "text": line}
-                                    for i, line in enumerate(text_content.split("\n"))
+                                    {"y": i * 10, "text": line.rstrip()}
+                                    for i, line in enumerate(
+                                        text_content.split("\n")
+                                    )
+                                    if line.strip()
                                 ]
 
                             # OCR all images
