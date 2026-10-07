@@ -175,5 +175,97 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         """Obsolete <strike> is still in the wild; treat it like <s>/<del>."""
         return self.convert_s(el, text, *args, **kwargs)  # type: ignore
 
+    def convert_colgroup(self, el, text, *args, **kwargs):
+        """<colgroup> carries presentational metadata only; skip its text."""
+        return ""
+
+    def convert_caption(self, el, text, parent_tags, *args, **kwargs):
+        """Emit the caption as a paragraph above the table, not inline
+        between header rows where it breaks the header-delimiter line."""
+        return text.strip() + "\n\n"
+
+    def convert_tfoot(self, el, text, parent_tags, *args, **kwargs):
+        """Render <tfoot> rows as plain body rows (no extra header)."""
+        return text
+
+    def convert_thead(self, el, text, parent_tags, *args, **kwargs):
+        return text
+
+    def convert_tbody(self, el, text, parent_tags, *args, **kwargs):
+        return text
+
+    def convert_table(self, el, text, parent_tags, *args, **kwargs):
+        """Reassemble a table so the header delimiter row sits under the
+        first header row, regardless of intervening <caption>/<colgroup>.
+
+        markdownify's default convert_tr keys off el.find_previous_sibling()
+        to detect "first row", which miscounts when a <caption> or
+        <colgroup> precedes the header <tr> (causing the delimiter line to
+        vanish). It also treats <tfoot> as a new header section, emitting
+        a spurious empty-header overline + delimiter for it. We fix
+        this by post-processing the rendered text: extract caption text,
+        locate the real delimiter row, and strip any spurious empty-header
+        rows / duplicate delimiters introduced by tfoot."""
+        import re as _re
+
+        rows = [r for r in text.split("\n") if r.strip().startswith("|")]
+        if not rows:
+            return "\n\n" + text.strip() + "\n\n"
+
+        ncols = max(r.count("|") - 1 for r in rows)
+        if ncols < 1:
+            ncols = 1
+
+        # Pattern for a delimiter row (|---|---|).
+        delim_re = _re.compile(r"^\|\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$")
+        # Pattern for an empty header overline markdownify inserts when it
+        # thinks a new "section" starts (|  |  |).
+        empty_row_re = _re.compile(r"^\|(\s*\|)+\s*$")
+
+        # Find the real delimiter: the first delimiter row that comes after
+        # the first non-empty row (the header). Drop any other delimiters
+        # and any empty-row overlines that precede them (the tfoot bug).
+        cleaned: list[str] = []
+        real_delim_added = False
+        i = 0
+        while i < len(rows):
+            r = rows[i]
+            is_delim = bool(delim_re.match(r.strip()))
+            is_empty = bool(empty_row_re.match(r.strip()))
+            if is_delim and not real_delim_added and i >= 1:
+                cleaned.append(r)
+                real_delim_added = True
+            elif is_delim:
+                # duplicate delimiter (from tfoot) - drop
+                pass
+            elif is_empty and not real_delim_added:
+                cleaned.append(r)
+            elif is_empty and real_delim_added:
+                # spurious empty-header overline from a <tfoot> (or any
+                # section after the real header) - drop it. The next row
+                # is the real content row.
+                pass
+            else:
+                cleaned.append(r)
+            i += 1
+
+        # If no real delimiter was present, insert one after the first row.
+        if not real_delim_added and len(cleaned) >= 1:
+            separator = "| " + " | ".join(["---"] * ncols) + " |"
+            cleaned = [cleaned[0], separator] + cleaned[1:]
+
+        # Pull the caption text out: it appears before the first |row|.
+        prefix_parts = []
+        for segment in text.split("\n"):
+            if segment.strip().startswith("|"):
+                break
+            if segment.strip():
+                prefix_parts.append(segment.strip())
+        prefix = ""
+        if prefix_parts:
+            prefix = " ".join(prefix_parts) + "\n\n"
+
+        return "\n\n" + prefix + "\n".join(cleaned).strip() + "\n\n"
+
     def convert_soup(self, soup: Any) -> str:
         return super().convert_soup(soup)  # type: ignore
