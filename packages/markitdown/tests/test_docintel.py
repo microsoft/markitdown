@@ -1,9 +1,15 @@
+"""Document Intelligence routing and client options."""
+
 import io
+
+from markitdown import StreamInfo
 from markitdown.converters._doc_intel_converter import (
     DocumentIntelligenceConverter,
     DocumentIntelligenceFileType,
 )
-from markitdown._stream_info import StreamInfo
+
+
+# Document Intelligence
 
 
 def _make_converter(file_types):

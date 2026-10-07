@@ -1,16 +1,18 @@
-"""Spreadsheet image hooks retain the native table pipeline and package bytes."""
+"""Spreadsheet conversion, compatibility repairs, and image hooks."""
 
 import inspect
 import io
+import zipfile
 from pathlib import Path
 from typing import Any, BinaryIO, Callable, Optional
 from unittest.mock import Mock
-import zipfile
 from xml.etree import ElementTree as ET
 
+import openpyxl
+import pytest
+from PIL import Image
 from bs4 import BeautifulSoup
 from defusedxml.common import EntitiesForbidden
-import openpyxl
 from openpyxl.drawing.image import Image as SheetImage
 from openpyxl.drawing.spreadsheet_drawing import (
     AbsoluteAnchor,
@@ -18,14 +20,44 @@ from openpyxl.drawing.spreadsheet_drawing import (
     OneCellAnchor,
     TwoCellAnchor,
 )
-from PIL import Image
-import pytest
 
-from markitdown import MissingDependencyException, StreamInfo
-from markitdown.converters import XlsConverter, XlsxConverter
-from markitdown.converters import _xlsx_converter
+from markitdown import MarkItDown, MissingDependencyException, StreamInfo
 from markitdown.converter_utils import _xlsx_images
+from markitdown.converters import XlsConverter, XlsxConverter, _xlsx_converter
 
+
+# Table cells
+
+
+def _convert_xlsx_dataframe(df) -> str:
+    pytest.importorskip("openpyxl")
+    pytest.importorskip("pandas")
+    import pandas as pd
+
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False)
+    buf.seek(0)
+    result = MarkItDown().convert_stream(buf, file_extension=".xlsx")
+    return result.markdown
+
+
+def test_xlsx_pipe_in_cell_is_escaped() -> None:
+    # Issue #2436: XLSX/XLS convert via HTML, so pipe escaping must apply there too.
+    pd = pytest.importorskip("pandas")
+    result = _convert_xlsx_dataframe(pd.DataFrame({"a": ["x|y"], "b": ["2"]}))
+
+    assert "| x\\|y | 2 |" in result
+
+
+def test_xlsx_pipe_in_header_is_escaped() -> None:
+    pd = pytest.importorskip("pandas")
+    result = _convert_xlsx_dataframe(pd.DataFrame({"a | b": [1], "c": [2]}))
+
+    assert "| a \\| b | c |" in result
+
+
+# Image hooks
 
 _INFO = StreamInfo(extension=".xlsx")
 
@@ -464,3 +496,81 @@ def test_missing_dependencies_and_legacy_xls_stay_separate(
         legacy.convert(io.BytesIO(data), StreamInfo(extension=".xls")).markdown
         == expected
     )
+
+
+# Conversion regressions
+
+
+def test_xlsx_legacy_show_zeroes_sheetview(tmp_path) -> None:
+    from openpyxl import Workbook
+
+    base_path = tmp_path / "base.xlsx"
+    xlsx_path = tmp_path / "legacy_show_zeroes.xlsx"
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Data"
+    sheet["A1"] = "hello"
+    sheet["B1"] = "world"
+    # A cell whose text is byte-identical to the malformed attribute. openpyxl stores it
+    # as an inline string, so it lands in the very worksheet part that gets repaired.
+    sheet["A2"] = ' showZeroes="0" '
+    workbook.save(base_path)
+
+    with zipfile.ZipFile(base_path) as source:
+        with zipfile.ZipFile(xlsx_path, "w", zipfile.ZIP_DEFLATED) as target:
+            for item in source.infolist():
+                data = source.read(item.filename)
+                if item.filename == "xl/worksheets/sheet1.xml":
+                    data = data.replace(
+                        b"<sheetView ", b'<sheetView showZeroes="0" ', 1
+                    )
+                    # Guard the fixture: the sheet view attribute and the cell text must
+                    # both live here, or this test stops exercising the repair.
+                    assert data.count(b'showZeroes="0"') == 2
+                target.writestr(item, data)
+
+    result = MarkItDown().convert(str(xlsx_path))
+
+    assert "## Data" in result.markdown
+    assert "hello" in result.markdown
+    assert "world" in result.markdown
+
+    # The repair must not reach into the worksheet's data: the cell keeps its text ...
+    assert 'showZeroes="0"' in result.markdown
+    # ... and no part of the document was silently renamed on the way through.
+    assert "showZeros" not in result.markdown
+
+
+def test_xlsx_show_zeroes_rename_is_scoped_to_sheet_view_tags() -> None:
+    from markitdown.converters._xlsx_converter import _rename_show_zeroes_attribute
+
+    worksheet_xml = (
+        b"<worksheet><sheetViews>"
+        b'<sheetView showZeroes="0" workbookViewId="0"/>'
+        b'<sheetView\n\tshowZeroes="1"\ttabSelected="1"/>'
+        b"</sheetViews>"
+        # openpyxl ignores custom sheet views entirely, so they need no repair
+        b'<customSheetViews><customSheetView showZeroes="0"/></customSheetViews>'
+        b'<sheetData><row r="1">'
+        b'<c r="A1" t="inlineStr"><is><t xml:space="preserve"> showZeroes="0" '
+        b"</t></is></c>"
+        b'<c r="B1"><f>IF(A1=" showZeroes=","x","y")</f><v>y</v></c>'
+        b"</row></sheetData></worksheet>"
+    )
+
+    repaired = _rename_show_zeroes_attribute(worksheet_xml)
+
+    # Every <sheetView> start tag is repaired, whatever separates its attributes ...
+    assert repaired.count(b"showZeros=") == 2
+    assert b'<sheetView showZeros="0" workbookViewId="0"/>' in repaired
+    assert b'<sheetView\n\tshowZeros="1"\ttabSelected="1"/>' in repaired
+
+    # ... and nothing outside those start tags is rewritten.
+    assert b'<t xml:space="preserve"> showZeroes="0" </t>' in repaired
+    assert b'<f>IF(A1=" showZeroes=","x","y")</f>' in repaired
+    assert b'<customSheetView showZeroes="0"/>' in repaired
+
+
+if __name__ == "__main__":
+    raise SystemExit(pytest.main([__file__]))
