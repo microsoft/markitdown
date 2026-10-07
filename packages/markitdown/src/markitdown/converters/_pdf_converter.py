@@ -62,9 +62,14 @@ _dependency_exc_info = None
 try:
     import pdfminer
     import pdfminer.high_level
+    import pdfminer.layout
     import pdfplumber
 except ImportError:
     _dependency_exc_info = sys.exc_info()
+
+_DEFAULT_LAPARAMS = (
+    pdfminer.layout.LAParams(all_texts=True) if "pdfminer" in sys.modules else None
+)
 
 
 ACCEPTED_MIME_TYPE_PREFIXES = [
@@ -555,9 +560,7 @@ class PdfConverter(DocumentConverter):
 
                     if page_content is not None:
                         form_page_count += 1
-                        page_results.append(
-                            {"type": "form", "content": page_content}
-                        )
+                        page_results.append({"type": "form", "content": page_content})
                     else:
                         plain_page_indices.append(page_idx)
                         fallback_text = page.extract_text() or ""
@@ -575,7 +578,9 @@ class PdfConverter(DocumentConverter):
             # the whole document (better text spacing and multi-column ordering).
             if form_page_count == 0:
                 pdf_bytes.seek(0)
-                markdown = pdfminer.high_level.extract_text(pdf_bytes)
+                markdown = pdfminer.high_level.extract_text(
+                    pdf_bytes, laparams=_DEFAULT_LAPARAMS
+                )
             else:
                 # For plain pages, use pdfminer to preserve multi-column reading order
                 # rather than pdfplumber's horizontal text extraction.
@@ -583,11 +588,16 @@ class PdfConverter(DocumentConverter):
                     try:
                         pdf_bytes.seek(0)
                         extracted = pdfminer.high_level.extract_text(
-                            pdf_bytes, page_numbers=plain_page_indices
+                            pdf_bytes,
+                            page_numbers=plain_page_indices,
+                            laparams=_DEFAULT_LAPARAMS,
                         )
                         # Pages in pdfminer output are separated by form feed (\x0c)
                         raw_pages = extracted.split("\x0c")
-                        if len(raw_pages) > len(plain_page_indices) and not raw_pages[-1].strip():
+                        if (
+                            len(raw_pages) > len(plain_page_indices)
+                            and not raw_pages[-1].strip()
+                        ):
                             raw_pages = raw_pages[:-1]
 
                         if len(raw_pages) == len(plain_page_indices):
@@ -598,9 +608,13 @@ class PdfConverter(DocumentConverter):
                             for item in page_results:
                                 if item["type"] == "plain":
                                     idx = item["page_idx"]
-                                    if idx in plain_text_by_idx and plain_text_by_idx[idx]:
+                                    if (
+                                        idx in plain_text_by_idx
+                                        and plain_text_by_idx[idx]
+                                    ):
                                         item["content"] = plain_text_by_idx[idx]
                     except Exception:
+                        # Fall back silently to pdfplumber text if pdfminer extraction fails
                         pass
 
                 markdown_chunks = [
@@ -613,12 +627,16 @@ class PdfConverter(DocumentConverter):
         except Exception:
             # Fallback if pdfplumber fails
             pdf_bytes.seek(0)
-            markdown = pdfminer.high_level.extract_text(pdf_bytes)
+            markdown = pdfminer.high_level.extract_text(
+                pdf_bytes, laparams=_DEFAULT_LAPARAMS
+            )
 
         # Fallback if still empty
         if not markdown:
             pdf_bytes.seek(0)
-            markdown = pdfminer.high_level.extract_text(pdf_bytes)
+            markdown = pdfminer.high_level.extract_text(
+                pdf_bytes, laparams=_DEFAULT_LAPARAMS
+            )
 
         # Post-process to merge MasterFormat-style partial numbering with following text
         markdown = _merge_partial_numbering_lines(markdown)
