@@ -1485,5 +1485,52 @@ def test_convert_docx_with_style_missing_type(tmp_path):
     assert "# Abstract" in result.markdown
 
 
+def test_omml_delimiter_multiple_arguments():
+    """<m:d> with multiple arguments should join them with sepChr (or default |)."""
+    # Explicit separator
+    omml_sep = """<m:oMathPara xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">
+        <m:oMath>
+            <m:r><m:t>f</m:t></m:r>
+            <m:d>
+                <m:dPr><m:sepChr m:val=","/></m:dPr>
+                <m:e><m:r><m:t>x</m:t></m:r></m:e>
+                <m:e><m:r><m:t>y</m:t></m:r></m:e>
+            </m:d>
+        </m:oMath>
+    </m:oMathPara>"""
+    results = list(load_string(omml_sep))
+    assert len(results) == 1
+    assert r"f\left(x,y\right)" in str(results[0])
+
+    # Default separator (vertical bar |) when sepChr element is omitted
+    omml_default_sep = """<m:oMathPara xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">
+        <m:oMath>
+            <m:d>
+                <m:dPr><m:begChr m:val="{"/><m:endChr m:val="}"/></m:dPr>
+                <m:e><m:r><m:t>x</m:t></m:r></m:e>
+                <m:e><m:r><m:t>x&gt;0</m:t></m:r></m:e>
+            </m:d>
+        </m:oMath>
+    </m:oMathPara>"""
+    results = list(load_string(omml_default_sep))
+    assert len(results) == 1
+    assert r"\left\{x|x>0\right\}" in str(results[0])
+
+    # Semicolon separator with 3 arguments
+    omml_semi = """<m:oMathPara xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">
+        <m:oMath>
+            <m:d>
+                <m:dPr><m:sepChr m:val=";"/></m:dPr>
+                <m:e><m:r><m:t>a</m:t></m:r></m:e>
+                <m:e><m:r><m:t>b</m:t></m:r></m:e>
+                <m:e><m:r><m:t>c</m:t></m:r></m:e>
+            </m:d>
+        </m:oMath>
+    </m:oMathPara>"""
+    results = list(load_string(omml_semi))
+    assert len(results) == 1
+    assert r"\left(a;b;c\right)" in str(results[0])
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
