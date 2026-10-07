@@ -602,6 +602,12 @@ class MarkItDown:
     def _convert(
         self, *, file_stream: BinaryIO, stream_info_guesses: List[StreamInfo], **kwargs
     ) -> DocumentConverterResult:
+        # Apply the requested policy before plugins, cloud services, and fallbacks.
+        if kwargs.get("reject_cad_pdfs") and any(
+            PdfConverter().accepts(file_stream, info) for info in stream_info_guesses
+        ):
+            PdfConverter.reject_cad_pdf(file_stream)
+
         res: Union[None, DocumentConverterResult] = None
 
         # Keep track of which converters throw exceptions
