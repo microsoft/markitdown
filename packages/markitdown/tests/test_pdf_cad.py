@@ -15,7 +15,9 @@ from markitdown._exceptions import (
 from markitdown.converters import _pdf_converter
 
 
-def drawing_pdf(creator="AutoCAD 2026", producer="PDF plotter", labels=True):
+def drawing_pdf(
+    creator="AutoCAD 2026", producer="PDF plotter", labels=True, creator_key="Creator"
+):
     # A minimal PDF with a vector floor plan and optional embedded text. Build
     # real cross-reference offsets so detection does not depend on parser repair.
     content = b"50 50 400 300 re S 250 50 m 250 350 l S"
@@ -32,7 +34,7 @@ def drawing_pdf(creator="AutoCAD 2026", producer="PDF plotter", labels=True):
         + content
         + b"\nendstream",
         b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-        f"<< /Creator ({creator}) /Producer ({producer}) >>".encode(),
+        f"<< /{creator_key} ({creator}) /Producer ({producer}) >>".encode(),
     ]
     data = b"%PDF-1.4\n"
     offsets = [0]
@@ -65,6 +67,16 @@ def test_known_exporter_metadata(field, exporter):
     with pytest.raises(UnsupportedFormatException, match="CAD-generated PDF"):
         MarkItDown().convert_stream(
             io.BytesIO(drawing_pdf(**metadata)), reject_cad_pdfs=True
+        )
+
+
+@pytest.mark.parametrize("creator_key", ["creator", "CREATOR"])
+def test_revit_export_with_nonstandard_metadata_key_case(creator_key):
+    # A public Revit 2026 PDF uses /creator rather than the standard /Creator.
+    with pytest.raises(UnsupportedFormatException, match="CAD-generated PDF"):
+        MarkItDown().convert_stream(
+            io.BytesIO(drawing_pdf(creator="Autodesk Revit", creator_key=creator_key)),
+            reject_cad_pdfs=True,
         )
 
 

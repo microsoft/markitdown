@@ -516,8 +516,10 @@ class PdfConverter(DocumentConverter):
         try:
             with pdfplumber.open(file_stream) as pdf:
                 metadata = pdf.metadata or {}
-                for field in ("Creator", "Producer"):
-                    value = metadata.get(field)
+                for field, value in metadata.items():
+                    # Revit exports may use /creator instead of /Creator.
+                    if field.casefold() not in ("creator", "producer"):
+                        continue
                     if isinstance(value, str) and re.search(
                         r"\b(?:AutoCAD|Revit|SolidWorks|MicroStation)\b", value, re.I
                     ):
