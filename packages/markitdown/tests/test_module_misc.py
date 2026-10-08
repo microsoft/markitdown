@@ -806,6 +806,61 @@ def test_explicit_charset_still_takes_precedence(markitdown: MarkItDown) -> None
     assert result.markdown == data.decode("cp1252")
 
 
+# Single-byte code page ties
+#
+# Western European text in cp1252 often scores exactly like cp1250 or a non-Latin
+# code page, and the detector then picks by name: "crème" came out as "crčme"
+# and "Café" as "Cafﻠ". Central European text in cp1250 must still decode as
+# cp1250.
+
+_CP1252_TEXTS = [
+    "Café crème",
+    "Le café crème coûte 3 € à la boulangerie près de l'église.",
+    "Señor Muñoz, año próximo",
+    "A informação está disponível na página de ações.",
+    "Blåbærgrød og rødgrød med fløde på ø-hoppet i Århus.",
+]
+
+_CP1250_TEXTS = [
+    "Zażółć gęślą jaźń. Łódź jest dużym miastem w Polsce.",
+    "Příliš žluťoučký kůň úpěl ďábelské ódy.",
+    "Árvíztűrő tükörfúrógép és őszintén szólva.",
+    "Čađava šuma, žuta ćuprija i đak u Zagrebu.",
+]
+
+
+@pytest.mark.parametrize(
+    "text", _CP1252_TEXTS, ids=["fr-short", "fr", "es", "pt", "da"]
+)
+def test_western_european_cp1252_text_is_decoded(
+    markitdown: MarkItDown, text: str
+) -> None:
+    result = markitdown.convert_stream(
+        io.BytesIO(text.encode("cp1252")), file_extension=".txt"
+    )
+    assert result.markdown == text
+
+
+@pytest.mark.parametrize("text", _CP1250_TEXTS, ids=["pl", "cs", "hu", "hr"])
+def test_central_european_cp1250_text_is_still_decoded(
+    markitdown: MarkItDown, text: str
+) -> None:
+    result = markitdown.convert_stream(
+        io.BytesIO(text.encode("cp1250")), file_extension=".txt"
+    )
+    assert result.markdown == text
+
+
+def test_western_european_cp1252_csv_is_decoded(markitdown: MarkItDown) -> None:
+    body = "Nom,Ville\r\nCafé Crème,Besançon\r\n"
+    result = markitdown.convert_stream(
+        io.BytesIO(body.encode("cp1252")), file_extension=".csv"
+    )
+    assert result.markdown == (
+        "| Nom | Ville |\n| --- | --- |\n| Café Crème | Besançon |"
+    )
+
+
 # Undetectable charsets
 
 # Tests for bytes no charset decodes.
