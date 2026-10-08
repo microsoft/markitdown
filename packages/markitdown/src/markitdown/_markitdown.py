@@ -18,6 +18,7 @@ import magika
 import charset_normalizer
 import codecs
 
+from ._charset_utils import best_charset_match
 from ._stream_info import StreamInfo
 from ._uri_utils import parse_data_uri, file_uri_to_path
 
@@ -770,7 +771,7 @@ class MarkItDown:
                     # Complete a split UTF-8 character at the sample boundary.
                     file_stream.seek(cur_pos)
                     stream_page = _read_charset_sample(file_stream)
-                    charset_result = charset_normalizer.from_bytes(stream_page).best()
+                    charset_result = best_charset_match(stream_page)
 
                     if charset_result is not None:
                         charset = self._normalize_charset(charset_result.encoding)
