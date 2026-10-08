@@ -38,7 +38,7 @@ def test_underline_preserves_whitespace_verbatim(whitespace: str) -> None:
         (" ", "First Last"),
         ("\t", "First Last"),
         ("&#160;", "First\u00a0Last"),
-        ("<br>", "First\nLast"),
+        ("<br>", "First  \nLast"),
         ("word", "First<u>word</u>Last"),
         (" word ", "First <u>word</u> Last"),
     ],
@@ -289,7 +289,7 @@ K</strike>L.</p>
             # A line break inside the element is kept, and the markup
             # survives it because strikethrough may span a single newline
             "Newline I~~J\nK~~L.",
-            "Break M~~N\nO~~P.",
+            "Break M~~N  \nO~~P.",
         ]
     )
 

@@ -98,6 +98,18 @@ def _read_charset_sample(file_stream: BinaryIO) -> bytes:
     return sample
 
 
+def _rstrip_preserving_hard_break(line: str) -> str:
+    """Drop insignificant trailing whitespace, but keep a CommonMark hard break.
+
+    Two or more trailing spaces before a newline are a hard line break. A line
+    that contains only whitespace is not one. Collapsing runs of blank lines is
+    unchanged.
+    """
+    if line.endswith("  ") and line.strip():
+        return line
+    return line.rstrip()
+
+
 # Lower priority values are tried first.
 PRIORITY_SPECIFIC_FILE_FORMAT = (
     0.0  # e.g., .docx, .pdf, .xlsx, Or specific pages, e.g., wikipedia
@@ -680,7 +692,10 @@ class MarkItDown:
                 if res is not None:
                     # Normalize the content
                     res.text_content = "\n".join(
-                        [line.rstrip() for line in re.split(r"\r?\n", res.text_content)]
+                        [
+                            _rstrip_preserving_hard_break(line)
+                            for line in re.split(r"\r?\n", res.text_content)
+                        ]
                     )
                     res.text_content = re.sub(r"\n{3,}", "\n\n", res.text_content)
                     return res
