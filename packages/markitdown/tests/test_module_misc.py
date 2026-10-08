@@ -748,6 +748,18 @@ def test_split_utf8_json_preserves_content(
     assert result.markdown == data.decode("utf-8")
 
 
+@pytest.mark.parametrize("text", ["ok ✓", "AAAㇰ"])
+def test_short_utf8_text_is_not_guessed_as_utf16(
+    markitdown: MarkItDown, text: str
+) -> None:
+    # charset_normalizer reads these short UTF-8 samples as UTF-16-BE.
+    stream = io.BytesIO(text.encode("utf-8"))
+
+    result = markitdown.convert_stream(stream, stream_info=StreamInfo(extension=".txt"))
+
+    assert result.markdown == text
+
+
 @pytest.mark.parametrize(
     "sample,tail",
     [
