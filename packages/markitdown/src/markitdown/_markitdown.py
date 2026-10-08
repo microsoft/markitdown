@@ -775,6 +775,15 @@ class MarkItDown:
                     if charset_result is not None:
                         charset = self._normalize_charset(charset_result.encoding)
 
+                    # The detector can read a short non-ASCII UTF-8 sample as
+                    # UTF-16 and garble it. Bytes that decode as UTF-8 are UTF-8.
+                    if not stream_page.isascii():
+                        try:
+                            stream_page.decode("utf-8")
+                            charset = "utf-8"
+                        except UnicodeDecodeError:
+                            pass
+
                 # Normalize the first extension listed
                 guessed_extension = None
                 if len(result.prediction.output.extensions) > 0:
