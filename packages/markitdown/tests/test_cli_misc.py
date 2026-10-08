@@ -45,6 +45,42 @@ def test_invalid_flag() -> None:
     assert "SYNTAX" in result.stderr, "Expected 'SYNTAX' to appear in STDERR"
 
 
+@pytest.mark.parametrize(
+    "mime_type",
+    [
+        'text/plain; profile="https://example.org/profile"',
+        'application/json; profile="https://example.org/a/b"; charset=utf-8',
+        "text/plain; charset=utf-8",
+    ],
+)
+def test_mime_type_parameters_are_preserved(monkeypatch, capsys, mime_type):
+    from markitdown import DocumentConverterResult
+
+    converter = MagicMock()
+    converter.convert_stream.return_value = DocumentConverterResult(markdown="Content")
+    monkeypatch.setattr("markitdown.__main__.MarkItDown", lambda **kwargs: converter)
+    monkeypatch.setattr(sys, "stdin", SimpleNamespace(buffer=io.BytesIO(b"Content")))
+    monkeypatch.setattr(sys, "argv", ["markitdown", "--mime-type", mime_type])
+
+    main()
+
+    assert converter.convert_stream.call_args.kwargs["stream_info"].mimetype == mime_type
+    assert capsys.readouterr().out.strip() == "Content"
+
+
+@pytest.mark.parametrize(
+    "mime_type", ["text/plain/extra; charset=utf-8", "text; profile=a/b"]
+)
+def test_invalid_media_type_is_not_hidden_by_parameters(monkeypatch, capsys, mime_type):
+    monkeypatch.setattr(sys, "argv", ["markitdown", "--mime-type", mime_type])
+
+    with pytest.raises(SystemExit) as exc:
+        main()
+
+    assert exc.value.code == 1
+    assert f"Invalid MIME type: {mime_type}" in capsys.readouterr().out
+
+
 def test_windows_pipe_input_is_buffered_before_conversion(monkeypatch, capsys) -> None:
     class WindowsPipe(io.BytesIO):
         def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:

@@ -160,7 +160,8 @@ def main():
     if mime_type_hint is not None:
         mime_type_hint = mime_type_hint.strip()
         if len(mime_type_hint) > 0:
-            if mime_type_hint.count("/") != 1:
+            # Parameters can contain slashes, e.g. a quoted profile URI.
+            if mime_type_hint.split(";", 1)[0].count("/") != 1:
                 _exit_with_error(f"Invalid MIME type: {mime_type_hint}")
         else:
             mime_type_hint = None
