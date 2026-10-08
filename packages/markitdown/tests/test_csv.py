@@ -6,7 +6,6 @@ import pytest
 
 from markitdown import MarkItDown, StreamInfo
 
-
 # Record separators
 
 
@@ -72,10 +71,20 @@ def test_csv_long_blank_runs(position: str) -> None:
         "all": blank,
     }[position]
 
-    result = MarkItDown(enable_plugins=False).convert_stream(
-        io.BytesIO(content),
-        stream_info=StreamInfo(extension=".csv", charset="utf-8"),
-    )
+    if position == "all":
+        with pytest.warns(
+            UserWarning,
+            match="CSV input is empty or contains only blank rows",
+        ):
+            result = MarkItDown(enable_plugins=False).convert_stream(
+                io.BytesIO(content),
+                stream_info=StreamInfo(extension=".csv", charset="utf-8"),
+            )
+    else:
+        result = MarkItDown(enable_plugins=False).convert_stream(
+            io.BytesIO(content),
+            stream_info=StreamInfo(extension=".csv", charset="utf-8"),
+        )
 
     expected = (
         "| name | value |  |\n"
@@ -138,8 +147,13 @@ def test_csv_blank_lines_between_rows_are_kept() -> None:
     )
 
 
-def test_csv_all_blank_input_returns_empty_markdown() -> None:
-    result = _convert_csv(b"\n\n\n")
+@pytest.mark.parametrize("data", [b"", b"\n\n\n"])
+def test_csv_empty_input_warns_and_returns_empty_markdown(data: bytes) -> None:
+    with pytest.warns(
+        UserWarning,
+        match="CSV input is empty or contains only blank rows",
+    ):
+        result = _convert_csv(data)
 
     assert result == ""
 
