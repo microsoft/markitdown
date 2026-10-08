@@ -221,3 +221,58 @@ def test_epub_metadata_and_text_are_unchanged() -> None:
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
+
+
+@pytest.mark.parametrize("prefixed_part", ["container", "package", "metadata"])
+def test_namespace_prefixes_do_not_change_epub_conversion(prefixed_part):
+    original = _build_epub(
+        [("c1", "one.xhtml"), ("c2", "two.xhtml")],
+        ["c2", "c1"],
+        {
+            "OEBPS/one.xhtml": ("First", "FIRST_BODY"),
+            "OEBPS/two.xhtml": ("Second", "SECOND_BODY"),
+        },
+    )
+    archive = io.BytesIO()
+    with zipfile.ZipFile(original) as source, zipfile.ZipFile(archive, "w") as target:
+        for entry in source.infolist():
+            content = source.read(entry)
+            if (
+                prefixed_part == "container"
+                and entry.filename == "META-INF/container.xml"
+            ):
+                text = content.decode().replace("xmlns=", "xmlns:ocf=")
+                for tag in ("container", "rootfiles", "rootfile"):
+                    text = text.replace(f"<{tag}", f"<ocf:{tag}").replace(
+                        f"</{tag}", f"</ocf:{tag}"
+                    )
+                content = text.encode()
+            elif entry.filename == "OEBPS/content.opf":
+                text = content.decode()
+                if prefixed_part == "package":
+                    text = text.replace("xmlns=", "xmlns:opf=")
+                    for tag in (
+                        "package",
+                        "metadata",
+                        "manifest",
+                        "spine",
+                        "itemref",
+                        "item",
+                    ):
+                        text = text.replace(f"<{tag}", f"<opf:{tag}").replace(
+                            f"</{tag}", f"</opf:{tag}"
+                        )
+                elif prefixed_part == "metadata":
+                    text = (
+                        text.replace("xmlns:dc=", "xmlns:book=")
+                        .replace("<dc:", "<book:")
+                        .replace("</dc:", "</book:")
+                    )
+                content = text.encode()
+            target.writestr(entry, content)
+    archive.seek(0)
+    result = EpubConverter().convert(archive, StreamInfo(extension=".epub"))
+    assert result.title == "Encoded Hrefs"
+    text = result.markdown.replace("\\", "")
+    assert "SECOND_BODY" in text and "FIRST_BODY" in text
+    assert text.index("SECOND_BODY") < text.index("FIRST_BODY")
