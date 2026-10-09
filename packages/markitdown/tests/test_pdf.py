@@ -1,8 +1,13 @@
 """PDF conversion, table extraction, numbering, and page cleanup."""
 
+import io
 import os
 import re
-from unittest.mock import patch
+import sys
+import types
+import warnings
+import zlib
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -1383,6 +1388,189 @@ def test_markitdown_remote() -> None:
     for test_string in PDF_TEST_STRINGS:
         assert test_string in result.text_content
 
+
+
+
+class TestPdfInlineImageRecovery:
+    """Recover text that pdfplumber/pdfminer drop after inline image data.
+
+    Some PDFs embed images with the inline-image operators (BI / ID / EI) in
+    the middle of a content stream. pdfminer truncates extraction at the raw
+    image bytes, so everything after the image is silently lost. When the
+    bytes contain inline-image markers, the converter compares against an
+    optional PyMuPDF extraction and keeps whichever recovers more text.
+    """
+
+    @staticmethod
+    def _inline_image_pdf_bytes() -> bytes:
+        return (
+            b"%PDF-1.7\n"
+            b"1 0 obj <<>> stream\n"
+            b"BT (BEFORE_IMAGE) Tj ET\n"
+            b"BI /W 1 /H 1 /BPC 1 /IM true ID\n"
+            b"abc\n"
+            b"EI\n"
+            b"BT (AFTER_IMAGE) Tj ET\n"
+            b"endstream endobj\n%%EOF\n"
+        )
+
+    @staticmethod
+    def _inline_image_pdf_bytes_compressed() -> bytes:
+        """Same inline image, but inside a Flate-compressed content stream."""
+        content = (
+            b"BT (BEFORE_IMAGE) Tj ET\n"
+            b"BI /W 1 /H 1 /BPC 1 /IM true ID\n"
+            b"abc\n"
+            b"EI\n"
+            b"BT (AFTER_IMAGE) Tj ET\n"
+        )
+        packed = zlib.compress(content)
+        return (
+            b"%PDF-1.7\n"
+            b"1 0 obj << /Length "
+            + str(len(packed)).encode()
+            + b" /Filter /FlateDecode >> stream\n"
+            + packed
+            + b"\nendstream endobj\n%%EOF\n"
+        )
+
+    @staticmethod
+    def _plain_page():
+        page = MagicMock()
+        page.width = 612
+        page.close = MagicMock()
+        page.extract_words.return_value = [
+            {
+                "text": "This is a long paragraph of plain text.",
+                "x0": 50,
+                "x1": 550,
+                "top": 10,
+                "bottom": 20,
+            },
+        ]
+        page.extract_text.return_value = "This is a long paragraph of plain text."
+        return page
+
+    @staticmethod
+    def _pdfplumber_open(pages):
+        def mock_open(stream):
+            mock_pdf = MagicMock()
+            mock_pdf.pages = pages
+            mock_pdf.__enter__ = MagicMock(return_value=mock_pdf)
+            mock_pdf.__exit__ = MagicMock(return_value=False)
+            return mock_pdf
+
+        return mock_open
+
+    def _convert(self, pages, pdf_bytes, monkeypatch=None, fitz_module=...):
+        from markitdown import StreamInfo
+
+        with (
+            patch("markitdown.converters._pdf_converter.pdfplumber") as mock_pdfplumber,
+            patch("markitdown.converters._pdf_converter.pdfminer") as mock_pdfminer,
+        ):
+            mock_pdfplumber.open.side_effect = self._pdfplumber_open(pages)
+            # pdfminer only sees the text before the image, matching what a
+            # truncated extraction produces for a stream with inline image data.
+            mock_pdfminer.high_level.extract_text.return_value = "BEFORE_IMAGE"
+            if fitz_module is not ...:
+                monkeypatch.setitem(sys.modules, "fitz", fitz_module)
+            result = MarkItDown().convert_stream(
+                io.BytesIO(pdf_bytes),
+                stream_info=StreamInfo(extension=".pdf", mimetype="application/pdf"),
+            )
+        return result
+
+    def test_uses_pymupdf_when_it_recovers_more_text(self, monkeypatch):
+        class FakePage:
+            def get_text(self, mode):
+                assert mode == "text"
+                return "BEFORE_IMAGE\nAFTER_IMAGE\n" + ("Recovered body. " * 50)
+
+        class FakeDoc:
+            def __iter__(self):
+                return iter([FakePage()])
+
+            def close(self):
+                pass
+
+        fake_fitz = types.SimpleNamespace(open=lambda *, stream, filetype: FakeDoc())
+        result = self._convert(
+            [self._plain_page()], self._inline_image_pdf_bytes(), monkeypatch, fake_fitz
+        )
+        assert "AFTER_IMAGE" in result.text_content
+
+    @pytest.mark.parametrize(
+        "pdf_bytes_factory",
+        [_inline_image_pdf_bytes.__func__, _inline_image_pdf_bytes_compressed.__func__],
+    )
+    def test_warns_when_pymupdf_is_missing(self, monkeypatch, pdf_bytes_factory):
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            result = self._convert(
+                [self._plain_page()], pdf_bytes_factory(), monkeypatch, None
+            )
+        assert result.text_content == "BEFORE_IMAGE"
+        assert any("inline image data" in str(item.message) for item in caught)
+
+    def test_detection_reads_flate_content_streams(self):
+        # The BI/ID/EI operators live in the page's content stream; when that
+        # stream is Flate-compressed the raw bytes show nothing.
+        from markitdown.converters._pdf_converter import _contains_inline_image
+
+        assert _contains_inline_image(self._inline_image_pdf_bytes())
+        assert _contains_inline_image(self._inline_image_pdf_bytes_compressed())
+        assert not _contains_inline_image(b"%PDF-1.7\nno images here")
+
+
+
+
+@pytest.mark.parametrize("padding", [170, 237])
+@pytest.mark.parametrize("delimiter", [b"\n", b"\r\n"])
+def test_flate_checksum_bytes_are_not_trimmed(padding, delimiter):
+    # Contributed-by-cagdasyurekli case: a compressed stream whose Adler-32
+    # checksum ends in 0x0a or 0x0d must not be trimmed as PDF whitespace.
+    from pdfminer.pdfdocument import PDFDocument
+    from pdfminer.pdfpage import PDFPage
+    from pdfminer.pdfparser import PDFParser
+    from markitdown.converters._pdf_converter import _contains_inline_image
+
+    content = (
+        b"q\nBI /W 1 /H 1 /BPC 8 /CS /G ID\n\x00\nEI\nQ\n% " + b"A" * padding + b"\n"
+    )
+    packed = zlib.compress(content)
+    # Adler-32 ends in 0x0a or 0x0d: these are data, not PDF whitespace.
+    assert packed[-1:] in (b"\n", b"\r")
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 100] "
+        b"/Resources << >> /Contents 4 0 R >>",
+        b"<< /Length "
+        + str(len(packed)).encode()
+        + b" /Filter /FlateDecode >>"
+        + b"\nstream\n"
+        + packed
+        + delimiter
+        + b"endstream",
+    ]
+    pdf = b"%PDF-1.7\n"
+    offsets = [0]
+    for number, obj in enumerate(objects, 1):
+        offsets.append(len(pdf))
+        pdf += f"{number} 0 obj\n".encode() + obj + b"\nendobj\n"
+    xref = len(pdf)
+    pdf += b"xref\n0 5\n0000000000 65535 f \n"
+    for offset in offsets[1:]:
+        pdf += f"{offset:010d} 00000 n \n".encode()
+    pdf += b"trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n"
+    pdf += str(xref).encode() + b"\n%%EOF\n"
+
+    # A real PDF parser must recognize the page and decode the intact stream.
+    document = PDFDocument(PDFParser(io.BytesIO(pdf)))
+    page = next(PDFPage.create_pages(document))
+    assert page.contents[0].get_data() == content
+    assert _contains_inline_image(pdf)
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
