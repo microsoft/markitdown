@@ -53,6 +53,9 @@ class HtmlConverter(DocumentConverter):
             if body_elm is not None and body_elm.source_line is None
             else body_elm or doc
         )
+        if body_elm is not None and body_elm.source_line is None:
+            for element in target.select("title, template"):
+                element.unwrap()
         webpage_text = _CustomMarkdown(**kwargs).convert(target).strip()
 
         return DocumentConverterResult(
