@@ -110,15 +110,6 @@ At the moment, the following optional dependencies are available:
 * `[audio-transcription]` Installs dependencies for audio transcription of wav and mp3 files
 * `[youtube-transcription]` Installs dependencies for fetching YouTube video transcription
 
-For PDFs containing bottom-to-top rotated text, pass the direction expected by
-pdfplumber when converting the document:
-
-```python
-from markitdown import MarkItDown
-
-result = MarkItDown().convert("rotated.pdf", pdf_char_dir_rotated="btt")
-```
-
 ### Plugins
 
 MarkItDown also supports 3rd-party plugins. Plugins are disabled by default. To list installed plugins:
@@ -279,6 +270,18 @@ md = MarkItDown(enable_plugins=False) # Set to True to enable plugins
 result = md.convert("test.xlsx")
 print(result.markdown)
 ```
+
+For PDFs containing rotated text, the built-in PDF converter accepts
+`pdf_char_dir_rotated="btt"` (bottom-to-top) or `"ttb"` (top-to-bottom):
+
+```python
+result = md.convert("rotated.pdf", pdf_char_dir_rotated="btt")
+```
+
+An explicit direction uses pdfplumber output for both text and table pages.
+Omitting the option or passing `None` retains the default extraction behavior.
+Other values raise a conversion error. The option controls character order;
+table column detection and multi-line header layout follow the existing rules.
 
 Document Intelligence conversion in Python:
 

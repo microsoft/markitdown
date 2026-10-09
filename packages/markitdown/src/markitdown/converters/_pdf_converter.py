@@ -404,9 +404,7 @@ def _extract_form_content_from_words(
     return "\n".join(result_lines)
 
 
-def _extract_tables_from_words(
-    page: Any, *, char_dir_rotated: str | None = None
-) -> list[list[list[str]]]:
+def _extract_tables_from_words(page: Any) -> list[list[list[str]]]:
     """
     Extract tables from a PDF page by analyzing word positions.
     This handles borderless tables where words are aligned in columns.
@@ -414,14 +412,7 @@ def _extract_tables_from_words(
     This function is designed for structured tabular data (like invoices),
     not for multi-column text layouts in scientific documents.
     """
-    extract_words_kwargs: dict[str, Any] = {
-        "keep_blank_chars": True,
-        "x_tolerance": 3,
-        "y_tolerance": 3,
-    }
-    if char_dir_rotated is not None:
-        extract_words_kwargs["char_dir_rotated"] = char_dir_rotated
-    words = page.extract_words(**extract_words_kwargs)
+    words = page.extract_words(keep_blank_chars=True, x_tolerance=3, y_tolerance=3)
     if not words:
         return []
 
@@ -555,6 +546,8 @@ class PdfConverter(DocumentConverter):
         assert isinstance(file_stream, io.IOBase)
 
         char_dir_rotated = kwargs.get("pdf_char_dir_rotated")
+        if char_dir_rotated not in (None, "ttb", "btt"):
+            raise ValueError("pdf_char_dir_rotated must be 'ttb', 'btt', or None")
         extract_text_kwargs: dict[str, Any] = {}
         if char_dir_rotated is not None:
             extract_text_kwargs["char_dir_rotated"] = char_dir_rotated
@@ -575,7 +568,7 @@ class PdfConverter(DocumentConverter):
             with pdfplumber.open(pdf_bytes) as pdf:
                 for page_idx, page in enumerate(pdf.pages):
                     page_content = _extract_form_content_from_words(
-                        page, char_dir_rotated=char_dir_rotated
+                        page, **extract_text_kwargs
                     )
 
                     if page_content is not None:
@@ -590,21 +583,22 @@ class PdfConverter(DocumentConverter):
 
                     page.close()  # Free cached page data immediately
 
-            # If no pages had form-style content, use pdfminer for
-            # the whole document (better text spacing for prose).
-            if form_page_count == 0:
+            # 显式指定旋转方向时，保留 pdfplumber 的提取结果。
+            if form_page_count == 0 and char_dir_rotated is None:
                 pdf_bytes.seek(0)
                 markdown = pdfminer.high_level.extract_text(pdf_bytes)
             else:
                 markdown = "\n\n".join(markdown_chunks).strip()
 
         except Exception:
+            if char_dir_rotated is not None:
+                raise
             # Fallback if pdfplumber fails
             pdf_bytes.seek(0)
             markdown = pdfminer.high_level.extract_text(pdf_bytes)
 
         # Fallback if still empty
-        if not markdown:
+        if not markdown and char_dir_rotated is None:
             pdf_bytes.seek(0)
             markdown = pdfminer.high_level.extract_text(pdf_bytes)
 

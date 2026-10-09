@@ -1,11 +1,20 @@
-#!/usr/bin/env python3 -m pytest
-"""Tests for PDF table extraction functionality."""
+"""PDF conversion, table extraction, numbering, and page cleanup."""
 
 import os
 import re
+from unittest.mock import patch
+
 import pytest
 
-from markitdown import MarkItDown
+from markitdown import FileConversionException, MarkItDown, StreamInfo
+from markitdown.converters._pdf_converter import (
+    PARTIAL_NUMBERING_PATTERN,
+    PdfConverter,
+    _merge_partial_numbering_lines,
+)
+
+
+# Table extraction
 
 TEST_FILES_DIR = os.path.join(os.path.dirname(__file__), "test_files")
 
@@ -51,8 +60,8 @@ def extract_markdown_tables(text_content):
     for line in lines:
         line = line.strip()
         if line.startswith("|") and line.endswith("|"):
-            # Skip separator rows (contain only dashes and pipes)
-            if re.match(r"^\|[\s\-|]+\|$", line):
+            # A separator needs dashes in every cell; retain blank data rows.
+            if re.match(r"^\|(?:\s*-+\s*\|)+$", line):
                 continue
             # Parse cells from the row
             cells = [cell.strip() for cell in line.split("|")[1:-1]]
@@ -271,7 +280,7 @@ class TestPdfTableExtraction:
         ), "Second table should come before Recommendations"
 
     def test_borderless_table_no_duplication(self, markitdown):
-        """Test that borderless table content is not duplicated excessively."""
+        """Each SKU reference appears once, without missing or duplicated content."""
         pdf_path = os.path.join(
             TEST_FILES_DIR, "SPARSE-2024-INV-1234_borderless_table.pdf"
         )
@@ -282,13 +291,9 @@ class TestPdfTableExtraction:
         result = markitdown.convert(pdf_path)
         text_content = result.text_content
 
-        # Count occurrences of unique table data - should not be excessively duplicated
-        # SKU-8847 appears in both tables, plus possibly once in summary text
+        # SKU-8847 appears once in each of two tables and once in the analysis.
         sku_count = text_content.count("SKU-8847")
-        # Should appear at most 4 times (2 tables + minor text references), not more
-        assert (
-            sku_count <= 4
-        ), f"SKU-8847 appears too many times ({sku_count}), suggests duplication issue"
+        assert sku_count == 3, f"Expected 3 SKU-8847 references, found {sku_count}"
 
     def test_borderless_table_correct_position(self, markitdown):
         """Test that tables appear in correct positions relative to text."""
@@ -626,31 +631,6 @@ class TestPdfTableExtraction:
             "multiagentconversations" not in text_content.lower()
         ), "Text should have proper spacing between words"
 
-    def test_scanned_pdf_handling(self, markitdown):
-        """Test handling of scanned/image-based PDF (no text layer).
-
-        Expected output: Empty - scanned PDFs without OCR have no text layer.
-        """
-        pdf_path = os.path.join(
-            TEST_FILES_DIR, "MEDRPT-2024-PAT-3847_medical_report_scan.pdf"
-        )
-
-        if not os.path.exists(pdf_path):
-            pytest.skip(f"Test file not found: {pdf_path}")
-
-        result = markitdown.convert(pdf_path)
-
-        # Scanned PDFs without OCR have no text layer, so extraction should be empty
-        assert (
-            result is not None
-        ), "Converter should return a result even for scanned PDFs"
-        assert result.text_content is not None, "text_content should not be None"
-
-        # Verify extraction is empty (no text layer in scanned PDF)
-        assert (
-            result.text_content.strip() == ""
-        ), f"Scanned PDF should have empty extraction, got: '{result.text_content[:100]}...'"
-
     def test_movie_theater_booking_pdf_extraction(self, markitdown):
         """Test extraction of movie theater booking PDF with complex tables.
 
@@ -746,35 +726,7 @@ class TestPdfFullOutputComparison:
         with open(expected_path, "r", encoding="utf-8") as f:
             expected_output = f.read()
 
-        # Compare outputs
-        actual_lines = [line.rstrip() for line in actual_output.split("\n")]
-        expected_lines = [line.rstrip() for line in expected_output.split("\n")]
-
-        # Check line count
-        assert abs(len(actual_lines) - len(expected_lines)) <= 2, (
-            f"Line count mismatch: actual={len(actual_lines)}, "
-            f"expected={len(expected_lines)}"
-        )
-
-        # Check structural elements
-        assert actual_output.count("|") > 80, "Should have many pipe separators"
-        assert actual_output.count("---") > 8, "Should have table separators"
-
-        # Validate critical sections
-        for section in [
-            "BOOKING ORDER",
-            "STARLIGHT CINEMAS",
-            "2024-12-5678",
-            "Holiday Spectacular",
-            "$12,500.00",
-        ]:
-            assert section in actual_output, f"Missing section: {section}"
-
-        # Check table structure
-        table_rows = [line for line in actual_lines if line.startswith("|")]
-        assert (
-            len(table_rows) > 15
-        ), f"Should have >15 table rows, got {len(table_rows)}"
+        assert actual_output == expected_output
 
     def test_sparse_borderless_table_full_output(self, markitdown):
         """Test complete output for SPARSE borderless table PDF."""
@@ -799,28 +751,7 @@ class TestPdfFullOutputComparison:
         with open(expected_path, "r", encoding="utf-8") as f:
             expected_output = f.read()
 
-        # Compare outputs
-        actual_lines = [line.rstrip() for line in actual_output.split("\n")]
-        expected_lines = [line.rstrip() for line in expected_output.split("\n")]
-
-        # Check line count is close
-        assert abs(len(actual_lines) - len(expected_lines)) <= 2, (
-            f"Line count mismatch: actual={len(actual_lines)}, "
-            f"expected={len(expected_lines)}"
-        )
-
-        # Check structural elements
-        assert actual_output.count("|") > 50, "Should have many pipe separators"
-
-        # Validate critical sections
-        for section in [
-            "INVENTORY RECONCILIATION REPORT",
-            "SPARSE-2024-INV-1234",
-            "SKU-8847",
-            "SKU-9201",
-            "Variance Analysis",
-        ]:
-            assert section in actual_output, f"Missing section: {section}"
+        assert actual_output == expected_output
 
     def test_repair_multipage_full_output(self, markitdown):
         """Test complete output for REPAIR multipage invoice PDF."""
@@ -841,28 +772,7 @@ class TestPdfFullOutputComparison:
         with open(expected_path, "r", encoding="utf-8") as f:
             expected_output = f.read()
 
-        # Compare outputs
-        actual_lines = [line.rstrip() for line in actual_output.split("\n")]
-        expected_lines = [line.rstrip() for line in expected_output.split("\n")]
-
-        # Check line count is close
-        assert abs(len(actual_lines) - len(expected_lines)) <= 2, (
-            f"Line count mismatch: actual={len(actual_lines)}, "
-            f"expected={len(expected_lines)}"
-        )
-
-        # Check structural elements
-        assert actual_output.count("|") > 40, "Should have many pipe separators"
-
-        # Validate critical sections
-        for section in [
-            "ZAVA AUTO REPAIR",
-            "Gabriel Diaz",
-            "Jeep",
-            "Grand Cherokee",
-            "GRAND TOTAL",
-        ]:
-            assert section in actual_output, f"Missing section: {section}"
+        assert actual_output == expected_output
 
     def test_receipt_full_output(self, markitdown):
         """Test complete output for RECEIPT retail purchase PDF."""
@@ -887,25 +797,7 @@ class TestPdfFullOutputComparison:
         with open(expected_path, "r", encoding="utf-8") as f:
             expected_output = f.read()
 
-        # Compare outputs
-        actual_lines = [line.rstrip() for line in actual_output.split("\n")]
-        expected_lines = [line.rstrip() for line in expected_output.split("\n")]
-
-        # Check line count is close
-        assert abs(len(actual_lines) - len(expected_lines)) <= 2, (
-            f"Line count mismatch: actual={len(actual_lines)}, "
-            f"expected={len(expected_lines)}"
-        )
-
-        # Validate critical sections
-        for section in [
-            "TECHMART ELECTRONICS",
-            "TXN-98765-2024",
-            "Sarah Mitchell",
-            "$821.14",
-            "RETURN POLICY",
-        ]:
-            assert section in actual_output, f"Missing section: {section}"
+        assert actual_output == expected_output
 
     def test_academic_paper_full_output(self, markitdown):
         """Test complete output for academic paper PDF."""
@@ -924,32 +816,10 @@ class TestPdfFullOutputComparison:
         with open(expected_path, "r", encoding="utf-8") as f:
             expected_output = f.read()
 
-        # Compare outputs
-        actual_lines = [line.rstrip() for line in actual_output.split("\n")]
-        expected_lines = [line.rstrip() for line in expected_output.split("\n")]
-
-        # Check line count is close
-        assert abs(len(actual_lines) - len(expected_lines)) <= 2, (
-            f"Line count mismatch: actual={len(actual_lines)}, "
-            f"expected={len(expected_lines)}"
-        )
-
-        # Academic paper should not have pipe separators
-        assert (
-            actual_output.count("|") == 0
-        ), "Academic paper should not have pipe separators"
-
-        # Validate critical sections
-        for section in [
-            "Introduction",
-            "Large language models",
-            "agents",
-            "multi-agent",
-        ]:
-            assert section in actual_output, f"Missing section: {section}"
+        assert actual_output == expected_output
 
     def test_medical_scan_full_output(self, markitdown):
-        """Test complete output for medical report scan PDF (empty, no text layer)."""
+        """A scanned PDF without OCR produces empty output and no Markdown tables."""
         pdf_path = os.path.join(
             TEST_FILES_DIR, "MEDRPT-2024-PAT-3847_medical_report_scan.pdf"
         )
@@ -976,6 +846,9 @@ class TestPdfFullOutputComparison:
         assert (
             expected_output.strip() == ""
         ), "Expected output should be empty for scanned PDF"
+        assert (
+            extract_markdown_tables(actual_output) == []
+        ), "Scanned PDF should have no extracted tables"
 
 
 class TestPdfTableMarkdownFormat:
@@ -1112,64 +985,38 @@ class TestPdfTableStructureConsistency:
             total_table_rows < 5
         ), f"Receipt should not have significant tables, found {total_table_rows} rows"
 
-    def test_scanned_pdf_no_tables(self, markitdown):
-        """Test that scanned PDF has empty extraction and no tables."""
-        pdf_path = os.path.join(
-            TEST_FILES_DIR, "MEDRPT-2024-PAT-3847_medical_report_scan.pdf"
-        )
-
-        if not os.path.exists(pdf_path):
-            pytest.skip(f"Test file not found: {pdf_path}")
-
-        result = markitdown.convert(pdf_path)
-
-        # Scanned PDF with no text layer should have empty extraction
-        assert (
-            result.text_content.strip() == ""
-        ), "Scanned PDF should have empty extraction"
-
-        tables = extract_markdown_tables(result.text_content)
-
-        # Scanned PDF with no text layer should have no tables
-        assert len(tables) == 0, "Scanned PDF should have no extracted tables"
-
-    def test_all_pdfs_table_rows_consistent(self, markitdown):
+    @pytest.mark.parametrize(
+        "pdf_file, expected_table_count",
+        [
+            ("SPARSE-2024-INV-1234_borderless_table.pdf", 2),
+            ("REPAIR-2022-INV-001_multipage.pdf", 6),
+            ("RECEIPT-2024-TXN-98765_retail_purchase.pdf", 0),
+            ("test.pdf", 0),
+        ],
+    )
+    def test_all_pdfs_table_rows_consistent(
+        self, markitdown, pdf_file, expected_table_count
+    ):
         """Test that all PDF tables have rows with pipe-separated content.
 
         Note: With gap-based column detection, rows may have different column counts
         depending on how content is spaced in the PDF. What's important is that each
         row has pipe separators and the content is readable.
         """
-        pdf_files = [
-            "SPARSE-2024-INV-1234_borderless_table.pdf",
-            "REPAIR-2022-INV-001_multipage.pdf",
-            "RECEIPT-2024-TXN-98765_retail_purchase.pdf",
-            "test.pdf",
-        ]
+        pdf_path = os.path.join(TEST_FILES_DIR, pdf_file)
+        result = markitdown.convert(pdf_path)
+        assert result.text_content.strip(), f"{pdf_file}: No text extracted"
 
-        for pdf_file in pdf_files:
-            pdf_path = os.path.join(TEST_FILES_DIR, pdf_file)
-            if not os.path.exists(pdf_path):
-                continue
+        tables = extract_markdown_tables(result.text_content)
+        assert (
+            len(tables) == expected_table_count
+        ), f"{pdf_file}: Expected {expected_table_count} tables, found {len(tables)}"
 
-            result = markitdown.convert(pdf_path)
-            tables = extract_markdown_tables(result.text_content)
-
-            for table_idx, table in enumerate(tables):
-                if not table:
-                    continue
-
-                # Verify each row has at least one column (pipe-separated content)
-                for row_idx, row in enumerate(table):
-                    assert (
-                        len(row) >= 1
-                    ), f"{pdf_file}: Table {table_idx}, row {row_idx} has no columns"
-
-                    # Verify the row has non-empty content
-                    row_content = " ".join(cell.strip() for cell in row)
-                    assert (
-                        len(row_content.strip()) > 0
-                    ), f"{pdf_file}: Table {table_idx}, row {row_idx} is empty"
+        for table_idx, table in enumerate(tables):
+            for row_idx, row in enumerate(table):
+                assert any(
+                    cell.strip() for cell in row
+                ), f"{pdf_file}: Table {table_idx}, row {row_idx} is empty"
 
     def test_borderless_table_data_integrity(self, markitdown):
         """Test that borderless table extraction preserves data integrity."""
@@ -1205,6 +1052,413 @@ class TestPdfTableStructureConsistency:
         assert "noitalupoP" in default_result.text_content
 
         result = markitdown.convert(pdf_path, pdf_char_dir_rotated="btt")
-        assert "Projected" in result.text_content
-        assert "Population" in result.text_content
+        assert "Projected Population" in result.text_content
         assert "noitalupoP" not in result.text_content
+        table = (
+            "| Column A | Column B | Column C |\n"
+            "| -------- | -------- | -------- |\n"
+            "| Alpha    | 100      | kg       |\n"
+            "| Beta     | 200      | lb       |"
+        )
+        assert table in default_result.text_content
+        assert table in result.text_content
+
+    @pytest.mark.parametrize("direction", ["btt", "ttb"])
+    def test_rotated_plain_text_direction(self, markitdown, direction):
+        pdf_path = os.path.join(TEST_FILES_DIR, f"rotated_plain_{direction}.pdf")
+        with open(pdf_path, "rb") as stream:
+            result = markitdown.convert_stream(
+                stream,
+                stream_info=StreamInfo(extension=".pdf"),
+                pdf_char_dir_rotated=direction,
+            )
+        assert result.text_content == (
+            "Rotation example\nProjected\nPopulation\nKharif\nRice"
+        )
+
+    def test_rotated_mixed_pages_preserve_order(self, markitdown):
+        pdf_path = os.path.join(TEST_FILES_DIR, "rotated_mixed.pdf")
+        result = markitdown.convert(pdf_path, pdf_char_dir_rotated="btt")
+        plain_page = "Rotation example\nProjected\nPopulation\nKharif\nRice"
+        table_page = (
+            "Inventory\n"
+            "| Column A | Column B | Column C |\n"
+            "| -------- | -------- | -------- |\n"
+            "| Alpha    | 100      | kg       |\n"
+            "| Beta     | 200      | lb       |"
+        )
+        assert result.text_content == "\n\n".join((plain_page, table_page, plain_page))
+
+    @pytest.mark.parametrize("direction", ["", "foo", "ltr", "rtl", True, 1, [], {}])
+    def test_invalid_rotated_direction_raises(self, markitdown, direction):
+        pdf_path = os.path.join(TEST_FILES_DIR, "rotated_table.pdf")
+        with open(pdf_path, "rb") as stream:
+            with pytest.raises(ValueError, match="pdf_char_dir_rotated"):
+                PdfConverter().convert(
+                    stream,
+                    StreamInfo(extension=".pdf"),
+                    pdf_char_dir_rotated=direction,
+                )
+            assert stream.tell() == 0
+        with pytest.raises(FileConversionException, match="pdf_char_dir_rotated"):
+            markitdown.convert(pdf_path, pdf_char_dir_rotated=direction)
+
+    @pytest.mark.parametrize("kind", ["plain", "form", "mixed"])
+    def test_unset_rotated_direction_preserves_default(self, markitdown, kind):
+        pdf_path = os.path.join(TEST_FILES_DIR, f"pdf_cleanup_{kind}.pdf")
+        default = markitdown.convert(pdf_path).text_content
+        assert default.strip()
+        assert (
+            markitdown.convert(pdf_path, pdf_char_dir_rotated=None).text_content
+            == default
+        )
+
+    @pytest.mark.parametrize("direction", ["btt", "ttb"])
+    def test_rotated_direction_with_empty_page(self, markitdown, direction):
+        pdf_path = os.path.join(TEST_FILES_DIR, "rotated_empty.pdf")
+        result = markitdown.convert(pdf_path, pdf_char_dir_rotated=direction)
+        assert result.text_content == ""
+
+
+# MasterFormat numbering
+
+
+class TestMasterFormatPartialNumbering:
+    """Test handling of MasterFormat-style partial numbering (.1, .2, etc.)."""
+
+    def test_partial_numbering_pattern_regex(self):
+        """Test that the partial numbering regex pattern correctly matches."""
+
+        # Should match partial numbering patterns
+        assert PARTIAL_NUMBERING_PATTERN.match(".1") is not None
+        assert PARTIAL_NUMBERING_PATTERN.match(".2") is not None
+        assert PARTIAL_NUMBERING_PATTERN.match(".10") is not None
+        assert PARTIAL_NUMBERING_PATTERN.match(".99") is not None
+
+        # Should NOT match other patterns
+        assert PARTIAL_NUMBERING_PATTERN.match("1.") is None
+        assert PARTIAL_NUMBERING_PATTERN.match("1.2") is None
+        assert PARTIAL_NUMBERING_PATTERN.match(".1.2") is None
+        assert PARTIAL_NUMBERING_PATTERN.match("text") is None
+        assert PARTIAL_NUMBERING_PATTERN.match(".a") is None
+        assert PARTIAL_NUMBERING_PATTERN.match("") is None
+
+    def test_masterformat_partial_numbering_not_split(self):
+        """Test that MasterFormat partial numbering stays with associated text.
+
+        MasterFormat documents use partial numbering like:
+            .1  The intent of this Request for Proposal...
+            .2  Available information relative to...
+
+        These should NOT be split into separate table columns, but kept
+        as coherent text lines with the number followed by its description.
+        """
+        pdf_path = os.path.join(TEST_FILES_DIR, "masterformat_partial_numbering.pdf")
+
+        markitdown = MarkItDown()
+        result = markitdown.convert(pdf_path)
+        text_content = result.text_content
+
+        # Partial numberings should NOT appear isolated on their own lines
+        # If they're isolated, it means the parser incorrectly split them from their text
+        lines = text_content.split("\n")
+        isolated_numberings = []
+        for line in lines:
+            stripped = line.strip()
+            # Check if line contains ONLY a partial numbering (with possible whitespace/pipes)
+            cleaned = stripped.replace("|", "").strip()
+            if cleaned in [".1", ".2", ".3", ".4", ".5", ".6", ".7", ".8", ".9", ".10"]:
+                isolated_numberings.append(stripped)
+
+        assert len(isolated_numberings) == 0, (
+            f"Partial numberings should not be isolated from their text. "
+            f"Found isolated: {isolated_numberings}"
+        )
+
+        # Verify that partial numberings appear WITH following text on the same line
+        # Look for patterns like ".1 The intent" or ".1  Some text"
+        partial_with_text = re.findall(r"\.\d+\s+\w+", text_content)
+        assert (
+            len(partial_with_text) > 0
+        ), "Expected to find partial numberings followed by text on the same line"
+
+    def test_masterformat_content_preserved(self):
+        """Test that MasterFormat document content is fully preserved."""
+        pdf_path = os.path.join(TEST_FILES_DIR, "masterformat_partial_numbering.pdf")
+
+        markitdown = MarkItDown()
+        result = markitdown.convert(pdf_path)
+        text_content = result.text_content
+
+        # Verify key content from the MasterFormat document is preserved
+        expected_content = [
+            "RFP for Construction Management Services",
+            "Section 00 00 43",
+            "Instructions to Respondents",
+            "Ken Sargent House",
+            "INTENT",
+            "Request for Proposal",
+            "KEN SARGENT HOUSE",
+            "GRANDE PRAIRIE, ALBERTA",
+            "Section 00 00 45",
+        ]
+
+        for content in expected_content:
+            assert (
+                content in text_content
+            ), f"Expected content '{content}' not found in extracted text"
+
+        # Verify partial numbering is followed by text on the same line
+        # .1 should be followed by "The intent" on the same line
+        assert re.search(
+            r"\.1\s+The intent", text_content
+        ), "Partial numbering .1 should be followed by 'The intent' text"
+
+        # .2 should be followed by "Available information" on the same line
+        assert re.search(
+            r"\.2\s+Available information", text_content
+        ), "Partial numbering .2 should be followed by 'Available information' text"
+
+        # Ensure text content is not empty and has reasonable length
+        assert (
+            len(text_content.strip()) > 100
+        ), "MasterFormat document should have substantial text content"
+
+    @pytest.mark.parametrize(
+        "blank_lines",
+        ["", "\n\n", " \n\t"],
+        ids=["one-blank-line", "multiple-blank-lines", "whitespace-only-lines"],
+    )
+    def test_merge_partial_numbering_with_empty_lines_between(self, blank_lines):
+        """Merge across blank lines while preserving surrounding text and paragraphs."""
+        text = (
+            "Heading\n\n"
+            f".1\n{blank_lines}\nThe intent of this Request...\n"
+            "Continuation.\n\n"
+            f".10\n{blank_lines}\nAvailable information."
+        )
+        expected = (
+            "Heading\n\n"
+            ".1 The intent of this Request...\n"
+            "Continuation.\n\n"
+            ".10 Available information."
+        )
+
+        assert _merge_partial_numbering_lines(text) == expected
+
+    def test_multiple_partial_numberings_all_merged(self):
+        """Test that all partial numberings in a document are properly merged."""
+        pdf_path = os.path.join(TEST_FILES_DIR, "masterformat_partial_numbering.pdf")
+
+        markitdown = MarkItDown()
+        result = markitdown.convert(pdf_path)
+        text_content = result.text_content
+
+        # Count occurrences of merged partial numberings (number followed by text)
+        merged_count = len(re.findall(r"\.\d+\s+[A-Za-z]", text_content))
+
+        # Count isolated partial numberings (number alone on a line)
+        isolated_count = 0
+        for line in text_content.split("\n"):
+            stripped = line.strip()
+            if re.match(r"^\.\d+$", stripped):
+                isolated_count += 1
+
+        assert (
+            merged_count >= 2
+        ), f"Expected at least 2 merged partial numberings, found {merged_count}"
+        assert (
+            isolated_count == 0
+        ), f"Found {isolated_count} isolated partial numberings that weren't merged"
+
+
+# Page cleanup and extraction fallback
+
+# Tests for PDF converter memory optimization.
+#
+# Verifies that:
+# - page.close() is called after processing each page (frees cached data)
+# - Plain-text PDFs fall back to pdfminer when no form pages are found
+# - Mixed PDFs use form extraction only on form-style pages
+
+
+@pytest.fixture
+def pdf_activity(monkeypatch):
+    """Record parser activity while executing every real library operation."""
+    import pdfplumber
+    from markitdown.converters import _pdf_converter
+
+    events = []
+    original_open = pdfplumber.open
+    original_page_close = pdfplumber.page.Page.close
+    original_extract_text = _pdf_converter.pdfminer.high_level.extract_text
+    original_form_extraction = _pdf_converter._extract_form_content_from_words
+
+    def open_pdf(*args, **kwargs):
+        events.append(("open", None))
+        return original_open(*args, **kwargs)
+
+    def close_page(page):
+        events.append(("close", page.page_number))
+        return original_page_close(page)
+
+    def extract_text(*args, **kwargs):
+        events.append(("pdfminer", None))
+        return original_extract_text(*args, **kwargs)
+
+    def extract_form(page):
+        result = original_form_extraction(page)
+        events.append(("form" if result is not None else "plain", page.page_number))
+        return result
+
+    monkeypatch.setattr(pdfplumber, "open", open_pdf)
+    monkeypatch.setattr(pdfplumber.page.Page, "close", close_page)
+    monkeypatch.setattr(
+        _pdf_converter.pdfminer.high_level, "extract_text", extract_text
+    )
+    monkeypatch.setattr(
+        _pdf_converter, "_extract_form_content_from_words", extract_form
+    )
+    return events
+
+
+def _convert_cleanup_fixture(kind):
+    return (
+        MarkItDown()
+        .convert(os.path.join(TEST_FILES_DIR, f"pdf_cleanup_{kind}.pdf"))
+        .markdown
+    )
+
+
+class TestPdfMemoryOptimization:
+    """Exercise page cleanup and fallback using copied, real PDF packages."""
+
+    def test_page_close_called_on_every_page(self, pdf_activity):
+        markdown = _convert_cleanup_fixture("form")
+        assert markdown.count("ZAVA AUTO REPAIR") == 3
+        for page in (1, 2, 3):
+            extracted = pdf_activity.index(("form", page))
+            closed = pdf_activity.index(("close", page))
+            assert extracted < closed
+            if page < 3:
+                assert closed < pdf_activity.index(("form", page + 1))
+
+    def test_plain_text_pdf_falls_back_to_pdfminer(self, pdf_activity):
+        markdown = _convert_cleanup_fixture("plain")
+        assert pdf_activity.count(("pdfminer", None)) == 1
+        assert [(kind, page) for kind, page in pdf_activity if kind == "plain"] == [
+            ("plain", 1),
+            ("plain", 2),
+            ("plain", 3),
+        ]
+        assert markdown.count("While there is contemporaneous exploration") == 3
+
+    def test_plain_text_pdf_still_closes_all_pages(self, pdf_activity):
+        _convert_cleanup_fixture("plain")
+        fallback = pdf_activity.index(("pdfminer", None))
+        for page in (1, 2, 3):
+            extracted = pdf_activity.index(("plain", page))
+            closed = pdf_activity.index(("close", page))
+            assert extracted < closed < fallback
+            if page < 3:
+                assert closed < pdf_activity.index(("plain", page + 1))
+
+    def test_mixed_pdf_uses_form_extraction_per_page(self, pdf_activity):
+        markdown = _convert_cleanup_fixture("mixed")
+        assert [
+            (kind, page) for kind, page in pdf_activity if kind in ("form", "plain")
+        ] == [("form", 1), ("plain", 2), ("form", 3)]
+        assert ("pdfminer", None) not in pdf_activity
+        assert markdown.count("ZAVA AUTO REPAIR") == 2
+        assert "While there is contemporaneous exploration" in markdown
+        assert "|" in markdown
+
+    def test_only_one_pdfplumber_open_call(self, pdf_activity):
+        _convert_cleanup_fixture("form")
+        assert pdf_activity.count(("open", None)) == 1
+
+    @pytest.mark.skipif(
+        not os.path.exists(
+            os.path.join(TEST_FILES_DIR, "REPAIR-2022-INV-001_multipage.pdf")
+        ),
+        reason="Multipage invoice PDF not available",
+    )
+    def test_real_pdf_page_cleanup(self):
+        """Close each real page before the next page or document cleanup begins."""
+        import pdfplumber
+
+        events = []
+        page_numbers = []
+        original_extract_words = pdfplumber.page.Page.extract_words
+        original_page_close = pdfplumber.page.Page.close
+        original_pdf_close = pdfplumber.PDF.close
+
+        def tracking_extract_words(page, *args, **kwargs):
+            events.append(("extract", page.page_number))
+            return original_extract_words(page, *args, **kwargs)
+
+        def tracking_page_close(page):
+            events.append(("close", page.page_number))
+            return original_page_close(page)
+
+        def tracking_pdf_close(pdf):
+            page_numbers.extend(page.page_number for page in pdf.pages)
+            events.append(("document_close", None))
+            return original_pdf_close(pdf)
+
+        with patch.object(
+            pdfplumber.page.Page, "extract_words", tracking_extract_words
+        ), patch.object(
+            pdfplumber.page.Page, "close", tracking_page_close
+        ), patch.object(
+            pdfplumber.PDF, "close", tracking_pdf_close
+        ):
+            pdf_path = os.path.join(TEST_FILES_DIR, "REPAIR-2022-INV-001_multipage.pdf")
+            MarkItDown().convert(pdf_path)
+
+        # Assert outside the spies: conversion catches pdfplumber exceptions and
+        # falls back to pdfminer, which could otherwise hide assertion failures.
+        assert len(page_numbers) > 1, "The fixture must exercise multiple pages"
+        document_close = events.index(("document_close", None))
+        for index, page_number in enumerate(page_numbers):
+            extracted = events.index(("extract", page_number))
+            closed = events.index(("close", page_number))
+            next_extraction = (
+                events.index(("extract", page_numbers[index + 1]))
+                if index + 1 < len(page_numbers)
+                else document_close
+            )
+            assert extracted < closed < next_extraction, (
+                f"Page {page_number} must be closed after extraction and before "
+                f"the next page or document cleanup: {events}"
+            )
+
+
+# Conversion regressions
+
+skip_remote = (
+    True if os.environ.get("GITHUB_ACTIONS") else False
+)  # Don't run these tests in CI
+
+PDF_TEST_URL = "https://arxiv.org/pdf/2308.08155v2.pdf"
+
+PDF_TEST_STRINGS = [
+    "While there is contemporaneous exploration of multi-agent approaches"
+]
+
+
+@pytest.mark.skipif(
+    skip_remote,
+    reason="do not run tests that query external urls",
+)
+def test_markitdown_remote() -> None:
+    markitdown = MarkItDown()
+
+    # By URL
+    result = markitdown.convert(PDF_TEST_URL)
+    for test_string in PDF_TEST_STRINGS:
+        assert test_string in result.text_content
+
+
+if __name__ == "__main__":
+    raise SystemExit(pytest.main([__file__]))
