@@ -152,7 +152,8 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
     ) -> str:
         """Convert checkboxes to Markdown [x]/[ ] syntax."""
 
-        if el.get("type") == "checkbox":
+        input_type = el.get("type") or ""
+        if input_type.isascii() and input_type.lower() == "checkbox":
             return "[x] " if el.has_attr("checked") else "[ ] "
         return ""
 
