@@ -22,6 +22,33 @@ def _convert_html(html: str, **kwargs) -> str:
     return result.markdown
 
 
+@pytest.mark.parametrize("input_type", ["checkbox", "CHECKBOX", "Checkbox", "cHeCkBoX"])
+@pytest.mark.parametrize("checked", [False, True])
+def test_html_checkbox_type_is_ascii_case_insensitive(
+    input_type: str, checked: bool
+) -> None:
+    checked_attribute = " checked" if checked else ""
+    html = f'<p><input type="{input_type}"{checked_attribute}>Task</p>'
+
+    assert _convert_html(html) == ("[x] Task" if checked else "[ ] Task")
+
+
+@pytest.mark.parametrize(
+    "type_attribute",
+    [
+        "",
+        " type",
+        ' type=""',
+        ' type="text"',
+        ' type="radio"',
+        ' type=" checkbox "',
+        ' type="chec\u212abox"',
+    ],
+)
+def test_html_non_checkbox_inputs_do_not_render_markers(type_attribute: str) -> None:
+    assert _convert_html(f"<p><input{type_attribute} checked>Task</p>") == "Task"
+
+
 @pytest.mark.parametrize(
     "whitespace", ["", " ", "  ", "\t", "\n", "\r\n", "\u00a0", " \t\n\u00a0 "]
 )
