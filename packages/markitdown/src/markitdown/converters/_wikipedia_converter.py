@@ -57,15 +57,16 @@ class WikipediaConverter(DocumentConverter):
 
         # Print only the main content
         body_elm = doc.select_one("div#mw-content-text")
-        title_elm = doc.select_one("span.mw-page-title-main") or doc.select_one("h1#firstHeading")
+        title_elm = doc.select_one("span.mw-page-title-main") or doc.select_one(
+            "h1#firstHeading"
+        )
 
         webpage_text = ""
         main_title = _document_title(doc)
 
         if body_elm:
-            # What's the title
-        body_elm = doc.select_one("div#mw-content-text")
-        title_elm = doc.select_one("span.mw-page-title-main") or doc.select_one("h1#firstHeading")
+            if title_elm:
+                main_title = title_elm.text or None
 
             # Treat whitespace-only titles as if they were absent
             if main_title:
