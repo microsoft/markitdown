@@ -6,12 +6,9 @@ import warnings
 from typing import Final
 
 import pytest
-from bs4 import BeautifulSoup
 
 from markitdown import MarkItDown, StreamInfo
 from markitdown.converters import WikipediaConverter
-from markitdown.converters._markdownify import _CustomMarkdownify
-
 
 # HTML rendering
 
@@ -23,15 +20,6 @@ def _convert_html(html: str, **kwargs) -> str:
         **kwargs,
     )
     return result.markdown
-
-
-@pytest.mark.parametrize(
-    "whitespace", ["", " ", "  ", "\t", "\n", "\r\n", "\u00a0", " \t\n\u00a0 "]
-)
-def test_underline_preserves_whitespace_verbatim(whitespace: str) -> None:
-    element = BeautifulSoup("<u></u>", "html.parser").u
-
-    assert _CustomMarkdownify().convert_u(element, whitespace) == whitespace
 
 
 @pytest.mark.parametrize(
@@ -51,7 +39,7 @@ def test_html_underlined_content_is_preserved(content: str, expected: str) -> No
 
 
 def test_preserves_non_utf8_percent_encoded_href_path() -> None:
-    href = "https://abc.com/hist/" "%a5%c8%a5%c3%a5%d7%a5%da%a1%bc%a5%b8"
+    href = "https://abc.com/hist/%a5%c8%a5%c3%a5%d7%a5%da%a1%bc%a5%b8"
     html = f'<a href="{href}">example</a>'
 
     markdown = _convert_html(html)
@@ -62,7 +50,7 @@ def test_preserves_non_utf8_percent_encoded_href_path() -> None:
 
 def test_html_href_still_quotes_raw_unicode_and_spaces() -> None:
     href = "https://example.com/a path/日本語"
-    expected_href = "https://example.com/a%20path/" "%E6%97%A5%E6%9C%AC%E8%AA%9E"
+    expected_href = "https://example.com/a%20path/%E6%97%A5%E6%9C%AC%E8%AA%9E"
 
     markdown = _convert_html(f'<a href="{href}">example</a>')
 
@@ -277,75 +265,10 @@ K</strike>L.</p>
     path.write_text(html, encoding="utf-8")
     markdown = MarkItDown().convert(str(path)).markdown
 
-    assert markdown == "\n\n".join(
-        [
-            # <s>, <del> and the obsolete <strike> all mean strikethrough
-            "Plain ~~s element~~ after.",
-            "Plain ~~del element~~ after.",
-            "Plain ~~strike element~~ after.",
-            # Surrounding whitespace stays outside of the markup ...
-            "Spaces A ~~B~~ C.",
-            # ... and runs of it collapse to a single space
-            "Runs D ~~E~~ F.",
-            # An empty element contributes nothing
-            "Empty GH.",
-            # A line break inside the element is kept, and the markup
-            # survives it because strikethrough may span a single newline
-            "Newline I~~J K~~L.",
-            "Break M~~N\nO~~P.",
-        ]
+    assert (
+        markdown
+        == "Plain ~~s element~~ after.\n\nPlain ~~del element~~ after.\n\nPlain ~~strike element~~ after.\n\nSpaces A ~~B~~ C.\n\nRuns D ~~E~~ F.\n\nEmpty GH.\n\nNewline I~~J K~~L.\n\nBreak M~~N\nO~~P."
     )
-
-
-def test_deeply_nested_html_fallback() -> None:
-    """Large, deeply nested HTML should fall back to plain-text extraction
-    instead of silently returning unconverted HTML (issue #1636).
-
-    Note: This test uses sys.setrecursionlimit to guarantee a RecursionError
-    regardless of the host environment's default limit, making it deterministic
-    across different platforms and CI configurations.
-    """
-    import sys
-    import warnings
-
-    markitdown = MarkItDown()
-
-    # Use a small recursion limit so the test is environment-independent.
-    # We restore the original limit in a finally block to avoid side-effects.
-    original_limit = sys.getrecursionlimit()
-    low_limit = 200  # well below markdownify's traversal depth for depth=500
-
-    # Build HTML with nesting deep enough to trigger RecursionError
-    depth = 500
-    html = "<html><body>"
-    for _ in range(depth):
-        html += '<div style="margin-left:10px">'
-    html += "<p>Deep content with <b>bold text</b></p>"
-    for _ in range(depth):
-        html += "</div>"
-    html += "</body></html>"
-
-    try:
-        sys.setrecursionlimit(low_limit)
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            result = markitdown.convert_stream(
-                io.BytesIO(html.encode("utf-8")),
-                file_extension=".html",
-            )
-
-            # Should have emitted a warning about the fallback
-            recursion_warnings = [x for x in w if "deeply nested" in str(x.message)]
-            assert len(recursion_warnings) > 0
-
-    finally:
-        sys.setrecursionlimit(original_limit)
-
-    # The output should contain the text content, not raw HTML
-    assert "Deep content" in result.markdown
-    assert "bold text" in result.markdown
-    assert "<div" not in result.markdown
-    assert "<p>" not in result.markdown
 
 
 if __name__ == "__main__":
@@ -388,7 +311,9 @@ if __name__ == "__main__":
     ],
 )
 def test_html_fragment_content(html: str, expected: str, title: str | None) -> None:
-    result = MarkItDown().convert_stream(io.BytesIO(html.encode()), file_extension=".html")
+    result = MarkItDown().convert_stream(
+        io.BytesIO(html.encode()), file_extension=".html"
+    )
     assert (result.markdown, result.title) == (expected, title)
 
 
@@ -402,9 +327,9 @@ def test_html_fragment_sniffs_unknown_charset() -> None:
 
 def test_html_table_cell_list_keeps_item_boundaries() -> None:
     html: Final = (
-        '<table><tr><th>Traded as</th><td><ul>'
+        "<table><tr><th>Traded as</th><td><ul>"
         '<li><a href="/nasdaq">Nasdaq</a></li><li>DJIA</li>'
-        '</ul></td></tr></table>'
+        "</ul></td></tr></table>"
     )
     assert "| Traded as | * [Nasdaq](/nasdaq) * DJIA |" in _convert_html(html)
 
@@ -412,9 +337,15 @@ def test_html_table_cell_list_keeps_item_boundaries() -> None:
 @pytest.mark.parametrize(
     ("html", "expected"),
     [
-        pytest.param("<code><ul><li>one</li><li>two</li></ul></code>", "`one two`", id="list"),
+        pytest.param(
+            "<code><ul><li>one</li><li>two</li></ul></code>", "`one two`", id="list"
+        ),
         pytest.param("<code><p>one</p><p>two</p></code>", "`one two`", id="paragraphs"),
-        pytest.param("<pre><code><ul><li>one</li><li>two</li></ul></code></pre>", "```\none\ntwo\n```", id="pre"),
+        pytest.param(
+            "<pre><code><ul><li>one</li><li>two</li></ul></code></pre>",
+            "```\none\ntwo\n```",
+            id="pre",
+        ),
         pytest.param(
             "<table><tr><td><code><p>one</p><p>two</p></code></td></tr></table>",
             "|  |\n| --- |\n| `one two` |",
@@ -439,7 +370,9 @@ def test_deeply_nested_html_converts() -> None:
         sys.setrecursionlimit(200)
         with warnings.catch_warnings():
             warnings.simplefilter("error")
-            result = MarkItDown().convert_stream(io.BytesIO(html.encode()), file_extension=".html")
+            result = MarkItDown().convert_stream(
+                io.BytesIO(html.encode()), file_extension=".html"
+            )
     finally:
         sys.setrecursionlimit(original_limit)
 
