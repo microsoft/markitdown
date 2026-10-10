@@ -29,6 +29,11 @@ PDF text extraction does not preserve drawing geometry, dimensions, or spatial
 relationships. A CAD drawing can therefore produce incomplete text or empty
 output without a parsing error; OCR does not guarantee faithful reconstruction.
 
+When a known CAD exporter is detected, successful conversion emits a Python
+`UserWarning` (stderr in the CLI) about potential information loss. The Markdown
+content remains unchanged. This warning is best-effort: missing PDF dependencies
+or uninspectable metadata do not block otherwise successful conversion.
+
 For workflows that must reject known CAD exporters, install the PDF dependencies
 and opt into the metadata policy:
 

@@ -5,7 +5,7 @@ import subprocess
 import sys
 
 import pytest
-from pdfplumber.utils.exceptions import PdfminerException
+from pdfminer.pdfparser import PDFSyntaxError
 
 from markitdown import MarkItDown, StreamInfo, DocumentConverter
 from markitdown._exceptions import (
@@ -137,7 +137,7 @@ def test_missing_pdf_dependencies_do_not_bypass_policy(monkeypatch):
 
 
 def test_malformed_pdf_does_not_fall_back_to_partial_conversion():
-    with pytest.raises(PdfminerException, match="No /Root object"):
+    with pytest.raises(PDFSyntaxError, match="No /Root object"):
         MarkItDown().convert_stream(
             io.BytesIO(b"%PDF-1.4\ninvalid"),
             stream_info=StreamInfo(extension=".pdf"),
@@ -168,3 +168,41 @@ def test_cli_rejects_without_writing_output(tmp_path, stdin):
     assert b"CAD-generated PDF" in result.stderr
     assert result.stdout == b""
     assert output.read_text(encoding="utf-8") == "existing output"
+
+
+@pytest.mark.parametrize("plugins", [False, True])
+def test_successful_cad_conversion_warns_without_changing_content(plugins):
+    with pytest.warns(UserWarning, match="CAD PDF conversion may omit"):
+        result = MarkItDown(enable_plugins=plugins).convert_stream(
+            io.BytesIO(drawing_pdf())
+        )
+    assert "ROOM A" in result.markdown
+    assert "Warning" not in result.markdown
+
+
+def test_warning_does_not_require_pdf_dependencies_for_custom_converters(monkeypatch):
+    from markitdown import DocumentConverterResult
+
+    class CustomPdfConverter(DocumentConverter):
+        def accepts(self, *args, **kwargs):
+            return True
+
+        def convert(self, *args, **kwargs):
+            return DocumentConverterResult(markdown="custom result")
+
+    monkeypatch.setattr(
+        _pdf_converter, "_dependency_exc_info", (ImportError, ImportError(), None)
+    )
+    md = MarkItDown(enable_builtins=False)
+    md.register_converter(CustomPdfConverter())
+    assert md.convert_stream(io.BytesIO(drawing_pdf())).markdown == "custom result"
+
+
+def test_cli_default_conversion_warns_on_stderr_and_keeps_stdout():
+    result = subprocess.run(
+        [sys.executable, "-m", "markitdown"], input=drawing_pdf(), capture_output=True
+    )
+    assert result.returncode == 0
+    assert b"ROOM A" in result.stdout
+    assert b"CAD PDF conversion may omit" in result.stderr
+    assert b"Warning" not in result.stdout
