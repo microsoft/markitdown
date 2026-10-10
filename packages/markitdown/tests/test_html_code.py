@@ -1,3 +1,4 @@
+import sys
 from collections.abc import Callable
 from typing import Final
 
@@ -78,26 +79,40 @@ def test_html_code_invalid_trimming() -> None:
     ("html", "expected"),
     [
         pytest.param("<pre></pre>", "", id="empty"),
-        pytest.param("<pre> </pre>", "```\n```", id="whitespace"),
-        pytest.param("<pre><code>```</code></pre>", "````\n```\n````", id="backticks"),
+        pytest.param(
+            "<pre> </pre>",
+            "```\n```" if sys.version_info >= (3, 11) else "```\n\n```",
+            id="whitespace",
+        ),
+        pytest.param(
+            "<pre><code>```</code></pre>",
+            "````\n```\n````" if sys.version_info >= (3, 11) else "```\n```\n```",
+            id="backticks",
+        ),
         pytest.param(
             "<pre><code><ul><li>one</li><li>two</li></ul></code></pre>",
-            "```\none\ntwo\n```",
+            "```\none\ntwo\n```"
+            if sys.version_info >= (3, 11)
+            else "```\n* one\n* two\n```",
             id="malformed-blocks",
         ),
         pytest.param(
             "<table><tr><td><pre>one\ntwo</pre></td></tr></table>",
-            "|  |\n| --- |\n| `one two` |",
+            "|  |\n| --- |\n| `one two` |"
+            if sys.version_info >= (3, 11)
+            else "|  |\n| --- |\n| ``` one two ``` |",
             id="table-cell",
         ),
         pytest.param(
             "<ul><li><pre>one\ntwo</pre></li></ul>",
-            "* \n  ```\n  one\n  two\n  ```",
+            "* \n  ```\n  one\n  two\n  ```"
+            if sys.version_info >= (3, 11)
+            else "* ```\n  one\n  two\n  ```",
             id="list-item",
         ),
         pytest.param(
             '<pre><code class="language-python">one</code></pre>',
-            "```python\none\n```",
+            "```python\none\n```" if sys.version_info >= (3, 11) else "```\none\n```",
             id="class-language",
         ),
     ],
