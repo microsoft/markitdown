@@ -56,6 +56,19 @@ def test_html_code_explicit_language_overrides_class(language: str) -> None:
     )
 
 
+def test_html_inline_symbols_keep_separate_wrappers() -> None:
+    assert (
+        HtmlConverter()
+        .convert_string(
+            "<p>H<sub>2</sub>O and x<sup>2</sup></p>",
+            sub_symbol="~",
+            sup_symbol="<sup>",
+        )
+        .markdown
+        == "H~2~O and x<sup>2</sup>"
+    )
+
+
 def test_html_code_invalid_trimming() -> None:
     with pytest.raises(ValueError, match="Invalid value for strip_pre: unknown"):
         HtmlConverter().convert_string("<pre>one</pre>", strip_pre="unknown")
