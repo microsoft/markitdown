@@ -257,6 +257,55 @@ def test_math_italic_expression_is_fully_normalized() -> None:
     assert _run_latex(expression) == "h(x)=g(x)"
 
 
+# Left-hand math scripts
+
+
+@pytest.mark.parametrize("properties", ["", "<m:sPrePr/>"])
+@pytest.mark.parametrize(
+    "subscript, superscript, expected",
+    [
+        ("6", "14", r"{}_{6}^{14}{C}"),
+        ("", "14", r"{}^{14}{C}"),
+        ("6", "", r"{}_{6}{C}"),
+        ("", "", "{C}"),
+    ],
+)
+def test_omml_prescripts(properties, subscript, superscript, expected) -> None:
+    element = _parse_omath(
+        f"<m:sPre>{properties}"
+        f"<m:sub><m:r><m:t>{subscript}</m:t></m:r></m:sub>"
+        f"<m:sup><m:r><m:t>{superscript}</m:t></m:r></m:sup>"
+        "<m:e><m:r><m:t>C</m:t></m:r></m:e></m:sPre>"
+    )
+
+    assert oMath2Latex(element).latex == expected
+
+
+def test_omml_prescripts_keep_nested_expressions() -> None:
+    element = _parse_omath(
+        "<m:r><m:t>X+</m:t></m:r><m:sPre>"
+        "<m:sub><m:r><m:t>i</m:t></m:r></m:sub>"
+        "<m:sup><m:r><m:t>j</m:t></m:r></m:sup>"
+        "<m:e><m:f><m:fPr/>"
+        "<m:num><m:r><m:t>a</m:t></m:r></m:num>"
+        "<m:den><m:r><m:t>b</m:t></m:r></m:den>"
+        "</m:f></m:e></m:sPre><m:r><m:t>+Y</m:t></m:r>"
+    )
+
+    assert oMath2Latex(element).latex == r"X+{}_{i}^{j}{\frac{a}{b}}+Y"
+
+
+def test_docx_prescript_fixture_with_unescaped_math() -> None:
+    result = MarkItDown().convert(
+        Path(__file__).parent / "test_files" / "docx_math_prescripts.docx",
+        escape_underscores=False,
+    )
+
+    assert r"Carbon isotope: ${}_{6}^{14}{C}$." in result.markdown
+    assert r"$$X+{}_{92}^{235}{U}$$" in result.markdown
+    assert "Equation after: $x+1$" in result.markdown
+
+
 # Malformed math runs
 
 # Regression test for a crash in the OMML -> LaTeX converter when a math run

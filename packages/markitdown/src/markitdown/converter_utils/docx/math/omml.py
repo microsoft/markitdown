@@ -239,10 +239,13 @@ class oMath2Latex(Tag2Method):
         )
 
     def do_spre(self, elm):
-        """
-        the Pre-Sub-Superscript object -- Not support yet
-        """
-        pass
+        """Render scripts to the left of the base expression."""
+        c_dict = self.process_children_dict(elm)
+        sub = c_dict.get("sub", "")
+        sup = c_dict.get("sup", "")
+        scripts = (sub if sub != "_{}" else "") + (sup if sup != "^{}" else "")
+        # Attach left scripts to an empty atom, rather than preceding content.
+        return ("{}" if scripts else "") + scripts + "{" + c_dict.get("e", "") + "}"
 
     def do_sub(self, elm):
         text = self.process_children(elm)
@@ -406,6 +409,7 @@ class oMath2Latex(Tag2Method):
         "fName": do_fname,
         "groupChr": do_groupchr,
         "d": do_d,
+        "sPre": do_spre,
         "rad": do_rad,
         "eqArr": do_eqarr,
         "limLow": do_limlow,
