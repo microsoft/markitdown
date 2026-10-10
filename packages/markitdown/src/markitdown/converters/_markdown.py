@@ -1,11 +1,16 @@
 import re
-from typing import Any, BinaryIO, Literal
+from typing import TYPE_CHECKING, Any, BinaryIO, Final, Literal
 from urllib.parse import quote, urlparse, urlunparse
 
 import turbohtml
+from bs4 import BeautifulSoup, Tag
 from turbohtml import Document, Element, Markdown
 
 from .._stream_info import StreamInfo
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
 
 _PERCENT_ENCODED_OCTET = re.compile(r"%[0-9A-Fa-f]{2}")
 
@@ -63,7 +68,13 @@ class _CustomMarkdown:
     - Ensuring URIs are properly escaped, and do not conflict with Markdown syntax
     """
 
-    def __init__(self, **options: Any):
+    def __init__(self, **options: Any) -> None:
+        self._code_language: Final[str] = options.get("code_language", "")
+        self._code_language_callback: Final[Callable[[Tag], str | None] | None] = (
+            options.get("code_language_callback")
+        )
+        self._strip_pre: Final[str | None] = options.get("strip_pre", "strip")
+        self._pre_languages: Final[dict[Element, str]] = {}
         self._keep_data_uris = options.get("keep_data_uris", False)
         self._autolinks = options.get("autolinks", True)
         self._default_title = options.get("default_title", False)
@@ -71,6 +82,7 @@ class _CustomMarkdown:
         converters = {
             "a": self._convert_a,
             "img": self._convert_img,
+            "pre": self._render_pre,
             "input": lambda el, text: (
                 ("[x] " if "checked" in el.attrs else "[ ] ")
                 if el.attr("type") == "checkbox"
@@ -96,6 +108,11 @@ class _CustomMarkdown:
             converters = {k: v for k, v in converters.items() if k not in strip}
         elif convert is not None:
             converters = {k: v for k, v in converters.items() if k in convert}
+        self._convert_pre: Final[bool] = (
+            "pre" not in strip
+            if strip is not None
+            else convert is None or "pre" in convert
+        )
         self._markdown = Markdown(
             headings=Markdown.Headings(
                 style=_HEADING_STYLES.get(
@@ -133,12 +150,69 @@ class _CustomMarkdown:
         )
 
     def convert(self, node: Document | Element) -> str:
+        self._pre_languages.clear()
+        if self._convert_pre:
+            tags: Final[dict[Element, Tag]] = {}
+            if self._code_language_callback is not None:
+                root: turbohtml.Node = node
+                while (parent := root.parent) is not None:
+                    root = parent
+                tags.update(
+                    zip(
+                        root.select("pre"),
+                        BeautifulSoup(root.serialize(), "html.parser").find_all("pre"),
+                        strict=True,
+                    )
+                )
+            for pre in node.select("pre"):
+                self._prepare_pre(
+                    pre,
+                    self._code_language_callback(tags[pre]) or self._code_language
+                    if self._code_language_callback is not None and pre.text
+                    else None,
+                )
         # An underline around nothing but whitespace or a line break would
         # render as nothing at all, so let its content render in its place
         for underline in node.select("u"):
             if not underline.text.strip():
                 underline.unwrap()
         return node.to_markdown(self._markdown)
+
+    def _prepare_pre(self, pre: Element, language: str | None = None) -> None:
+        if not pre.text:
+            pre.extract()
+            return
+        opening, _, rendered = pre.to_markdown(
+            Markdown(code=Markdown.Code(language=self._code_language))
+        ).partition("\n")
+        text, _, fence = rendered.rpartition("\n")
+        # Native fences consume one trailing newline; restore it before applying strip_pre.
+        if pre.text.endswith("\n"):
+            text += "\n"
+        if language is None:
+            language = opening[len(fence) :]
+        if self._strip_pre == "strip":
+            text = re.sub(r"[ \n]*$", "", re.sub(r"^[ \n]*\n", "", text))
+        elif self._strip_pre == "strip_one":
+            text = re.sub(r"\n *$", "", re.sub(r"^ *\n", "", text))
+        elif self._strip_pre is not None:
+            msg = f"Invalid value for strip_pre: {self._strip_pre}"
+            raise ValueError(msg)
+        pre.clear()
+        self._pre_languages[pre] = language
+        code: Final = Element("code")
+        code.append(turbohtml.Text(text + "\n" if text.endswith("\n") else text))
+        pre.append(code)
+
+    def _render_pre(self, pre: Element, text: str) -> str:
+        ancestor = pre.parent
+        while isinstance(ancestor, Element):
+            if ancestor.tag in {"td", "th"}:
+                return text
+            ancestor = ancestor.parent
+        return pre.to_markdown(
+            Markdown(code=Markdown.Code(language=self._pre_languages[pre]))
+        )
 
     def _convert_a(self, el: Element, text: str) -> str:
         """Same as usual converter, but removes JavaScript links and escapes URIs."""
@@ -205,3 +279,11 @@ class _CustomMarkdown:
             src = src.split(",")[0] + "..."
 
         return f"![{alt}]({src}{title_part})"
+
+
+__all__ = [
+    "_CustomMarkdown",
+    "_document_title",
+    "_parse_html",
+    "_parse_html_with_source",
+]
