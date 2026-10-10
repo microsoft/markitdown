@@ -70,6 +70,7 @@ class _CustomMarkdown:
 
     def __init__(self, **options: Any) -> None:
         self._code_language: Final[str] = options.get("code_language", "")
+        self._explicit_code_language: Final[str | None] = options.get("code_language")
         self._code_language_callback: Final[Callable[[Tag], str | None] | None] = (
             options.get("code_language_callback")
         )
@@ -97,9 +98,13 @@ class _CustomMarkdown:
                     if symbol[:1] == "<" and symbol[-1:] == ">"
                     else symbol
                 )
-                converters[tag] = lambda el, text, symbol=symbol, closing=closing: (
-                    f"{symbol}{text}{closing}"
-                )
+
+                def convert_symbol(
+                    el: Element, text: str, symbol: str = symbol, closing: str = closing
+                ) -> str:
+                    return f"{symbol}{text}{closing}"
+
+                converters[tag] = convert_symbol
         # Tags that are stripped, or not converted, render as plain text, so
         # none of the converters above may apply to them
         strip = options.get("strip")
@@ -169,7 +174,7 @@ class _CustomMarkdown:
                     pre,
                     self._code_language_callback(tags[pre]) or self._code_language
                     if self._code_language_callback is not None and pre.text
-                    else None,
+                    else self._explicit_code_language,
                 )
         # An underline around nothing but whitespace or a line break would
         # render as nothing at all, so let its content render in its place
