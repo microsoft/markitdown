@@ -6,6 +6,7 @@ import os
 import sys
 import codecs
 import io
+from pathlib import Path
 from typing import Any, Dict
 from textwrap import dedent
 from importlib.metadata import entry_points
@@ -143,7 +144,27 @@ def main():
     )
 
     parser.add_argument("filename", nargs="?")
+    parser.add_argument(
+        "--pdf-drawing-mode",
+        action="store_true",
+        help="Extract PDF drawing labels and raster page views with a Markdown limitations report. Not lossless. Requires PDF dependencies.",
+    )
+    parser.add_argument(
+        "--conversion-report",
+        help="Markdown report path for drawing mode (default: OUTPUT stem + .report.md).",
+    )
     args = parser.parse_args()
+    if args.conversion_report and not args.pdf_drawing_mode:
+        parser.error("--conversion-report requires --pdf-drawing-mode")
+    if args.pdf_drawing_mode and not args.output:
+        if not args.keep_data_uris or not args.conversion_report:
+            parser.error(
+                "Drawing mode on stdout requires --keep-data-uris and --conversion-report; otherwise use -o."
+            )
+    if args.pdf_drawing_mode and (args.use_docintel or args.use_cu):
+        parser.error(
+            "Drawing mode is a local extraction mode; do not combine it with cloud conversion flags."
+        )
 
     # Parse the extension hint
     extension_hint = args.extension
@@ -248,19 +269,37 @@ def main():
     else:
         markitdown = MarkItDown(enable_plugins=args.use_plugins)
 
+    conversion_kwargs: Dict[str, Any] = {}
+    if args.pdf_drawing_mode:
+        conversion_kwargs["pdf_drawing_mode"] = True
+
     if args.filename is None:
         # Windows pipe-backed stdin can report seekable() even though it cannot rewind.
         result = markitdown.convert_stream(
             io.BytesIO(sys.stdin.buffer.read()),
             stream_info=stream_info,
             keep_data_uris=args.keep_data_uris,
+            **conversion_kwargs,
         )
     else:
         result = markitdown.convert(
-            args.filename, stream_info=stream_info, keep_data_uris=args.keep_data_uris
+            args.filename,
+            stream_info=stream_info,
+            keep_data_uris=args.keep_data_uris,
+            **conversion_kwargs,
         )
 
-    _handle_output(args, result)
+    if args.pdf_drawing_mode:
+        from ._drawing_output import write_drawing_output
+
+        report_path = args.conversion_report or str(
+            Path(args.output).with_suffix(".report.md")
+        )
+        markdown = write_drawing_output(args.output, report_path, result)
+        if not args.output:
+            print(markdown)
+    else:
+        _handle_output(args, result)
 
 
 def _handle_output(args, result: DocumentConverterResult):

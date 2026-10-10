@@ -6,7 +6,12 @@ from collections.abc import AsyncIterator
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from starlette.applications import Starlette
-from markitdown import MarkItDown, FileConversionException, UnsupportedFormatException
+from markitdown import (
+    MarkItDown,
+    FileConversionException,
+    UnsupportedFormatException,
+    MissingDependencyException,
+)
 import requests
 import uvicorn
 
@@ -17,10 +22,17 @@ mcp = MCPServer("markitdown")
 
 
 @mcp.tool()
-async def convert_to_markdown(uri: str) -> str:
-    """Convert a resource described by an http:, https:, file: or data: URI to markdown"""
+async def convert_to_markdown(uri: str, pdf_drawing_mode: bool = False) -> str:
+    """Convert a URI to Markdown. Optional local PDF drawing mode includes raster views and a limitations report; it is not lossless."""
     converter = MarkItDown(enable_plugins=check_plugins_enabled())
     try:
+        if pdf_drawing_mode:
+            result = converter.convert_uri(
+                uri, pdf_drawing_mode=True, keep_data_uris=True
+            )
+            if result.conversion_report is None:
+                raise ValueError("Drawing mode did not convert a PDF.")
+            return result.markdown + "\n\n" + result.conversion_report
         return converter.convert_uri(uri).markdown
 
     # SDK 2.x only exposes ToolError messages.
@@ -33,6 +45,8 @@ async def convert_to_markdown(uri: str) -> str:
         ) from exc
     except requests.exceptions.RequestException as exc:
         raise ToolError("Could not fetch the resource.") from exc
+    except MissingDependencyException as exc:
+        raise ToolError("PDF drawing mode requires the PDF dependencies.") from exc
     except FileConversionException as exc:
         raise ToolError("File conversion failed.") from exc
     except OSError as exc:

@@ -23,6 +23,61 @@ MarkItDown currently supports the conversion from:
 - EPubs
 - ... and more!
 
+## Optional PDF drawing mode
+
+Drawing PDFs can contain useful text but lose their geometry in ordinary text extraction.
+An opt-in local mode produces located native labels and textual annotations (including
+AutoCAD SHX text), raster page views, and a separate Markdown limitations report.
+It does not reconstruct dimensions, units, scale, constraints, or drawing semantics.
+It is not lossless and does not claim to identify every omission.
+
+```bash
+pip install 'markitdown[pdf]'
+markitdown drawing.pdf --pdf-drawing-mode -o drawing.md
+```
+
+This writes `drawing.md`, `drawing.report.md`, and `drawing.assets/page-1.png`, etc.
+Output/report files and the asset directory must not already exist; source files are
+never replaced. Use `--conversion-report PATH` to choose the report location.
+Default conversion of all other files, including CAD PDFs, remains unchanged.
+The drawing mode applies to PDF members inside ZIPs and uses distinct asset names.
+
+Large drawings can require substantial memory; the API keeps page PNG assets in
+memory. External PNG files are the default because inline base64 can be very large.
+Explicit `--keep-data-uris` embeds the images instead. Stdout drawing output requires
+both `--keep-data-uris` and `--conversion-report PATH`. Local drawing mode cannot
+be combined with Azure conversion flags. Rendering failures do not fall back to
+successful text-only conversion. Drawing output publication uses exclusive hard
+links; it requires a filesystem supporting hard links and writable destination parents.
+
+```python
+from pathlib import Path
+from markitdown import MarkItDown
+
+result = MarkItDown().convert("drawing.pdf", pdf_drawing_mode=True)
+# No files are written by the API. Relative image links refer to result.assets.
+print(result.markdown)
+print(result.conversion_report)
+for name, png in result.assets.items():
+    # These generated names can be nested for archive members.
+    target = Path("new-output") / name
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with target.open("xb") as stream:
+        stream.write(png)
+```
+
+The API returns PNG bytes in `assets` and the Markdown report in `conversion_report`.
+With `keep_data_uris=True`, images are inline and `assets` is empty. The MCP tool's
+optional `pdf_drawing_mode` argument returns inline page views followed by the report,
+without creating files. Clients must opt in knowing that this response can be large.
+
+Page views use the visible CropBox, up to 200 DPI and an 8192-pixel longest-edge cap.
+Label coordinates use PDF points in the rotated page coordinate system; MediaBox
+and CropBox bounds are listed in the report. They are not engineering measurements. Angled lettering may have imperfect word grouping.
+Outlined/raster-only lettering is shown visually but not OCR-transcribed. Viewers
+must support the selected image representation, and multimodal consumers must
+receive image pixels explicitly; reading a relative link or base64 text is insufficient.
+
 ## Why Markdown?
 
 Markdown is extremely close to plain text, with minimal markup or formatting, but still
