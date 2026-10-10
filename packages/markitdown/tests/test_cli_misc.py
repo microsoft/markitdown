@@ -116,37 +116,103 @@ class TestCLIArgs:
             "--use-cu/--use-content-understanding"
         ) in result.stderr, result.stderr
 
-    def test_cu_file_types_parsing(self):
-        """--cu-file-types should parse comma-separated values into enum list."""
-        from markitdown.converters import ContentUnderstandingFileType
+    @pytest.mark.parametrize("raw", ["pdf,jpeg,wav", " , PDF, JPEG,, WAV, "])
+    @pytest.mark.parametrize(
+        "filename, content_type, analyzer",
+        [
+            ("test.pdf", "application/pdf", "prebuilt-documentSearch"),
+            ("test.jpg", "image/jpeg", "prebuilt-documentSearch"),
+            ("test.wav", "audio/wav", "prebuilt-audioSearch"),
+        ],
+    )
+    def test_cu_file_types_parsing(
+        self, monkeypatch, capsys, raw, filename, content_type, analyzer
+    ):
+        self._check_cu_file_types(
+            monkeypatch, capsys, raw, filename, content_type, analyzer
+        )
 
-        raw = "pdf,jpeg,mp4"
-        type_names = [t.strip().lower() for t in raw.split(",") if t.strip()]
-        cu_types = [ContentUnderstandingFileType(name) for name in type_names]
+    def test_cu_file_types_single_value(self, monkeypatch, capsys):
+        self._check_cu_file_types(
+            monkeypatch, capsys, "wav", "test.wav", "audio/wav", "prebuilt-audioSearch"
+        )
 
-        assert cu_types == [
-            ContentUnderstandingFileType.PDF,
-            ContentUnderstandingFileType.JPEG,
-            ContentUnderstandingFileType.MP4,
-        ]
+    def _check_cu_file_types(
+        self, monkeypatch, capsys, raw, filename, content_type, analyzer
+    ):
+        from azure.ai.contentunderstanding.models import AnalysisResult, DocumentContent
+        from markitdown.converters import _cu_converter
 
-    def test_cu_file_types_invalid_value(self):
-        """Unknown file type name should raise ValueError."""
-        from markitdown.converters import ContentUnderstandingFileType
+        client = MagicMock()
+        client.begin_analyze_binary.return_value.result.return_value = AnalysisResult(
+            contents=[DocumentContent(kind="document", markdown="# Parsed CLI input")]
+        )
+        client_cls = MagicMock(return_value=client)
+        monkeypatch.setattr(_cu_converter, "ContentUnderstandingClient", client_cls)
+        monkeypatch.setenv("AZURE_API_KEY", "test-key")
+        path = os.path.join(os.path.dirname(__file__), "test_files", filename)
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            [
+                "markitdown",
+                "--use-cu",
+                "--cu-endpoint",
+                "https://fake-cu",
+                "--cu-file-types",
+                raw,
+                path,
+            ],
+        )
 
-        with pytest.raises(ValueError):
-            ContentUnderstandingFileType("nonsense")
+        main()
 
-    def test_cu_file_types_single_value(self):
-        """Single file type (no comma) should parse correctly."""
-        from markitdown.converters import ContentUnderstandingFileType
+        client_cls.assert_called_once()
+        client.begin_analyze_binary.assert_called_once()
+        request = client.begin_analyze_binary.call_args.kwargs
+        assert request["analyzer_id"] == analyzer
+        assert request["content_type"] == content_type
+        assert "# Parsed CLI input" in capsys.readouterr().out
 
-        cu_types = [
-            ContentUnderstandingFileType(t.strip().lower())
-            for t in "wav".split(",")
-            if t.strip()
-        ]
-        assert cu_types == [ContentUnderstandingFileType.WAV]
+        # An excluded format must use its local converter, not the CU service.
+        # This also catches a CLI that silently ignores --cu-file-types.
+        client.begin_analyze_binary.reset_mock()
+        html_path = os.path.join(
+            os.path.dirname(__file__), "test_files", "test_blog.html"
+        )
+        monkeypatch.setattr(sys, "argv", sys.argv[:-1] + [html_path])
+        main()
+        client.begin_analyze_binary.assert_not_called()
+        output = capsys.readouterr().out
+        assert "Large language models" in output
+        assert "# Parsed CLI input" not in output
+
+    @pytest.mark.parametrize("raw", ["nonsense", "pdf,nonsense"])
+    def test_cu_file_types_invalid_value(self, monkeypatch, capsys, raw):
+        from markitdown.converters import _cu_converter
+
+        client_cls = MagicMock()
+        monkeypatch.setattr(_cu_converter, "ContentUnderstandingClient", client_cls)
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            [
+                "markitdown",
+                "--use-cu",
+                "--cu-endpoint",
+                "https://fake-cu",
+                "--cu-file-types",
+                raw,
+                "unused.pdf",
+            ],
+        )
+
+        with pytest.raises(SystemExit) as exc:
+            main()
+
+        assert exc.value.code == 1
+        assert "Unknown file type: nonsense" in capsys.readouterr().out
+        client_cls.assert_not_called()
 
     def test_use_cu_wires_kwargs_to_markitdown(self, capsys):
         """--use-cu should pass CU options through to MarkItDown."""
