@@ -144,6 +144,43 @@ def test_csv_all_blank_input_returns_empty_markdown() -> None:
     assert result == ""
 
 
+def test_csv_comma_padded_blank_rows_are_trimmed() -> None:
+    # A writer that pads every record to the column width writes a blank row
+    # as ",," rather than an empty line; pandas' to_csv does this for all-NaN
+    # rows. Such a row is blank just the same: an outer one must not become an
+    # empty header, nor survive as an empty data row.
+    result = _convert_csv(b",,\nname,age\nAlice,30\n,,\n,,\n")
+
+    assert result == "| name | age |\n| --- | --- |\n| Alice | 30 |"
+
+
+def test_csv_whitespace_padded_blank_rows_are_trimmed() -> None:
+    result = _convert_csv(b" , \nname,age\nAlice,30\n , \n")
+
+    assert result == "| name | age |\n| --- | --- |\n| Alice | 30 |"
+
+
+def test_csv_comma_padded_row_between_data_rows_is_kept() -> None:
+    # Only the outer runs are trimmed; an internal blank row keeps its place,
+    # exactly as the existing blank-line test pins for unpadded blank rows.
+    # (The ",," record carries three empty fields, so it is the widest row.)
+    result = _convert_csv(b"name,age\nAlice,30\n,,\nBob,40\n")
+
+    assert (
+        result == "| name | age |  |\n"
+        "| --- | --- | --- |\n"
+        "| Alice | 30 |  |\n"
+        "|  |  |  |\n"
+        "| Bob | 40 |  |"
+    )
+
+
+def test_csv_blank_row_after_header_is_trimmed() -> None:
+    result = _convert_csv(b"name,age\n,,\nAlice,30\n")
+
+    assert result == "| name | age |\n| --- | --- |\n| Alice | 30 |"
+
+
 @pytest.mark.parametrize(
     "data,expected",
     [

@@ -29,10 +29,22 @@ def _escape_table_cell(value: str) -> str:
     return value.replace("\r\n", " ").replace("\n", " ").replace("\r", " ")
 
 
+def _is_blank_row(row: list[str]) -> bool:
+    """Whether a parsed row carries no data.
+
+    Writers that pad every record to the column width emit a blank row as
+    ",," rather than an empty line -- ``pandas.DataFrame.to_csv`` does this
+    for all-NaN rows -- so a run of empty (or whitespace-only) cells is the
+    same blank row. This is the same reading the PDF table builder already
+    uses in ``_pdf_converter._to_markdown_table``.
+    """
+    return all(not cell.strip() for cell in row)
+
+
 def _trim_outer_blank_rows(rows: list[list[str]]) -> None:
     """Remove empty rows from the beginning and end, and immediately after the header. This operation is performed in-place."""
     start = 0
-    while start < len(rows) and not rows[start]:
+    while start < len(rows) and _is_blank_row(rows[start]):
         start += 1
 
     if start == len(rows):
@@ -41,11 +53,11 @@ def _trim_outer_blank_rows(rows: list[list[str]]) -> None:
 
     header_index = start
     start += 1
-    while start < len(rows) and not rows[start]:
+    while start < len(rows) and _is_blank_row(rows[start]):
         start += 1
 
     end = len(rows)
-    while end > start and not rows[end - 1]:
+    while end > start and _is_blank_row(rows[end - 1]):
         end -= 1
 
     # Remove each blank run at once, rather than shifting the list per row.
