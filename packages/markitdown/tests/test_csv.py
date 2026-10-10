@@ -2,6 +2,8 @@
 
 import csv
 import io
+import threading
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -32,6 +34,27 @@ def test_csv_long_fields_preserve_table_and_parser_limit(
     )
 
     assert result.markdown == f"| content | other |\n| --- | --- |\n| {value} | ok |"
+    assert csv.field_size_limit() == original_limit
+
+
+def test_csv_concurrent_long_fields_preserve_table_and_parser_limit() -> None:
+    original_limit = csv.field_size_limit()
+    start = threading.Barrier(2)
+
+    def convert(value: str) -> str:
+        converter = MarkItDown(enable_plugins=False)
+        start.wait(timeout=10)
+        return converter.convert_stream(
+            io.BytesIO(f"content,other\n{value},ok\n".encode("utf-8")),
+            stream_info=StreamInfo(extension=".csv", charset="utf-8"),
+        ).markdown
+
+    values = ["x" * 131073, "é" * 131074]
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(convert, values))
+
+    for value, result in zip(values, results):
+        assert result == f"| content | other |\n| --- | --- |\n| {value} | ok |"
     assert csv.field_size_limit() == original_limit
 
 

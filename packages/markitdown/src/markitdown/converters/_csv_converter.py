@@ -61,6 +61,11 @@ def _trim_outer_blank_rows(rows: list[list[str]]) -> None:
 class CsvConverter(DocumentConverter):
     """
     Converts CSV files to Markdown tables.
+
+    Oversized fields are parsed with a temporarily raised process-wide CSV
+    field limit. The lock coordinates CsvConverter instances only; unrelated
+    CSV readers can observe the temporary limit, and changes made by other
+    code to that limit are not synchronized with this converter.
     """
 
     def __init__(self):
