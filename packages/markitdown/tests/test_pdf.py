@@ -1248,6 +1248,20 @@ class TestMasterFormatPartialNumbering:
         )
         assert _merge_partial_numbering_lines(text) == expected
 
+    def test_merge_partial_numbering_preceding_inline_numbered_line(self):
+        """Test standalone partial number does not merge into a line already prefixed with a partial number."""
+        text = (
+            ".1\n"
+            ".2 Contractor shall furnish all materials.\n"
+            ".3 Work shall comply with local codes."
+        )
+        expected = (
+            ".1\n"
+            ".2 Contractor shall furnish all materials.\n"
+            ".3 Work shall comply with local codes."
+        )
+        assert _merge_partial_numbering_lines(text) == expected
+
 
 # Page cleanup and extraction fallback
 
