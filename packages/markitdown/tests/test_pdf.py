@@ -1262,6 +1262,29 @@ class TestMasterFormatPartialNumbering:
         )
         assert _merge_partial_numbering_lines(text) == expected
 
+    @pytest.mark.parametrize(
+        "first_num,second_num",
+        [
+            (".1", ".2"),
+            (".9", ".10"),
+            (".10", ".11"),
+            (".99", ".100"),
+            (".1", ".100"),
+        ],
+    )
+    def test_merge_partial_numbering_varying_digit_lengths(self, first_num, second_num):
+        """Test consecutive partial numbering protection across varying digit lengths."""
+        text = (
+            f"{first_num}\n"
+            f"{second_num}\n"
+            "Technical specification content."
+        )
+        expected = (
+            f"{first_num}\n"
+            f"{second_num} Technical specification content."
+        )
+        assert _merge_partial_numbering_lines(text) == expected
+
 
 # Page cleanup and extraction fallback
 
