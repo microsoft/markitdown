@@ -1323,6 +1323,30 @@ class TestMasterFormatPartialNumbering:
         assert ".1\n.2 Contractor shall furnish all materials." in result.text_content
         assert ".3 Work shall comply with local codes." in result.text_content
 
+    @pytest.mark.parametrize(
+        "non_partial_pattern",
+        [
+            ".5 mg",
+            "1.2",
+            ".a",
+            "..1",
+            "section .1",
+            "... ellipsis",
+        ],
+        ids=["unit-suffix", "standard-decimal", "letter-suffix", "double-dot", "text-prefix", "ellipsis"],
+    )
+    def test_merge_partial_numbering_boundary_conditions(self, non_partial_pattern):
+        """Test boundary conditions ensure non-partial numbering lines are unaffected."""
+        text = (
+            f"{non_partial_pattern}\n"
+            "Following line of text."
+        )
+        expected = (
+            f"{non_partial_pattern}\n"
+            "Following line of text."
+        )
+        assert _merge_partial_numbering_lines(text) == expected
+
 
 # Page cleanup and extraction fallback
 
