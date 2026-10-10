@@ -14,6 +14,19 @@ class FileTestVector(object):
 
 GENERAL_TEST_VECTORS = [
     FileTestVector(
+        filename="docx_math_prescripts.docx",
+        mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        charset=None,
+        url=None,
+        must_include=[
+            "Isotope notation",
+            r"Carbon isotope: ${}\_{6}^{14}{C}$.",
+            r"$$X+{}\_{92}^{235}{U}$$",
+            "Equation after: $x+1$",
+        ],
+        must_not_include=["Carbon isotope: $$.", "$$X+$$", "None"],
+    ),
+    FileTestVector(
         filename="test.docx",
         mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         charset=None,
