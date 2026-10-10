@@ -1195,6 +1195,158 @@ class TestMasterFormatPartialNumbering:
             isolated_count == 0
         ), f"Found {isolated_count} isolated partial numberings that weren't merged"
 
+    def test_merge_partial_numbering_consecutive_standalone(self):
+        """Test that two consecutive partial numberings are not merged together into a single token."""
+        text = (
+            ".1\n"
+            ".2\n"
+            "Contractor shall furnish all materials.\n"
+            ".3\n"
+            "Work shall comply with local codes."
+        )
+        expected = (
+            ".1\n"
+            ".2 Contractor shall furnish all materials.\n"
+            ".3 Work shall comply with local codes."
+        )
+        assert _merge_partial_numbering_lines(text) == expected
+
+    def test_merge_partial_numbering_multiple_consecutive_and_trailing(self):
+        """Test three or more consecutive partial numberings and trailing standalone numbers."""
+        three_consecutive = (
+            ".1\n"
+            ".2\n"
+            ".3\n"
+            "Final requirements and specification details."
+        )
+        expected_three = (
+            ".1\n"
+            ".2\n"
+            ".3 Final requirements and specification details."
+        )
+        assert _merge_partial_numbering_lines(three_consecutive) == expected_three
+
+        trailing_numbers = ".1\n.2\n.3"
+        expected_trailing = ".1\n.2\n.3"
+        assert _merge_partial_numbering_lines(trailing_numbers) == expected_trailing
+
+    @pytest.mark.parametrize(
+        "separator",
+        ["\n", "\n\n", "\n  \n\t\n"],
+        ids=["single-blank-line", "multiple-blank-lines", "whitespace-lines"],
+    )
+    def test_merge_partial_numbering_consecutive_with_blank_lines(self, separator):
+        """Test consecutive partial numbers separated by blank lines preserve their structure."""
+        text = (
+            f".1{separator}"
+            ".2\n"
+            "Contractor shall furnish all materials."
+        )
+        expected = (
+            f".1{separator}"
+            ".2 Contractor shall furnish all materials."
+        )
+        assert _merge_partial_numbering_lines(text) == expected
+
+    def test_merge_partial_numbering_preceding_inline_numbered_line(self):
+        """Test standalone partial number does not merge into a line already prefixed with a partial number."""
+        text = (
+            ".1\n"
+            ".2 Contractor shall furnish all materials.\n"
+            ".3 Work shall comply with local codes."
+        )
+        expected = (
+            ".1\n"
+            ".2 Contractor shall furnish all materials.\n"
+            ".3 Work shall comply with local codes."
+        )
+        assert _merge_partial_numbering_lines(text) == expected
+
+    @pytest.mark.parametrize(
+        "first_num,second_num",
+        [
+            (".1", ".2"),
+            (".9", ".10"),
+            (".10", ".11"),
+            (".99", ".100"),
+            (".1", ".100"),
+        ],
+    )
+    def test_merge_partial_numbering_varying_digit_lengths(self, first_num, second_num):
+        """Test consecutive partial numbering protection across varying digit lengths."""
+        text = (
+            f"{first_num}\n"
+            f"{second_num}\n"
+            "Technical specification content."
+        )
+        expected = (
+            f"{first_num}\n"
+            f"{second_num} Technical specification content."
+        )
+        assert _merge_partial_numbering_lines(text) == expected
+
+    def test_merge_partial_numbering_preserves_multiple_blank_lines_between_sections(self):
+        """Test multiple blank lines between sections with consecutive numbers are preserved."""
+        text = (
+            "Section 01 00 00\n\n\n"
+            ".1\n\n"
+            "Preliminary note.\n\n\n"
+            ".2\n\n"
+            ".3\n\n"
+            "Execution requirements.\n\n\n"
+            ".4\n\n"
+            "Quality assurance."
+        )
+        expected = (
+            "Section 01 00 00\n\n\n"
+            ".1 Preliminary note.\n\n\n"
+            ".2\n\n"
+            ".3 Execution requirements.\n\n\n"
+            ".4 Quality assurance."
+        )
+        assert _merge_partial_numbering_lines(text) == expected
+
+    def test_end_to_end_pdf_conversion_with_consecutive_partial_numbering(self):
+        """Test full MarkItDown PDF conversion pipeline preserves consecutive partial numbering."""
+        pdf_path = os.path.join(TEST_FILES_DIR, "test.pdf")
+        simulated_pdfminer_text = (
+            ".1\n"
+            ".2\n"
+            "Contractor shall furnish all materials.\n"
+            ".3\n"
+            "Work shall comply with local codes."
+        )
+        with patch("pdfminer.high_level.extract_text", return_value=simulated_pdfminer_text):
+            result = MarkItDown().convert(pdf_path)
+
+        assert ".1 .2" not in result.text_content
+        assert ".1\n.2 Contractor shall furnish all materials." in result.text_content
+        assert ".3 Work shall comply with local codes." in result.text_content
+
+    @pytest.mark.parametrize(
+        "non_partial_pattern",
+        [
+            ".5 mg",
+            "1.2",
+            ".a",
+            "..1",
+            "section .1",
+            "... ellipsis",
+        ],
+        ids=["unit-suffix", "standard-decimal", "letter-suffix", "double-dot", "text-prefix", "ellipsis"],
+    )
+    def test_merge_partial_numbering_boundary_conditions(self, non_partial_pattern):
+        """Test boundary conditions ensure non-partial numbering lines are unaffected."""
+        text = (
+            f"{non_partial_pattern}\n"
+            "Following line of text."
+        )
+        expected = (
+            f"{non_partial_pattern}\n"
+            "Following line of text."
+        )
+        assert _merge_partial_numbering_lines(text) == expected
+
 
 # Page cleanup and extraction fallback
 
