@@ -1230,6 +1230,24 @@ class TestMasterFormatPartialNumbering:
         expected_trailing = ".1\n.2\n.3"
         assert _merge_partial_numbering_lines(trailing_numbers) == expected_trailing
 
+    @pytest.mark.parametrize(
+        "separator",
+        ["\n", "\n\n", "\n  \n\t\n"],
+        ids=["single-blank-line", "multiple-blank-lines", "whitespace-lines"],
+    )
+    def test_merge_partial_numbering_consecutive_with_blank_lines(self, separator):
+        """Test consecutive partial numbers separated by blank lines preserve their structure."""
+        text = (
+            f".1{separator}"
+            ".2\n"
+            "Contractor shall furnish all materials."
+        )
+        expected = (
+            f".1{separator}"
+            ".2 Contractor shall furnish all materials."
+        )
+        assert _merge_partial_numbering_lines(text) == expected
+
 
 # Page cleanup and extraction fallback
 
