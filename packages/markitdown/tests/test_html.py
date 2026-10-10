@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Final
 
 import pytest
+
 from markitdown import MarkItDown, StreamInfo
 from markitdown.converters import HtmlConverter, WikipediaConverter
 
@@ -166,7 +167,12 @@ def test_wikipedia_title(heading: str, expected: str) -> None:
             extension=".html",
         ),
     )
-    assert (result.title, result.markdown) == (expected, f"# {expected}\n\nBody text.")
+    assert (result.title, result.markdown) == (
+        expected,
+        f"# {expected}\n\nBody text."
+        if sys.version_info >= (3, 11)
+        else f"# {expected}\n\n\n\nBody text.\n\n",
+    )
 
 
 @pytest.mark.parametrize(
@@ -180,7 +186,10 @@ def test_wikipedia_empty_title(title: str) -> None:
         ),
         StreamInfo(mimetype="text/html", url="https://en.wikipedia.org/wiki/Test"),
     )
-    assert (result.title, result.markdown) == (None, "Hello")
+    assert (result.title, result.markdown) == (
+        None,
+        "Hello" if sys.version_info >= (3, 11) else "\n\nHello\n\n",
+    )
 
 
 @pytest.mark.parametrize(
@@ -210,7 +219,9 @@ def test_wikipedia_empty_title(title: str) -> None:
         pytest.param("<p>Empty G<strike></strike>H.</p>", "Empty GH.", id="empty"),
         pytest.param(
             "<p>Newline I<strike>J\nK</strike>L.</p>",
-            "Newline I~~J K~~L.",
+            "Newline I~~J K~~L."
+            if sys.version_info >= (3, 11)
+            else "Newline I~~J\nK~~L.",
             id="newline",
         ),
         pytest.param(
@@ -266,6 +277,10 @@ def test_html_fragment_content(html: str, expected: str, title: str | None) -> N
     assert (result.markdown, result.title) == (expected, title)
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 11),
+    reason="turbohtml encoding detection requires Python 3.11",
+)
 def test_html_fragment_sniffs_unknown_charset() -> None:
     result: Final = MarkItDown().convert_stream(
         io.BytesIO("<title>Café</title><p>Résumé</p>".encode("cp1252")),
@@ -289,17 +304,27 @@ def test_html_table_cell_list_keeps_item_boundaries(
     ("html", "expected"),
     [
         pytest.param(
-            "<code><ul><li>one</li><li>two</li></ul></code>", "`one two`", id="list"
+            "<code><ul><li>one</li><li>two</li></ul></code>",
+            "`one two`" if sys.version_info >= (3, 11) else "`* one\n* two`",
+            id="list",
         ),
-        pytest.param("<code><p>one</p><p>two</p></code>", "`one two`", id="paragraphs"),
+        pytest.param(
+            "<code><p>one</p><p>two</p></code>",
+            "`one two`" if sys.version_info >= (3, 11) else "`one\n\ntwo`",
+            id="paragraphs",
+        ),
         pytest.param(
             "<pre><code><ul><li>one</li><li>two</li></ul></code></pre>",
-            "```\none\ntwo\n```",
+            "```\none\ntwo\n```"
+            if sys.version_info >= (3, 11)
+            else "```\n* one\n* two\n```",
             id="pre",
         ),
         pytest.param(
             "<table><tr><td><code><p>one</p><p>two</p></code></td></tr></table>",
-            "|  |\n| --- |\n| `one two` |",
+            "|  |\n| --- |\n| `one two` |"
+            if sys.version_info >= (3, 11)
+            else "|  |\n| --- |\n| `one  two` |",
             id="table-cell",
         ),
     ],
@@ -310,6 +335,10 @@ def test_html_code_block_descendants_keep_boundaries(
     assert convert_html(html) == expected
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 11),
+    reason="iterative Markdown rendering requires Python 3.11",
+)
 def test_deeply_nested_html_converts() -> None:
     html: Final = (
         "<html><body>"

@@ -3,15 +3,20 @@ from __future__ import annotations
 import base64
 import binascii
 import re
+import sys
 from typing import TYPE_CHECKING, BinaryIO, Final, cast
 from urllib.parse import parse_qs, urlparse
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
-from ._markdown import _CustomMarkdown, _document_title, _parse_html
+
+if sys.version_info < (3, 11):
+    from ._legacy_html import convert_bing
+else:
+    from ._markdown import _CustomMarkdown, _document_title, _parse_html
 
 if TYPE_CHECKING:
-    from ._markdown import _OPTION_VALUE, _MarkdownOptions
+    from ._markdown_options import _OPTION_VALUE, _MarkdownOptions
 
 
 _ACCEPTED_MIME_TYPE_PREFIXES: Final = [
@@ -56,6 +61,10 @@ class BingSerpConverter(DocumentConverter):
         stream_info: StreamInfo,
         **kwargs: _OPTION_VALUE,
     ) -> DocumentConverterResult:
+        if sys.version_info < (3, 11):
+            return convert_bing(
+                file_stream, stream_info, cast("_MarkdownOptions", kwargs)
+            )
         assert stream_info.url is not None
 
         query: Final = parse_qs(urlparse(stream_info.url).query).get("q", [""])[0]

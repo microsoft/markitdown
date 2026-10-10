@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, BinaryIO, Final, Literal, TypedDict, TypeVar
+from typing import TYPE_CHECKING, BinaryIO, Final, Literal
 from urllib.parse import quote, urlparse, urlunparse
 
 import turbohtml
@@ -11,12 +11,11 @@ from turbohtml import Document, Element, Markdown
 from .._stream_info import StreamInfo
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Callable
 
     from typing_extensions import Unpack
 
-
-_OPTION_VALUE = TypeVar("_OPTION_VALUE")
+    from ._markdown_options import _MarkdownOptions
 
 _PERCENT_ENCODED_OCTET: Final = re.compile(r"%[0-9A-Fa-f]{2}")
 
@@ -30,9 +29,9 @@ class _CustomMarkdown:
     def __init__(self, **options: Unpack[_MarkdownOptions]) -> None:
         self._code_language: Final[str] = options.get("code_language", "")
         self._explicit_code_language: Final[str | None] = options.get("code_language")
-        self._code_language_callback: Final[Callable[[Tag], str | None] | None] = (
-            options.get("code_language_callback")
-        )
+        self._code_language_callback: Final[
+            Callable[[Tag], str | None] | None
+        ] = options.get("code_language_callback")
         self._strip_pre: Final[str | None] = options.get("strip_pre", "strip")
         self._pre_languages: Final[dict[Element, str]] = {}
         self._keep_data_uris: Final[bool] = options.get("keep_data_uris", False)
@@ -271,35 +270,8 @@ def _document_title(doc: Document | Element) -> str | None:
     )
 
 
-class _MarkdownOptions(TypedDict, total=False):
-    code_language: str
-    code_language_callback: Callable[[Tag], str | None]
-    strip_pre: str | None
-    keep_data_uris: bool
-    autolinks: bool
-    default_title: bool
-    strong_em_symbol: str
-    sub_symbol: str
-    sup_symbol: str
-    strip: Sequence[str] | None
-    convert: Sequence[str] | None
-    heading_style: str
-    bullets: str
-    table_infer_header: bool
-    escape_misc: bool
-    escape_asterisks: bool
-    escape_underscores: bool
-    wrap_width: int
-    wrap: bool
-    newline_style: str
-    strip_document: Literal["strip", "lstrip", "rstrip"] | None
-    strict: bool
-
-
 __all__ = [
-    "_OPTION_VALUE",
     "_CustomMarkdown",
-    "_MarkdownOptions",
     "_document_title",
     "_parse_html",
     "_parse_html_with_source",

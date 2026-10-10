@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 import textwrap
 from html import escape
 from typing import TYPE_CHECKING, BinaryIO, Final, cast
@@ -7,17 +8,23 @@ from urllib.parse import urljoin
 from xml.dom.minidom import Document, Element, Node
 from xml.parsers.expat import ExpatError
 
-import turbohtml
 from bs4 import BeautifulSoup
 from defusedxml import minidom
 from defusedxml.common import DefusedXmlException
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
-from ._markdown import _CustomMarkdown, _MarkdownOptions
+from ._markdown_options import _MarkdownOptions
+
+if sys.version_info < (3, 11):
+    from ._legacy_html import convert_feed
+else:
+    import turbohtml
+
+    from ._markdown import _CustomMarkdown
 
 if TYPE_CHECKING:
-    from ._markdown import _OPTION_VALUE
+    from ._markdown_options import _OPTION_VALUE
 
 _PRECISE_MIME_TYPE_PREFIXES: Final = [
     "application/rss",
@@ -163,9 +170,7 @@ class RssConverter(DocumentConverter):
             file_stream.seek(cur_pos)
 
     def _feed_type(self, doc: Document) -> str | None:
-        root: Final = doc.documentElement
-        if root is None:
-            return None
+        root: Final = cast("Element", doc.documentElement)
         if root.tagName == "rss":
             return "rss"
         if (
@@ -351,6 +356,8 @@ class RssConverter(DocumentConverter):
         )
 
     def _parse_content(self, content: str, *, base_url: str = "") -> str:
+        if sys.version_info < (3, 11):
+            return convert_feed(content, base_url, self._kwargs)
         fragment: Final = turbohtml.parse_fragment(content)
         self._resolve_content_links(fragment, base_url)
         return _CustomMarkdown(**cast("_MarkdownOptions", self._kwargs)).convert(

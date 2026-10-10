@@ -1,14 +1,19 @@
 from __future__ import annotations
 
 import re
+import sys
 from typing import TYPE_CHECKING, BinaryIO, Final, cast
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
-from ._markdown import _CustomMarkdown, _document_title, _parse_html
+
+if sys.version_info < (3, 11):
+    from ._legacy_html import convert_wikipedia
+else:
+    from ._markdown import _CustomMarkdown, _document_title, _parse_html
 
 if TYPE_CHECKING:
-    from ._markdown import _OPTION_VALUE, _MarkdownOptions
+    from ._markdown_options import _OPTION_VALUE, _MarkdownOptions
 
 
 _ACCEPTED_MIME_TYPE_PREFIXES: Final = [
@@ -53,6 +58,10 @@ class WikipediaConverter(DocumentConverter):
         stream_info: StreamInfo,
         **kwargs: _OPTION_VALUE,
     ) -> DocumentConverterResult:
+        if sys.version_info < (3, 11):
+            return convert_wikipedia(
+                file_stream, stream_info, cast("_MarkdownOptions", kwargs)
+            )
         doc: Final = _parse_html(file_stream, stream_info)
 
         body_elm: Final = doc.select_one("div#mw-content-text")

@@ -1,16 +1,21 @@
 from __future__ import annotations
 
 import io
+import sys
 from typing import TYPE_CHECKING, BinaryIO, Final, cast
-
-import turbohtml
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
-from ._markdown import _CustomMarkdown, _document_title, _parse_html_with_source
+
+if sys.version_info < (3, 11):
+    from ._legacy_html import convert_html
+else:
+    import turbohtml
+
+    from ._markdown import _CustomMarkdown, _document_title, _parse_html_with_source
 
 if TYPE_CHECKING:
-    from ._markdown import _OPTION_VALUE, _MarkdownOptions
+    from ._markdown_options import _OPTION_VALUE, _MarkdownOptions
 
 
 _ACCEPTED_MIME_TYPE_PREFIXES: Final = [
@@ -49,6 +54,10 @@ class HtmlConverter(DocumentConverter):
         stream_info: StreamInfo,
         **kwargs: _OPTION_VALUE,
     ) -> DocumentConverterResult:
+        if sys.version_info < (3, 11):
+            return convert_html(
+                file_stream, stream_info, cast("_MarkdownOptions", kwargs)
+            )
         doc, source = _parse_html_with_source(file_stream, stream_info)
         body_elm: Final = doc.select_one("body")
         # Fragment context retains content moved into a synthetic head.
