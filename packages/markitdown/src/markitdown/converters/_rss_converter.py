@@ -1,45 +1,84 @@
+from __future__ import annotations
+
 import textwrap
 from html import escape
+from typing import TYPE_CHECKING, BinaryIO, Final, cast
 from urllib.parse import urljoin
-
-from defusedxml import minidom
 from xml.dom.minidom import Document, Element, Node
-from typing import BinaryIO, Any, Union
+from xml.parsers.expat import ExpatError
+
 import turbohtml
 from bs4 import BeautifulSoup
+from defusedxml import minidom
+from defusedxml.common import DefusedXmlException
 
-from ._markdown import _CustomMarkdown
-from .._stream_info import StreamInfo
 from .._base_converter import DocumentConverter, DocumentConverterResult
+from .._stream_info import StreamInfo
+from ._markdown import _CustomMarkdown, _MarkdownOptions
 
-PRECISE_MIME_TYPE_PREFIXES = [
+if TYPE_CHECKING:
+    from ._markdown import _OPTION_VALUE
+
+_PRECISE_MIME_TYPE_PREFIXES: Final = [
     "application/rss",
     "application/rss+xml",
     "application/atom",
     "application/atom+xml",
 ]
 
-PRECISE_FILE_EXTENSIONS = [".rss", ".atom"]
+_PRECISE_FILE_EXTENSIONS: Final = [".rss", ".atom"]
 
-CANDIDATE_MIME_TYPE_PREFIXES = [
+_CANDIDATE_MIME_TYPE_PREFIXES: Final = [
     "text/xml",
     "application/xml",
 ]
 
-CANDIDATE_FILE_EXTENSIONS = [
+_CANDIDATE_FILE_EXTENSIONS: Final = [
     ".xml",
 ]
 
-ATOM_NAMESPACE = "http://www.w3.org/2005/Atom"
-XHTML_NAMESPACE = "http://www.w3.org/1999/xhtml"
-CONTENT_NAMESPACE = "http://purl.org/rss/1.0/modules/content/"
-XML_NAMESPACE = "http://www.w3.org/XML/1998/namespace"
+_ATOM_NAMESPACE: Final = "http://www.w3.org/2005/Atom"
+_XHTML_NAMESPACE: Final = "http://www.w3.org/1999/xhtml"
+_CONTENT_NAMESPACE: Final = "http://purl.org/rss/1.0/modules/content/"
+_XML_NAMESPACE: Final = "http://www.w3.org/XML/1998/namespace"
 
 # Boundaries to retain when reducing markup to readable heading/plain text.
 # Inline elements must not introduce spaces (e.g. co<b>op</b>erate).
-_TEXT_BREAK_ELEMENTS = frozenset(
-    "address article aside blockquote br dd div dl dt figcaption figure footer "
-    "h1 h2 h3 h4 h5 h6 header hr li main nav ol p pre section table td th tr ul".split()
+_TEXT_BREAK_ELEMENTS: Final = frozenset(
+    [
+        "address",
+        "article",
+        "aside",
+        "blockquote",
+        "br",
+        "dd",
+        "div",
+        "dl",
+        "dt",
+        "figcaption",
+        "figure",
+        "footer",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "header",
+        "hr",
+        "li",
+        "main",
+        "nav",
+        "ol",
+        "p",
+        "pre",
+        "section",
+        "table",
+        "td",
+        "th",
+        "tr",
+        "ul",
+    ]
 )
 
 
@@ -84,69 +123,68 @@ def _atom_content_kind(content_type: str, *, allow_media_types: bool) -> str:
 class RssConverter(DocumentConverter):
     """Convert RSS / Atom type to markdown"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
-        self._kwargs = {}
+        self._kwargs: _FeedOptions = {}
 
     def accepts(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
-        **kwargs: Any,  # Options to pass to the converter
+        **kwargs: _OPTION_VALUE,
     ) -> bool:
         mimetype = (stream_info.mimetype or "").lower()
         extension = (stream_info.extension or "").lower()
 
-        # Check for precise mimetypes and file extensions
-        if extension in PRECISE_FILE_EXTENSIONS:
+        if extension in _PRECISE_FILE_EXTENSIONS:
             return True
 
-        for prefix in PRECISE_MIME_TYPE_PREFIXES:
+        for prefix in _PRECISE_MIME_TYPE_PREFIXES:
             if mimetype.startswith(prefix):
                 return True
 
-        # Check for precise mimetypes and file extensions
-        if extension in CANDIDATE_FILE_EXTENSIONS:
+        if extension in _CANDIDATE_FILE_EXTENSIONS:
             return self._check_xml(file_stream)
 
-        for prefix in CANDIDATE_MIME_TYPE_PREFIXES:
+        for prefix in _CANDIDATE_MIME_TYPE_PREFIXES:
             if mimetype.startswith(prefix):
                 return self._check_xml(file_stream)
 
         return False
 
     def _check_xml(self, file_stream: BinaryIO) -> bool:
-        cur_pos = file_stream.tell()
+        cur_pos: Final = file_stream.tell()
         try:
             doc = minidom.parse(file_stream)
             return self._feed_type(doc) is not None
-        except BaseException as _:
-            pass
+        except (ExpatError, DefusedXmlException, OSError):
+            return False
         finally:
             file_stream.seek(cur_pos)
-        return False
 
     def _feed_type(self, doc: Document) -> str | None:
-        root = doc.documentElement
+        root: Final = doc.documentElement
         if root is None:
             return None
         if root.tagName == "rss":
             return "rss"
-        if root.localName == "feed" and root.namespaceURI in (None, ATOM_NAMESPACE):
-            if self._get_children(root, "entry"):
-                # An Atom feed must have a root element of <feed> and at least one <entry>
-                return "atom"
+        if (
+            root.localName == "feed"
+            and root.namespaceURI in (None, _ATOM_NAMESPACE)
+            and self._get_children(root, "entry")
+        ):
+            return "atom"
         return None
 
     def convert(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
-        **kwargs: Any,  # Options to pass to the converter
+        **kwargs: _OPTION_VALUE,
     ) -> DocumentConverterResult:
-        self._kwargs = kwargs
+        self._kwargs = cast("_FeedOptions", kwargs)
         doc = minidom.parse(file_stream)
-        doc.documentURI = stream_info.url or kwargs.get("url")
+        doc.documentURI = stream_info.url or self._kwargs.get("url")
         feed_type = self._feed_type(doc)
 
         if feed_type == "rss":
@@ -157,11 +195,7 @@ class RssConverter(DocumentConverter):
             raise ValueError("Unknown feed type")
 
     def _parse_atom_type(self, doc: Document) -> DocumentConverterResult:
-        """Parse the type of an Atom feed.
-
-        Returns None if the feed type is not recognized or something goes wrong.
-        """
-        root = doc.documentElement
+        root: Final = doc.documentElement
         assert root is not None
         title = self._get_flattened_text(root, "title", atom_text=True)
         subtitle = self._get_flattened_text(root, "subtitle", atom_text=True)
@@ -180,14 +214,16 @@ class RssConverter(DocumentConverter):
                 md_text += f"\n## {entry_title}\n"
             if entry_updated:
                 md_text += f"Updated on: {entry_updated}\n"
-            # HTML parsing would drop tag-shaped plain text such as <job_id>.
+            # Keep tag-shaped plain text such as <job_id> outside the HTML parser.
             body_parts = (
-                self._parse_content(
-                    value,
-                    base_url=self._get_field_base_url(entry, tag_name),
+                (
+                    self._parse_content(
+                        value,
+                        base_url=self._get_field_base_url(entry, tag_name),
+                    )
+                    if is_markup
+                    else value
                 )
-                if is_markup
-                else value
                 for value, is_markup, tag_name in (
                     (entry_summary, summary_is_markup, "summary"),
                     (entry_content, content_is_markup, "content"),
@@ -206,7 +242,7 @@ class RssConverter(DocumentConverter):
 
     def _get_atom_content(
         self, entry: Element, tag_name: str
-    ) -> tuple[Union[str, None], bool]:
+    ) -> tuple[str | None, bool]:
         """Return an Atom text construct or content, and whether it is markup.
 
         Values flagged as markup are converted by ``_parse_content``; plain text
@@ -239,7 +275,7 @@ class RssConverter(DocumentConverter):
 
     def _get_flattened_text(
         self, element: Element, tag_name: str, *, atom_text: bool = False
-    ) -> Union[str, None]:
+    ) -> str | None:
         """Get a value that is rendered as a heading or a metadata line.
 
         Feeds are routinely pretty-printed, so a value written as
@@ -268,11 +304,7 @@ class RssConverter(DocumentConverter):
         return " ".join(part for part in parts if part) or None
 
     def _parse_rss_type(self, doc: Document) -> DocumentConverterResult:
-        """Parse the type of an RSS feed.
-
-        Returns None if the feed type is not recognized or something goes wrong.
-        """
-        root = doc.documentElement
+        root: Final = doc.documentElement
         assert root is not None
         channel = self._get_child(root, "channel")
         if channel is None:
@@ -319,14 +351,11 @@ class RssConverter(DocumentConverter):
         )
 
     def _parse_content(self, content: str, *, base_url: str = "") -> str:
-        """Parse the content of an RSS feed item"""
-        try:
-            # using an HTML parser because many RSS feeds have HTML-styled content
-            fragment = turbohtml.parse_fragment(content)
-            self._resolve_content_links(fragment, base_url)
-            return _CustomMarkdown(**self._kwargs).convert(fragment)
-        except BaseException as _:
-            return content
+        fragment: Final = turbohtml.parse_fragment(content)
+        self._resolve_content_links(fragment, base_url)
+        return _CustomMarkdown(**cast("_MarkdownOptions", self._kwargs)).convert(
+            fragment
+        )
 
     def _get_field_base_url(self, element: Element, tag_name: str) -> str:
         """Apply xml:base from the document root through the selected field.
@@ -339,8 +368,10 @@ class RssConverter(DocumentConverter):
         bases: list[str] = []
         node: Node | None = self._get_child(element, tag_name)
         while node is not None:
-            if isinstance(node, Element) and node.hasAttributeNS(XML_NAMESPACE, "base"):
-                bases.append(node.getAttributeNS(XML_NAMESPACE, "base"))
+            if isinstance(node, Element) and node.hasAttributeNS(
+                _XML_NAMESPACE, "base"
+            ):
+                bases.append(node.getAttributeNS(_XML_NAMESPACE, "base"))
             node = node.parentNode
         document = element.ownerDocument
         base_url = (document.documentURI or "") if document is not None else ""
@@ -385,7 +416,7 @@ class RssConverter(DocumentConverter):
         """Select fields on their owner, without borrowing descendant metadata."""
         namespace: str | None
         if tag_name == "content:encoded":
-            namespace, local_name = CONTENT_NAMESPACE, "encoded"
+            namespace, local_name = _CONTENT_NAMESPACE, "encoded"
         else:
             namespace, local_name = element.namespaceURI, tag_name
         return [
@@ -401,7 +432,7 @@ class RssConverter(DocumentConverter):
 
     def _get_data_by_tag_name(
         self, element: Element, tag_name: str, *, kind: str = "text"
-    ) -> Union[str, None]:
+    ) -> str | None:
         """Read the complete value of the first matching direct child field."""
         node = self._get_child(element, tag_name)
         if node is None:
@@ -441,7 +472,7 @@ class RssConverter(DocumentConverter):
                     # The HTML parser recognizes local HTML names, not x:strong.
                     name = (
                         child.localName
-                        if child.namespaceURI == XHTML_NAMESPACE
+                        if child.namespaceURI == _XHTML_NAMESPACE
                         else child.tagName
                     )
                     attrs = "".join(
@@ -455,3 +486,10 @@ class RssConverter(DocumentConverter):
                         parts.append(f"<{name}{attrs}/>")
                 stack.extend(reversed(child.childNodes))
         return "".join(parts)
+
+
+class _FeedOptions(_MarkdownOptions, total=False):
+    url: str | None
+
+
+__all__ = ["RssConverter"]

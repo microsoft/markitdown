@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import io
-from typing import Any, BinaryIO, Optional
+from typing import TYPE_CHECKING, BinaryIO, Final, cast
 
 import turbohtml
 
@@ -7,33 +9,35 @@ from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
 from ._markdown import _CustomMarkdown, _document_title, _parse_html_with_source
 
-ACCEPTED_MIME_TYPE_PREFIXES = [
+if TYPE_CHECKING:
+    from ._markdown import _OPTION_VALUE, _MarkdownOptions
+
+
+_ACCEPTED_MIME_TYPE_PREFIXES: Final = [
     "text/html",
     "application/xhtml",
 ]
 
-ACCEPTED_FILE_EXTENSIONS = [
+_ACCEPTED_FILE_EXTENSIONS: Final = [
     ".html",
     ".htm",
 ]
 
 
 class HtmlConverter(DocumentConverter):
-    """Anything with content type text/html"""
-
     def accepts(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
-        **kwargs: Any,  # Options to pass to the converter
+        **kwargs: _OPTION_VALUE,
     ) -> bool:
-        mimetype = (stream_info.mimetype or "").lower()
-        extension = (stream_info.extension or "").lower()
+        mimetype: Final = (stream_info.mimetype or "").lower()
+        extension: Final = (stream_info.extension or "").lower()
 
-        if extension in ACCEPTED_FILE_EXTENSIONS:
+        if extension in _ACCEPTED_FILE_EXTENSIONS:
             return True
 
-        for prefix in ACCEPTED_MIME_TYPE_PREFIXES:
+        for prefix in _ACCEPTED_MIME_TYPE_PREFIXES:
             if mimetype.startswith(prefix):
                 return True
 
@@ -43,12 +47,12 @@ class HtmlConverter(DocumentConverter):
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
-        **kwargs: Any,  # Options to pass to the converter
+        **kwargs: _OPTION_VALUE,
     ) -> DocumentConverterResult:
         doc, source = _parse_html_with_source(file_stream, stream_info)
-        body_elm = doc.select_one("body")
+        body_elm: Final = doc.select_one("body")
         # Fragment context retains content moved into a synthetic head.
-        target = (
+        target: Final = (
             turbohtml.parse_fragment(source if source is not None else doc.to_source())
             if body_elm is not None and body_elm.source_line is None
             else body_elm or doc
@@ -56,21 +60,20 @@ class HtmlConverter(DocumentConverter):
         if body_elm is not None and body_elm.source_line is None:
             for element in target.select("title, template"):
                 element.unwrap()
-        webpage_text = _CustomMarkdown(**kwargs).convert(target).strip()
-
         return DocumentConverterResult(
-            markdown=webpage_text,
+            markdown=_CustomMarkdown(**cast("_MarkdownOptions", kwargs))
+            .convert(target)
+            .strip(),
             title=_document_title(doc),
         )
 
     def convert_string(
-        self, html_content: str, *, url: Optional[str] = None, **kwargs
+        self,
+        html_content: str,
+        *,
+        url: str | None = None,
+        **kwargs: _OPTION_VALUE,
     ) -> DocumentConverterResult:
-        """
-        Non-standard convenience method to convert a string to markdown.
-        Given that many converters produce HTML as intermediate output, this
-        allows for easy conversion of HTML to markdown.
-        """
         return self.convert(
             file_stream=io.BytesIO(html_content.encode("utf-8")),
             stream_info=StreamInfo(
@@ -81,3 +84,6 @@ class HtmlConverter(DocumentConverter):
             ),
             **kwargs,
         )
+
+
+__all__ = ["HtmlConverter"]
