@@ -5,7 +5,6 @@ from io import BytesIO
 from typing import Final
 
 import pytest
-
 from markitdown import StreamInfo
 from markitdown.converters import (
     BingSerpConverter,
@@ -13,6 +12,24 @@ from markitdown.converters import (
     RssConverter,
     WikipediaConverter,
 )
+
+
+@pytest.mark.parametrize(
+    ("source", "message"),
+    [
+        pytest.param(b"<document/>", "Unknown feed type", id="unknown-root"),
+        pytest.param(b"<rss/>", "No channel found in RSS feed", id="missing-channel"),
+    ],
+)
+def test_feed_rejects_incomplete_documents(source: bytes, message: str) -> None:
+    with pytest.raises(ValueError, match=message):
+        RssConverter().convert(BytesIO(source), StreamInfo(extension=".xml"))
+
+
+def test_feed_accepts_xml_mime_type() -> None:
+    assert RssConverter().accepts(
+        BytesIO(b"<rss><channel/></rss>"), StreamInfo(mimetype="text/xml")
+    )
 
 
 @pytest.mark.parametrize(
