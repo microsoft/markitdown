@@ -1285,6 +1285,27 @@ class TestMasterFormatPartialNumbering:
         )
         assert _merge_partial_numbering_lines(text) == expected
 
+    def test_merge_partial_numbering_preserves_multiple_blank_lines_between_sections(self):
+        """Test multiple blank lines between sections with consecutive numbers are preserved."""
+        text = (
+            "Section 01 00 00\n\n\n"
+            ".1\n\n"
+            "Preliminary note.\n\n\n"
+            ".2\n\n"
+            ".3\n\n"
+            "Execution requirements.\n\n\n"
+            ".4\n\n"
+            "Quality assurance."
+        )
+        expected = (
+            "Section 01 00 00\n\n\n"
+            ".1 Preliminary note.\n\n\n"
+            ".2\n\n"
+            ".3 Execution requirements.\n\n\n"
+            ".4 Quality assurance."
+        )
+        assert _merge_partial_numbering_lines(text) == expected
+
 
 # Page cleanup and extraction fallback
 
