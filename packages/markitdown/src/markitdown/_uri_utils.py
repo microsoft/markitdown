@@ -43,6 +43,7 @@ def parse_data_uri(uri: str) -> Tuple[str | None, Dict[str, str], bytes]:
     if uri[:5].lower() != "data:":
         raise ValueError("Not a data URI")
 
+    uri = uri.partition("#")[0]
     header, _, data = uri.partition(",")
     if not _:
         raise ValueError("Malformed data URI, missing ',' separator")

@@ -192,6 +192,27 @@ def test_data_uris() -> None:
     assert data == b"Hello, World!"
 
 
+@pytest.mark.parametrize(
+    "uri, expected",
+    [
+        ("data:text/plain,Hello#section", "Hello"),
+        ("data:text/plain;base64,SGVsbG8h#AAAA", "Hello!"),
+        ("data:text/plain,Hello%23section", "Hello#section"),
+        ("data:text/plain,Hello#", "Hello"),
+        ("data:text/plain,Hello?query", "Hello?query"),
+        ("data:text/plain;base64,SGVsbG8=#section", "Hello"),
+    ],
+)
+@pytest.mark.parametrize("public_api", [False, True])
+def test_data_uri_fragments(uri: str, expected: str, public_api: bool) -> None:
+    if public_api:
+        actual = MarkItDown(enable_plugins=False).convert_uri(uri).text_content
+    else:
+        actual = parse_data_uri(uri)[2].decode("ascii")
+
+    assert actual == expected
+
+
 def test_file_uris() -> None:
     expected_path = os.path.abspath("/path/to/file.txt")
 
