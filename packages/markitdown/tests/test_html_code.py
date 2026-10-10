@@ -3,6 +3,7 @@ from typing import Final
 
 import pytest
 from bs4 import Tag
+
 from markitdown.converters import HtmlConverter
 
 
@@ -36,6 +37,22 @@ def test_html_code_default_language() -> None:
         .convert_string("<pre>one</pre>", code_language="python linenums")
         .markdown
         == "```python linenums\none\n```"
+    )
+
+
+@pytest.mark.parametrize(
+    "language",
+    [pytest.param("ruby", id="override"), pytest.param("", id="disable")],
+)
+def test_html_code_explicit_language_overrides_class(language: str) -> None:
+    assert (
+        HtmlConverter()
+        .convert_string(
+            '<pre><code class="language-python">one</code></pre>',
+            code_language=language,
+        )
+        .markdown
+        == f"```{language}\none\n```"
     )
 
 
