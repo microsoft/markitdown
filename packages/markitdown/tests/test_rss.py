@@ -2,12 +2,13 @@
 
 import io
 import sys
+import warnings
+from typing import Final
 
 import pytest
-
+from bs4 import Tag
 from markitdown import MarkItDown, StreamInfo
 from markitdown.converters import RssConverter
-
 
 # Feed bodies and links
 
@@ -42,9 +43,7 @@ def test_atom_namespace_prefixes(root_prefix: str, child_prefix: str) -> None:
     </{child_prefix}content>
   </{child_prefix}entry>
 </{root_prefix}feed>
-""".encode(
-        "utf-8"
-    )
+""".encode()
     stream_info = StreamInfo(mimetype="application/xml", extension=".xml")
     converter = RssConverter()
     stream = io.BytesIO(feed)
@@ -391,8 +390,10 @@ def _feed_with_body(field: str, payload: str, *, atom_type: str = "html") -> byt
             "**nested** trailing",
         ),
         (
-            '<p>Read <a href="https://example.com/?a=1&amp;b=2">this</a>.</p>'
-            "<p>Then <em>continue</em>.</p>",
+            (
+                '<p>Read <a href="https://example.com/?a=1&amp;b=2">this</a>.</p>'
+                "<p>Then <em>continue</em>.</p>"
+            ),
             "Read [this](https://example.com/?a=1&b=2).\n\nThen *continue*.",
         ),
         (
@@ -496,24 +497,37 @@ def test_complete_feed_content_through_public_api(field: str) -> None:
     assert result.markdown.endswith("## Entry\nBefore **nested** after.")
 
 
-@pytest.mark.parametrize("field", ["rss-description", "atom-content"])
-def test_deep_xml_body_uses_rendering_fallback(field: str) -> None:
-    payload = "<div>" * 500 + "Deep <b>body</b>." + "</div>" * 500
-    feed = _feed_with_body(field, payload, atom_type="xhtml")
-    stream_info = StreamInfo(extension=".rss" if field.startswith("rss-") else ".atom")
-    original_limit = sys.getrecursionlimit()
+@pytest.mark.parametrize(
+    ("field", "atom_type", "cdata"),
+    [
+        pytest.param("rss-description", "html", False, id="rss-description"),
+        pytest.param("rss-content", "html", True, id="rss-content-cdata"),
+        pytest.param("atom-content", "html", True, id="atom-html-cdata"),
+        pytest.param("atom-content", "xhtml", False, id="atom-xhtml"),
+    ],
+)
+@pytest.mark.skipif(
+    sys.version_info < (3, 11),
+    reason="iterative Markdown rendering requires Python 3.11",
+)
+def test_deep_xml_body_converts(field: str, atom_type: str, *, cdata: bool) -> None:
+    payload: Final = "<div>" * 500 + "Deep <b>body</b>." + "</div>" * 500
+    feed: Final = _feed_with_body(
+        field, f"<![CDATA[{payload}]]>" if cdata else payload, atom_type=atom_type
+    )
+    stream_info: Final = StreamInfo(
+        extension=".rss" if field.startswith("rss-") else ".atom"
+    )
+    original_limit: Final = sys.getrecursionlimit()
     try:
         sys.setrecursionlimit(200)
-        with pytest.warns(UserWarning, match="too deeply nested"):
-            result = RssConverter().convert(io.BytesIO(feed), stream_info)
-        with pytest.raises(RecursionError):
-            RssConverter().convert(io.BytesIO(feed), stream_info, strict=True)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            result: Final = RssConverter().convert(io.BytesIO(feed), stream_info)
     finally:
         sys.setrecursionlimit(original_limit)
 
-    assert "Deep" in result.markdown
-    assert "body" in result.markdown
-    assert "<div>" not in result.markdown
+    assert result.markdown.endswith("Deep **body**.")
 
 
 def test_rss_content_namespace_alias_and_field_ownership() -> None:
@@ -901,8 +915,10 @@ def test_complete_feed_and_entry_titles(
         ("html", "Use &amp;lt;slot&amp;gt;", "Use <slot>"),
         (
             "xhtml",
-            '<x:div xmlns:x="http://www.w3.org/1999/xhtml">co<x:b>op</x:b>erate'
-            " <![CDATA[<slot> &lt;literal&gt;]]></x:div>",
+            (
+                '<x:div xmlns:x="http://www.w3.org/1999/xhtml">co<x:b>op</x:b>erate'
+                " <![CDATA[<slot> &lt;literal&gt;]]></x:div>"
+            ),
             "cooperate <slot> &lt;literal&gt;",
         ),
         ("text/plain", "Use &lt;slot&gt;", "Use <slot>"),
@@ -996,35 +1012,23 @@ def test_rss_channel_description_and_date_preserve_complete_text() -> None:
 # Conversion regressions
 
 
-def test_deeply_nested_rss_item_fallback() -> None:
-    """Deeply nested HTML inside an RSS item should fall back to plain-text
-    extraction instead of silently embedding raw unconverted HTML in the
-    markdown output (same failure class as the HTML converter fix in #1644).
-
-    Note: This test uses sys.setrecursionlimit to guarantee a RecursionError
-    regardless of the host environment's default limit, making it deterministic
-    across different platforms and CI configurations.
-    """
-    import sys
-    import warnings
-
-    markitdown = MarkItDown()
-
-    # Use a small recursion limit so the test is environment-independent.
-    # We restore the original limit in a finally block to avoid side-effects.
-    original_limit = sys.getrecursionlimit()
-    low_limit = 200  # well below markdownify's traversal depth for depth=500
-
-    # Build an RSS item whose content is deeply nested HTML
-    depth = 500
-    item_html = ""
-    for _ in range(depth):
-        item_html += '<div style="margin-left:10px">'
-    item_html += "<p>Deep feed content with <b>bold text</b></p>"
-    for _ in range(depth):
-        item_html += "</div>"
-
-    rss = (
+@pytest.mark.parametrize(
+    "extension", [pytest.param(".rss", id="rss"), pytest.param(".atom", id="atom")]
+)
+@pytest.mark.parametrize(
+    "strict", [pytest.param(False, id="default"), pytest.param(True, id="strict")]
+)
+@pytest.mark.skipif(
+    sys.version_info < (3, 11),
+    reason="iterative Markdown rendering requires Python 3.11",
+)
+def test_deeply_nested_rss_item_converts(extension: str, strict: bool) -> None:
+    item_html: Final = (
+        "<div>" * 500
+        + "<p>Deep feed content with <b>bold text</b></p>"
+        + "</div>" * 500
+    )
+    rss: Final = (
         '<?xml version="1.0" encoding="UTF-8"?>'
         '<rss version="2.0" '
         'xmlns:content="http://purl.org/rss/1.0/modules/content/">'
@@ -1038,7 +1042,7 @@ def test_deeply_nested_rss_item_fallback() -> None:
         "</channel>"
         "</rss>"
     )
-    atom = (
+    atom: Final = (
         '<?xml version="1.0" encoding="UTF-8"?>'
         '<feed xmlns="http://www.w3.org/2005/Atom">'
         "<title>Test Feed</title>"
@@ -1049,41 +1053,40 @@ def test_deeply_nested_rss_item_fallback() -> None:
         "</feed>"
     )
 
+    original_limit: Final = sys.getrecursionlimit()
     try:
-        sys.setrecursionlimit(low_limit)
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            result = markitdown.convert_stream(
-                io.BytesIO(rss.encode("utf-8")),
-                file_extension=".rss",
-            )
-
-            # Should have emitted a warning about the fallback
-            recursion_warnings = [x for x in w if "deeply nested" in str(x.message)]
-            assert len(recursion_warnings) > 0
-
-        # strict=True should expose the conversion failure rather than applying
-        # the plain-text fallback.
-        with pytest.raises(RecursionError):
-            RssConverter().convert(
-                io.BytesIO(rss.encode("utf-8")),
-                StreamInfo(extension=".rss"),
-                strict=True,
-            )
-        with pytest.raises(RecursionError):
-            RssConverter().convert(
-                io.BytesIO(atom.encode("utf-8")),
-                StreamInfo(extension=".atom"),
-                strict=True,
+        sys.setrecursionlimit(200)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            result: Final = RssConverter().convert(
+                io.BytesIO((rss if extension == ".rss" else atom).encode()),
+                StreamInfo(extension=extension),
+                strict=strict,
             )
     finally:
         sys.setrecursionlimit(original_limit)
 
-    # The output should contain the text content, not raw HTML
-    assert "Deep feed content" in result.markdown
-    assert "bold text" in result.markdown
-    assert "<div" not in result.markdown
-    assert "<p>" not in result.markdown
+    assert "Deep feed content with **bold text**" in result.markdown
+
+
+@pytest.mark.parametrize(
+    "extension",
+    [pytest.param(".rss", id="rss"), pytest.param(".atom", id="atom")],
+)
+def test_feed_propagates_language_callback_errors(extension: str) -> None:
+    def fail_language(tag: Tag) -> str:
+        raise ValueError(f"Cannot classify {tag.get_text()}")
+
+    feed: Final = _feed_with_body(
+        "rss-content" if extension == ".rss" else "atom-content",
+        "<![CDATA[<pre>Garden</pre>]]>",
+    )
+    with pytest.raises(ValueError, match="Cannot classify Garden"):
+        RssConverter().convert(
+            io.BytesIO(feed),
+            StreamInfo(extension=extension),
+            code_language_callback=fail_language,
+        )
 
 
 if __name__ == "__main__":
