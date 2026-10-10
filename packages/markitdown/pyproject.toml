@@ -27,7 +27,7 @@ classifiers = [
 dependencies = [
   "beautifulsoup4",
   "requests",
-  "turbohtml>=1.14.0",
+  "turbohtml>=1.14.1",
   "magika~=0.6.1",
   "charset-normalizer",
   "defusedxml",
