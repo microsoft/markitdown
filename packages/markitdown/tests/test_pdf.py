@@ -1211,6 +1211,25 @@ class TestMasterFormatPartialNumbering:
         )
         assert _merge_partial_numbering_lines(text) == expected
 
+    def test_merge_partial_numbering_multiple_consecutive_and_trailing(self):
+        """Test three or more consecutive partial numberings and trailing standalone numbers."""
+        three_consecutive = (
+            ".1\n"
+            ".2\n"
+            ".3\n"
+            "Final requirements and specification details."
+        )
+        expected_three = (
+            ".1\n"
+            ".2\n"
+            ".3 Final requirements and specification details."
+        )
+        assert _merge_partial_numbering_lines(three_consecutive) == expected_three
+
+        trailing_numbers = ".1\n.2\n.3"
+        expected_trailing = ".1\n.2\n.3"
+        assert _merge_partial_numbering_lines(trailing_numbers) == expected_trailing
+
 
 # Page cleanup and extraction fallback
 
