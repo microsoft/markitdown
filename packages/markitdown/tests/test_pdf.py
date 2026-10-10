@@ -1195,6 +1195,22 @@ class TestMasterFormatPartialNumbering:
             isolated_count == 0
         ), f"Found {isolated_count} isolated partial numberings that weren't merged"
 
+    def test_merge_partial_numbering_consecutive_standalone(self):
+        """Test that two consecutive partial numberings are not merged together into a single token."""
+        text = (
+            ".1\n"
+            ".2\n"
+            "Contractor shall furnish all materials.\n"
+            ".3\n"
+            "Work shall comply with local codes."
+        )
+        expected = (
+            ".1\n"
+            ".2 Contractor shall furnish all materials.\n"
+            ".3 Work shall comply with local codes."
+        )
+        assert _merge_partial_numbering_lines(text) == expected
+
 
 # Page cleanup and extraction fallback
 
