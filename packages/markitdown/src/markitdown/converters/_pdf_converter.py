@@ -25,7 +25,10 @@ def _merge_partial_numbering_lines(text: str) -> str:
         .1
         The intent of this Request for Proposal...
 
-    This function merges them back together.
+    This function merges them back together. When consecutive partial numberings
+    appear (e.g., an unnumbered section stub or consecutive sub-items like
+    '.1\n.2\nContractor shall...'), standalone numbers are preserved on their own
+    lines rather than being collapsed into an invalid compound token like '.1 .2'.
     """
     lines = text.split("\n")
     result_lines: list[str] = []
@@ -42,13 +45,15 @@ def _merge_partial_numbering_lines(text: str) -> str:
             while j < len(lines) and not lines[j].strip():
                 j += 1
 
+            # Only merge if the next line is actual content, not another partial numbering
             if j < len(lines) and not PARTIAL_NUMBERING_PREFIX_PATTERN.match(lines[j].strip()):
                 # Merge the partial numbering with the next line
                 next_line = lines[j].strip()
                 result_lines.append(f"{stripped} {next_line}")
                 i = j + 1  # Skip past the merged line
             else:
-                # Next line is also a partial numbering, or no next line to merge with
+                # Next line is also a partial numbering, or no next line to merge with;
+                # preserve the standalone partial numbering as-is.
                 result_lines.append(line)
                 i += 1
         else:
