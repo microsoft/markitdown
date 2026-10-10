@@ -3,11 +3,13 @@
 import io
 import sys
 import warnings
+from typing import Final
+
+from bs4 import Tag
 
 import pytest
 from markitdown import MarkItDown, StreamInfo
 from markitdown.converters import RssConverter
-
 
 # Feed bodies and links
 
@@ -42,7 +44,7 @@ def test_atom_namespace_prefixes(root_prefix: str, child_prefix: str) -> None:
     </{child_prefix}content>
   </{child_prefix}entry>
 </{root_prefix}feed>
-""".encode("utf-8")
+""".encode()
     stream_info = StreamInfo(mimetype="application/xml", extension=".xml")
     converter = RssConverter()
     stream = io.BytesIO(feed)
@@ -389,8 +391,10 @@ def _feed_with_body(field: str, payload: str, *, atom_type: str = "html") -> byt
             "**nested** trailing",
         ),
         (
-            '<p>Read <a href="https://example.com/?a=1&amp;b=2">this</a>.</p>'
-            "<p>Then <em>continue</em>.</p>",
+            (
+                '<p>Read <a href="https://example.com/?a=1&amp;b=2">this</a>.</p>'
+                "<p>Then <em>continue</em>.</p>"
+            ),
             "Read [this](https://example.com/?a=1&b=2).\n\nThen *continue*.",
         ),
         (
@@ -504,17 +508,19 @@ def test_complete_feed_content_through_public_api(field: str) -> None:
     ],
 )
 def test_deep_xml_body_converts(field: str, atom_type: str, *, cdata: bool) -> None:
-    payload = "<div>" * 500 + "Deep <b>body</b>." + "</div>" * 500
-    feed = _feed_with_body(
+    payload: Final = "<div>" * 500 + "Deep <b>body</b>." + "</div>" * 500
+    feed: Final = _feed_with_body(
         field, f"<![CDATA[{payload}]]>" if cdata else payload, atom_type=atom_type
     )
-    stream_info = StreamInfo(extension=".rss" if field.startswith("rss-") else ".atom")
-    original_limit = sys.getrecursionlimit()
+    stream_info: Final = StreamInfo(
+        extension=".rss" if field.startswith("rss-") else ".atom"
+    )
+    original_limit: Final = sys.getrecursionlimit()
     try:
         sys.setrecursionlimit(200)
         with warnings.catch_warnings():
             warnings.simplefilter("error")
-            result = RssConverter().convert(io.BytesIO(feed), stream_info)
+            result: Final = RssConverter().convert(io.BytesIO(feed), stream_info)
     finally:
         sys.setrecursionlimit(original_limit)
 
@@ -906,8 +912,10 @@ def test_complete_feed_and_entry_titles(
         ("html", "Use &amp;lt;slot&amp;gt;", "Use <slot>"),
         (
             "xhtml",
-            '<x:div xmlns:x="http://www.w3.org/1999/xhtml">co<x:b>op</x:b>erate'
-            " <![CDATA[<slot> &lt;literal&gt;]]></x:div>",
+            (
+                '<x:div xmlns:x="http://www.w3.org/1999/xhtml">co<x:b>op</x:b>erate'
+                " <![CDATA[<slot> &lt;literal&gt;]]></x:div>"
+            ),
             "cooperate <slot> &lt;literal&gt;",
         ),
         ("text/plain", "Use &lt;slot&gt;", "Use <slot>"),
@@ -1001,18 +1009,19 @@ def test_rss_channel_description_and_date_preserve_complete_text() -> None:
 # Conversion regressions
 
 
-@pytest.mark.parametrize("extension", [".rss", ".atom"])
-@pytest.mark.parametrize("strict", [False, True])
+@pytest.mark.parametrize(
+    "extension", [pytest.param(".rss", id="rss"), pytest.param(".atom", id="atom")]
+)
+@pytest.mark.parametrize(
+    "strict", [pytest.param(False, id="default"), pytest.param(True, id="strict")]
+)
 def test_deeply_nested_rss_item_converts(extension: str, strict: bool) -> None:
-    import sys
-    import warnings
-
-    item_html = (
+    item_html: Final = (
         "<div>" * 500
         + "<p>Deep feed content with <b>bold text</b></p>"
         + "</div>" * 500
     )
-    rss = (
+    rss: Final = (
         '<?xml version="1.0" encoding="UTF-8"?>'
         '<rss version="2.0" '
         'xmlns:content="http://purl.org/rss/1.0/modules/content/">'
@@ -1026,7 +1035,7 @@ def test_deeply_nested_rss_item_converts(extension: str, strict: bool) -> None:
         "</channel>"
         "</rss>"
     )
-    atom = (
+    atom: Final = (
         '<?xml version="1.0" encoding="UTF-8"?>'
         '<feed xmlns="http://www.w3.org/2005/Atom">'
         "<title>Test Feed</title>"
@@ -1037,12 +1046,12 @@ def test_deeply_nested_rss_item_converts(extension: str, strict: bool) -> None:
         "</feed>"
     )
 
-    original_limit = sys.getrecursionlimit()
+    original_limit: Final = sys.getrecursionlimit()
     try:
         sys.setrecursionlimit(200)
         with warnings.catch_warnings():
             warnings.simplefilter("error")
-            result = RssConverter().convert(
+            result: Final = RssConverter().convert(
                 io.BytesIO((rss if extension == ".rss" else atom).encode()),
                 StreamInfo(extension=extension),
                 strict=strict,
@@ -1055,3 +1064,23 @@ def test_deeply_nested_rss_item_converts(extension: str, strict: bool) -> None:
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
+
+
+@pytest.mark.parametrize(
+    "extension",
+    [pytest.param(".rss", id="rss"), pytest.param(".atom", id="atom")],
+)
+def test_feed_propagates_language_callback_errors(extension: str) -> None:
+    def fail_language(tag: Tag) -> str:
+        raise ValueError(f"Cannot classify {tag.get_text()}")
+
+    feed: Final = _feed_with_body(
+        "rss-content" if extension == ".rss" else "atom-content",
+        "<![CDATA[<pre>Garden</pre>]]>",
+    )
+    with pytest.raises(ValueError, match="Cannot classify Garden"):
+        RssConverter().convert(
+            io.BytesIO(feed),
+            StreamInfo(extension=extension),
+            code_language_callback=fail_language,
+        )

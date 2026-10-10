@@ -1,278 +1,227 @@
-"""HTML conversion, link handling, and Wikipedia pages."""
+from __future__ import annotations
 
 import io
 import sys
 import warnings
+from collections.abc import Callable
+from pathlib import Path
 from typing import Final
 
 import pytest
-
 from markitdown import MarkItDown, StreamInfo
-from markitdown.converters import WikipediaConverter
-
-# HTML rendering
-
-
-def _convert_html(html: str, **kwargs) -> str:
-    result = MarkItDown().convert_stream(
-        io.BytesIO(html.encode("utf-8")),
-        file_extension=".html",
-        **kwargs,
-    )
-    return result.markdown
+from markitdown.converters import HtmlConverter, WikipediaConverter
 
 
 @pytest.mark.parametrize(
     ("content", "expected"),
     [
-        ("", "FirstLast"),
-        (" ", "First Last"),
-        ("\t", "First Last"),
-        ("&#160;", "First\u00a0Last"),
-        ("<br>", "First\nLast"),
-        ("word", "First<u>word</u>Last"),
-        (" word ", "First <u>word</u> Last"),
+        pytest.param("", "FirstLast", id="empty"),
+        pytest.param(" ", "First Last", id="space"),
+        pytest.param("\t", "First Last", id="tab"),
+        pytest.param("&#160;", "First\u00a0Last", id="nonbreaking-space"),
+        pytest.param("<br>", "First\nLast", id="break"),
+        pytest.param("word", "First<u>word</u>Last", id="word"),
+        pytest.param(" word ", "First <u>word</u> Last", id="padded-word"),
     ],
 )
-def test_html_underlined_content_is_preserved(content: str, expected: str) -> None:
-    assert _convert_html(f"<p>First<u>{content}</u>Last</p>") == expected
+def test_html_underlined_content_is_preserved(
+    convert_html: Callable[[str], str], content: str, expected: str
+) -> None:
+    assert convert_html(f"<p>First<u>{content}</u>Last</p>") == expected
 
 
-def test_preserves_non_utf8_percent_encoded_href_path() -> None:
-    href = "https://abc.com/hist/%a5%c8%a5%c3%a5%d7%a5%da%a1%bc%a5%b8"
-    html = f'<a href="{href}">example</a>'
-
-    markdown = _convert_html(html)
-
-    assert f"[example]({href})" in markdown
-    assert "%EF%BF%BD" not in markdown
-
-
-def test_html_href_still_quotes_raw_unicode_and_spaces() -> None:
-    href = "https://example.com/a path/日本語"
-    expected_href = "https://example.com/a%20path/%E6%97%A5%E6%9C%AC%E8%AA%9E"
-
-    markdown = _convert_html(f'<a href="{href}">example</a>')
-
-    assert f"[example]({expected_href})" in markdown
-
-
-def test_html_href_quotes_literal_percent_sign() -> None:
-    href = "https://example.com/100% complete"
-    expected_href = "https://example.com/100%25%20complete"
-
-    markdown = _convert_html(f'<a href="{href}">example</a>')
-
-    assert f"[example]({expected_href})" in markdown
-
-
-def test_html_href_quotes_malformed_percent_escape() -> None:
-    href = "https://example.com/items/%ZZ/%2F"
-    expected_href = "https://example.com/items/%25ZZ/%2F"
-
-    markdown = _convert_html(f'<a href="{href}">example</a>')
-
-    assert f"[example]({expected_href})" in markdown
-
-
-def test_html_href_preserves_encoded_slash() -> None:
-    href = "https://example.com/items/a%2Fb"
-
-    markdown = _convert_html(f'<a href="{href}">example</a>')
-
-    assert f"[example]({href})" in markdown
-
-
-def test_html_href_does_not_quote_query_or_fragment() -> None:
-    href = "https://example.com/a path?query=a b%20c#fragment with spaces"
-    expected_href = "https://example.com/a%20path?query=a b%20c#fragment with spaces"
-
-    markdown = _convert_html(f'<a href="{href}">example</a>')
-
-    assert f"[example]({expected_href})" in markdown
-
-
-def test_img_prefers_data_src_over_placeholder_data_uri() -> None:
-    placeholder = (
-        "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBTAA7"
-    )
-    real_src = "https://example.com/photo.jpg"
-    html = (
-        f'<img src="{placeholder}" data-src="{real_src}" alt="A photo" loading="lazy">'
-    )
-
-    markdown = _convert_html(html)
-
-    assert f"![A photo]({real_src})" in markdown
-    assert placeholder not in markdown
-
-
-def test_img_uses_real_src_over_data_src_when_both_present() -> None:
-    real_src = "https://example.com/photo.jpg"
-    other_src = "https://example.com/photo-alt.jpg"
-    html = f'<img src="{real_src}" data-src="{other_src}" alt="A photo">'
-
-    markdown = _convert_html(html)
-
-    assert f"![A photo]({real_src})" in markdown
-
-
-def test_img_falls_back_to_data_src_when_src_missing() -> None:
-    real_src = "https://example.com/photo.jpg"
-    html = f'<img data-src="{real_src}" alt="A photo">'
-
-    markdown = _convert_html(html)
-
-    assert f"![A photo]({real_src})" in markdown
-
-
-def test_img_keeps_truncated_data_uri_when_no_data_src() -> None:
-    placeholder = (
-        "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBTAA7"
-    )
-    html = f'<img src="{placeholder}" alt="A photo">'
-
-    markdown = _convert_html(html)
-
-    assert "![A photo](data:image/gif;base64...)" in markdown
-
-
-def test_img_keeps_embedded_data_uri_over_data_src_when_keeping_data_uris() -> None:
-    embedded = (
-        "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBTAA7"
-    )
-    other_src = "https://example.com/photo.jpg"
-    html = f'<img src="{embedded}" data-src="{other_src}" alt="A photo">'
-
-    markdown = _convert_html(html, keep_data_uris=True)
-
-    assert f"![A photo]({embedded})" in markdown
-    assert other_src not in markdown
-
-
-# Wikipedia article titles
-
-STREAM_INFO = StreamInfo(
-    url="https://en.wikipedia.org/wiki/Example",
-    mimetype="text/html",
-    extension=".html",
+@pytest.mark.parametrize(
+    ("href", "expected"),
+    [
+        pytest.param(
+            "https://abc.com/hist/%a5%c8%a5%c3%a5%d7%a5%da%a1%bc%a5%b8",
+            "https://abc.com/hist/%a5%c8%a5%c3%a5%d7%a5%da%a1%bc%a5%b8",
+            id="non-utf8-octets",
+        ),
+        pytest.param(
+            "https://example.com/a path/日本語",
+            "https://example.com/a%20path/%E6%97%A5%E6%9C%AC%E8%AA%9E",
+            id="unicode-spaces",
+        ),
+        pytest.param(
+            "https://example.com/100% complete",
+            "https://example.com/100%25%20complete",
+            id="literal-percent",
+        ),
+        pytest.param(
+            "https://example.com/items/%ZZ/%2F",
+            "https://example.com/items/%25ZZ/%2F",
+            id="malformed-escape",
+        ),
+        pytest.param(
+            "https://example.com/items/a%2Fb",
+            "https://example.com/items/a%2Fb",
+            id="encoded-slash",
+        ),
+        pytest.param(
+            "https://example.com/a path?query=a b%20c#fragment with spaces",
+            "https://example.com/a%20path?query=a b%20c#fragment with spaces",
+            id="query-fragment",
+        ),
+    ],
 )
+def test_html_href_escaping(
+    convert_html: Callable[[str], str], href: str, expected: str
+) -> None:
+    assert convert_html(f'<a href="{href}">example</a>') == f"[example]({expected})"
 
 
-def _page(heading: str, document_title: str) -> io.BytesIO:
-    """Build a page shaped like the article HTML Wikipedia actually serves."""
-    return io.BytesIO(
-        f"""<html><head><title>{document_title} - Wikipedia</title></head><body>
-<h1 id="firstHeading" class="firstHeading mw-first-heading">{heading}</h1>
-<div id="mw-content-text"><p>Body text.</p></div>
-</body></html>""".encode()
-    )
-
-
-def test_plain_title_is_read_from_the_title_span() -> None:
-    """A plain title keeps being read from mw-page-title-main."""
-    page = _page(
-        '<span lang="en" dir="ltr"><span class="mw-page-title-main">Paris</span></span>',
-        "Paris",
-    )
-
-    result = WikipediaConverter().convert(page, STREAM_INFO)
-
-    assert result.title == "Paris"
-    assert result.markdown.lstrip().startswith("# Paris")
-
-
-def test_fully_italicised_title_keeps_its_text() -> None:
-    """Wikipedia drops the title span for italicised titles, e.g. species names."""
-    page = _page("<i>Escherichia coli</i>", "Escherichia coli")
-
-    result = WikipediaConverter().convert(page, STREAM_INFO)
-
-    # Without the first-heading fallback this became "Escherichia coli - Wikipedia".
-    assert result.title == "Escherichia coli"
-    assert result.markdown.lstrip().startswith("# Escherichia coli")
-
-
-def test_title_mixing_markup_and_plain_text_keeps_both_parts() -> None:
-    """A disambiguated italic title spans several children, so .string is None."""
-    page = _page("<i>Titanic</i> (1997 film)", "Titanic (1997 film)")
-
-    result = WikipediaConverter().convert(page, STREAM_INFO)
-
-    assert result.title == "Titanic (1997 film)"
-    assert result.markdown.lstrip().startswith("# Titanic (1997 film)")
-
-
-# Conversion regressions
-
-
-def test_wikipedia_converter_no_title() -> None:
-    """WikipediaConverter should not render '# None' when page has no title."""
-    converter = WikipediaConverter()
-    html = b"<html><body><div id='mw-content-text'><p>Hello</p></div></body></html>"
-    stream_info = StreamInfo(
-        mimetype="text/html", url="https://en.wikipedia.org/wiki/Test"
-    )
-    result = converter.convert(io.BytesIO(html), stream_info)
-    assert "# None" not in result.markdown
-    assert "Hello" in result.markdown
-    assert result.markdown.strip() == "Hello"
-
-
-def test_wikipedia_converter_blank_title() -> None:
-    """WikipediaConverter should not render an empty heading for a blank title."""
-    converter = WikipediaConverter()
-    html = b"<html><head><title>   </title></head><body><div id='mw-content-text'><p>Hello</p></div></body></html>"
-    stream_info = StreamInfo(
-        mimetype="text/html", url="https://en.wikipedia.org/wiki/Test"
-    )
-    result = converter.convert(io.BytesIO(html), stream_info)
-    assert not result.markdown.lstrip().startswith("#")
-    assert result.title is None
-    assert result.text_content.strip() == "Hello"
-
-
-def test_uppercase_data_image_uri_is_truncated_by_default() -> None:
-    markitdown = MarkItDown()
-    html = b'<html><body><img alt="dot" src="DATA:image/png;base64,AAAA"></body></html>'
-    stream_info = StreamInfo(mimetype="text/html", extension=".html")
-
-    result = markitdown.convert_stream(io.BytesIO(html), stream_info=stream_info)
-    assert result.markdown == "![dot](DATA:image/png;base64...)"
-    assert "AAAA" not in result.markdown
-
-    result = markitdown.convert_stream(
-        io.BytesIO(html), stream_info=stream_info, keep_data_uris=True
-    )
-    assert result.markdown == "![dot](DATA:image/png;base64,AAAA)"
-
-
-def test_html_strikethrough_variants(tmp_path) -> None:
-    html = """<!doctype html>
-<html><body>
-<p>Plain <s>s element</s> after.</p>
-<p>Plain <del>del element</del> after.</p>
-<p>Plain <strike>strike element</strike> after.</p>
-<p>Spaces A<strike> B </strike>C.</p>
-<p>Runs D<strike>  E  </strike>F.</p>
-<p>Empty G<strike></strike>H.</p>
-<p>Newline I<strike>J
-K</strike>L.</p>
-<p>Break M<strike>N<br>O</strike>P.</p>
-</body></html>
-"""
-    path = tmp_path / "strike.html"
-    path.write_text(html, encoding="utf-8")
-    markdown = MarkItDown().convert(str(path)).markdown
-
+@pytest.mark.parametrize(
+    ("source", "lazy_source", "keep_data_uris", "expected"),
+    [
+        pytest.param(
+            "data:image/gif;base64,AAAA",
+            "https://example.com/photo.jpg",
+            False,
+            "https://example.com/photo.jpg",
+            id="lazy-placeholder",
+        ),
+        pytest.param(
+            "https://example.com/photo.jpg",
+            "https://example.com/other.jpg",
+            False,
+            "https://example.com/photo.jpg",
+            id="real-source",
+        ),
+        pytest.param(
+            "",
+            "https://example.com/photo.jpg",
+            False,
+            "https://example.com/photo.jpg",
+            id="missing-source",
+        ),
+        pytest.param(
+            "data:image/gif;base64,AAAA",
+            "",
+            False,
+            "data:image/gif;base64...",
+            id="truncated-data-uri",
+        ),
+        pytest.param(
+            "data:image/gif;base64,AAAA",
+            "https://example.com/photo.jpg",
+            True,
+            "data:image/gif;base64,AAAA",
+            id="keep-data-uri",
+        ),
+        pytest.param(
+            "DATA:image/png;base64,AAAA",
+            "",
+            False,
+            "DATA:image/png;base64...",
+            id="uppercase-truncated",
+        ),
+        pytest.param(
+            "DATA:image/png;base64,AAAA",
+            "",
+            True,
+            "DATA:image/png;base64,AAAA",
+            id="uppercase-kept",
+        ),
+    ],
+)
+def test_html_image_source(
+    source: str, lazy_source: str, *, keep_data_uris: bool, expected: str
+) -> None:
     assert (
-        markdown
-        == "Plain ~~s element~~ after.\n\nPlain ~~del element~~ after.\n\nPlain ~~strike element~~ after.\n\nSpaces A ~~B~~ C.\n\nRuns D ~~E~~ F.\n\nEmpty GH.\n\nNewline I~~J K~~L.\n\nBreak M~~N\nO~~P."
+        HtmlConverter()
+        .convert_string(
+            f'<img src="{source}" data-src="{lazy_source}" alt="A photo">',
+            keep_data_uris=keep_data_uris,
+        )
+        .markdown
+        == f"![A photo]({expected})"
     )
 
 
-if __name__ == "__main__":
-    raise SystemExit(pytest.main([__file__]))
+@pytest.mark.parametrize(
+    ("heading", "expected"),
+    [
+        pytest.param(
+            '<span lang="en" dir="ltr"><span class="mw-page-title-main">Paris</span></span>',
+            "Paris",
+            id="title-span",
+        ),
+        pytest.param("<i>Escherichia coli</i>", "Escherichia coli", id="italic"),
+        pytest.param(
+            "<i>Titanic</i> (1997 film)", "Titanic (1997 film)", id="mixed-content"
+        ),
+    ],
+)
+def test_wikipedia_title(heading: str, expected: str) -> None:
+    result: Final = WikipediaConverter().convert(
+        io.BytesIO(
+            f"<html><head><title>{expected} - Wikipedia</title></head><body>"
+            f'<h1 id="firstHeading">{heading}</h1>'
+            '<div id="mw-content-text"><p>Body text.</p></div></body></html>'.encode()
+        ),
+        StreamInfo(
+            url="https://en.wikipedia.org/wiki/Example",
+            mimetype="text/html",
+            extension=".html",
+        ),
+    )
+    assert (result.title, result.markdown) == (expected, f"# {expected}\n\nBody text.")
+
+
+@pytest.mark.parametrize(
+    "title",
+    [pytest.param("", id="missing"), pytest.param("<title>   </title>", id="blank")],
+)
+def test_wikipedia_empty_title(title: str) -> None:
+    result: Final = WikipediaConverter().convert(
+        io.BytesIO(
+            f"<html><head>{title}</head><body><div id='mw-content-text'><p>Hello</p></div></body></html>".encode()
+        ),
+        StreamInfo(mimetype="text/html", url="https://en.wikipedia.org/wiki/Test"),
+    )
+    assert (result.title, result.markdown) == (None, "Hello")
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        pytest.param(
+            "<p>Plain <s>s element</s> after.</p>", "Plain ~~s element~~ after.", id="s"
+        ),
+        pytest.param(
+            "<p>Plain <del>del element</del> after.</p>",
+            "Plain ~~del element~~ after.",
+            id="del",
+        ),
+        pytest.param(
+            "<p>Plain <strike>strike element</strike> after.</p>",
+            "Plain ~~strike element~~ after.",
+            id="strike",
+        ),
+        pytest.param(
+            "<p>Spaces A<strike> B </strike>C.</p>", "Spaces A ~~B~~ C.", id="padded"
+        ),
+        pytest.param(
+            "<p>Runs D<strike>  E  </strike>F.</p>",
+            "Runs D ~~E~~ F.",
+            id="repeated-spaces",
+        ),
+        pytest.param("<p>Empty G<strike></strike>H.</p>", "Empty GH.", id="empty"),
+        pytest.param(
+            "<p>Newline I<strike>J\nK</strike>L.</p>",
+            "Newline I~~J K~~L.",
+            id="newline",
+        ),
+        pytest.param(
+            "<p>Break M<strike>N<br>O</strike>P.</p>", "Break M~~N\nO~~P.", id="break"
+        ),
+    ],
+)
+def test_html_strikethrough(tmp_path: Path, source: str, expected: str) -> None:
+    path: Final = tmp_path / "strike.html"
+    path.write_text(source, encoding="utf-8")
+    assert MarkItDown().convert(str(path)).markdown == expected
 
 
 @pytest.mark.parametrize(
@@ -311,27 +260,29 @@ if __name__ == "__main__":
     ],
 )
 def test_html_fragment_content(html: str, expected: str, title: str | None) -> None:
-    result = MarkItDown().convert_stream(
+    result: Final = MarkItDown().convert_stream(
         io.BytesIO(html.encode()), file_extension=".html"
     )
     assert (result.markdown, result.title) == (expected, title)
 
 
 def test_html_fragment_sniffs_unknown_charset() -> None:
-    result = MarkItDown().convert_stream(
+    result: Final = MarkItDown().convert_stream(
         io.BytesIO("<title>Café</title><p>Résumé</p>".encode("cp1252")),
         stream_info=StreamInfo(extension=".html", charset="utf-8"),
     )
     assert (result.markdown, result.title) == ("Café\n\nRésumé", "Café")
 
 
-def test_html_table_cell_list_keeps_item_boundaries() -> None:
+def test_html_table_cell_list_keeps_item_boundaries(
+    convert_html: Callable[[str], str],
+) -> None:
     html: Final = (
         "<table><tr><th>Traded as</th><td><ul>"
         '<li><a href="/nasdaq">Nasdaq</a></li><li>DJIA</li>'
         "</ul></td></tr></table>"
     )
-    assert "| Traded as | * [Nasdaq](/nasdaq) * DJIA |" in _convert_html(html)
+    assert "| Traded as | * [Nasdaq](/nasdaq) * DJIA |" in convert_html(html)
 
 
 @pytest.mark.parametrize(
@@ -353,8 +304,10 @@ def test_html_table_cell_list_keeps_item_boundaries() -> None:
         ),
     ],
 )
-def test_html_code_block_descendants_keep_boundaries(html: str, expected: str) -> None:
-    assert _convert_html(html) == expected
+def test_html_code_block_descendants_keep_boundaries(
+    convert_html: Callable[[str], str], html: str, expected: str
+) -> None:
+    assert convert_html(html) == expected
 
 
 def test_deeply_nested_html_converts() -> None:
@@ -370,10 +323,20 @@ def test_deeply_nested_html_converts() -> None:
         sys.setrecursionlimit(200)
         with warnings.catch_warnings():
             warnings.simplefilter("error")
-            result = MarkItDown().convert_stream(
+            result: Final = MarkItDown().convert_stream(
                 io.BytesIO(html.encode()), file_extension=".html"
             )
     finally:
         sys.setrecursionlimit(original_limit)
 
     assert result.markdown == "Deep content with **bold text**"
+
+
+@pytest.fixture
+def convert_html() -> Callable[[str], str]:
+    converter: Final = MarkItDown()
+    return lambda html: (
+        converter.convert_stream(
+            io.BytesIO(html.encode()), file_extension=".html"
+        ).markdown
+    )
