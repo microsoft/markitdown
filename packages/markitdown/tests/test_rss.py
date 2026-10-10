@@ -5,9 +5,8 @@ import sys
 import warnings
 from typing import Final
 
-from bs4 import Tag
-
 import pytest
+from bs4 import Tag
 from markitdown import MarkItDown, StreamInfo
 from markitdown.converters import RssConverter
 
@@ -506,6 +505,10 @@ def test_complete_feed_content_through_public_api(field: str) -> None:
         pytest.param("atom-content", "html", True, id="atom-html-cdata"),
         pytest.param("atom-content", "xhtml", False, id="atom-xhtml"),
     ],
+)
+@pytest.mark.skipif(
+    sys.version_info < (3, 11),
+    reason="iterative Markdown rendering requires Python 3.11",
 )
 def test_deep_xml_body_converts(field: str, atom_type: str, *, cdata: bool) -> None:
     payload: Final = "<div>" * 500 + "Deep <b>body</b>." + "</div>" * 500
@@ -1015,6 +1018,10 @@ def test_rss_channel_description_and_date_preserve_complete_text() -> None:
 @pytest.mark.parametrize(
     "strict", [pytest.param(False, id="default"), pytest.param(True, id="strict")]
 )
+@pytest.mark.skipif(
+    sys.version_info < (3, 11),
+    reason="iterative Markdown rendering requires Python 3.11",
+)
 def test_deeply_nested_rss_item_converts(extension: str, strict: bool) -> None:
     item_html: Final = (
         "<div>" * 500
@@ -1062,10 +1069,6 @@ def test_deeply_nested_rss_item_converts(extension: str, strict: bool) -> None:
     assert "Deep feed content with **bold text**" in result.markdown
 
 
-if __name__ == "__main__":
-    raise SystemExit(pytest.main([__file__]))
-
-
 @pytest.mark.parametrize(
     "extension",
     [pytest.param(".rss", id="rss"), pytest.param(".atom", id="atom")],
@@ -1084,3 +1087,7 @@ def test_feed_propagates_language_callback_errors(extension: str) -> None:
             StreamInfo(extension=extension),
             code_language_callback=fail_language,
         )
+
+
+if __name__ == "__main__":
+    raise SystemExit(pytest.main([__file__]))

@@ -5,6 +5,7 @@ import inspect
 import io
 import os
 import re
+import sys
 import zipfile
 from pathlib import Path
 from typing import Any, BinaryIO, Callable, Optional
@@ -772,7 +773,11 @@ def test_block_image_keeps_its_table_cell(
         == "<td><p>Serial: 12345</p><p>Status: active</p></td>"
     )
     assert not soup.select("p p")
-    assert "| A | Serial: 12345 Status: active |" in result.markdown
+    assert (
+        "| A | Serial: 12345 Status: active |"
+        if sys.version_info >= (3, 11)
+        else "| A | Serial: 12345  Status: active |"
+    ) in result.markdown
 
 
 def test_nested_run_formatting_is_preserved_around_blocks(

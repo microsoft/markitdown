@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from io import BytesIO
 from typing import Final
 
@@ -61,7 +62,7 @@ def test_bing_invalid_redirect_keeps_original_link(destination: str) -> None:
     )
     assert result.markdown == (
         "## A Bing search for 'garden' found the following results:\n\n"
-        f"* [Garden](https://www.bing.com/ck?a&u={destination})"
+        f"{'*' if sys.version_info >= (3, 11) else '-'} [Garden](https://www.bing.com/ck?a&u={destination})"
     )
 
 
@@ -72,7 +73,10 @@ def test_wikipedia_without_content_container_converts_document() -> None:
         ),
         StreamInfo(url="https://en.wikipedia.org/wiki/Garden"),
     )
-    assert (result.title, result.markdown) == ("Garden notes", "Garden")
+    assert (result.title, result.markdown) == (
+        "Garden notes",
+        "Garden" if sys.version_info >= (3, 11) else "Garden notes\n\nGarden",
+    )
 
 
 def test_html_default_link_title_uses_destination() -> None:

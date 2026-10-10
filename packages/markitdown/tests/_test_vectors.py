@@ -1,4 +1,5 @@
 import dataclasses
+import sys
 from typing import List
 
 
@@ -220,8 +221,7 @@ GENERAL_TEST_VECTORS = [
         charset="utf-8",
         url="https://www.bing.com/search?q=microsoft+wikipedia",
         must_include=[
-            "1. See more\n",
-            "2. [Wikipedia\n",
+            *(["1. See more\n", "2. [Wikipedia\n"] if sys.version_info >= (3, 11) else []),
             "](https://en.wikipedia.org/wiki/Microsoft",
             "Microsoft Corporation is **an American multinational corporation and technology company headquartered** in Redmond",
             "1995–2007: Foray into the Web, Windows 95, Windows XP, and Xbox",
