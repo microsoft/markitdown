@@ -1306,6 +1306,23 @@ class TestMasterFormatPartialNumbering:
         )
         assert _merge_partial_numbering_lines(text) == expected
 
+    def test_end_to_end_pdf_conversion_with_consecutive_partial_numbering(self):
+        """Test full MarkItDown PDF conversion pipeline preserves consecutive partial numbering."""
+        pdf_path = os.path.join(TEST_FILES_DIR, "test.pdf")
+        simulated_pdfminer_text = (
+            ".1\n"
+            ".2\n"
+            "Contractor shall furnish all materials.\n"
+            ".3\n"
+            "Work shall comply with local codes."
+        )
+        with patch("pdfminer.high_level.extract_text", return_value=simulated_pdfminer_text):
+            result = MarkItDown().convert(pdf_path)
+
+        assert ".1 .2" not in result.text_content
+        assert ".1\n.2 Contractor shall furnish all materials." in result.text_content
+        assert ".3 Work shall comply with local codes." in result.text_content
+
 
 # Page cleanup and extraction fallback
 
