@@ -9,6 +9,7 @@ from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 
 # Pattern for MasterFormat-style partial numbering (e.g., ".1", ".2", ".10")
 PARTIAL_NUMBERING_PATTERN = re.compile(r"^\.\d+$")
+PARTIAL_NUMBERING_PREFIX_PATTERN = re.compile(r"^\.\d+(\s+|$)")
 
 
 def _merge_partial_numbering_lines(text: str) -> str:
@@ -41,7 +42,7 @@ def _merge_partial_numbering_lines(text: str) -> str:
             while j < len(lines) and not lines[j].strip():
                 j += 1
 
-            if j < len(lines) and not PARTIAL_NUMBERING_PATTERN.match(lines[j].strip()):
+            if j < len(lines) and not PARTIAL_NUMBERING_PREFIX_PATTERN.match(lines[j].strip()):
                 # Merge the partial numbering with the next line
                 next_line = lines[j].strip()
                 result_lines.append(f"{stripped} {next_line}")
