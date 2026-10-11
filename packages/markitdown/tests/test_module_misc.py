@@ -211,6 +211,13 @@ def test_data_uris() -> None:
     assert len(attributes) == 0
     assert data == b"\xfb\xef"
 
+    # Test lowercase percent-encoded base64 characters
+    data_uri = "data:application/octet-stream;base64,%2b%2f8%3d"
+    mime_type, attributes, data = parse_data_uri(data_uri)
+    assert mime_type == "application/octet-stream"
+    assert len(attributes) == 0
+    assert data == b"\xfb\xff"
+
 
 def test_file_uris() -> None:
     expected_path = os.path.abspath("/path/to/file.txt")
