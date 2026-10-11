@@ -22,7 +22,6 @@ from markitdown import FileConversionException, MarkItDown, StreamInfo
 from markitdown.converters import XlsxConverter
 from markitdown.converters import _xlsx_converter
 import markitdown._markitdown as markitdown_module
-from markitdown_ocr import _plugin
 from markitdown_ocr._ocr_service import OCRResult
 from markitdown_ocr._xlsx_converter_with_ocr import XlsxConverterWithOCR
 
@@ -82,11 +81,7 @@ def test_ocr_is_a_thin_subclass_with_native_acceptance_and_signature() -> None:
 def test_plugin_full_trip_uses_native_cells_and_original_image(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    entry_point = Mock()
-    entry_point.load.return_value = _plugin
-    monkeypatch.setattr(
-        markitdown_module, "entry_points", Mock(return_value=[entry_point])
-    )
+    # Reset the cache so discovery reads the installed package entry points.
     monkeypatch.setattr(markitdown_module, "_plugins", None)
     client = Mock()
     client.chat.completions.create.return_value.choices = [
