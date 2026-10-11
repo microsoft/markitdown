@@ -161,18 +161,19 @@ class EpubConverter(HtmlConverter):
         return candidates[0]
 
     def _get_elements(
-        self, dom: Document, namespace: str, local_name: str
+        self,
+        dom: Document,
+        namespace: str,
+        local_name: str,
+        legacy_name: str | None = None,
     ) -> List[Element]:
         # Match namespace URIs, not the arbitrary prefix chosen by the author.
         nodes = list(dom.getElementsByTagNameNS(namespace, local_name))
         if nodes:
             return nodes
-        # Retain support for older files that omit the container/OPF namespace.
-        return [
-            node
-            for node in dom.getElementsByTagName(local_name)
-            if node.namespaceURI is None
-        ]
+        # Preserve the original tag-name lookup for legacy/malformed namespace
+        # URIs, but only when there are no elements in the standard namespace.
+        return list(dom.getElementsByTagName(legacy_name or local_name))
 
     def _get_text_from_node(self, dom: Document, tag_name: str) -> str | None:
         """Convenience function to extract a single occurrence of a tag (e.g., title)."""
@@ -185,7 +186,9 @@ class EpubConverter(HtmlConverter):
     def _get_all_texts_from_nodes(self, dom: Document, tag_name: str) -> List[str]:
         """Helper function to extract all occurrences of a tag (e.g., multiple authors)."""
         texts: List[str] = []
-        for node in self._get_elements(dom, DC_NAMESPACE, tag_name.removeprefix("dc:")):
+        for node in self._get_elements(
+            dom, DC_NAMESPACE, tag_name.removeprefix("dc:"), legacy_name=tag_name
+        ):
             text_parts: List[str] = []
             self._collect_node_text(node, text_parts)
             text_val = "".join(text_parts).strip()

@@ -219,10 +219,6 @@ def test_epub_metadata_and_text_are_unchanged() -> None:
     assert "Chapter text." in result.markdown
 
 
-if __name__ == "__main__":
-    raise SystemExit(pytest.main([__file__]))
-
-
 @pytest.mark.parametrize("prefixed_part", ["container", "package", "metadata"])
 def test_namespace_prefixes_do_not_change_epub_conversion(prefixed_part):
     original = _build_epub(
@@ -276,3 +272,51 @@ def test_namespace_prefixes_do_not_change_epub_conversion(prefixed_part):
     text = result.markdown.replace("\\", "")
     assert "SECOND_BODY" in text and "FIRST_BODY" in text
     assert text.index("SECOND_BODY") < text.index("FIRST_BODY")
+
+
+@pytest.mark.parametrize(
+    "original_namespace,replacement_namespace",
+    [
+        (
+            "http://www.idpf.org/2007/opf",
+            "http://openebook.org/namespaces/oeb-package/1.0/",
+        ),
+        ("http://purl.org/dc/elements/1.1/", "http://purl.org/dc/elements/1.0/"),
+        ("http://purl.org/dc/elements/1.1/", "http://purl.org/dc/elements/1.1"),
+        ("urn:oasis:names:tc:opendocument:xmlns:container", "urn:legacy:container"),
+        ("urn:oasis:names:tc:opendocument:xmlns:container", ""),
+        ("http://www.idpf.org/2007/opf", ""),
+    ],
+)
+def test_legacy_namespace_uris_keep_metadata_and_chapters(
+    original_namespace, replacement_namespace
+):
+    original = _build_epub(
+        [("c1", "one.xhtml")],
+        ["c1"],
+        {"OEBPS/one.xhtml": ("First", "CHAPTER_BODY")},
+    )
+    archive = io.BytesIO()
+    with zipfile.ZipFile(original) as source, zipfile.ZipFile(archive, "w") as target:
+        for entry in source.infolist():
+            content = source.read(entry)
+            if entry.filename in ("META-INF/container.xml", "OEBPS/content.opf"):
+                text = content.decode().replace(
+                    original_namespace, replacement_namespace
+                )
+                if entry.filename == "OEBPS/content.opf":
+                    text = text.replace(
+                        "</metadata>",
+                        "<dc:creator>Example Author</dc:creator></metadata>",
+                    )
+                content = text.encode()
+            target.writestr(entry, content)
+    archive.seek(0)
+    result = EpubConverter().convert(archive, StreamInfo(extension=".epub"))
+    assert result.title == "Encoded Hrefs"
+    assert "**Authors:** Example Author" in result.markdown
+    assert "CHAPTER_BODY" in result.markdown.replace("\\", "")
+
+
+if __name__ == "__main__":
+    raise SystemExit(pytest.main([__file__]))
