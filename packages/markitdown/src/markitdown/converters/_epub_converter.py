@@ -59,6 +59,7 @@ class EpubConverter(HtmlConverter):
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
         with zipfile.ZipFile(file_stream, "r") as z:
+            zip_names = set(z.namelist())
             # Extracts metadata (title, authors, language, publisher, date, description, cover) from an EPUB file.
 
             # Locate content.opf
@@ -66,6 +67,7 @@ class EpubConverter(HtmlConverter):
             opf_path = container_dom.getElementsByTagName("rootfile")[0].getAttribute(
                 "full-path"
             )
+            opf_path = self._resolve_manifest_href(opf_path, "", zip_names)
 
             # Parse content.opf
             opf_dom = minidom.parse(z.open(opf_path))
@@ -93,7 +95,6 @@ class EpubConverter(HtmlConverter):
             base_path = "/".join(
                 opf_path.split("/")[:-1]
             )  # Get base directory of content.opf
-            zip_names = set(z.namelist())
             spine = [
                 self._resolve_manifest_href(manifest[item_id], base_path, zip_names)
                 for item_id in spine_order
@@ -136,12 +137,12 @@ class EpubConverter(HtmlConverter):
     def _resolve_manifest_href(
         self, href: str, base_path: str, zip_names: Set[str]
     ) -> str:
-        """Resolve a manifest href to the matching ZIP entry name.
+        """Resolve an EPUB URL reference to the matching ZIP entry name.
 
-        Manifest hrefs are URI references relative to the OPF, so reserved
-        characters such as spaces arrive percent-encoded, while ZIP entry names
-        are not encoded. Prefer the decoded form, but fall back to the raw href
-        so archives that store a literally-encoded name still resolve.
+        Rootfile URLs are relative to the archive root and manifest hrefs to the
+        OPF. Characters such as spaces arrive percent-encoded, while ZIP entry
+        names are not encoded. Prefer the decoded form, but fall back to the raw
+        href so archives that store a literally-encoded name still resolve.
         """
         candidates: List[str] = []
         for candidate in (unquote(href), href):

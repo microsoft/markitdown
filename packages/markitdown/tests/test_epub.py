@@ -25,7 +25,14 @@ CHAPTER_XHTML = """<html xmlns="http://www.w3.org/1999/xhtml">
 """
 
 
-def _build_epub(manifest_items, spine_ids, documents) -> io.BytesIO:
+def _build_epub(
+    manifest_items,
+    spine_ids,
+    documents,
+    *,
+    opf_path: str = "OEBPS/content.opf",
+    rootfile_href: str | None = None,
+) -> io.BytesIO:
     """Assemble a minimal EPUB from manifest entries and ZIP member names."""
     manifest = "\n".join(
         f'<item id="{item_id}" href="{href}" media-type="application/xhtml+xml"/>'
@@ -45,8 +52,11 @@ def _build_epub(manifest_items, spine_ids, documents) -> io.BytesIO:
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as z:
         z.writestr("mimetype", "application/epub+zip")
-        z.writestr("META-INF/container.xml", CONTAINER_XML)
-        z.writestr("OEBPS/content.opf", opf)
+        z.writestr(
+            "META-INF/container.xml",
+            CONTAINER_XML.replace("OEBPS/content.opf", rootfile_href or opf_path),
+        )
+        z.writestr(opf_path, opf)
         for name, (title, body) in documents.items():
             z.writestr(name, CHAPTER_XHTML.format(title=title, body=body))
     buffer.seek(0)
@@ -112,6 +122,70 @@ def test_parent_relative_href_resolves() -> None:
     )
 
     assert "SHARED_BODY" in _convert(stream)
+
+
+@pytest.mark.parametrize(
+    "opf_path,rootfile_href",
+    [
+        ("OEBPS/content.opf", "OEBPS/content.opf"),
+        ("OEBPS/My Book.opf", "OEBPS/My%20Book.opf"),
+        ("OEBPS/capítulo.opf", "OEBPS/cap%C3%ADtulo.opf"),
+        ("My Book/content.opf", "My%20Book/content.opf"),
+        ("Guía/content.opf", "Gu%C3%ADa/content.opf"),
+        ("OEBPS/100%.opf", "OEBPS/100%25.opf"),
+        ("OEBPS/book%20name.opf", "OEBPS/book%2520name.opf"),
+        ("OEBPS/book%20name.opf", "OEBPS/book%20name.opf"),
+        ("OEBPS/My Book.opf", "OEBPS/My Book.opf"),
+        ("OEBPS/capítulo.opf", "OEBPS/capítulo.opf"),
+        ("OEBPS/100%.opf", "OEBPS/100%.opf"),
+    ],
+)
+def test_public_conversion_resolves_rootfile_url(
+    opf_path: str, rootfile_href: str
+) -> None:
+    """Rootfile URLs resolve to ZIP paths without decoding literal percent twice."""
+    chapter_path = opf_path.rsplit("/", 1)[0] + "/chapter.xhtml"
+    stream = _build_epub(
+        manifest_items=[("c1", "chapter.xhtml")],
+        spine_ids=["c1"],
+        documents={chapter_path: ("Chapter", "Book content survives")},
+        opf_path=opf_path,
+        rootfile_href=rootfile_href,
+    )
+
+    result = MarkItDown(enable_plugins=False).convert_stream(
+        stream, stream_info=StreamInfo(extension=".epub")
+    )
+
+    assert result.title == "Encoded Hrefs"
+    assert "# Chapter" in result.markdown
+    assert "Book content survives" in result.markdown
+
+
+def test_public_conversion_prefers_decoded_rootfile_url() -> None:
+    """The decoded OPF path also supplies the base for resolving manifest URLs."""
+    stream = _build_epub(
+        manifest_items=[("c1", "literal.xhtml")],
+        spine_ids=["c1"],
+        documents={
+            "My%20Book/literal.xhtml": ("Literal", "Literal rootfile content"),
+            "My Book/decoded.xhtml": ("Decoded", "Decoded rootfile content"),
+        },
+        opf_path="My%20Book/content.opf",
+    )
+    with zipfile.ZipFile(stream, "a") as archive:
+        opf = archive.read("My%20Book/content.opf")
+        archive.writestr(
+            "My Book/content.opf", opf.replace(b"literal.xhtml", b"decoded.xhtml")
+        )
+    stream.seek(0)
+
+    result = MarkItDown(enable_plugins=False).convert_stream(
+        stream, stream_info=StreamInfo(extension=".epub")
+    )
+
+    assert "Decoded rootfile content" in result.markdown
+    assert "Literal rootfile content" not in result.markdown
 
 
 # Conversion regressions
