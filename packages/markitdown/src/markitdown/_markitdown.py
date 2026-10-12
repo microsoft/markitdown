@@ -15,7 +15,6 @@ from urllib.parse import urlparse
 from warnings import warn
 import requests
 import magika
-import charset_normalizer
 import codecs
 
 from ._charset_utils import best_charset_match

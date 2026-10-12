@@ -851,6 +851,46 @@ def test_central_european_cp1250_text_is_still_decoded(
     assert result.markdown == text
 
 
+# Short Central European samples that tie with cp1252 in the detector. Their
+# bytes still point to cp1250: ą and ł read as ¹ and ³ inside words, Ľ as ¼
+# before a letter, and ő as õ, which Portuguese only has before "e".
+_CP1250_TIED_TEXTS = [
+    "Pociąg był pełny.",
+    "Ľudia sa rodia slobodní",
+    "egyenlő jogokkal",
+]
+
+# Western European samples with the same bytes in positions cp1250 does not use.
+_CP1252_LOOKALIKE_TEXTS = [
+    "As razões e as lições",
+    "¿Qué tal?",
+    "Smith¹ wrote it",
+    "Nº 5, rue de l'Église",
+]
+
+
+@pytest.mark.parametrize("text", _CP1250_TIED_TEXTS, ids=["pl", "sk", "hu"])
+def test_central_european_cp1250_tie_is_decoded(
+    markitdown: MarkItDown, text: str
+) -> None:
+    result = markitdown.convert_stream(
+        io.BytesIO(text.encode("cp1250")), file_extension=".txt"
+    )
+    assert result.markdown == text
+
+
+@pytest.mark.parametrize(
+    "text", _CP1252_LOOKALIKE_TEXTS, ids=["pt", "es", "footnote", "numero"]
+)
+def test_western_european_cp1252_lookalike_is_decoded(
+    markitdown: MarkItDown, text: str
+) -> None:
+    result = markitdown.convert_stream(
+        io.BytesIO(text.encode("cp1252")), file_extension=".txt"
+    )
+    assert result.markdown == text
+
+
 def test_western_european_cp1252_csv_is_decoded(markitdown: MarkItDown) -> None:
     body = "Nom,Ville\r\nCafé Crème,Besançon\r\n"
     result = markitdown.convert_stream(
