@@ -53,6 +53,13 @@ apply. A consolidation should preserve test bodies, parametrization, fixtures,
 and skip conditions; compare collected cases as well as test results to catch
 accidentally dropped or overwritten tests.
 
+The `pdf_provenance_*.pdf` fixtures are wholly synthetic, including their text,
+page labels and PDF objects. They cover native tables/prose, empty positions,
+repeated content, form-feed characters inside text, and page-bounded numbering
+cleanup. Rebuild all six with
+`python tests/test_files/generate_pdf_provenance_fixtures.py`; the generator
+uses only the standard library and adds no runtime or test dependency.
+
 The `test_files/pdf_cleanup_{plain,form,mixed}.pdf` fixtures contain copied pages
 from `test.pdf` and `REPAIR-2022-INV-001_multipage.pdf`. They exercise real PDF
 parsing, fallback, and cleanup without changing either source fixture. Rebuild

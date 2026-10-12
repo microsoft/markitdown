@@ -1,5 +1,20 @@
+from dataclasses import dataclass
 from typing import Any, BinaryIO, Optional
 from ._stream_info import StreamInfo
+
+
+@dataclass(frozen=True)
+class PageInfo:
+    """Extracted content from a physical page of a document.
+
+    The built-in PDF converter uses one-based physical positions, including
+    pages with no native text. These are not printed numbers or PDF page labels.
+    Empty content does not establish that a page is visually blank. Content is
+    a page reading, not a character range in the combined Markdown.
+    """
+
+    page_number: int
+    content: str
 
 
 class DocumentConverterResult:
@@ -10,6 +25,7 @@ class DocumentConverterResult:
         markdown: str,
         *,
         title: Optional[str] = None,
+        pages: Optional[list[PageInfo]] = None,
     ):
         """
         Initialize the DocumentConverterResult.
@@ -20,9 +36,12 @@ class DocumentConverterResult:
         Parameters:
         - markdown: The converted Markdown text.
         - title: Optional title of the document.
+        - pages: Optional physical page records. None means records were not
+          requested or the selected converter does not support them.
         """
         self.markdown = markdown
         self.title = title
+        self.pages = pages
 
     @property
     def text_content(self) -> str:

@@ -271,6 +271,36 @@ result = md.convert("test.xlsx")
 print(result.markdown)
 ```
 
+To obtain physical page records from the built-in PDF converter:
+
+```python
+md = MarkItDown(enable_plugins=False)
+result = md.convert_local("document.pdf", extract_pages=True)
+for page in result.pages:
+    print(page.page_number, page.content)
+```
+
+`PageInfo.page_number` is the one-based position in the PDF, including pages
+with no extracted native text. It is not a printed page number or a PDF page
+label. Empty text can mean a blank page or an image/scan requiring OCR; this
+option does not perform OCR. Repeated content retains each physical position.
+
+The normal `markdown` output is unchanged, including when records are requested.
+Page records use the same table/prose extraction decisions. After a pdfplumber
+failure, pdfminer can recover physical records; a failure in that page-aware
+extraction propagates instead of labelling whole-document text as page 1. If
+pdfplumber established a page count, fallback records must match that count.
+
+Numbering cleanup is bounded to each page record. Joining records need not
+reproduce `markdown`: the combined output also undergoes whitespace
+normalisation. Records provide page identity, not character offsets into that
+combined output. No source path or URL is inserted into the Markdown.
+
+`pages` is `None` by default and when the selected converter does not support
+page records. Only the built-in PDF converter implements this option here;
+OCR plugins and Azure converters keep their existing behaviour. The option is
+available through the Python API, without adding a CLI output format.
+
 Document Intelligence conversion in Python:
 
 ```python

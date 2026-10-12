@@ -2,11 +2,15 @@
 
 import os
 import re
+import io
+from itertools import islice
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
-from markitdown import MarkItDown
+from markitdown import FileConversionException, MarkItDown, PageInfo, StreamInfo
+from markitdown.converters import _pdf_converter
 from markitdown.converters._pdf_converter import (
     PARTIAL_NUMBERING_PATTERN,
     _merge_partial_numbering_lines,
@@ -1386,3 +1390,283 @@ def test_markitdown_remote() -> None:
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
+
+
+# Structured PDF page records
+
+PROVENANCE_FILES_DIR = Path(TEST_FILES_DIR)
+
+
+def _convert_fixture(name, extract_pages=False):
+    return MarkItDown().convert_local(
+        str(PROVENANCE_FILES_DIR / f"pdf_provenance_{name}.pdf"),
+        extract_pages=extract_pages,
+    )
+
+
+@pytest.mark.parametrize("name,count", [("mixed", 5), ("plain", 3), ("empty", 3)])
+def test_pdf_page_records_preserve_physical_positions(name, count):
+    result = _convert_fixture(name, extract_pages=True)
+    assert [page.page_number for page in result.pages] == list(range(1, count + 1))
+    assert result.pages[1].content == ""
+    if name == "empty":
+        assert all(page.content == "" for page in result.pages)
+    else:
+        assert "Synthetic cover" in result.pages[0].content
+        assert "Synthetic cover" not in result.pages[2].content
+        assert "Printed page i" in result.pages[0].content
+        if name == "plain":
+            assert "Printed page 27" in result.pages[2].content
+        else:
+            assert "ALPHA" in result.pages[2].content
+
+
+def test_pdf_page_records_keep_forms_and_numbering():
+    result = _convert_fixture("mixed", extract_pages=True)
+    assert "| Item" in result.pages[2].content
+    assert "| ALPHA" in result.pages[2].content
+    assert ".1 Keep this numbered text together." in result.pages[3].content
+    assert result.pages[4].content == ""
+
+
+def test_pdf_page_labels_are_separate_from_physical_numbers():
+    with _pdf_converter.pdfplumber.open(
+        PROVENANCE_FILES_DIR / "pdf_provenance_mixed.pdf"
+    ) as pdf:
+        assert list(islice(pdf.doc.get_page_labels(), len(pdf.pages))) == [
+            "i",
+            "ii",
+            "27",
+            "28",
+            "29",
+        ]
+    result = _convert_fixture("mixed", extract_pages=True)
+    assert [page.page_number for page in result.pages] == [1, 2, 3, 4, 5]
+
+
+def test_pdf_repeated_content_keeps_each_physical_page():
+    result = _convert_fixture("repeated", extract_pages=True)
+    assert [page.page_number for page in result.pages] == [1, 2, 3, 4]
+    assert result.pages[0].content == result.pages[2].content
+    assert "Synthetic cover" in result.pages[0].content
+    assert result.pages[1].content == result.pages[3].content == ""
+
+
+def test_pdf_mixed_pages_keep_leading_interior_and_trailing_empty_positions():
+    result = _convert_fixture("edges", extract_pages=True)
+    assert [page.page_number for page in result.pages] == [1, 2, 3, 4, 5, 6]
+    assert (
+        result.pages[0].content
+        == result.pages[2].content
+        == result.pages[5].content
+        == ""
+    )
+    assert "Synthetic cover" in result.pages[1].content
+    assert "| ALPHA" in result.pages[3].content
+    assert "Synthetic prose" in result.pages[4].content
+    assert result.markdown == _convert_fixture("edges").markdown
+
+
+def test_pdf_page_records_do_not_split_embedded_form_feeds():
+    result = _convert_fixture("plain", extract_pages=True)
+    assert len(result.pages) == 3
+    assert "Before\fAfter" in result.pages[0].content
+    assert result.pages[1].content == ""
+    assert ".1 Keep this numbered text together." in result.pages[2].content
+
+
+def test_pdf_numbering_repair_does_not_cross_a_page_boundary():
+    result = _convert_fixture("boundaries", extract_pages=True)
+    assert result.pages[0].content.endswith(".1")
+    assert "continuation on next physical page." not in result.pages[0].content
+    assert result.pages[1].content == "continuation on next physical page."
+    assert ".2 This continuation is on the same page." in result.pages[2].content
+    assert result.pages[2].content.endswith("unfinished-")
+    assert "lowercase continuation" not in result.pages[2].content
+    assert result.pages[3].content == "lowercase continuation stays on the fourth page."
+
+
+@pytest.mark.parametrize("name", ["mixed", "plain", "empty"])
+def test_pdf_page_records_leave_markdown_unchanged(name):
+    default = _convert_fixture(name)
+    disabled = _convert_fixture(name, extract_pages=False)
+    enabled = _convert_fixture(name, extract_pages=True)
+    assert default.pages is None
+    assert disabled.pages is None
+    assert default.markdown == disabled.markdown == enabled.markdown
+
+
+def test_pdf_page_records_through_stream():
+    content = (PROVENANCE_FILES_DIR / "pdf_provenance_mixed.pdf").read_bytes()
+    result = MarkItDown().convert_stream(
+        io.BytesIO(content),
+        stream_info=StreamInfo(extension=".pdf"),
+        extract_pages=True,
+    )
+    assert [page.page_number for page in result.pages] == [1, 2, 3, 4, 5]
+    assert "ALPHA" in result.pages[2].content
+
+
+def test_pdf_empty_form_output_recovers_page_records_with_markdown(monkeypatch):
+    # The normal converter's final fallback changes extraction strategy. Page
+    # records must change with it rather than retaining empty form readings.
+    monkeypatch.setattr(
+        _pdf_converter, "_extract_form_content_from_words", lambda page: ""
+    )
+    result = _convert_fixture("mixed", extract_pages=True)
+    assert "ALPHA" in result.markdown
+    assert [page.page_number for page in result.pages] == [1, 2, 3, 4, 5]
+    assert "Synthetic cover" in result.pages[0].content
+    assert result.pages[1].content == result.pages[4].content == ""
+    assert "ALPHA" in result.pages[2].content
+    assert "ALPHA" not in result.pages[0].content
+
+
+@pytest.mark.parametrize("fail_after_page", [0, 2, 3])
+def test_pdf_page_records_recover_pdfplumber_failure(monkeypatch, fail_after_page):
+    original = _pdf_converter._extract_form_content_from_words
+    closed = []
+    original_close = _pdf_converter.pdfplumber.page.Page.close
+
+    def fail_form(page):
+        if page.page_number > fail_after_page:
+            raise RuntimeError("Synthetic form extraction failure")
+        return original(page)
+
+    def close(page):
+        closed.append(page.page_number)
+        return original_close(page)
+
+    monkeypatch.setattr(_pdf_converter, "_extract_form_content_from_words", fail_form)
+    monkeypatch.setattr(_pdf_converter.pdfplumber.page.Page, "close", close)
+    result = _convert_fixture("mixed", extract_pages=True)
+    assert [page.page_number for page in result.pages] == [1, 2, 3, 4, 5]
+    assert result.pages[1].content == result.pages[4].content == ""
+    assert "Synthetic cover" in result.pages[0].content
+    assert "ALPHA" in result.pages[2].content
+    assert "ALPHA" not in result.pages[0].content
+    assert fail_after_page + 1 in closed
+
+
+@pytest.mark.parametrize("fail_on_page", [1, 3])
+def test_pdf_page_records_never_label_full_document_page_one(monkeypatch, fail_on_page):
+    original = _pdf_converter.PDFPageInterpreter.process_page
+    devices = []
+
+    class TrackingConverter(_pdf_converter.TextConverter):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.closed = False
+            devices.append(self)
+
+        def close(self):
+            self.closed = True
+            return super().close()
+
+    # Patch only the page helper's interpreter. The normal whole-document
+    # pdfminer extraction still succeeds, as it does in the faulty fallback.
+    count = 0
+
+    class FailingInterpreter(_pdf_converter.PDFPageInterpreter):
+        def process_page(self, page):
+            nonlocal count
+            count += 1
+            if count == fail_on_page:
+                raise RuntimeError("Synthetic page extraction failure")
+            return original(self, page)
+
+    monkeypatch.setattr(_pdf_converter, "PDFPageInterpreter", FailingInterpreter)
+    monkeypatch.setattr(_pdf_converter, "TextConverter", TrackingConverter)
+    with pytest.raises(
+        FileConversionException, match="Synthetic page extraction failure"
+    ):
+        _convert_fixture("plain", extract_pages=True)
+    assert len(devices) == 1
+    assert all(device.closed for device in devices)
+
+
+def test_pdf_prose_page_records_use_one_pdfminer_pass(monkeypatch):
+    passes = []
+    original = _pdf_converter._extract_text_pages
+
+    def extract(stream):
+        passes.append("pages")
+        return original(stream)
+
+    def unexpected_whole_document(*args, **kwargs):
+        pytest.fail("Page records must not require another whole-document pass")
+
+    monkeypatch.setattr(_pdf_converter, "_extract_text_pages", extract)
+    monkeypatch.setattr(
+        _pdf_converter.pdfminer.high_level, "extract_text", unexpected_whole_document
+    )
+    result = _convert_fixture("plain", extract_pages=True)
+    assert "Last physical page" in result.markdown
+    assert passes == ["pages"]
+
+
+def test_pdf_default_preserves_retry_after_prose_extraction_failure(monkeypatch):
+    original = _pdf_converter.pdfminer.high_level.extract_text
+    calls = 0
+
+    def extract(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise RuntimeError("Synthetic transient default extraction failure")
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(_pdf_converter.pdfminer.high_level, "extract_text", extract)
+    assert "Last physical page" in _convert_fixture("plain").markdown
+    assert calls == 2
+
+
+@pytest.mark.parametrize("extra", [False, True], ids=["missing-page", "extra-page"])
+def test_pdf_fallback_rejects_page_count_disagreement(monkeypatch, extra):
+    original_form = _pdf_converter._extract_form_content_from_words
+    original_extract = _pdf_converter._extract_text_pages
+
+    def failed_form(page):
+        if page.page_number == 4:
+            raise RuntimeError("Synthetic failure after a valid table page")
+        return original_form(page)
+
+    def mismatched_extract(stream):
+        raw, pages = original_extract(stream)
+        return raw, pages + [""] if extra else pages[:-1]
+
+    monkeypatch.setattr(_pdf_converter, "_extract_form_content_from_words", failed_form)
+    monkeypatch.setattr(_pdf_converter, "_extract_text_pages", mismatched_extract)
+    with pytest.raises(FileConversionException, match="records for 5 physical pages"):
+        _convert_fixture("mixed", extract_pages=True)
+
+
+@pytest.mark.parametrize(
+    "name", sorted(path.name for path in PROVENANCE_FILES_DIR.glob("*.pdf"))
+)
+def test_pdf_page_iterator_preserves_raw_pdfminer_output(name):
+    content = (PROVENANCE_FILES_DIR / name).read_bytes()
+    expected = _pdf_converter.pdfminer.high_level.extract_text(io.BytesIO(content))
+    raw, pages = _pdf_converter._extract_text_pages(io.BytesIO(content))
+    assert raw == expected
+    assert raw == "".join(pages)
+
+
+def test_non_pdf_conversion_leaves_page_records_unavailable():
+    result = MarkItDown().convert_stream(
+        io.BytesIO(b"Some text\n"),
+        stream_info=StreamInfo(extension=".txt", mimetype="text/plain"),
+        extract_pages=True,
+    )
+    assert result.pages is None
+    assert result.markdown == "Some text\n"
+
+
+def test_page_info_is_exported_and_result_pages_are_optional():
+    from markitdown import DocumentConverterResult
+
+    page = PageInfo(page_number=1, content="Source text")
+    assert page.page_number == 1
+    assert page.content == "Source text"
+    assert DocumentConverterResult("Text").pages is None
+    assert DocumentConverterResult("", pages=[]).pages == []
