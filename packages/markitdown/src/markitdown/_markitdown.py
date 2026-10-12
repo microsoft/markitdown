@@ -99,12 +99,7 @@ def _read_charset_sample(file_stream: BinaryIO) -> bytes:
 
 
 def _rstrip_preserving_hard_break(line: str) -> str:
-    """Drop insignificant trailing whitespace, but keep a CommonMark hard break.
-
-    Two or more trailing spaces before a newline are a hard line break. A line
-    that contains only whitespace is not one. Collapsing runs of blank lines is
-    unchanged.
-    """
+    """Retain Markdown input's two-space break syntax on nonblank lines."""
     if line.endswith("  ") and line.strip():
         return line
     return line.rstrip()
@@ -690,10 +685,19 @@ class MarkItDown:
                         file_stream.seek(cur_pos)
 
                 if res is not None:
+                    preserve_hard_breaks = isinstance(
+                        converter, PlainTextConverter
+                    ) and (
+                        (stream_info.extension or "").lower() in (".md", ".markdown")
+                        or (stream_info.mimetype or "").split(";", 1)[0].strip().lower()
+                        in ("text/markdown", "application/markdown")
+                    )
                     # Normalize the content
                     res.text_content = "\n".join(
                         [
                             _rstrip_preserving_hard_break(line)
+                            if preserve_hard_breaks
+                            else line.rstrip()
                             for line in re.split(r"\r?\n", res.text_content)
                         ]
                     )

@@ -20,6 +20,24 @@ from markitdown.converters._cu_converter import ContentUnderstandingFileType
 # This includes things like help messages, version numbers, and invalid flags.
 
 
+@pytest.mark.parametrize(
+    "extension,expected", [(".md", "First  \nSecond\n"), (".txt", "First\nSecond\n")]
+)
+def test_cli_preserves_hard_breaks_only_for_markdown(
+    tmp_path, extension, expected
+) -> None:
+    path = tmp_path / ("notes" + extension)
+    path.write_text("First  \nSecond", encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, "-m", "markitdown", str(path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == expected
+
+
 def test_version() -> None:
     result = subprocess.run(
         [sys.executable, "-m", "markitdown", "--version"],

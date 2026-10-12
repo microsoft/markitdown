@@ -534,6 +534,18 @@ def _docx(body: str = _BODY, *, embedded_style_map: Optional[str] = None) -> io.
     return stream
 
 
+@pytest.mark.parametrize(
+    "breaks,expected", [(1, "First\nSecond"), (2, "First\n\nSecond")]
+)
+def test_docx_keeps_upstream_break_normalization(breaks, expected) -> None:
+    body = _paragraph(_text("First") + "<w:r><w:br/></w:r>" * breaks + _text("Second"))
+    result = MarkItDown(enable_plugins=False).convert_stream(
+        _docx(body), stream_info=StreamInfo(extension=".docx")
+    )
+
+    assert result.markdown == expected
+
+
 class _ImageConverter(DocxConverter):
     def __init__(self, render: Callable[..., Optional[str]]):
         super().__init__()
@@ -1134,7 +1146,7 @@ def test_docx_underlined_text_is_preserved(tmp_path) -> None:
         ('<w:t xml:space="preserve"> </w:t>', "First Last"),
         ("<w:tab/>", "First Last"),
         ("<w:t>&#160;</w:t>", "First\u00a0Last"),
-        ("<w:br/>", "First  \nLast"),
+        ("<w:br/>", "First\nLast"),
     ],
 )
 def test_docx_underlined_whitespace_is_preserved(
