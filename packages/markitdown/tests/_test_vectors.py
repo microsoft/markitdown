@@ -73,6 +73,22 @@ GENERAL_TEST_VECTORS = [
         must_not_include=["data:image/jpeg;base64,/9j/4AAQSkZJRgABAQE"],
     ),
     FileTestVector(
+        filename="pptx_chart_boundaries.pptx",
+        mimetype="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        charset=None,
+        url=None,
+        must_include=[
+            "| Category | Revenue |\n|---|---|\n| Q1 | 10.0 |\n| Q2 | 20.0 |",
+            "| Q2 | 20.0 |\n\nFollow-up analysis.",
+            "| Q2 | 20.0 |\n\n| Item | Details |\n| --- | --- |\n| A | B |",
+            "<!-- Slide number: 3 -->",
+        ],
+        must_not_include=[
+            "| Q2 | 20.0 |Follow-up analysis.",
+            "| Q2 | 20.0 || Item | Details |",
+        ],
+    ),
+    FileTestVector(
         filename="pptx_empty_title_run.pptx",
         mimetype="application/vnd.openxmlformats-officedocument.presentationml.presentation",
         charset=None,
