@@ -71,19 +71,27 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         href = el.get("href")
         title = el.get("title")
 
-        # Escape URIs and skip non-http or file schemes
+        # Escape URIs and skip non-http or file schemes.
+        # mailto: and tel: links are kept because they are common in
+        # documents and do not execute code.
+        _SAFE_SCHEMES = {"http", "https", "file", "mailto", "tel"}
         if href:
             try:
                 parsed_url = urlparse(href)  # type: ignore
-                if parsed_url.scheme and parsed_url.scheme.lower() not in ["http", "https", "file"]:  # type: ignore
+                if parsed_url.scheme and parsed_url.scheme.lower() not in _SAFE_SCHEMES:  # type: ignore
                     return "%s%s%s" % (prefix, text, suffix)
-                href = urlunparse(
-                    parsed_url._replace(
-                        path=_quote_path_preserving_percent_encoded_octets(
-                            parsed_url.path
+                # mailto: and tel: URIs have no hierarchical path to
+                # percent-encode, so pass them through unchanged.
+                if parsed_url.scheme and parsed_url.scheme.lower() in {"mailto", "tel"}:
+                    pass  # keep href as-is
+                else:
+                    href = urlunparse(
+                        parsed_url._replace(
+                            path=_quote_path_preserving_percent_encoded_octets(
+                                parsed_url.path
+                            )
                         )
-                    )
-                )  # type: ignore
+                    )  # type: ignore
             except ValueError:  # It's not clear if this ever gets thrown
                 return "%s%s%s" % (prefix, text, suffix)
 
