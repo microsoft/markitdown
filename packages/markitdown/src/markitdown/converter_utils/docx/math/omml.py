@@ -234,7 +234,8 @@ class oMath2Latex(Tag2Method):
             c_dict[stag] = t
             if stag == "e":
                 args.append(t)
-        pr = c_dict["dPr"]
+        # <m:dPr> is optional; without it every property takes its default.
+        pr = c_dict.get("dPr") or Pr(())
         null = D_DEFAULT.get("null")
         s_val = get_char(pr.begChr, default=D_DEFAULT.get("left"), store=T)
         e_val = get_char(pr.endChr, default=D_DEFAULT.get("right"), store=T)
