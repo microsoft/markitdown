@@ -101,6 +101,25 @@ def test_html_href_does_not_quote_query_or_fragment() -> None:
     assert f"[example]({expected_href})" in markdown
 
 
+def test_mailto_links_are_preserved() -> None:
+    markdown = _convert_html('<p>Contact <a href="mailto:team@example.com">the team</a>.</p>')
+
+    assert "mailto:team%40example.com" in markdown
+    assert "[the team](mailto:team%40example.com)" in markdown
+
+
+def test_tel_links_are_preserved() -> None:
+    markdown = _convert_html('<p>Call <a href="tel:+15551234567">support</a>.</p>')
+
+    assert "[support](tel:%2B15551234567)" in markdown
+
+
+def test_javascript_links_are_still_dropped() -> None:
+    markdown = _convert_html('<a href="javascript:alert(1)">x</a>')
+
+    assert markdown == "x"
+
+
 def test_img_prefers_data_src_over_placeholder_data_uri() -> None:
     placeholder = (
         "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBTAA7"
