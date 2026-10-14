@@ -38,13 +38,29 @@ def test_underline_preserves_whitespace_verbatim(whitespace: str) -> None:
         (" ", "First Last"),
         ("\t", "First Last"),
         ("&#160;", "First\u00a0Last"),
-        ("<br>", "First\nLast"),
+        # <br> is a hard line break, kept as trailing spaces in Markdown
+        ("<br>", "First  \nLast"),
         ("word", "First<u>word</u>Last"),
         (" word ", "First <u>word</u> Last"),
     ],
 )
 def test_html_underlined_content_is_preserved(content: str, expected: str) -> None:
     assert _convert_html(f"<p>First<u>{content}</u>Last</p>") == expected
+
+
+def test_html_br_becomes_hard_line_break() -> None:
+    # A <br> is a hard line break and must survive the trailing-whitespace
+    # normalization (regression test for #2642).
+    markdown = _convert_html("<p>Line one<br>Line two</p>")
+
+    assert markdown == "Line one  \nLine two"
+
+
+def test_html_no_trailing_spaces_without_br() -> None:
+    # Lines without a hard break keep no trailing spaces.
+    markdown = _convert_html("<p>hello</p>")
+
+    assert markdown == "hello"
 
 
 def test_preserves_non_utf8_percent_encoded_href_path() -> None:
@@ -308,7 +324,8 @@ K</strike>L.</p>
             # A line break inside the element is kept, and the markup
             # survives it because strikethrough may span a single newline
             "Newline I~~J\nK~~L.",
-            "Break M~~N\nO~~P.",
+            # <br> is a hard line break, so the line keeps its trailing spaces
+            "Break M~~N  \nO~~P.",
         ]
     )
 
