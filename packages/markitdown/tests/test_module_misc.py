@@ -192,6 +192,29 @@ def test_data_uris() -> None:
     assert data == b"Hello, World!"
 
 
+def test_data_uris_strip_fragment() -> None:
+    # A raw fragment is not part of the payload and must not be decoded
+    # into the content (WHATWG data URL spec).
+    data_uri = "data:text/plain,Hello#section"
+    mime_type, attributes, data = parse_data_uri(data_uri)
+    assert mime_type == "text/plain"
+    assert data == b"Hello"
+
+    # With base64, the fragment must not add bytes to the decoded payload.
+    data_uri = "data:text/plain;base64,SGVsbG8h#AAAA"
+    mime_type, attributes, data = parse_data_uri(data_uri)
+    assert mime_type == "text/plain"
+    assert data == b"Hello!"
+
+
+def test_data_uris_preserve_encoded_hash_and_query() -> None:
+    # A percent-encoded hash decodes to a literal '#'; a '?' stays in payload.
+    data_uri = "data:text/plain,Hello%23World?query=1#frag"
+    mime_type, attributes, data = parse_data_uri(data_uri)
+    assert mime_type == "text/plain"
+    assert data == b"Hello#World?query=1"
+
+
 def test_file_uris() -> None:
     expected_path = os.path.abspath("/path/to/file.txt")
 

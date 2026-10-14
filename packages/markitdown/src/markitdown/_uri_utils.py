@@ -70,6 +70,12 @@ def parse_data_uri(uri: str) -> Tuple[str | None, Dict[str, str], bytes]:
         elif len(part) > 0:
             attributes[part.lower()] = ""
 
+    # Strip a raw fragment (everything from the first '#' onward) before
+    # decoding. Per the WHATWG data URL spec a fragment is not part of the
+    # payload, so it must not be decoded into the content. Percent-encoded
+    # hashes ("%23") are unaffected because they do not contain a raw '#'.
+    data = data.split("#", 1)[0]
+
     content = base64.b64decode(data) if is_base64 else unquote_to_bytes(data)
 
     return mime_type, attributes, content
