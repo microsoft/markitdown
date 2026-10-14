@@ -1088,3 +1088,133 @@ def test_deeply_nested_rss_item_fallback() -> None:
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
+
+
+def _convert_rss_link(href: str, url: str = "https://example.com/bucket/feed.xml"):
+    feed = f"""<rss version="2.0"><channel>
+<title>Exports</title><link>https://example.com/bucket/</link>
+<description>Available reports</description>
+<item><title>Report</title><description><![CDATA[
+<a href="{href}">Download</a> <img src="{href}" alt="preview">
+]]></description></item>
+</channel></rss>""".encode()
+    return (
+        MarkItDown()
+        .convert_stream(
+            io.BytesIO(feed),
+            stream_info=StreamInfo(extension=".rss", charset="utf-8", url=url),
+        )
+        .markdown
+    )
+
+
+@pytest.mark.parametrize(
+    ("url", "href", "expected"),
+    [
+        # Issue #2468: repeated slashes in the reference are kept.
+        (
+            "https://example.com/bucket/feed.xml",
+            "exports/2026//report.csv",
+            "https://example.com/bucket/exports/2026//report.csv",
+        ),
+        # Repeated slashes inherited from the base path are kept.
+        (
+            "https://example.com/a//b/feed.xml",
+            "report.csv",
+            "https://example.com/a//b/report.csv",
+        ),
+        # Dot segments still resolve, without collapsing empty segments.
+        (
+            "https://example.com/a//b/c/feed.xml",
+            "../x//y.csv",
+            "https://example.com/a//b/x//y.csv",
+        ),
+        (
+            "https://example.com/bucket/feed.xml",
+            "/root//x.csv?q=1#f",
+            "https://example.com/root//x.csv?q=1#f",
+        ),
+    ],
+)
+def test_feed_links_keep_empty_path_segments(url: str, href: str, expected: str):
+    markdown = _convert_rss_link(href, url)
+    assert f"[Download]({expected})" in markdown
+    assert f"![preview]({expected})" in markdown
+
+
+# RFC 3986 section 5.4 reference resolution examples. ``http:g`` is omitted:
+# like urljoin, the resolver uses the backwards-compatible non-strict reading.
+_RFC3986_BASE = "http://a/b/c/d;p?q"
+_RFC3986_EXAMPLES = {
+    "g:h": "g:h",
+    "g": "http://a/b/c/g",
+    "./g": "http://a/b/c/g",
+    "g/": "http://a/b/c/g/",
+    "/g": "http://a/g",
+    "//g": "http://g",
+    "?y": "http://a/b/c/d;p?y",
+    "g?y": "http://a/b/c/g?y",
+    "#s": "http://a/b/c/d;p?q#s",
+    "g#s": "http://a/b/c/g#s",
+    "g?y#s": "http://a/b/c/g?y#s",
+    ";x": "http://a/b/c/;x",
+    "g;x": "http://a/b/c/g;x",
+    "g;x?y#s": "http://a/b/c/g;x?y#s",
+    "": "http://a/b/c/d;p?q",
+    ".": "http://a/b/c/",
+    "./": "http://a/b/c/",
+    "..": "http://a/b/",
+    "../": "http://a/b/",
+    "../g": "http://a/b/g",
+    "../..": "http://a/",
+    "../../": "http://a/",
+    "../../g": "http://a/g",
+    "../../../g": "http://a/g",
+    "../../../../g": "http://a/g",
+    "/./g": "http://a/g",
+    "/../g": "http://a/g",
+    "g.": "http://a/b/c/g.",
+    ".g": "http://a/b/c/.g",
+    "g..": "http://a/b/c/g..",
+    "..g": "http://a/b/c/..g",
+    "./../g": "http://a/b/g",
+    "./g/.": "http://a/b/c/g/",
+    "g/./h": "http://a/b/c/g/h",
+    "g/../h": "http://a/b/c/h",
+    "g;x=1/./y": "http://a/b/c/g;x=1/y",
+    "g;x=1/../y": "http://a/b/c/y",
+    "g?y/./x": "http://a/b/c/g?y/./x",
+    "g?y/../x": "http://a/b/c/g?y/../x",
+    "g#s/./x": "http://a/b/c/g#s/./x",
+    "g#s/../x": "http://a/b/c/g#s/../x",
+}
+
+
+@pytest.mark.parametrize(("reference", "expected"), _RFC3986_EXAMPLES.items())
+def test_join_url_rfc3986_examples(reference: str, expected: str) -> None:
+    from markitdown.converters._rss_converter import _join_url
+
+    assert _join_url(_RFC3986_BASE, reference) == expected
+
+
+@pytest.mark.parametrize(
+    ("base", "reference"),
+    [
+        ("", "../a"),
+        ("/rel/feed.xml", "../a"),
+        ("mailto:x@example.com", "y"),
+        ("urn:a:b", "c"),
+        ("https://example.com/a/", "//other.example/./x"),
+        ("https://example.com/a/", "ftp://other.example/x"),
+        ("https://example.com/a/b?q=1", "?"),
+        ("https://example.com/a/b?q=1#f", "#"),
+    ],
+)
+def test_join_url_matches_urljoin_outside_relative_merges(
+    base: str, reference: str
+) -> None:
+    from urllib.parse import urljoin
+
+    from markitdown.converters._rss_converter import _join_url
+
+    assert _join_url(base, reference) == urljoin(base, reference)
