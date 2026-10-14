@@ -73,12 +73,12 @@ def _mock_field(**kwargs):
 # --------- Phase 1: API version + user agent -------------------------------
 
 
-def test_default_api_version_is_2024_11_30():
-    """The default api_version must be the GA value '2024-11-30'."""
+def test_default_api_version_uses_sdk_default():
+    """The default api_version must defer to the Document Intelligence SDK."""
     import inspect
 
     sig = inspect.signature(DocumentIntelligenceConverter.__init__)
-    assert sig.parameters["api_version"].default == "2024-11-30"
+    assert sig.parameters["api_version"].default is None
 
 
 def test_user_agent_string_format():
@@ -87,8 +87,8 @@ def test_user_agent_string_format():
     assert len(_USER_AGENT) > len("markitdown-docintel/")
 
 
-def test_client_constructed_with_user_agent_and_api_version():
-    """__init__ should pass user_agent and api_version to DocumentIntelligenceClient."""
+def test_client_constructed_with_user_agent_and_sdk_default_api_version():
+    """__init__ should pass user_agent without overriding the SDK API version."""
     fake_client = mock.MagicMock()
     with mock.patch.object(
         di_mod, "DocumentIntelligenceClient", return_value=fake_client
@@ -98,7 +98,7 @@ def test_client_constructed_with_user_agent_and_api_version():
             credential=mock.MagicMock(),
         )
     kwargs = ctor.call_args.kwargs
-    assert kwargs["api_version"] == "2024-11-30"
+    assert "api_version" not in kwargs
     assert kwargs["user_agent"] == _USER_AGENT
 
 
