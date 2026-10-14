@@ -114,7 +114,8 @@ def test_input_from_stdin_without_hints(shared_tmp_dir, test_vector) -> None:
         text=False,
     )
 
-    stdout = result.stdout.decode(locale.getpreferredencoding())
+    # Binary capture preserves Windows CRLF; match text-mode capture semantics.
+    stdout = result.stdout.decode(locale.getpreferredencoding()).replace("\r\n", "\n")
     assert (
         result.returncode == 0
     ), f"CLI exited with error: {result.stderr.decode('utf-8')}"
@@ -145,7 +146,8 @@ def test_convert_url(shared_tmp_dir, test_vector):
         text=False,
     )
 
-    stdout = result.stdout.decode(locale.getpreferredencoding())
+    # Binary capture preserves Windows CRLF; match text-mode capture semantics.
+    stdout = result.stdout.decode(locale.getpreferredencoding()).replace("\r\n", "\n")
     assert result.returncode == 0, f"CLI exited with error: {result.stderr}"
     for test_string in test_vector.must_include:
         assert test_string in stdout
