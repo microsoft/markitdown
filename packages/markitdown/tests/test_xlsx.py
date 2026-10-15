@@ -584,5 +584,19 @@ def test_xlsx_numeric_cells_render_as_before() -> None:
     ]
 
 
+def test_xlsx_repeated_header_names_are_kept() -> None:
+    markdown = _convert_rows(
+        [
+            ["Item", "Total", "Total", "Item", "Total.1", "NA", None],
+            ["x", 1, 2, "y", 3, 4, 5],
+        ]
+    )
+
+    assert markdown.splitlines()[1] == (
+        "| Item | Total | Total | Item | Total.1 | NA | Unnamed: 6 |"
+    )
+    assert markdown.splitlines()[3] == "| x | 1 | 2 | y | 3 | 4 | 5 |"
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))

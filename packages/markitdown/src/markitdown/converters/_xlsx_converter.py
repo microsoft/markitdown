@@ -52,8 +52,41 @@ def _read_excel_sheets(stream: BinaryIO, engine: str) -> dict[str, Any]:
     object keeps the value each cell holds; infer_objects() then restores the
     usual column dtypes for genuinely numeric, boolean and date columns.
     """
+    start_pos = stream.tell()
     sheets = pd.read_excel(stream, sheet_name=None, engine=engine, dtype=object)
+    for name, sheet in sheets.items():
+        if _may_have_renamed_duplicates(sheet.columns):
+            stream.seek(start_pos)
+            raw = pd.read_excel(
+                stream, sheet_name=name, engine=engine, dtype=object, header=None
+            )
+            sheet.columns = _restore_header(sheet.columns, raw.iloc[0])
     return {name: sheet.infer_objects() for name, sheet in sheets.items()}
+
+
+# pandas renames a repeated header ("Total", "Total") to "Total", "Total.1", and
+# pandas 2 removed the option to turn that off.
+_RENAMED_DUPLICATE = re.compile(r"^(.*)\.\d+$", re.DOTALL)
+
+
+def _may_have_renamed_duplicates(columns: Any) -> bool:
+    names = {str(column) for column in columns}
+    for column in columns:
+        match = _RENAMED_DUPLICATE.match(str(column))
+        if match and match.group(1) in names:
+            return True
+    return False
+
+
+def _restore_header(columns: Any, first_row: Any) -> list[Any]:
+    """Take the header text from the sheet's first row, as the cells hold it.
+
+    A header cell pandas reads as missing (blank, or text such as "NA") keeps the
+    name pandas gave it, so only the renamed duplicates change.
+    """
+    return [
+        column if pd.isna(value) else value for column, value in zip(columns, first_row)
+    ]
 
 
 @contextmanager
