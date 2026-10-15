@@ -77,10 +77,10 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
                 parsed_url = urlparse(href)  # type: ignore
                 if parsed_url.scheme and parsed_url.scheme.lower() not in ["http", "https", "file", "mailto", "tel"]:  # type: ignore
                     return "%s%s%s" % (prefix, text, suffix)
-                # Only percent-quote hierarchical URI paths (http/https/file);
+                # Keep escaping hierarchical and relative URI paths;
                 # opaque schemes such as mailto: and tel: carry their payload
                 # in path and would mangle addresses/numbers if quoted here.
-                if parsed_url.scheme and parsed_url.scheme.lower() in ["http", "https", "file"]:
+                if parsed_url.scheme.lower() not in ["mailto", "tel"]:
                     href = urlunparse(
                         parsed_url._replace(
                             path=_quote_path_preserving_percent_encoded_octets(
