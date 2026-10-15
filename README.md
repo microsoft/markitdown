@@ -51,7 +51,9 @@ result = MarkItDown().convert("drawing.pdf", reject_cad_pdfs=True)
 This raises `UnsupportedFormatException` when a PDF's Creator or Producer metadata
 names AutoCAD, Revit, SolidWorks, or MicroStation, before any plugin or cloud
 converter runs. The check is local, also applies to stdin, and rejection occurs
-before the CLI writes output. Existing partial extraction remains available by
+before the CLI writes output. A rejected CAD PDF inside a ZIP, including nested
+ZIPs, fails conversion instead of silently omitting that member. Existing partial
+extraction remains available by
 omitting the option.
 
 This is an exporter policy, not a drawing classifier: it also rejects text-heavy

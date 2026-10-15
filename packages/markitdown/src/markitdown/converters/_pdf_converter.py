@@ -8,7 +8,7 @@ from .._stream_info import StreamInfo
 from .._exceptions import (
     MissingDependencyException,
     MISSING_DEPENDENCY_MESSAGE,
-    UnsupportedFormatException,
+    CadPdfRejectedException,
 )
 
 # Pattern for MasterFormat-style partial numbering (e.g., ".1", ".2", ".10")
@@ -537,7 +537,7 @@ class PdfConverter(DocumentConverter):
     def reject_cad_pdf(file_stream: BinaryIO) -> None:
         """Reject known CAD exporters; metadata is not a fidelity assessment."""
         if PdfConverter.cad_pdf_exporter(file_stream) is not None:
-            raise UnsupportedFormatException(
+            raise CadPdfRejectedException(
                 "CAD-generated PDF rejected: Creator or Producer metadata "
                 "identifies a known CAD exporter. Text extraction cannot "
                 "preserve drawing geometry, dimensions, or spatial relationships. "

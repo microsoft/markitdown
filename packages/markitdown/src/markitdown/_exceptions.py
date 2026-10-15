@@ -39,6 +39,10 @@ class UnsupportedFormatException(MarkItDownException):
     pass
 
 
+class CadPdfRejectedException(UnsupportedFormatException):
+    """A requested CAD rejection policy must survive converter/archive fallbacks."""
+
+
 class FailedConversionAttempt(object):
     """
     Represents a single attempt to convert a file.
