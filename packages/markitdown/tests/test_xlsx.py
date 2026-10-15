@@ -598,5 +598,23 @@ def test_xlsx_repeated_header_names_are_kept() -> None:
     assert markdown.splitlines()[3] == "| x | 1 | 2 | y | 3 | 4 | 5 |"
 
 
+@pytest.mark.parametrize("label", ["NA", "N/A", "NULL", "nan", ""])
+def test_xlsx_repeated_na_like_header_names_are_kept(label: str) -> None:
+    markdown = _convert_rows([[label, label, "x"], [1, 2, 3]])
+
+    if label:
+        assert markdown.splitlines()[1] == f"| {label} | {label} | x |"
+    else:
+        # openpyxl writes "" as an empty cell, so pandas names both columns.
+        assert markdown.splitlines()[1] == "| Unnamed: 0 | Unnamed: 1 | x |"
+
+
+def test_xlsx_repeated_headers_with_a_narrow_first_row() -> None:
+    markdown = _convert_rows([["Total", "Total"], [1, 2, 3, 4]])
+
+    assert markdown.splitlines()[1] == "| Total | Total | Unnamed: 2 | Unnamed: 3 |"
+    assert markdown.splitlines()[3] == "| 1 | 2 | 3 | 4 |"
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))

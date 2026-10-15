@@ -57,10 +57,9 @@ def _read_excel_sheets(stream: BinaryIO, engine: str) -> dict[str, Any]:
     for name, sheet in sheets.items():
         if _may_have_renamed_duplicates(sheet.columns):
             stream.seek(start_pos)
-            raw = pd.read_excel(
-                stream, sheet_name=name, engine=engine, dtype=object, header=None
+            sheet.columns = _restore_header(
+                sheet.columns, _read_header_row(stream, engine, name)
             )
-            sheet.columns = _restore_header(sheet.columns, raw.iloc[0])
     return {name: sheet.infer_objects() for name, sheet in sheets.items()}
 
 
@@ -78,15 +77,44 @@ def _may_have_renamed_duplicates(columns: Any) -> bool:
     return False
 
 
-def _restore_header(columns: Any, first_row: Any) -> list[Any]:
-    """Take the header text from the sheet's first row, as the cells hold it.
+def _read_header_row(stream: BinaryIO, engine: str, sheet_name: str) -> list[Any]:
+    """Read only the sheet's first row, as the cells hold it.
 
-    A header cell pandas reads as missing (blank, or text such as "NA") keeps the
-    name pandas gave it, so only the renamed duplicates change.
+    NA parsing is off so header text such as "NA", "N/A" or "NULL" stays text;
+    blank cells come back as "".
     """
-    return [
-        column if pd.isna(value) else value for column, value in zip(columns, first_row)
-    ]
+    raw = pd.read_excel(
+        stream,
+        sheet_name=sheet_name,
+        engine=engine,
+        dtype=object,
+        header=None,
+        nrows=1,
+        na_filter=False,
+    )
+    return list(raw.iloc[0]) if len(raw) else []
+
+
+def _restore_header(columns: Any, first_row: list[Any]) -> list[Any]:
+    """Take the header text from the sheet's first row.
+
+    A blank header cell keeps the name pandas gave it ("Unnamed: 3"), so only the
+    renamed duplicates change. The first row can be narrower than the sheet when
+    its trailing cells are empty.
+    """
+    restored = []
+    for index, column in enumerate(columns):
+        value = first_row[index] if index < len(first_row) else ""
+        restored.append(column if _is_blank(value) else value)
+    return restored
+
+
+def _is_blank(value: Any) -> bool:
+    return (
+        value is None
+        or (isinstance(value, str) and value == "")
+        or (isinstance(value, float) and value != value)
+    )
 
 
 @contextmanager
