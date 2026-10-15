@@ -273,6 +273,10 @@ class MarkItDown:
                 if docintel_model_id is not None:
                     docintel_args["model_id"] = docintel_model_id
 
+                docintel_features = kwargs.get("docintel_features")
+                if docintel_features is not None:
+                    docintel_args["features"] = docintel_features
+
                 docintel_query_fields = kwargs.get("docintel_query_fields")
                 if docintel_query_fields is not None:
                     docintel_args["query_fields"] = docintel_query_fields

@@ -116,6 +116,54 @@ class TestCLIArgs:
             "--use-cu/--use-content-understanding"
         ) in result.stderr, result.stderr
 
+    @pytest.mark.parametrize(
+        "raw_features, expected_features",
+        [
+            ("formulas,ocrHighResolution", ["formulas", "ocrHighResolution"]),
+            ("none", []),
+        ],
+    )
+    def test_use_docintel_wires_configuration(
+        self, monkeypatch, capsys, raw_features, expected_features
+    ):
+        import markitdown.__main__ as markitdown_cli
+
+        markitdown_instance = MagicMock()
+        markitdown_instance.convert.return_value.markdown = "converted"
+        markitdown_cls = MagicMock(return_value=markitdown_instance)
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            [
+                "markitdown",
+                "--use-docintel",
+                "--endpoint",
+                "https://fake-di",
+                "--docintel-model-id",
+                "prebuilt-read",
+                "--docintel-features",
+                raw_features,
+                "--docintel-query-fields",
+                "Title,Author",
+                "fake.pdf",
+            ],
+        )
+        monkeypatch.setattr(markitdown_cli, "MarkItDown", markitdown_cls)
+
+        markitdown_cli.main()
+
+        markitdown_cls.assert_called_once_with(
+            enable_plugins=False,
+            docintel_endpoint="https://fake-di",
+            docintel_model_id="prebuilt-read",
+            docintel_features=expected_features,
+            docintel_query_fields=["Title", "Author"],
+        )
+        markitdown_instance.convert.assert_called_once_with(
+            "fake.pdf", stream_info=None, keep_data_uris=False
+        )
+        assert capsys.readouterr().out == "converted\n"
+
     @pytest.mark.parametrize("raw", ["pdf,jpeg,wav", " , PDF, JPEG,, WAV, "])
     @pytest.mark.parametrize(
         "filename, content_type, analyzer",

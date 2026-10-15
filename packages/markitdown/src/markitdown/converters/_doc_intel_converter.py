@@ -305,6 +305,7 @@ class DocumentIntelligenceConverter(DocumentConverter):
         api_version: str | None = None,
         credential: AzureKeyCredential | TokenCredential | None = None,
         model_id: str = "prebuilt-layout",
+        features: Optional[List[str]] = None,
         query_fields: Optional[List[str]] = None,
         file_types: List[DocumentIntelligenceFileType] = [
             DocumentIntelligenceFileType.DOCX,
@@ -326,6 +327,10 @@ class DocumentIntelligenceConverter(DocumentConverter):
             credential (AzureKeyCredential | TokenCredential | None): The credential to use for authentication.
             model_id (str): The Document Intelligence model ID to use (e.g., "prebuilt-layout",
                 "prebuilt-invoice", "prebuilt-receipt", or a custom model ID). Defaults to "prebuilt-layout".
+            features (List[str] | None): Analysis add-on features to request for OCR-supported
+                file types. Defaults to None, which uses formulas, high-resolution OCR, and font
+                styling. Pass an empty list to disable all default add-ons. Query fields
+                automatically add the required ``queryFields`` feature.
             query_fields (List[str] | None): Optional list of field names to extract via the DI
                 ``queryFields`` add-on. Only applied to OCR-supported file types (PDF/images).
             file_types (List[DocumentIntelligenceFileType]): The file types to accept. Defaults to all supported file types.
@@ -334,6 +339,7 @@ class DocumentIntelligenceConverter(DocumentConverter):
         super().__init__()
         self._file_types = file_types
         self._model_id = model_id
+        self._features = list(features) if features is not None else None
         self._query_fields = list(query_fields) if query_fields else None
 
         # Raise an error if the dependencies are not available.
@@ -408,12 +414,16 @@ class DocumentIntelligenceConverter(DocumentConverter):
             if mimetype.startswith(prefix):
                 return []
 
-        features = [
-            DocumentAnalysisFeature.FORMULAS,  # enable formula extraction
-            DocumentAnalysisFeature.OCR_HIGH_RESOLUTION,  # enable high resolution OCR
-            DocumentAnalysisFeature.STYLE_FONT,  # enable font style extraction
-        ]
-        if self._query_fields:
+        if self._features is None:
+            features = [
+                DocumentAnalysisFeature.FORMULAS,
+                DocumentAnalysisFeature.OCR_HIGH_RESOLUTION,
+                DocumentAnalysisFeature.STYLE_FONT,
+            ]
+        else:
+            features = list(self._features)
+
+        if self._query_fields and DocumentAnalysisFeature.QUERY_FIELDS not in features:
             features.append(DocumentAnalysisFeature.QUERY_FIELDS)
         return features
 

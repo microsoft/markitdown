@@ -30,6 +30,7 @@ def _bare_converter(
     *,
     file_types=None,
     model_id="prebuilt-layout",
+    features=None,
     query_fields=None,
     client=None,
 ):
@@ -40,6 +41,7 @@ def _bare_converter(
         DocumentIntelligenceFileType.DOCX,
     ]
     conv._model_id = model_id
+    conv._features = list(features) if features is not None else None
     conv._query_fields = list(query_fields) if query_fields else None
     conv.endpoint = "https://example.cognitiveservices.azure.com/"
     conv.api_version = "2024-11-30"
@@ -145,7 +147,76 @@ def test_convert_uses_overridden_model_id():
     )
 
 
-# --------- Phase 3: YAML front matter --------------------------------------
+# --------- Phase 3: configurable features ---------------------------------
+
+
+def test_default_features_preserve_existing_addons():
+    conv = _bare_converter()
+    features = conv._analysis_features(
+        StreamInfo(extension=".pdf", mimetype="application/pdf")
+    )
+
+    assert features == [
+        di_mod.DocumentAnalysisFeature.FORMULAS,
+        di_mod.DocumentAnalysisFeature.OCR_HIGH_RESOLUTION,
+        di_mod.DocumentAnalysisFeature.STYLE_FONT,
+    ]
+
+
+def test_empty_features_disable_all_addons():
+    conv = _bare_converter(features=[])
+
+    assert (
+        conv._analysis_features(
+            StreamInfo(extension=".pdf", mimetype="application/pdf")
+        )
+        == []
+    )
+
+
+def test_explicit_features_are_copied():
+    configured = [di_mod.DocumentAnalysisFeature.OCR_HIGH_RESOLUTION]
+    conv = _bare_converter(features=configured)
+
+    resolved = conv._analysis_features(
+        StreamInfo(extension=".pdf", mimetype="application/pdf")
+    )
+    resolved.append(di_mod.DocumentAnalysisFeature.STYLE_FONT)
+
+    assert configured == [di_mod.DocumentAnalysisFeature.OCR_HIGH_RESOLUTION]
+    assert conv._features == [di_mod.DocumentAnalysisFeature.OCR_HIGH_RESOLUTION]
+
+
+def test_explicit_features_are_not_sent_for_office_types():
+    conv = _bare_converter(features=[di_mod.DocumentAnalysisFeature.STYLE_FONT])
+
+    assert (
+        conv._analysis_features(
+            StreamInfo(
+                extension=".docx",
+                mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        )
+        == []
+    )
+
+
+def test_query_fields_extend_explicit_features_without_mutating_them():
+    configured = [di_mod.DocumentAnalysisFeature.OCR_HIGH_RESOLUTION]
+    conv = _bare_converter(features=configured, query_fields=["VendorName"])
+
+    features = conv._analysis_features(
+        StreamInfo(extension=".pdf", mimetype="application/pdf")
+    )
+
+    assert features == [
+        di_mod.DocumentAnalysisFeature.OCR_HIGH_RESOLUTION,
+        di_mod.DocumentAnalysisFeature.QUERY_FIELDS,
+    ]
+    assert configured == [di_mod.DocumentAnalysisFeature.OCR_HIGH_RESOLUTION]
+
+
+# --------- Phase 4: YAML front matter --------------------------------------
 
 
 def test_field_value_typed_scalars():
@@ -256,7 +327,7 @@ def test_convert_no_front_matter_when_no_documents():
     assert result.markdown.startswith("# Layout")
 
 
-# --------- Phase 4: query fields -------------------------------------------
+# --------- Phase 5: query fields -------------------------------------------
 
 
 def test_query_fields_adds_feature_for_ocr_types():
@@ -320,7 +391,7 @@ def test_query_fields_not_passed_for_office_types():
 
 
 def test_markitdown_forwards_docintel_kwargs(monkeypatch):
-    """MarkItDown(...) should forward docintel_model_id / docintel_query_fields."""
+    """MarkItDown(...) should forward Document Intelligence configuration."""
     from markitdown import _markitdown as md_mod
 
     captured = {}
@@ -334,9 +405,11 @@ def test_markitdown_forwards_docintel_kwargs(monkeypatch):
     md_mod.MarkItDown(
         docintel_endpoint="https://example.cognitiveservices.azure.com/",
         docintel_model_id="prebuilt-invoice",
+        docintel_features=[],
         docintel_query_fields=["A", "B"],
     )
 
     assert captured.get("endpoint") == "https://example.cognitiveservices.azure.com/"
     assert captured.get("model_id") == "prebuilt-invoice"
+    assert captured.get("features") == []
     assert captured.get("query_fields") == ["A", "B"]
