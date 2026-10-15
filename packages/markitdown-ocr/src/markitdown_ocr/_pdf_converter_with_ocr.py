@@ -387,6 +387,7 @@ class PdfConverterWithOCR(DocumentConverter):
             pdf_bytes.seek(0)
             with pdfplumber.open(pdf_bytes) as pdf:
                 for page_num, page in enumerate(pdf.pages, 1):
+                    page_img = None
                     try:
                         markdown_parts.append(f"\n## Page {page_num}\n")
 
@@ -426,6 +427,11 @@ class PdfConverterWithOCR(DocumentConverter):
                             f"*[Error processing page {page_num}: {str(e)}]*"
                         )
                         continue
+                    finally:
+                        if page_img is not None:
+                            page_img.original.close()
+                            page_img.annotated.close()
+                        page.close()
 
         except Exception:
             # pdfplumber failed (e.g. malformed EOF) — try PyMuPDF for rendering

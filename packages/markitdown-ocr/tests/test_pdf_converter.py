@@ -456,3 +456,47 @@ def test_plugin_registration_forwarding() -> None:
     converter = args[0]
     assert isinstance(converter, PdfConverterWithOCR)
     assert converter.semantic_pdf_ocr is True
+
+
+@pytest.mark.parametrize("outcome", ["text", "empty", "error"])
+def test_semantic_full_page_releases_render_and_page_cache(monkeypatch, outcome):
+    import pdfplumber.page
+
+    rendered = []
+    closed_pages = []
+    render = pdfplumber.page.Page.to_image
+    close = pdfplumber.page.Page.close
+
+    def record_render(page, *args, **kwargs):
+        image = render(page, *args, **kwargs)
+        rendered.append(image)
+        return image
+
+    def record_close(page):
+        closed_pages.append(page.page_number)
+        return close(page)
+
+    class Service:
+        def extract_text(self, stream, **kwargs):
+            if outcome == "error":
+                raise RuntimeError("OCR unavailable")
+            return OCRResult(
+                text="kept" if outcome == "text" else "", backend_used="mock"
+            )
+
+    monkeypatch.setattr(pdfplumber.page.Page, "to_image", record_render)
+    monkeypatch.setattr(pdfplumber.page.Page, "close", record_close)
+    converter = PdfConverterWithOCR()
+    result = converter._ocr_full_pages(
+        io.BytesIO((TEST_DATA_DIR / "pdf_multipage.pdf").read_bytes()),
+        Service(),
+        prompt="faithful",
+        preserve_markdown=True,
+    )
+    assert rendered
+    for image in rendered:
+        for raster in (image.original, image.annotated):
+            with pytest.raises(ValueError, match="closed image"):
+                raster.getbbox()
+    assert set(range(1, len(rendered) + 1)) <= set(closed_pages)
+    assert bool(result) == (outcome == "text")
