@@ -770,6 +770,40 @@ def test_missing_optional_dependencies_fail_before_hook(
 # Conversion regressions
 
 
+@pytest.mark.parametrize("hierarchical", [False, True])
+def test_chart_preserves_category_paths(hierarchical: bool) -> None:
+    data = CategoryChartData()
+    if hierarchical:
+        data.categories.add_category("2024").add_sub_category("Q1")
+        data.categories.add_category("2025").add_sub_category("Q1")
+    else:
+        data.categories = ["Q1", "Q2"]
+    data.add_series("Revenue", [1, 2])
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    slide.shapes.add_chart(
+        XL_CHART_TYPE.COLUMN_CLUSTERED,
+        Inches(1), Inches(1), Inches(6), Inches(4), data,
+    )
+    stream = io.BytesIO()
+    presentation.save(stream)
+    stream.seek(0)
+    markdown = MarkItDown().convert_stream(
+        stream, stream_info=StreamInfo(extension=".pptx")
+    ).text_content
+    rows = [
+        [cell.strip() for cell in line.strip().strip("|").split("|")]
+        for line in markdown.splitlines()
+        if line.lstrip().startswith("|")
+    ]
+    if hierarchical:
+        assert rows[0] == ["Category (L1)", "Category (L2)", "Revenue"]
+        assert rows[2:] == [["2024", "Q1", "1.0"], ["2025", "Q1", "2.0"]]
+    else:
+        assert rows[0] == ["Category", "Revenue"]
+        assert rows[2:] == [["Q1", "1.0"], ["Q2", "2.0"]]
+
+
 def test_pptx_chart_multi_series_conversion() -> None:
     """Charts with multiple series and many categories must convert correctly.
 

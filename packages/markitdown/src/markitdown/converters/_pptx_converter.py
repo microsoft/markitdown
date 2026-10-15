@@ -338,7 +338,7 @@ class PptxConverter(DocumentConverter):
             # category labels (e.g. Year/Quarter). For flat (single-level)
             # categories this returns 1-tuples equivalent to c.label.
             flat_labels = list(categories.flattened_labels)
-            # Multi-level headers: one column per level plus "Category".
+            # One category column per hierarchy level.
             depth = max((len(lbl) for lbl in flat_labels), default=1)
             if depth <= 1:
                 header = ["Category"]
@@ -355,21 +355,13 @@ class PptxConverter(DocumentConverter):
 
             for idx, label_tuple in enumerate(flat_labels):
                 row = list(label_tuple)
-                # Pad to depth in case some labels are shorter.
-                while len(row) < depth:
-                    row.append("")
                 for sv in series_values:
                     row.append(sv[idx] if idx < len(sv) else None)
                 data.append(row)
 
-            def _fmt(v):
-                if v is None:
-                    return ""
-                return str(v)
-
             markdown_table = []
             for row in data:
-                markdown_table.append("| " + " | ".join(_fmt(v) for v in row) + " |")
+                markdown_table.append("| " + " | ".join(map(str, row)) + " |")
             md_header = markdown_table[0]
             separator = "|" + "|".join(["---"] * len(data[0])) + "|"
             return md + "\n".join([md_header, separator] + markdown_table[1:])
