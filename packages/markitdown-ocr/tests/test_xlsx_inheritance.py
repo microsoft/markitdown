@@ -283,7 +283,7 @@ def test_inherited_repairs_and_native_table_fixes_reach_ocr(
     assert "Future shared fix" in result and "<native>" not in result
     assert result.count("[Image OCR]") == 2
     repair.assert_called_once()
-    assert calls == [{"sheet_name": None, "engine": "openpyxl"}] * 2
+    assert calls == [{"sheet_name": None, "engine": "openpyxl", "dtype": object}] * 2
     service.extract_text.assert_called_once()
 
 

@@ -44,6 +44,18 @@ _SHEET_VIEW_START_TAG = re.compile(rb"<sheetView(?=[\s/>])[^>]*>")
 _SHOW_ZEROES_ATTRIBUTE = re.compile(rb"(?<=[\s])showZeroes(\s*=)")
 
 
+def _read_excel_sheets(stream: BinaryIO, engine: str) -> dict[str, Any]:
+    """Read every sheet, keeping text cells as text.
+
+    By default pandas parses a text cell that looks numeric into a number, so a
+    ZIP code "02134" becomes 2134 and "+15551234" becomes 15551234. Reading as
+    object keeps the value each cell holds; infer_objects() then restores the
+    usual column dtypes for genuinely numeric, boolean and date columns.
+    """
+    sheets = pd.read_excel(stream, sheet_name=None, engine=engine, dtype=object)
+    return {name: sheet.infer_objects() for name, sheet in sheets.items()}
+
+
 @contextmanager
 def _read_xlsx_sheets(
     file_stream: BinaryIO,
@@ -52,12 +64,12 @@ def _read_xlsx_sheets(
     repaired_stream = None
     try:
         try:
-            sheets = pd.read_excel(file_stream, sheet_name=None, engine="openpyxl")
+            sheets = _read_excel_sheets(file_stream, "openpyxl")
         except TypeError as exc:
             if "showZeroes" not in str(exc):
                 raise
             repaired_stream = _repair_sheetview_show_zeroes(file_stream, start_pos)
-            sheets = pd.read_excel(repaired_stream, sheet_name=None, engine="openpyxl")
+            sheets = _read_excel_sheets(repaired_stream, "openpyxl")
         yield sheets, repaired_stream if repaired_stream is not None else file_stream
     finally:
         if repaired_stream is not None:
@@ -237,7 +249,7 @@ class XlsConverter(DocumentConverter):
                 _xls_dependency_exc_info[2]
             )
 
-        sheets = pd.read_excel(file_stream, sheet_name=None, engine="xlrd")
+        sheets = _read_excel_sheets(file_stream, "xlrd")
         md_content = ""
         for s in sheets:
             md_content += f"## {s}\n"

@@ -541,5 +541,48 @@ def test_xlsx_show_zeroes_rename_is_scoped_to_sheet_view_tags() -> None:
     assert b'<customSheetView showZeroes="0"/>' in repaired
 
 
+# Cell values
+
+
+def _convert_rows(rows: list[list[Any]]) -> str:
+    workbook = openpyxl.Workbook()
+    for row in rows:
+        workbook.active.append(row)
+    stream = io.BytesIO()
+    workbook.save(stream)
+    stream.seek(0)
+    return MarkItDown().convert_stream(stream, stream_info=_INFO).markdown
+
+
+def test_xlsx_text_cells_that_look_numeric_stay_text() -> None:
+    markdown = _convert_rows(
+        [
+            ["zip", "phone", "account"],
+            ["02134", "+15551234", "12345678901234567890"],
+            ["00501", "0612345678", "007"],
+        ]
+    )
+
+    assert markdown.splitlines()[-2:] == [
+        "| 02134 | +15551234 | 12345678901234567890 |",
+        "| 00501 | 0612345678 | 007 |",
+    ]
+
+
+def test_xlsx_numeric_cells_render_as_before() -> None:
+    markdown = _convert_rows(
+        [
+            ["int", "sparse", "float", "flag"],
+            [1, 2, 1.5, True],
+            [3, None, 0.25, False],
+        ]
+    )
+
+    assert markdown.splitlines()[-2:] == [
+        "| 1 | 2.0 | 1.50 | True |",
+        "| 3 | NaN | 0.25 | False |",
+    ]
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
