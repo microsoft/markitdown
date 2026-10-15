@@ -95,7 +95,10 @@ class AudioConverter(DocumentConverter):
         if audio_format:
             try:
                 transcript = transcribe_audio(
-                    file_stream, audio_format=audio_format, language=language
+                    file_stream,
+                    audio_format=audio_format,
+                    language=language,
+                    client=kwargs.get("llm_client"),
                 )
                 if transcript:
                     md_content += "\n\n### Audio Transcript:\n" + transcript

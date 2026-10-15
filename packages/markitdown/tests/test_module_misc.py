@@ -878,3 +878,106 @@ def test_a_declared_charset_still_wins() -> None:
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
+
+
+# Audio provider selection (no recordings leave the test process).
+@pytest.fixture
+def audio_provider_mocks(monkeypatch):
+    from contextlib import nullcontext
+    from markitdown.converters import _audio_converter, _transcribe_audio
+
+    recognizer = MagicMock()
+    recognizer.recognize_google.return_value = "legacy Google transcript"
+    monkeypatch.setattr(_transcribe_audio, "_dependency_exc_info", None)
+    monkeypatch.setattr(
+        _transcribe_audio,
+        "sr",
+        SimpleNamespace(
+            Recognizer=lambda: recognizer, AudioFile=lambda _: nullcontext(object())
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(_audio_converter, "exiftool_metadata", lambda *a, **kw: {})
+    return recognizer
+
+
+def convert_mock_wav(client=None, **kwargs):
+    return MarkItDown(llm_client=client).convert_stream(
+        io.BytesIO((Path(TEST_FILES_DIR) / "test.wav").read_bytes()),
+        stream_info=StreamInfo(extension=".wav", mimetype="audio/x-wav"),
+        **kwargs,
+    )
+
+
+def test_audio_uses_selected_client_without_google(audio_provider_mocks):
+    client = MagicMock()
+    client.audio.transcriptions.create.return_value.text = "selected transcript"
+    result = convert_mock_wav(client)
+    assert "selected transcript" in result.markdown
+    audio_provider_mocks.recognize_google.assert_not_called()
+    request = client.audio.transcriptions.create.call_args.kwargs
+    assert request["model"] == "whisper-1"
+    assert request["file"][0] == "audio.wav"
+    assert request["file"][2] == "audio/wav"
+
+
+def test_audio_selected_client_failure_never_falls_back(audio_provider_mocks):
+    client = MagicMock()
+    client.audio.transcriptions.create.side_effect = RuntimeError(
+        "selected provider failed"
+    )
+    with pytest.raises(FileConversionException, match="selected provider failed"):
+        convert_mock_wav(client)
+    audio_provider_mocks.recognize_google.assert_not_called()
+
+
+def test_audio_selected_client_empty_transcript(audio_provider_mocks):
+    client = MagicMock()
+    client.audio.transcriptions.create.return_value.text = "   "
+    assert "[No speech detected]" in convert_mock_wav(client).markdown
+    audio_provider_mocks.recognize_google.assert_not_called()
+
+
+def test_audio_without_client_preserves_legacy_language(audio_provider_mocks):
+    assert "legacy Google transcript" in convert_mock_wav(language="fr-FR").markdown
+    assert audio_provider_mocks.recognize_google.call_args.kwargs == {
+        "language": "fr-FR"
+    }
+
+
+def test_selected_audio_client_does_not_require_legacy_dependencies(
+    audio_provider_mocks, monkeypatch
+):
+    from markitdown.converters import _transcribe_audio
+
+    monkeypatch.setattr(
+        _transcribe_audio,
+        "_dependency_exc_info",
+        (ImportError, ImportError("legacy dependencies absent"), None),
+    )
+    client = MagicMock()
+    client.audio.transcriptions.create.return_value.text = "selected transcript"
+    assert "selected transcript" in convert_mock_wav(client).markdown
+    audio_provider_mocks.recognize_google.assert_not_called()
+
+
+@pytest.mark.parametrize("audio_format", ["mp3", "mp4", "flac", "aiff"])
+def test_selected_audio_client_receives_original_encoded_format(
+    audio_provider_mocks, audio_format
+):
+    from markitdown.converters._transcribe_audio import transcribe_audio
+
+    stream = io.BytesIO(b"original encoded audio")
+    client = MagicMock()
+    client.audio.transcriptions.create.return_value.text = "selected transcript"
+    assert (
+        transcribe_audio(stream, audio_format=audio_format, client=client)
+        == "selected transcript"
+    )
+    request = client.audio.transcriptions.create.call_args.kwargs
+    assert request["file"][0] == f"audio.{audio_format}"
+    assert request["file"][1].read() == b"original encoded audio"
+    assert request["file"][2] == {"mp3": "audio/mpeg"}.get(
+        audio_format, f"audio/{audio_format}"
+    )
+    audio_provider_mocks.recognize_google.assert_not_called()

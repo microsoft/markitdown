@@ -297,6 +297,20 @@ print(result.markdown)
 
 If any attempt succeeds, image conversion continues normally. If the client raises an error after exhausting its retries, or encounters a non-retryable error, MarkItDown tries other applicable converters and raises `FileConversionException` only if none succeeds.
 
+### Audio transcription provider
+
+For the built-in audio converter, supplying `llm_client` selects that client's
+OpenAI-compatible `audio.transcriptions.create` endpoint with model `whisper-1`.
+The client must support audio transcription. Original encoded audio is uploaded
+with its matching filename and media type; this path does not require local
+decoding or the legacy Google dependencies. Provider errors propagate; a selected
+client's recording is never retried through Google. Transcript headings stay generic.
+
+Without a client, the legacy SpeechRecognition Google service remains the default
+and receives the recording using its generic API key. This behavior is preserved
+for compatibility; callers requiring a particular provider should supply its client.
+The `language` hint continues to apply to the legacy Google path.
+
 ### Docker
 
 ```sh
