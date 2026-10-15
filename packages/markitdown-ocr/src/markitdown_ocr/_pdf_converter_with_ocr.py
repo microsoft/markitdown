@@ -353,14 +353,17 @@ class PdfConverterWithOCR(DocumentConverter):
     def _ocr_page(self, page: Any, ocr_service: LLMVisionOCRService) -> str:
         """Render and OCR one PDF page."""
         page_img = page.to_image(resolution=300)
-        img_stream = io.BytesIO()
-        page_img.original.save(img_stream, format="PNG")
-        img_stream.seek(0)
-
-        ocr_result = ocr_service.extract_text(img_stream)
-        if ocr_result.text.strip():
-            return f"*[Image OCR]\n{ocr_result.text.strip()}\n[End OCR]*"
-        return "*[No text could be extracted from this page]*"
+        try:
+            with io.BytesIO() as img_stream:
+                page_img.original.save(img_stream, format="PNG")
+                img_stream.seek(0)
+                ocr_result = ocr_service.extract_text(img_stream)
+            if ocr_result.text.strip():
+                return f"*[Image OCR]\n{ocr_result.text.strip()}\n[End OCR]*"
+            return "*[No text could be extracted from this page]*"
+        finally:
+            page_img.original.close()
+            page_img.annotated.close()
 
     def _ocr_full_pages(
         self, pdf_bytes: io.BytesIO, ocr_service: LLMVisionOCRService

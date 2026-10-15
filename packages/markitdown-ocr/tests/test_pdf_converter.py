@@ -331,3 +331,54 @@ def test_pdf_no_ocr_service_no_tags() -> None:
         md = converter.convert(f, StreamInfo(extension=".pdf")).text_content
     assert "*[Image OCR]" not in md
     assert "[End OCR]*" not in md
+
+
+@pytest.mark.parametrize("outcome", ["text", "empty", "ocr_error", "encode_error"])
+def test_ocr_page_closes_rendered_images(monkeypatch, outcome: str) -> None:
+    import pdfplumber
+
+    converter = PdfConverterWithOCR()
+    rendered = []
+
+    class OCR:
+        def extract_text(self, stream):
+            assert stream.read(8) == b"\x89PNG\r\n\x1a\n"
+            if outcome == "ocr_error":
+                raise RuntimeError("OCR failed")
+            return OCRResult(
+                text=_MOCK_TEXT if outcome == "text" else "", backend_used="mock"
+            )
+
+    with pdfplumber.open(TEST_DATA_DIR / "pdf_scanned_minimal.pdf") as pdf:
+        page = pdf.pages[0]
+        to_image = page.to_image
+
+        def capture_render(**kwargs):
+            image = to_image(**kwargs)
+            rendered.append(image)
+            if outcome == "encode_error":
+
+                def fail_save(*args, **kwargs):
+                    raise RuntimeError("encoding failed")
+
+                monkeypatch.setattr(image.original, "save", fail_save)
+            return image
+
+        monkeypatch.setattr(page, "to_image", capture_render)
+        if outcome.endswith("error"):
+            message = "OCR failed" if outcome == "ocr_error" else "encoding failed"
+            with pytest.raises(RuntimeError, match=message):
+                converter._ocr_page(page, OCR())
+        else:
+            result = converter._ocr_page(page, OCR())
+            assert result == (
+                _OCR_BLOCK
+                if outcome == "text"
+                else "*[No text could be extracted from this page]*"
+            )
+
+        assert len(rendered) == 1
+        assert rendered[0].original is not rendered[0].annotated
+        for image in (rendered[0].original, rendered[0].annotated):
+            with pytest.raises(ValueError, match="closed image"):
+                image.getpixel((0, 0))
