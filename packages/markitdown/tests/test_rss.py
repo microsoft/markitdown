@@ -1208,6 +1208,9 @@ def test_join_url_rfc3986_examples(reference: str, expected: str) -> None:
         ("https://example.com/a/", "ftp://other.example/x"),
         ("https://example.com/a/b?q=1", "?"),
         ("https://example.com/a/b?q=1#f", "#"),
+        ("https://example.com/a/", " //other.example/x"),
+        ("https://example.com/a/", "\t//other.example/x"),
+        ("https://example.com/a/", "\n//other.example/x"),
     ],
 )
 def test_join_url_matches_urljoin_outside_relative_merges(
@@ -1218,3 +1221,30 @@ def test_join_url_matches_urljoin_outside_relative_merges(
     from markitdown.converters._rss_converter import _join_url
 
     assert _join_url(base, reference) == urljoin(base, reference)
+
+
+@pytest.mark.parametrize("prefix", [" ", "\t", "\n"])
+def test_rss_keeps_authority_of_whitespace_prefixed_network_path(
+    prefix: str,
+) -> None:
+    import io
+
+    from markitdown import MarkItDown, StreamInfo
+
+    feed = f"""<?xml version="1.0"?>
+<rss version="2.0"><channel><title>T</title>
+<link>https://feeds.example.org/news/</link>
+<item><title>I</title>
+<description><![CDATA[<a href="{prefix}//cdn.example.org/book">Book</a>
+<img src="{prefix}//cdn.example.org/cover.png" alt="Cover">]]></description>
+</item></channel></rss>"""
+    result = MarkItDown().convert_stream(
+        io.BytesIO(feed.encode()),
+        stream_info=StreamInfo(
+            extension=".xml", url="https://feeds.example.org/news/feed.xml"
+        ),
+    )
+    assert "https://cdn.example.org/book" in result.markdown
+    assert "https://cdn.example.org/cover.png" in result.markdown
+    assert "feeds.example.org/book" not in result.markdown
+    assert "feeds.example.org/cover.png" not in result.markdown

@@ -91,7 +91,7 @@ def _join_url(base_url: str, reference: str) -> str:
         or base.scheme not in uses_relative
         or base.scheme not in uses_netloc
         or (ref.scheme and (ref.scheme != base.scheme or ref.netloc))
-        or reference.startswith("//")
+        or ref.netloc
     ):
         return urljoin(base_url, reference)
 
