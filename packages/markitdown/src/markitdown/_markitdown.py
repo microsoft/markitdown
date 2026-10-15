@@ -98,7 +98,7 @@ def _read_charset_sample(file_stream: BinaryIO) -> bytes:
     return sample
 
 
-_FENCE_RE = re.compile(r"^(\s*)(`{3,}|~{3,})")
+_FENCE_RE = re.compile(r"^[ \t]*(`{3,}|~{3,})(.*)$")
 _HARD_BREAK_RE = re.compile(r" {2,}$")
 
 
@@ -114,17 +114,21 @@ def _normalize_markdown(text: str) -> str:
     pending_blank = False
     for line in lines:
         m = _FENCE_RE.match(line)
-        if m and (not in_fence or line.lstrip().startswith(fence_marker)):
-            if not in_fence:
-                in_fence = True
-                fence_marker = m.group(2)[:3]
-                pending_blank = False
-            else:
+        if in_fence:
+            if (
+                m
+                and m.group(1)[0] == fence_marker[0]
+                and len(m.group(1)) >= len(fence_marker)
+                and not m.group(2).strip()
+            ):
                 in_fence = False
                 fence_marker = ""
-            out.append(line.rstrip())
+            pending_blank = False
+            out.append(line)
             continue
-        if in_fence:
+        if m and (m.group(1)[0] == "~" or "`" not in m.group(2)):
+            in_fence = True
+            fence_marker = m.group(1)
             pending_blank = False
             out.append(line)
             continue
