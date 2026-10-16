@@ -8,6 +8,7 @@ from unittest.mock import Mock, create_autospec
 import zipfile
 
 import openpyxl
+import pandas
 from openpyxl.drawing.image import Image as SheetImage
 from openpyxl.drawing.spreadsheet_drawing import (
     AbsoluteAnchor,
@@ -269,7 +270,7 @@ def test_inherited_repairs_and_native_table_fixes_reach_ocr(
     service = _service()
     repair = Mock(wraps=_xlsx_converter._repair_sheetview_show_zeroes)
     monkeypatch.setattr(_xlsx_converter, "_repair_sheetview_show_zeroes", repair)
-    native_read = _xlsx_converter.pd.read_excel
+    native_read = pandas.read_excel
     calls = []
 
     def fixed_read(*args: Any, **kwargs: Any):
@@ -278,7 +279,7 @@ def test_inherited_repairs_and_native_table_fixes_reach_ocr(
         sheets["Cells"].iloc[0, 0] = "Future shared fix"
         return sheets
 
-    monkeypatch.setattr(_xlsx_converter.pd, "read_excel", fixed_read)
+    monkeypatch.setattr(pandas, "read_excel", fixed_read)
     result = _convert(XlsxConverterWithOCR(service), stream.getvalue())
     assert "Future shared fix" in result and "<native>" not in result
     assert result.count("[Image OCR]") == 2

@@ -2,6 +2,8 @@
 
 import inspect
 import io
+import subprocess
+import sys
 import zipfile
 from pathlib import Path
 from typing import Any, BinaryIO, Callable, Optional
@@ -9,6 +11,7 @@ from unittest.mock import Mock
 from xml.etree import ElementTree as ET
 
 import openpyxl
+import pandas
 import pytest
 from PIL import Image
 from bs4 import BeautifulSoup
@@ -241,8 +244,8 @@ def test_default_converter_does_not_parse_images_or_change_native_output(
     monkeypatch.setattr(
         _xlsx_images, "_XlsxImages", Mock(side_effect=AssertionError("extra parsing"))
     )
-    reader = Mock(wraps=_xlsx_converter.pd.read_excel)
-    monkeypatch.setattr(_xlsx_converter.pd, "read_excel", reader)
+    reader = Mock(wraps=pandas.read_excel)
+    monkeypatch.setattr(pandas, "read_excel", reader)
 
     class NativeSubclass(XlsxConverter):
         pass
@@ -333,7 +336,7 @@ def test_native_table_failure_is_not_silently_skipped(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     error = TypeError("not the repairable error")
-    monkeypatch.setattr(_xlsx_converter.pd, "read_excel", Mock(side_effect=error))
+    monkeypatch.setattr(pandas, "read_excel", Mock(side_effect=error))
     render = Mock(return_value="<p>recognized</p>")
     with pytest.raises(TypeError) as caught:
         _convert(_ImageConverter(render), _workbook())
@@ -453,10 +456,7 @@ def test_missing_dependencies_and_legacy_xls_stay_separate(
     data = (Path(__file__).parent / "test_files" / "test.xls").read_bytes()
     legacy = XlsConverter()
     expected = legacy.convert(io.BytesIO(data), StreamInfo(extension=".xls")).markdown
-    dependency = ImportError("openpyxl unavailable")
-    monkeypatch.setattr(
-        _xlsx_converter, "_xlsx_dependency_exc_info", (ImportError, dependency, None)
-    )
+    monkeypatch.setitem(sys.modules, "openpyxl", None)
     with pytest.raises(MissingDependencyException, match=r"\[xlsx\]"):
         XlsxConverter().convert(io.BytesIO(), _INFO)
     assert not hasattr(legacy, "_image_to_html")
@@ -465,6 +465,17 @@ def test_missing_dependencies_and_legacy_xls_stay_separate(
         legacy.convert(io.BytesIO(data), StreamInfo(extension=".xls")).markdown
         == expected
     )
+
+
+def test_pandas_is_imported_only_for_spreadsheets() -> None:
+    code = (
+        "import sys, markitdown; markitdown.MarkItDown(); "
+        "print(sorted({'pandas', 'openpyxl', 'xlrd'} & set(sys.modules)))"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, check=True
+    )
+    assert result.stdout.strip() == "[]"
 
 
 # Conversion regressions
