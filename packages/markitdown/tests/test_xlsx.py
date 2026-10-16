@@ -569,6 +569,29 @@ def test_xlsx_text_cells_that_look_numeric_stay_text() -> None:
     ]
 
 
+def test_xlsx_missing_value_markers_are_unchanged() -> None:
+    # Keeping numeric-looking text does not change pandas' NA markers: these
+    # cells were missing before and still are, next to text that is kept.
+    markdown = _convert_rows(
+        [
+            ["zip", "marker"],
+            ["02134", "NA"],
+            ["00501", "N/A"],
+            ["00601", "NULL"],
+            ["00701", "nan"],
+            ["00801", "kept"],
+        ]
+    )
+
+    assert markdown.splitlines()[-5:] == [
+        "| 02134 | NaN |",
+        "| 00501 | NaN |",
+        "| 00601 | NaN |",
+        "| 00701 | NaN |",
+        "| 00801 | kept |",
+    ]
+
+
 def test_xlsx_numeric_cells_render_as_before() -> None:
     markdown = _convert_rows(
         [

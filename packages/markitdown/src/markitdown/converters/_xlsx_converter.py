@@ -51,6 +51,9 @@ def _read_excel_sheets(stream: BinaryIO, engine: str) -> dict[str, Any]:
     ZIP code "02134" becomes 2134 and "+15551234" becomes 15551234. Reading as
     object keeps the value each cell holds; infer_objects() then restores the
     usual column dtypes for genuinely numeric, boolean and date columns.
+
+    pandas' missing-value markers are unchanged: text such as "NA", "N/A",
+    "NULL" or "nan" in a data cell is still read as missing, as before.
     """
     start_pos = stream.tell()
     sheets = pd.read_excel(stream, sheet_name=None, engine=engine, dtype=object)
