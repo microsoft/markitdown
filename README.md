@@ -304,6 +304,28 @@ docker build -t markitdown:latest .
 docker run --rm -i markitdown:latest < ~/your-file.pdf > output.md
 ```
 
+## Related Projects
+
+Community projects built on MarkItDown or compatible with its API. They are maintained by their authors, not by Microsoft, and are listed to help people find them. A listing is not an endorsement. Plugins are listed separately under the [`#markitdown-plugin`](https://github.com/topics/markitdown-plugin) topic.
+
+**Apps**
+
+- [doc2md.cn](https://doc2md.cn): web page for uploading a file, previewing the Markdown, and downloading it.
+- [MDFlux](https://github.com/ibrahimqureshae/mdflux): local desktop app that adds OCR for scanned PDFs, batch folders, and cleanup modes.
+- [MdPipe](https://github.com/gdols/mdpipe): single-file Windows app and CLI; drag files or folders onto it to get Markdown next to each one.
+
+**Workflows and integrations**
+
+- [claude-markitdown-hook](https://github.com/AndrewAvery7/claude-markitdown-hook): Claude Code hook that converts documents referenced in a prompt so the model reads Markdown instead of page images.
+- [FolioQueue](https://github.com/GokouRuri43/folioqueue): keeps a Markdown copy of a document folder up to date, re-converting only changed files and resuming after interruptions.
+
+**Forks and compatible implementations**
+
+- [docling.rs](https://github.com/docling-project/docling.rs): Rust document converter whose Python package implements the MarkItDown API. It is not built on MarkItDown.
+- [MarkItDown 2Ways](https://github.com/Nolane-x/markitdown-2ways): fork that adds editing documents and writing them back to their original format.
+
+To suggest a project, open a pull request that adds one line to this section.
+
 ## Contributing
 
 Before starting significant work, please read [What to Contribute](#what-to-contribute), which describes what is in and out of scope for this repository.
