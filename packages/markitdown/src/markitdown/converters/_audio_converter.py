@@ -99,6 +99,7 @@ class AudioConverter(DocumentConverter):
                     audio_format=audio_format,
                     language=language,
                     client=kwargs.get("llm_client"),
+                    model=kwargs.get("audio_model", "whisper-1"),
                 )
                 if transcript:
                     md_content += "\n\n### Audio Transcript:\n" + transcript

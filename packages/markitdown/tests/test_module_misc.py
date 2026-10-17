@@ -981,3 +981,69 @@ def test_selected_audio_client_receives_original_encoded_format(
         audio_format, f"audio/{audio_format}"
     )
     audio_provider_mocks.recognize_google.assert_not_called()
+
+
+@pytest.mark.parametrize("legacy_dependencies", [True, False])
+def test_audio_chat_only_client_preserves_legacy_behavior(
+    audio_provider_mocks, monkeypatch, legacy_dependencies
+):
+    from markitdown.converters import _transcribe_audio
+
+    if not legacy_dependencies:
+        monkeypatch.setattr(
+            _transcribe_audio,
+            "_dependency_exc_info",
+            (ImportError, ImportError("legacy dependencies absent"), None),
+        )
+    result = convert_mock_wav(SimpleNamespace(chat=object()), language="fr-FR")
+    if legacy_dependencies:
+        assert "legacy Google transcript" in result.markdown
+        audio_provider_mocks.recognize_google.assert_called_once()
+        assert audio_provider_mocks.recognize_google.call_args.kwargs == {
+            "language": "fr-FR"
+        }
+    else:
+        assert "Audio Transcript" not in result.markdown
+        audio_provider_mocks.recognize_google.assert_not_called()
+
+
+def test_audio_noncallable_endpoint_preserves_legacy_behavior(audio_provider_mocks):
+    client = SimpleNamespace(
+        audio=SimpleNamespace(transcriptions=SimpleNamespace(create=None))
+    )
+    assert "legacy Google transcript" in convert_mock_wav(client).markdown
+    audio_provider_mocks.recognize_google.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "constructor_model, conversion_model, expected_model",
+    [
+        ("azure-speech", None, "azure-speech"),
+        ("azure-speech", "override-speech", "override-speech"),
+        (None, "override-speech", "override-speech"),
+        (None, None, "whisper-1"),
+    ],
+)
+def test_audio_model_is_separate_from_image_model(
+    audio_provider_mocks, constructor_model, conversion_model, expected_model
+):
+    client = MagicMock()
+    client.audio.transcriptions.create.return_value.text = "selected transcript"
+    constructor_options = (
+        {} if constructor_model is None else {"audio_model": constructor_model}
+    )
+    conversion_options = (
+        {} if conversion_model is None else {"audio_model": conversion_model}
+    )
+    md = MarkItDown(llm_client=client, llm_model="image-model", **constructor_options)
+    result = md.convert_stream(
+        io.BytesIO((Path(TEST_FILES_DIR) / "test.wav").read_bytes()),
+        stream_info=StreamInfo(extension=".wav", mimetype="audio/x-wav"),
+        **conversion_options,
+    )
+    assert "selected transcript" in result.markdown
+    client.audio.transcriptions.create.assert_called_once()
+    assert (
+        client.audio.transcriptions.create.call_args.kwargs["model"] == expected_model
+    )
+    audio_provider_mocks.recognize_google.assert_not_called()

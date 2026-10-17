@@ -299,17 +299,28 @@ If any attempt succeeds, image conversion continues normally. If the client rais
 
 ### Audio transcription provider
 
-For the built-in audio converter, supplying `llm_client` selects that client's
-OpenAI-compatible `audio.transcriptions.create` endpoint with model `whisper-1`.
-The client must support audio transcription. Original encoded audio is uploaded
-with its matching filename and media type; this path does not require local
-decoding or the legacy Google dependencies. Provider errors propagate; a selected
-client's recording is never retried through Google. Transcript headings stay generic.
+The built-in audio converter uses `llm_client` for transcription when the client
+exposes a callable `audio.transcriptions.create` endpoint. Original encoded audio
+is uploaded with its matching filename and media type; this path does not require
+local decoding or the legacy Google dependencies. Once that endpoint is selected,
+provider errors propagate without retrying the recording through Google.
 
-Without a client, the legacy SpeechRecognition Google service remains the default
-and receives the recording using its generic API key. This behavior is preserved
-for compatibility; callers requiring a particular provider should supply its client.
-The `language` hint continues to apply to the legacy Google path.
+Set `audio_model` to the transcription model or Azure deployment name; the default
+is `whisper-1`. It is separate from `llm_model`, which configures image descriptions.
+A conversion-level `audio_model` overrides the constructor setting:
+
+```python
+md = MarkItDown(llm_client=client, llm_model="image-model", audio_model="speech-deployment")
+result = md.convert("recording.wav", audio_model="another-speech-deployment")
+```
+
+Without a transcription-capable client (including a chat-only client), the legacy
+SpeechRecognition Google service remains the default and receives the recording
+using its generic API key when the optional audio dependencies are installed.
+Without those dependencies, legacy transcription is skipped. This preserves
+existing image-only client usage. The `language` hint applies to the legacy Google
+path. Callers requiring a particular provider should supply a client with the audio
+endpoint and the corresponding transcription model or deployment name.
 
 ### Docker
 

@@ -32,14 +32,18 @@ def transcribe_audio(
     audio_format: str = "wav",
     language: str = "en-US",
     client: Any = None,
+    model: str = "whisper-1",
 ) -> str:
-    if client is not None:
+    create_transcription = getattr(
+        getattr(getattr(client, "audio", None), "transcriptions", None), "create", None
+    )
+    if callable(create_transcription):
         # An explicit provider stays selected, including on authentication/network
         # errors. Upload the original encoding with its filename and media type;
         # this path does not need the legacy Google or local decoder dependencies.
         media_type = {"mp3": "audio/mpeg"}.get(audio_format, f"audio/{audio_format}")
-        transcription = client.audio.transcriptions.create(
-            model="whisper-1",
+        transcription = create_transcription(
+            model=model,
             file=(f"audio.{audio_format}", file_stream, media_type),
         )
         transcript = transcription.text.strip()
