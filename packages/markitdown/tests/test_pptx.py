@@ -795,6 +795,20 @@ def test_pptx_soft_line_breaks_are_not_vertical_tabs() -> None:
 
     slide.notes_slide.notes_text_frame.text = "NOTE LINE ONE\vNOTE LINE TWO"
 
+    chart_data = CategoryChartData()
+    chart_data.categories = ["Q1", "Q2"]
+    chart_data.add_series("Sales", (1, 2))
+    chart = slide.shapes.add_chart(
+        XL_CHART_TYPE.COLUMN_CLUSTERED,
+        Inches(0.5),
+        Inches(5),
+        Inches(4),
+        Inches(2),
+        chart_data,
+    ).chart
+    chart.has_title = True
+    chart.chart_title.text_frame.text = "CHART LINE ONE\vCHART LINE TWO"
+
     buffer = io.BytesIO()
     presentation.save(buffer)
     buffer.seek(0)
@@ -809,6 +823,7 @@ def test_pptx_soft_line_breaks_are_not_vertical_tabs() -> None:
     # A heading and a table row cannot carry a newline, so those collapse to a
     # space and the row stays one row.
     assert "# TITLE ONE TITLE TWO" in md
+    assert "### Chart: CHART LINE ONE CHART LINE TWO" in md
     assert "| CELL LINE ONE CELL LINE TWO | C2 |" in md
     assert "| HEADER A HEADER B | H2 |" in md
 

@@ -349,7 +349,9 @@ class PptxConverter(DocumentConverter):
             # None. has_text_frame is the property that actually reflects
             # whether a text frame exists.
             if chart.has_title and chart.chart_title.has_text_frame:
-                md += f": {_normalize_soft_line_breaks(chart.chart_title.text_frame.text)}"
+                # A heading is one line, as for the slide title.
+                title = _normalize_soft_line_breaks(chart.chart_title.text_frame.text)
+                md += f": {title.replace(chr(10), ' ').strip()}"
             md += "\n\n"
             data = []
             category_names = [c.label for c in chart.plots[0].categories]
