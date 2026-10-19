@@ -15,7 +15,6 @@ from markitdown import FileConversionException, MarkItDown, StreamInfo
 from markitdown.converters import DocxConverter
 from markitdown.converters import _docx_converter
 import markitdown._markitdown as markitdown_module
-from markitdown_ocr import _plugin
 from markitdown_ocr._docx_converter_with_ocr import DocxConverterWithOCR
 from markitdown_ocr._ocr_service import OCRResult
 
@@ -82,10 +81,7 @@ def test_docx_ocr_is_a_thin_subclass() -> None:
 
 
 def test_plugin_registration_full_trip(monkeypatch: pytest.MonkeyPatch) -> None:
-    entry_point = Mock()
-    entry_point.load.return_value = _plugin
-    entry_points = Mock(return_value=[entry_point])
-    monkeypatch.setattr(markitdown_module, "entry_points", entry_points)
+    # Reset the cache so discovery reads the installed package entry points.
     monkeypatch.setattr(markitdown_module, "_plugins", None)
     client = Mock()
     client.chat.completions.create.return_value.choices = [
@@ -111,7 +107,6 @@ def test_plugin_registration_full_trip(monkeypatch: pytest.MonkeyPatch) -> None:
         "*[Image OCR]\nRecognized\\_text\n[End OCR]*\n\n"
         "After\n\n**Native content**"
     )
-    entry_points.assert_called_once_with(group="markitdown.plugin")
     client.chat.completions.create.assert_called_once()
     request = client.chat.completions.create.call_args.kwargs
     assert request["model"] == "vision-model"

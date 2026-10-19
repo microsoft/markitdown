@@ -1,12 +1,17 @@
+"""YouTube URL handling, metadata, transcripts, and HTML fallback."""
+
 import io
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 
+import markitdown.converters._youtube_converter as youtube_module
 from markitdown import MarkItDown, StreamInfo
 from markitdown.converters import HtmlConverter, YouTubeConverter
-import markitdown.converters._youtube_converter as youtube_module
+
+
+# Extraction and fallback
 
 
 @pytest.fixture
@@ -166,3 +171,82 @@ def test_youtube_preserves_library_transcript(
     )
     transcript_api.return_value.list.assert_called_once_with("12345")
     transcript_api.return_value.fetch.assert_called_once_with("12345", languages=["fr"])
+
+
+# Conversion regressions
+
+
+@pytest.mark.parametrize(
+    ("url", "video_id"),
+    [
+        ("https://www.youtube.com/watch?v=V2qZ_lgxTzg", "V2qZ_lgxTzg"),
+        ("https://youtu.be/V2qZ_lgxTzg", "V2qZ_lgxTzg"),
+        ("https://www.youtube.com/shorts/V2qZ_lgxTzg", "V2qZ_lgxTzg"),
+        ("https://www.youtube.com/embed/V2qZ_lgxTzg", "V2qZ_lgxTzg"),
+    ],
+)
+def test_youtube_converter_extracts_supported_video_ids(
+    url: str, video_id: str
+) -> None:
+    converter = YouTubeConverter()
+    assert converter._get_video_id(url) == video_id
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://www.youtube.com/watch?v=V2qZ_lgxTzg",
+        "https://youtu.be/V2qZ_lgxTzg",
+        "https://www.youtube.com/shorts/V2qZ_lgxTzg",
+    ],
+)
+def test_youtube_converter_accepts_supported_url_formats(url: str) -> None:
+    converter = YouTubeConverter()
+    assert converter.accepts(
+        io.BytesIO(b"<html></html>"),
+        StreamInfo(url=url, extension=".html"),
+    )
+
+
+def test_youtube_converter_missing_title_metadata() -> None:
+    """Missing titles fall back to HTML when no video content is extracted."""
+    from unittest.mock import patch
+    from markitdown.converters._youtube_converter import YouTubeConverter
+
+    converter = YouTubeConverter()
+    stream_info = StreamInfo(
+        mimetype="text/html",
+        extension=".html",
+        url="https://www.youtube.com/watch?v=12345",
+    )
+
+    with patch(
+        "markitdown.converters._youtube_converter.IS_YOUTUBE_TRANSCRIPT_CAPABLE",
+        False,
+    ):
+        # Case 1: Stream with no title metadata or title tag
+        html_content_no_title = b"<html><head></head><body>Video Content</body></html>"
+        stream_no_title = io.BytesIO(html_content_no_title)
+        result_no_title = converter.convert(stream_no_title, stream_info)
+        assert result_no_title.title is None
+        assert result_no_title.markdown == "Video Content"
+
+        # Case 2: Stream with an empty <title> tag
+        html_content_empty_title = (
+            b"<html><head><title></title></head><body>Video Content</body></html>"
+        )
+        stream_empty_title = io.BytesIO(html_content_empty_title)
+        result_empty_title = converter.convert(stream_empty_title, stream_info)
+        assert result_empty_title.title is None
+        assert result_empty_title.markdown == "Video Content"
+
+        # Case 3: Stream whose title is only available from the <title> tag
+        html_content_title_tag = b"<html><head><title>Fallback Title</title></head><body>Video Content</body></html>"
+        stream_title_tag = io.BytesIO(html_content_title_tag)
+        result_title_tag = converter.convert(stream_title_tag, stream_info)
+        assert result_title_tag.title == "Fallback Title"
+        assert result_title_tag.markdown == "# YouTube\n\n## Fallback Title\n"
+
+
+if __name__ == "__main__":
+    raise SystemExit(pytest.main([__file__]))
