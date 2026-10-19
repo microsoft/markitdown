@@ -149,6 +149,13 @@ class XlsxConverter(DocumentConverter):
                 images = _XlsxImages(workbook_stream)
 
             for s in sheets:
+                # A worksheet with no columns has no header row either; rendering it would
+                # emit a heading followed by a one-column "table" with no delimiter row
+                # (`|\n|  |`), which is not valid Markdown. Skip it instead. A sheet that
+                # has columns but no data rows already renders a well-formed empty table,
+                # so it keeps its heading.
+                if sheets[s].columns.empty:
+                    continue
                 md_content += f"## {s}\n"
                 html_content = sheets[s].to_html(index=False)
                 md_content += (
@@ -240,6 +247,10 @@ class XlsConverter(DocumentConverter):
         sheets = pd.read_excel(file_stream, sheet_name=None, engine="xlrd")
         md_content = ""
         for s in sheets:
+            # Same rule as the XLSX path: a sheet with no columns has no header row, so
+            # rendering it would emit a heading followed by broken table syntax.
+            if sheets[s].columns.empty:
+                continue
             md_content += f"## {s}\n"
             html_content = sheets[s].to_html(index=False)
             md_content += (

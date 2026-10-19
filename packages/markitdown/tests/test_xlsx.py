@@ -543,3 +543,53 @@ def test_xlsx_show_zeroes_rename_is_scoped_to_sheet_view_tags() -> None:
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
+
+
+# Worksheets with no columns
+
+
+def _workbook_with(sheets: list[tuple[str, list[list[Any]]]]) -> bytes:
+    workbook = openpyxl.Workbook()
+    workbook.remove(workbook.active)
+    for name, rows in sheets:
+        sheet = workbook.create_sheet(name)
+        for row in rows:
+            sheet.append(row)
+    stream = io.BytesIO()
+    workbook.save(stream)
+    return stream.getvalue()
+
+
+def test_completely_empty_sheet_is_skipped_instead_of_emitting_broken_table() -> None:
+    data = _workbook_with([("Empty", [])])
+
+    markdown = _convert(XlsxConverter(), data)
+
+    assert markdown == ""
+    assert "Empty" not in markdown
+    assert "|" not in markdown
+
+
+def test_sheet_with_a_header_but_no_data_rows_keeps_its_heading() -> None:
+    data = _workbook_with([("HeaderOnly", [["col"]])])
+
+    markdown = _convert(XlsxConverter(), data)
+
+    assert markdown == "## HeaderOnly\n| col |\n| --- |"
+
+
+def test_data_sheet_followed_by_an_empty_sheet() -> None:
+    data = _workbook_with([("HasData", [["col"], ["v"]]), ("Empty", [])])
+
+    markdown = _convert(XlsxConverter(), data)
+
+    assert markdown == "## HasData\n| col |\n| --- |\n| v |"
+    assert "Empty" not in markdown
+
+
+def test_empty_sheet_does_not_hide_the_next_sheet() -> None:
+    data = _workbook_with([("Empty", []), ("HasData", [["col"], ["v"]])])
+
+    markdown = _convert(XlsxConverter(), data)
+
+    assert markdown == "## HasData\n| col |\n| --- |\n| v |"
