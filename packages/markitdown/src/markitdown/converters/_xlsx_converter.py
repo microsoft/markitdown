@@ -149,30 +149,41 @@ class XlsxConverter(DocumentConverter):
                 images = _XlsxImages(workbook_stream)
 
             for s in sheets:
-                # A worksheet with no columns has no header row either; rendering it would
-                # emit a heading followed by a one-column "table" with no delimiter row
-                # (`|\n|  |`), which is not valid Markdown. Skip it instead. A sheet that
-                # has columns but no data rows already renders a well-formed empty table,
-                # so it keeps its heading.
-                if sheets[s].columns.empty:
-                    continue
-                md_content += f"## {s}\n"
-                html_content = sheets[s].to_html(index=False)
-                md_content += (
-                    self._html_converter.convert_string(
-                        html_content, **kwargs
-                    ).markdown.strip()
-                    + "\n\n"
-                )
+                # Build the sheet's two content channels separately: the cell table and
+                # any embedded images. A worksheet with no columns has no header row, so
+                # rendering its table would emit a heading followed by a one-column
+                # "table" with no delimiter row (`|\n|  |`), which is not valid Markdown.
+                # But that must not skip the image hook: an image-only worksheet (an
+                # embedded image and no cell values) still produces content through
+                # `_image_to_html`, and dropping it would lose that content silently.
+                table_md = ""
+                if not sheets[s].columns.empty:
+                    html_content = sheets[s].to_html(index=False)
+                    table_md = (
+                        self._html_converter.convert_string(
+                            html_content, **kwargs
+                        ).markdown.strip()
+                        + "\n\n"
+                    )
+                image_md = ""
                 if images is not None:
                     image_content = images.to_html(s, self._image_to_html, kwargs)
                     if image_content:
-                        md_content += (
+                        image_md = (
                             self._html_converter.convert_string(
                                 image_content, **kwargs
                             ).markdown.strip()
                             + "\n\n"
                         )
+
+                # Emit the heading only when the sheet actually produces content, so a
+                # genuinely empty sheet stays entirely absent rather than leaving a bare
+                # `## name` with nothing under it.
+                if not table_md and not image_md:
+                    continue
+                md_content += f"## {s}\n"
+                md_content += table_md
+                md_content += image_md
 
         return DocumentConverterResult(markdown=md_content.strip())
 

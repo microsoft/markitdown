@@ -593,3 +593,27 @@ def test_empty_sheet_does_not_hide_the_next_sheet() -> None:
     markdown = _convert(XlsxConverter(), data)
 
     assert markdown == "## HasData\n| col |\n| --- |\n| v |"
+
+
+def test_image_only_sheet_is_preserved_via_the_hook() -> None:
+    """An image-only worksheet (no cell values) must still reach the image hook.
+
+    `columns.empty` describes only the cell table; a sheet carrying an embedded
+    image and no data must not be skipped, or the `_image_to_html` output is lost.
+    """
+
+    def render(stream: BinaryIO, info: StreamInfo, **kwargs: Any) -> str:
+        return "<p>Quarterly revenue chart</p>"
+
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = "ChartOnly"
+    sheet.add_image(SheetImage(io.BytesIO(_RED)), "A1")
+    stream = io.BytesIO()
+    workbook.save(stream)
+    workbook.close()
+
+    markdown = _convert(_ImageConverter(render), stream.getvalue())
+
+    assert "Quarterly revenue chart" in markdown
+    assert "ChartOnly" in markdown
