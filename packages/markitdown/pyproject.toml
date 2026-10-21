@@ -28,7 +28,7 @@ dependencies = [
   "beautifulsoup4",
   "requests",
   "markdownify",
-  "magika~=0.6.1",
+  "magika>=0.6.1,<2",
   "charset-normalizer",
   "defusedxml",
 ]
