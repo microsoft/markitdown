@@ -22,7 +22,6 @@ from markitdown.converters._cu_converter import (
     _resolve_analyzer_modality,
 )
 
-
 # Content Understanding
 
 # ---------------------------------------------------------------------------
