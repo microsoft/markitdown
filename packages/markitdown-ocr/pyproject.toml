@@ -29,7 +29,7 @@ dependencies = [
   "pdfminer.six>=20251230",
   "pdfplumber>=0.11.9",
   "PyMuPDF>=1.24.0,<2",
-  "mammoth~=1.11.0",
+  "mammoth>=1.12.2,<2",
   "python-docx",
   "python-pptx",
   "pandas",
