@@ -34,7 +34,7 @@ dependencies = [
   "python-pptx",
   "pandas",
   "openpyxl",
-  "Pillow>=9.0.0",
+  "Pillow>=12.1.1",
 ]
 
 # llm_client is passed in by the user (same as for markitdown image descriptions);

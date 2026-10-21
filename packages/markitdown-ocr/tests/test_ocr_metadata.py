@@ -13,7 +13,6 @@ from markitdown_ocr._ocr_service import OCRResult, _extract_text_with_metadata
 from markitdown_ocr._pptx_converter_with_ocr import PptxConverterWithOCR
 from markitdown_ocr._xlsx_converter_with_ocr import XlsxConverterWithOCR
 
-
 _Converter = DocxConverterWithOCR | PptxConverterWithOCR | XlsxConverterWithOCR
 _CONVERTERS = [DocxConverterWithOCR, PptxConverterWithOCR, XlsxConverterWithOCR]
 _SVG = b'<svg xmlns="http://www.w3.org/2000/svg"><text>recognized</text></svg>'

@@ -13,7 +13,6 @@ from markitdown import __version__
 from markitdown.__main__ import main
 from markitdown.converters._cu_converter import ContentUnderstandingFileType
 
-
 # CLI behavior
 
 # This file contains CLI tests that are not directly tested by the FileTestVectors.

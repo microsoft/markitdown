@@ -12,7 +12,6 @@ from markitdown.converters._pdf_converter import (
     _merge_partial_numbering_lines,
 )
 
-
 # Table extraction
 
 TEST_FILES_DIR = os.path.join(os.path.dirname(__file__), "test_files")
