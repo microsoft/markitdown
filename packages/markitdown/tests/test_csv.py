@@ -111,6 +111,12 @@ def test_csv_utf8_bom_is_stripped_from_the_header() -> None:
     assert "| Alice | 30 |" in result
 
 
+def test_csv_cp1252_is_decoded_when_detection_has_no_confidence() -> None:
+    result = _convert_csv(b"name,value\nCaf\xe9,cr\xe8me\n")
+
+    assert "| Caf\xe9 | cr\xe8me |" in result
+
+
 def test_csv_utf8_bom_is_stripped_when_charset_is_known() -> None:
     result = _convert_csv(b"\xef\xbb\xbfname,age\nAlice,30\n", charset="utf-8")
 

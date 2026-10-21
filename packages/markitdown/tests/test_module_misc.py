@@ -246,6 +246,15 @@ def test_convert_case_insensitive_uri_schemes(tmp_path) -> None:
     assert path == expected_path
 
 
+def test_plain_text_cp1252_is_decoded_when_detection_has_no_confidence() -> None:
+    result = MarkItDown(enable_plugins=False).convert_stream(
+        io.BytesIO(b"Caf\xe9 cr\xe8me"),
+        stream_info=StreamInfo(extension=".txt"),
+    )
+
+    assert result.markdown == "Caf\xe9 cr\xe8me"
+
+
 def test_file_uri_with_percent_encoded_windows_drive(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

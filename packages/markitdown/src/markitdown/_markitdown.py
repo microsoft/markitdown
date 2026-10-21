@@ -20,6 +20,7 @@ import codecs
 
 from ._stream_info import StreamInfo
 from ._uri_utils import parse_data_uri, file_uri_to_path
+from .converter_utils._text import detect_charset
 
 from .converters import (
     PlainTextConverter,
@@ -770,10 +771,7 @@ class MarkItDown:
                     # Complete a split UTF-8 character at the sample boundary.
                     file_stream.seek(cur_pos)
                     stream_page = _read_charset_sample(file_stream)
-                    charset_result = charset_normalizer.from_bytes(stream_page).best()
-
-                    if charset_result is not None:
-                        charset = self._normalize_charset(charset_result.encoding)
+                    charset = self._normalize_charset(detect_charset(stream_page))
 
                 # Normalize the first extension listed
                 guessed_extension = None
