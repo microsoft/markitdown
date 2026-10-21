@@ -470,6 +470,43 @@ def test_missing_dependencies_and_legacy_xls_stay_separate(
 # Conversion regressions
 
 
+@pytest.mark.parametrize("cached_value", ["0", "3", "77"])
+def test_xlsx_formulas_use_saved_results_without_recalculation(
+    cached_value: str,
+) -> None:
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.append(["Label", "Result"])
+    sheet.append(["formula", "=1+2"])
+    source = io.BytesIO()
+    workbook.save(source)
+    workbook.close()
+
+    # openpyxl writes formulas but does not calculate/cache their results.
+    # Set the stored result explicitly, including zero and a stale result.
+    def cache_result(name: str, data: bytes) -> bytes:
+        if name != "xl/worksheets/sheet1.xml":
+            return data
+        root = ET.fromstring(data)
+        ns = {"s": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+        cell = root.find(".//s:c[@r='B2']", ns)
+        assert cell is not None
+        formula = cell.find("s:f", ns)
+        value = cell.find("s:v", ns)
+        assert formula is not None and formula.text == "1+2"
+        assert value is not None
+        value.text = cached_value
+        return ET.tostring(root, encoding="utf-8")
+
+    data = _rewrite(source.getvalue(), cache_result)
+    result = MarkItDown(enable_plugins=False).convert_stream(
+        io.BytesIO(data), stream_info=_INFO
+    )
+
+    assert f"| formula | {cached_value} |" in result.markdown
+    assert "1+2" not in result.markdown
+
+
 def test_xlsx_legacy_show_zeroes_sheetview(tmp_path) -> None:
     from openpyxl import Workbook
 
