@@ -43,6 +43,11 @@ def parse_data_uri(uri: str) -> Tuple[str | None, Dict[str, str], bytes]:
     if uri[:5].lower() != "data:":
         raise ValueError("Not a data URI")
 
+    # A raw '#' starts the URI fragment, which is not part of the data, so it
+    # is removed before parsing as the WHATWG Fetch standard does. Percent
+    # encoded characters such as %23 stay part of the payload.
+    uri = uri.partition("#")[0]
+
     header, _, data = uri.partition(",")
     if not _:
         raise ValueError("Malformed data URI, missing ',' separator")
