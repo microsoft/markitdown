@@ -26,6 +26,37 @@ from markitdown.converter_utils import _xlsx_images
 from markitdown.converters import XlsConverter, XlsxConverter, _xlsx_converter
 
 
+# Table cells
+
+
+def _convert_xlsx_dataframe(df) -> str:
+    pytest.importorskip("openpyxl")
+    pytest.importorskip("pandas")
+    import pandas as pd
+
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False)
+    buf.seek(0)
+    result = MarkItDown().convert_stream(buf, file_extension=".xlsx")
+    return result.markdown
+
+
+def test_xlsx_pipe_in_cell_is_escaped() -> None:
+    # Issue #2436: XLSX/XLS convert via HTML, so pipe escaping must apply there too.
+    pd = pytest.importorskip("pandas")
+    result = _convert_xlsx_dataframe(pd.DataFrame({"a": ["x|y"], "b": ["2"]}))
+
+    assert "| x\\|y | 2 |" in result
+
+
+def test_xlsx_pipe_in_header_is_escaped() -> None:
+    pd = pytest.importorskip("pandas")
+    result = _convert_xlsx_dataframe(pd.DataFrame({"a | b": [1], "c": [2]}))
+
+    assert "| a \\| b | c |" in result
+
+
 # Image hooks
 
 _INFO = StreamInfo(extension=".xlsx")

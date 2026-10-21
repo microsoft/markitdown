@@ -7,6 +7,22 @@ from urllib.parse import quote, urlparse, urlunparse
 
 _PERCENT_ENCODED_OCTET = re.compile(r"%[0-9A-Fa-f]{2}")
 
+# Matches a pipe together with the (possibly empty) run of backslashes in front
+# of it, so that run can be doubled before the pipe is escaped. Same rule as the
+# CSV converter (#2266 / #2464). The lookbehind avoids retrying from each
+# position inside a backslash run.
+_PIPE_ESCAPE_RE = re.compile(r"(?<!\\)(\\*)\|")
+
+
+def _escape_table_cell(value: str) -> str:
+    r"""Escape cell text so it is safe inside a Markdown table cell.
+
+    A pipe is a column separator, so it must be escaped.
+    Line breaks would end the row early, so they collapse to a single space.
+    """
+    value = _PIPE_ESCAPE_RE.sub(lambda m: m.group(1) * 2 + r"\|", value)
+    return value.replace("\r\n", " ").replace("\n", " ").replace("\r", " ")
+
 
 def _quote_path_preserving_percent_encoded_octets(path: str) -> str:
     """Quote a URL path while preserving existing %HH byte encodings."""
@@ -30,6 +46,7 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
     - Removing javascript hyperlinks.
     - Truncating images with large data:uri sources.
     - Ensuring URIs are properly escaped, and do not conflict with Markdown syntax
+    - Escaping pipes (and collapsing newlines) in table cells
     """
 
     def __init__(self, **options: Any):
@@ -142,6 +159,34 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
             src = src.split(",")[0] + "..."
 
         return "![%s](%s%s)" % (alt, src, title_part)
+
+    def convert_td(
+        self,
+        el: Any,
+        text: str,
+        parent_tags: Any = None,
+        **kwargs,
+    ) -> str:
+        """Escape pipes so cell data cannot split the Markdown table row."""
+        colspan = 1
+        colspan_attr = el.attrs.get("colspan") if el.attrs else None
+        if isinstance(colspan_attr, str) and colspan_attr.isdigit():
+            colspan = max(1, min(1000, int(colspan_attr)))
+        return " " + _escape_table_cell(text.strip()) + " |" * colspan
+
+    def convert_th(
+        self,
+        el: Any,
+        text: str,
+        parent_tags: Any = None,
+        **kwargs,
+    ) -> str:
+        """Escape pipes so header cell data cannot split the Markdown table row."""
+        colspan = 1
+        colspan_attr = el.attrs.get("colspan") if el.attrs else None
+        if isinstance(colspan_attr, str) and colspan_attr.isdigit():
+            colspan = max(1, min(1000, int(colspan_attr)))
+        return " " + _escape_table_cell(text.strip()) + " |" * colspan
 
     def convert_input(
         self,
