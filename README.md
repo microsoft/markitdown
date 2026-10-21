@@ -271,6 +271,19 @@ result = md.convert("test.xlsx")
 print(result.markdown)
 ```
 
+**Excel formulas:**
+
+The built-in `.xlsx` converter reads the formula results cached in the workbook;
+it does not evaluate formulas or include their expressions in the Markdown output.
+For example, a cell containing `=1+2` is converted using its saved result, not by
+calculating `1+2` during conversion.
+
+If a workbook was generated or edited without recalculating and saving it in a
+spreadsheet application, cached results can be missing or stale. Recalculate and
+save the workbook in Excel or another compatible spreadsheet application before
+conversion when current results are needed. Successfully converting a workbook
+does not verify that its formulas or cached results are correct.
+
 Document Intelligence conversion in Python:
 
 ```python
