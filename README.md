@@ -271,6 +271,13 @@ result = md.convert("test.xlsx")
 print(result.markdown)
 ```
 
+The built-in XLSX converter includes all worksheets by default. To exclude
+worksheets marked `hidden` or `veryHidden`, pass `include_hidden_sheets=False`:
+
+```python
+result = md.convert("test.xlsx", include_hidden_sheets=False)
+```
+
 Document Intelligence conversion in Python:
 
 ```python
