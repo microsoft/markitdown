@@ -174,5 +174,36 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         """Obsolete <strike> is still in the wild; treat it like <s>/<del>."""
         return self.convert_s(el, text, *args, **kwargs)  # type: ignore
 
+    def convert_colgroup(self, el, text, *args, **kwargs):
+        return ""
+
+    def convert_caption(self, el, text, parent_tags):
+        return text.strip() + "\n\n"
+
+    def convert_tr(self, el, text, parent_tags):
+        table = el.find_parent("table")
+        if table is None:
+            return super().convert_tr(el, text, parent_tags)
+        row = "|" + text + "\n"
+        if el is not table.find("tr"):
+            return row
+
+        cells = el.find_all(["td", "th"])
+        # Preserve markdownify's colspan bounds at the HTML input boundary.
+        columns = sum(
+            max(1, min(1000, int(cell["colspan"])))
+            if "colspan" in cell.attrs and cell["colspan"].isdigit()
+            else 1
+            for cell in cells
+        )
+        separator = "| " + " | ".join(["---"] * columns) + " |\n"
+        is_header = all(cell.name == "th" for cell in cells) or (
+            el.parent.name == "thead" and len(el.parent.find_all("tr")) == 1
+        )
+        if is_header or self.options["table_infer_header"]:
+            return row + separator
+        empty_header = "| " + " | ".join([""] * columns) + " |\n"
+        return empty_header + separator + row
+
     def convert_soup(self, soup: Any) -> str:
         return super().convert_soup(soup)  # type: ignore
