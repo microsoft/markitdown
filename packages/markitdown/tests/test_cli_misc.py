@@ -30,6 +30,24 @@ def test_version() -> None:
     assert __version__ in result.stdout, f"Version not found in output: {result.stdout}"
 
 
+def test_docintel_help_lists_features_and_charges() -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", "markitdown", "--help"],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, f"CLI exited with error: {result.stderr}"
+    help_text = " ".join(result.stdout.split())
+    assert (
+        "barcodes, formulas, keyValuePairs, languages, ocrHighResolution, and styleFont"
+        in help_text
+    )
+    assert "incur additional charges" in help_text
+    assert "No add-ons are enabled by default" in help_text
+    assert "billable Document Intelligence queryFields add-on" in help_text
+
+
 def test_invalid_flag() -> None:
     result = subprocess.run(
         [sys.executable, "-m", "markitdown", "--foobar"],
@@ -114,6 +132,54 @@ class TestCLIArgs:
             "argument -d/--use-docintel: not allowed with argument "
             "--use-cu/--use-content-understanding"
         ) in result.stderr, result.stderr
+
+    @pytest.mark.parametrize(
+        "raw_features, expected_features",
+        [
+            ("formulas,ocrHighResolution", ["formulas", "ocrHighResolution"]),
+            ("none", []),
+        ],
+    )
+    def test_use_docintel_wires_configuration(
+        self, monkeypatch, capsys, raw_features, expected_features
+    ):
+        import markitdown.__main__ as markitdown_cli
+
+        markitdown_instance = MagicMock()
+        markitdown_instance.convert.return_value.markdown = "converted"
+        markitdown_cls = MagicMock(return_value=markitdown_instance)
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            [
+                "markitdown",
+                "--use-docintel",
+                "--endpoint",
+                "https://fake-di",
+                "--docintel-model-id",
+                "prebuilt-read",
+                "--docintel-features",
+                raw_features,
+                "--docintel-query-fields",
+                "Title,Author",
+                "fake.pdf",
+            ],
+        )
+        monkeypatch.setattr(markitdown_cli, "MarkItDown", markitdown_cls)
+
+        markitdown_cli.main()
+
+        markitdown_cls.assert_called_once_with(
+            enable_plugins=False,
+            docintel_endpoint="https://fake-di",
+            docintel_model_id="prebuilt-read",
+            docintel_features=expected_features,
+            docintel_query_fields=["Title", "Author"],
+        )
+        markitdown_instance.convert.assert_called_once_with(
+            "fake.pdf", stream_info=None, keep_data_uris=False
+        )
+        assert capsys.readouterr().out == "converted\n"
 
     @pytest.mark.parametrize("raw", ["pdf,jpeg,wav", " , PDF, JPEG,, WAV, "])
     @pytest.mark.parametrize(
