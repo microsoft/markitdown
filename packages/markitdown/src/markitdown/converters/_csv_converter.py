@@ -2,7 +2,7 @@ import csv
 import io
 import re
 from typing import BinaryIO, Any
-from charset_normalizer import from_bytes
+from .._charset_utils import best_charset_match
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
 
@@ -88,7 +88,7 @@ class CsvConverter(DocumentConverter):
             content = file_stream.read().decode(stream_info.charset)
         else:
             data = file_stream.read()
-            detected = from_bytes(data).best()
+            detected = best_charset_match(data)
             content = (
                 str(detected)
                 if detected is not None
