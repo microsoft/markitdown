@@ -135,9 +135,9 @@ def test_pdf_complex_layout(svc: MockOCRService) -> None:
         "## Page 1\n\n\n"
         "Complex Layout Document\n\n"
         "Table:\n\n"
-        "ItemQuantity\n\n\n\n"
+        "Item Quantity\n\n\n\n"
         "*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*\n\n\n"
-        "Widget A5"
+        "Widget A 5"
     )
     assert _convert("pdf_complex_layout.pdf", svc) == expected
 
