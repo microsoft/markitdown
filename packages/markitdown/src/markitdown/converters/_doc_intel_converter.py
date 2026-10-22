@@ -212,13 +212,20 @@ def _yaml_scalar(value: Any) -> str:
         or s != s.strip()
         or s.lower() in ("null", "true", "false", "yes", "no", "on", "off", "y", "n")
     ):
-        # Escape backslashes and double quotes; collapse newlines.
+        # Escape backslashes, double quotes, and common whitespace characters.
         escaped = (
             s.replace("\\", "\\\\")
             .replace('"', '\\"')
             .replace("\n", "\\n")
             .replace("\r", "\\r")
             .replace("\t", "\\t")
+        )
+        # Quoting alone does not make YAML control characters valid. Escape
+        # those too, including Unicode line breaks that YAML would normalize.
+        escaped = re.sub(
+            r"[\x00-\x1f\x7f-\x9f\u2028\u2029\ud800-\udfff\ufffe\uffff]",
+            lambda match: f"\\u{ord(match.group()):04x}",
+            escaped,
         )
         return f'"{escaped}"'
     return s

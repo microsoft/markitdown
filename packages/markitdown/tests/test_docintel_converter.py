@@ -11,6 +11,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 import pytest
+import yaml
 from azure.ai.documentintelligence.models import AnalyzedDocument, DocumentField
 
 from markitdown._stream_info import StreamInfo
@@ -361,6 +362,45 @@ def test_fields_with_special_chars_are_quoted():
     fm = _fields_to_front_matter([doc])
     # Value contains both \n and ':' so it must be quoted.
     assert '  Note: "line1\\nline2: with colon"' in fm
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "page one\fpage two",
+        "back\bspace",
+        "null\x00byte",
+        "vertical\vtab",
+        "control\x1fend",
+        "delete\x7fcharacter",
+        "next\x85line",
+        "control\x9fend",
+        "line\u2028separator",
+        "paragraph\u2029separator",
+        "noncharacter\ufffe",
+        "noncharacter\uffff",
+        "tab\tnewline\nreturn\r",
+        'quote"backslash\\',
+        "café U0001f600",
+        "00123",
+        "[1, 2]",
+        "- pending",
+        "+12065550100",
+        "on",
+    ],
+)
+def test_front_matter_string_keys_and_values_round_trip(text):
+    doc = AnalyzedDocument(
+        doc_type="custom",
+        fields={text: DocumentField(type="string", value_string=text)},
+        spans=[],
+        confidence=1.0,
+    )
+
+    front_matter = _fields_to_front_matter([doc])
+    assert front_matter.startswith("---\n")
+    assert front_matter.endswith("---\n\n")
+    assert yaml.safe_load(front_matter[4:-5]) == {"fields": {text: text}}
 
 
 def test_yaml_dump_nested_dict():
