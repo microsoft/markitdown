@@ -1,6 +1,7 @@
 """CLI behavior outside the shared file-vector matrix."""
 
 import io
+from pathlib import Path
 import os
 import subprocess
 import sys
@@ -235,7 +236,7 @@ class TestCLIArgs:
                 "pdf,jpeg,mp4",
                 "fake.pdf",
             ],
-        ), patch.object(markitdown_cli, "MarkItDown", markitdown_cls):
+        ), patch("markitdown._markitdown.MarkItDown", markitdown_cls):
             markitdown_cli.main()
 
         markitdown_cls.assert_called_once_with(
@@ -272,8 +273,8 @@ class TestCLIArgs:
                 "--cu-endpoint",
                 "https://fake-cu",
             ],
-        ), patch.object(sys, "stdin", stdin), patch.object(
-            markitdown_cli, "MarkItDown", markitdown_cls
+        ), patch.object(sys, "stdin", stdin), patch(
+            "markitdown._markitdown.MarkItDown", markitdown_cls
         ):
             markitdown_cli.main()
 
@@ -319,7 +320,7 @@ class TestEndpointEnvVars:
         monkeypatch.setenv(env_var, "https://from-env")
         monkeypatch.setattr(sys, "argv", argv)
 
-        with patch("markitdown.__main__.MarkItDown") as mock_markitdown:
+        with patch("markitdown._markitdown.MarkItDown") as mock_markitdown:
             main()
 
         assert mock_markitdown.call_args.kwargs[kwarg] == "https://from-env"
@@ -341,7 +342,7 @@ class TestEndpointEnvVars:
             ],
         )
 
-        with patch("markitdown.__main__.MarkItDown") as mock_markitdown:
+        with patch("markitdown._markitdown.MarkItDown") as mock_markitdown:
             main()
 
         assert mock_markitdown.call_args.kwargs["cu_endpoint"] == "https://from-flag"
@@ -361,3 +362,35 @@ class TestEndpointEnvVars:
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
+
+
+# Startup without conversion dependencies
+
+
+@pytest.mark.parametrize("entrypoint", ["module", "console"])
+@pytest.mark.parametrize(
+    "args, returncode, expected",
+    [
+        (["--help"], 0, "Convert various file formats to markdown."),
+        (["--version"], 0, "markitdown "),
+        (["--foobar"], 2, "unrecognized arguments"),
+        (["--list-plugins"], 0, "Installed MarkItDown 3rd-party Plugins:"),
+    ],
+)
+def test_cli_without_conversion_dependencies(entrypoint, args, returncode, expected):
+    # -S excludes site-packages, including all conversion dependencies. Point at
+    # the source explicitly because editable installs also live in site-packages.
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(Path(__file__).resolve().parents[1] / "src")
+    if entrypoint == "module":
+        command = ["-m", "markitdown"]
+    else:
+        command = ["-c", "from markitdown.__main__ import main; main()"]
+    result = subprocess.run(
+        [sys.executable, "-S", *command, *args],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert result.returncode == returncode, result.stderr
+    assert expected in result.stdout + result.stderr

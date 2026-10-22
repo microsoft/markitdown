@@ -1,6 +1,9 @@
 """Library infrastructure, cross-format options, and remaining format regressions."""
 
 import io
+import subprocess
+import sys
+from textwrap import dedent
 import json
 import ntpath
 import os
@@ -877,3 +880,46 @@ def test_a_declared_charset_still_wins() -> None:
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
+
+
+# Lazy public imports
+
+
+def test_public_exports():
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            dedent(
+                """
+                import sys
+                import markitdown
+
+                assert "markitdown._markitdown" not in sys.modules
+                assert set(markitdown.__all__) <= set(dir(markitdown))
+                assert not hasattr(markitdown, "unknown_export")
+                assert "markitdown._markitdown" not in sys.modules
+
+                from markitdown import MarkItDown
+                from markitdown import _markitdown
+
+                assert MarkItDown is _markitdown.MarkItDown
+                assert vars(markitdown)["MarkItDown"] is MarkItDown
+
+                namespace = {}
+                exec("from markitdown import *", namespace)
+                for name in markitdown.__all__:
+                    assert namespace[name] is getattr(markitdown, name)
+                for name in (
+                    "PRIORITY_SPECIFIC_FILE_FORMAT",
+                    "PRIORITY_GENERIC_FILE_FORMAT",
+                ):
+                    assert namespace[name] is getattr(_markitdown, name)
+                    assert vars(markitdown)[name] is namespace[name]
+                """
+            ),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
