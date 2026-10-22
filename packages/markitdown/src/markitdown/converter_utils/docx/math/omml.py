@@ -15,6 +15,7 @@ from .latex_dict import (
     CHR_DEFAULT,
     POS,
     POS_DEFAULT,
+    BORDER_BOX,
     SUB,
     SUP,
     F,
@@ -223,6 +224,13 @@ class oMath2Latex(Tag2Method):
         latex_s = get_val(pr.pos, default=POS_DEFAULT.get("BAR_VAL"), store=POS)
         return pr.text + latex_s.format(c_dict["e"])
 
+    def do_borderbox(self, elm):
+        """
+        the Border-Box object
+        """
+        c_dict = self.process_children_dict(elm)
+        return BORDER_BOX.format(text=c_dict.get("e", BLANK))
+
     def do_d(self, elm):
         """
         the delimiter object
@@ -399,6 +407,7 @@ class oMath2Latex(Tag2Method):
         "acc": do_acc,
         "r": do_r,
         "bar": do_bar,
+        "borderBox": do_borderbox,
         "sub": do_sub,
         "sup": do_sup,
         "f": do_f,

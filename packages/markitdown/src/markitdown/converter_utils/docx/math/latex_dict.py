@@ -252,6 +252,8 @@ POS_DEFAULT = {
     "BAR_VAL": "\\overline{{{0}}}",
 }
 
+BORDER_BOX = "\\boxed{{{text}}}"
+
 SUB = "_{{{0}}}"
 
 SUP = "^{{{0}}}"
