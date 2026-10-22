@@ -122,6 +122,33 @@ def main():
     )
 
     parser.add_argument(
+        "--docintel-model-id",
+        type=str,
+        default=None,
+        help="Document Intelligence model ID (e.g., 'prebuilt-layout', 'prebuilt-invoice', or a custom model ID). Defaults to 'prebuilt-layout'.",
+    )
+
+    parser.add_argument(
+        "--docintel-query-fields",
+        type=str,
+        default=None,
+        help="Comma-separated list of field names to extract via the billable Document Intelligence queryFields add-on (OCR file types only).",
+    )
+
+    parser.add_argument(
+        "--docintel-features",
+        type=str,
+        default=None,
+        help=(
+            "Comma-separated Document Intelligence analysis add-ons for OCR file types. "
+            "Available values: barcodes, formulas, keyValuePairs, languages, "
+            "ocrHighResolution, and styleFont. The formulas, ocrHighResolution, and "
+            "styleFont incur additional charges. No add-ons are enabled by default; "
+            "use 'none' to explicitly request none."
+        ),
+    )
+
+    parser.add_argument(
         "-p",
         "--use-plugins",
         action="store_true",
@@ -211,9 +238,28 @@ def main():
         elif args.filename is None:
             _exit_with_error("Filename is required when using Document Intelligence.")
 
-        markitdown = MarkItDown(
-            enable_plugins=args.use_plugins, docintel_endpoint=args.endpoint
-        )
+        docintel_kwargs: Dict[str, Any] = {
+            "docintel_endpoint": args.endpoint,
+        }
+        if args.docintel_model_id:
+            docintel_kwargs["docintel_model_id"] = args.docintel_model_id
+        if args.docintel_features is not None:
+            if args.docintel_features.strip().lower() == "none":
+                docintel_kwargs["docintel_features"] = []
+            else:
+                docintel_kwargs["docintel_features"] = [
+                    feature.strip()
+                    for feature in args.docintel_features.split(",")
+                    if feature.strip()
+                ]
+        if args.docintel_query_fields:
+            fields = [
+                f.strip() for f in args.docintel_query_fields.split(",") if f.strip()
+            ]
+            if fields:
+                docintel_kwargs["docintel_query_fields"] = fields
+
+        markitdown = MarkItDown(enable_plugins=args.use_plugins, **docintel_kwargs)
     elif args.use_cu:
         if args.cu_endpoint is None:
             _exit_with_error(
