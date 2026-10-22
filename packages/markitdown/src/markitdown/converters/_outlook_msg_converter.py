@@ -75,6 +75,20 @@ CODEPAGE_CODECS = {
 }
 
 
+def _strip_terminators(text: str) -> str:
+    """Remove the NUL terminators or padding some writers append to a stream.
+
+    ``str.strip()`` keeps NULs, so a terminator survives it as a character. In
+    a UTF-16 stream that character is what the same two bytes produce in an
+    8-bit stream, which is why the bytes themselves cannot simply be stripped
+    the way ``_get_ansi_stream_data`` does: the last byte of a UTF-16 stream is
+    the high byte of its final character. Removal happens before the strip, so a
+    value that holds nothing but terminators reads as empty, exactly as it does
+    for a non-Unicode message.
+    """
+    return text.rstrip("\x00").strip()
+
+
 class OutlookMsgConverter(DocumentConverter):
     """Converts Outlook .msg files to markdown by extracting email metadata and content.
 
@@ -336,14 +350,14 @@ class OutlookMsgConverter(DocumentConverter):
                 data = msg.openstream(stream_path).read()
                 # Try UTF-16 first (common for .msg files)
                 try:
-                    return data.decode("utf-16-le").strip()
+                    return _strip_terminators(data.decode("utf-16-le"))
                 except UnicodeDecodeError:
                     # Fall back to UTF-8
                     try:
-                        return data.decode("utf-8").strip()
+                        return _strip_terminators(data.decode("utf-8"))
                     except UnicodeDecodeError:
                         # Last resort - ignore errors
-                        return data.decode("utf-8", errors="ignore").strip()
+                        return _strip_terminators(data.decode("utf-8", errors="ignore"))
         except Exception:
             pass
         return None
