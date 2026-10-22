@@ -531,6 +531,60 @@ def _docx(body: str = _BODY, *, embedded_style_map: Optional[str] = None) -> io.
     return stream
 
 
+def _docx_with_heading_levels() -> io.BytesIO:
+    """A docx whose paragraphs carry Heading 7/8/9 styles, for #2530."""
+    stream = io.BytesIO()
+    with zipfile.ZipFile(stream, "w") as archive:
+        archive.writestr(
+            "[Content_Types].xml",
+            """<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+  <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
+</Types>""",
+        )
+        archive.writestr(
+            "_rels/.rels",
+            """<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rIdDocument" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>""",
+        )
+        archive.writestr(
+            "word/styles.xml",
+            """<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:style w:type="paragraph" w:styleId="Heading7"><w:name w:val="Heading 7"/></w:style>
+  <w:style w:type="paragraph" w:styleId="Heading8"><w:name w:val="Heading 8"/></w:style>
+  <w:style w:type="paragraph" w:styleId="Heading9"><w:name w:val="Heading 9"/></w:style>
+</w:styles>""",
+        )
+        paragraphs = "".join(
+            f'<w:p><w:pPr><w:pStyle w:val="Heading{level}"/></w:pPr>'
+            f"<w:r><w:t>H{level}</w:t></w:r></w:p>"
+            for level in (7, 8, 9)
+        )
+        archive.writestr(
+            "word/document.xml",
+            f"""<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>{paragraphs}</w:body>
+</w:document>""",
+        )
+    stream.seek(0)
+    return stream
+
+
+def test_docx_headings_seven_to_nine_clamp_to_h6() -> None:
+    markdown = (
+        MarkItDown()
+        .convert_stream(_docx_with_heading_levels(), stream_info=_INFO)
+        .markdown
+    )
+
+    assert "###### H7" in markdown
+    assert "###### H8" in markdown
+    assert "###### H9" in markdown
+
+
 class _ImageConverter(DocxConverter):
     def __init__(self, render: Callable[..., Optional[str]]):
         super().__init__()
