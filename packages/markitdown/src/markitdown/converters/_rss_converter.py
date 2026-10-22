@@ -120,7 +120,7 @@ class RssConverter(DocumentConverter):
         try:
             doc = minidom.parse(file_stream)
             return self._feed_type(doc) is not None
-        except BaseException as _:
+        except Exception:
             pass
         finally:
             file_stream.seek(cur_pos)
@@ -357,7 +357,7 @@ class RssConverter(DocumentConverter):
                 stacklevel=2,
             )
             return BeautifulSoup(content, "html.parser").get_text("\n", strip=True)
-        except BaseException as _:
+        except Exception:
             return content
 
     def _get_field_base_url(self, element: Element, tag_name: str) -> str:
