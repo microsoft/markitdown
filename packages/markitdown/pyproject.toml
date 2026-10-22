@@ -27,8 +27,9 @@ classifiers = [
 dependencies = [
   "beautifulsoup4",
   "requests",
+  "certifi>=2026.10.19",
   "markdownify",
-  "magika~=0.6.1",
+  "magika>=0.6.1,<2",
   "charset-normalizer",
   "defusedxml",
 ]
@@ -36,7 +37,7 @@ dependencies = [
 [project.optional-dependencies]
 all = [
   "python-pptx",
-  "mammoth~=1.11.0",
+  "mammoth>=1.12.2,<2",
   "pandas",
   "openpyxl",
   "xlrd",
@@ -52,7 +53,7 @@ all = [
   "azure-identity",
 ]
 pptx = ["python-pptx"]
-docx = ["mammoth~=1.11.0", "lxml"]
+docx = ["mammoth>=1.12.2,<2", "lxml"]
 xlsx = ["pandas", "openpyxl"]
 xls = ["pandas", "xlrd"]
 pdf = ["pdfminer.six>=20251230", "pdfplumber>=0.11.9"]
