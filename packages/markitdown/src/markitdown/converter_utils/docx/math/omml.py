@@ -132,7 +132,7 @@ class Tag2Method(object):
 class Pr(Tag2Method):
     text = ""
 
-    __val_tags = ("chr", "pos", "begChr", "endChr", "type")
+    __val_tags = ("chr", "pos", "begChr", "endChr", "type", "sepChr")
 
     __innerdict = None  # can't use the __dict__
 
@@ -169,6 +169,7 @@ class Pr(Tag2Method):
         "begChr": do_common,
         "endChr": do_common,
         "type": do_common,
+        "sepChr": do_common,
     }
 
 
@@ -227,16 +228,36 @@ class oMath2Latex(Tag2Method):
         """
         the delimiter object
         """
-        c_dict = self.process_children_dict(elm)
-        pr = c_dict["dPr"]
+        c_dict = self.process_children_dict(elm, include=("dPr",))
+        pr = c_dict.get("dPr")
         null = D_DEFAULT.get("null")
-        s_val = get_char(pr.begChr, default=D_DEFAULT.get("left"), store=T)
-        e_val = get_char(pr.endChr, default=D_DEFAULT.get("right"), store=T)
-        return pr.text + D.format(
+        s_val = get_char(pr.begChr if pr else None, default=D_DEFAULT.get("left"), store=T)
+        e_val = get_char(pr.endChr if pr else None, default=D_DEFAULT.get("right"), store=T)
+        # Collect every <m:e> in document order; process_children_dict only
+        # keeps the last one, which drops arguments for multi-arg delimiters
+        # such as (a|b|c).
+        args = [t for stag, t, _e in self.process_children_list(elm, include=("e",))]
+        # sepChr is the separator character between arguments; Word defaults
+        # to a vertical bar "|". An explicitly empty m:val means "no
+        # separator". When absent fall back to | so single-arg delimiters
+        # produce the same output as before.
+        sep = "|"
+        if pr is not None and getattr(pr, "sepChr", None) is not None:
+            sep = pr.sepChr or ""
+        text = sep.join(args) if args else c_dict.get("e", "")
+        return (pr.text if pr else "") + D.format(
             left=null if not s_val else escape_latex(s_val),
-            text=c_dict["e"],
+            text=text,
             right=null if not e_val else escape_latex(e_val),
         )
+
+    def do_borderBox(self, elm):
+        """
+        the border-box object (boxed formula), rendered as \\boxed{}
+        """
+        c_dict = self.process_children_dict(elm)
+        pr = c_dict.get("borderBoxPr")
+        return (pr.text if pr else "") + "\\boxed{{{0}}}".format(c_dict.get("e", ""))
 
     def do_spre(self, elm):
         """
@@ -406,6 +427,7 @@ class oMath2Latex(Tag2Method):
         "fName": do_fname,
         "groupChr": do_groupchr,
         "d": do_d,
+        "borderBox": do_borderBox,
         "rad": do_rad,
         "eqArr": do_eqarr,
         "limLow": do_limlow,
