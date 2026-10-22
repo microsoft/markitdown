@@ -13,7 +13,7 @@ import pytest
 from bs4 import BeautifulSoup
 from lxml import etree
 from pptx import Presentation
-from pptx.chart.data import CategoryChartData
+from pptx.chart.data import CategoryChartData, XyChartData
 from pptx.enum.chart import XL_CHART_TYPE
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 from pptx.util import Inches
@@ -891,6 +891,66 @@ def test_pptx_chart_title_text_frame(title: str | None) -> None:
     stream.seek(0)
     markdown = converter.convert(stream, StreamInfo(extension=".pptx")).markdown
     assert result.strip() in markdown
+
+
+def _charts_with_gaps() -> list:
+    # A gap is a blank Excel cell: python-pptx writes no point for it.
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    category_data = CategoryChartData()
+    category_data.categories = ["Cat 1", "Cat 2", "Cat 3"]
+    category_data.add_series("Series 1", [10.0, None, 30.0])
+    xy_data = XyChartData()
+    xy_series = xy_data.add_series("XY 1")
+    for x, y in [(1.0, 5.0), (2.0, None), (3.0, 7.0)]:
+        xy_series.add_data_point(x, y)
+    for chart_type, data in [
+        (XL_CHART_TYPE.COLUMN_CLUSTERED, category_data),
+        (XL_CHART_TYPE.XY_SCATTER, xy_data),
+    ]:
+        slide.shapes.add_chart(
+            chart_type, Inches(1), Inches(1), Inches(5), Inches(3), data
+        )
+    stream = io.BytesIO()
+    presentation.save(stream)
+    stream.seek(0)
+    return [shape.chart for shape in Presentation(stream).slides[0].shapes]
+
+
+def test_series_values_match_python_pptx() -> None:
+    for chart in _charts_with_gaps():
+        for series in chart.series:
+            assert _pptx_converter._series_values(series) == series.values
+
+
+def test_chart_bound_to_whole_column_reads_points_once(monkeypatch) -> None:
+    # A series bound to a whole Excel column ($G:$G) declares 1,048,576
+    # points. Looking each one up with python-pptx's pt_v() takes hours.
+    def per_point_lookup(self, idx):
+        raise AssertionError("chart values were read one point at a time")
+
+    monkeypatch.setattr(
+        pptx.oxml.chart.series.CT_NumDataSource, "pt_v", per_point_lookup
+    )
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    data = CategoryChartData()
+    data.categories = ["Cat 1", "Cat 2", "Cat 3"]
+    data.add_series("Series 1", [10.0, 20.0, 30.0])
+    chart = slide.shapes.add_chart(
+        XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(1), Inches(1), Inches(5), Inches(3), data
+    ).chart
+    for count in chart._chartSpace.xpath(".//c:val//c:ptCount"):
+        count.set("val", "1048576")
+    stream = io.BytesIO()
+    presentation.save(stream)
+    stream.seek(0)
+
+    markdown = PptxConverter().convert(stream, StreamInfo(extension=".pptx")).markdown
+
+    assert "[unsupported chart]" not in markdown
+    assert "| Cat 1 | 10.0 |" in markdown
+    assert "| Cat 3 | 30.0 |" in markdown
 
 
 if __name__ == "__main__":

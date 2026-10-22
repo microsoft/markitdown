@@ -31,6 +31,31 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 ACCEPTED_FILE_EXTENSIONS = [".pptx"]
 
 
+def _series_values(series):
+    """Return the same tuple as ``series.values``, reading the points once.
+
+    python-pptx looks up each point with its own XPath search over the whole
+    series, so ``series.values`` is quadratic in the number of points. A
+    series bound to a whole Excel column declares 1,048,576 of them, which
+    takes hours to read that way.
+    """
+    try:
+        ser = series._element
+        source = ser.yVal if ser.yVal is not None else ser.val
+    except AttributeError:
+        return tuple(series.values)
+    if source is None:
+        return ()
+    points = {}
+    for pt in source.xpath(".//c:pt"):
+        points.setdefault(pt.idx, pt)
+    values = []
+    for idx in range(source.ptCount_val):
+        pt = points.get(idx)
+        values.append(None if pt is None else pt.value)
+    return tuple(values)
+
+
 class PptxConverter(DocumentConverter):
     """
     Converts PPTX files to Markdown. Supports heading, tables and images with alt text.
@@ -341,7 +366,7 @@ class PptxConverter(DocumentConverter):
             # Materialize each series' values once. Accessing series.values[idx]
             # inside the nested loop is O(n^2) in python-pptx (each lookup does an
             # XPath scan of all points), which is extremely slow on large charts.
-            series_values = [list(s.values) for s in series_list]
+            series_values = [_series_values(s) for s in series_list]
 
             for idx, category in enumerate(category_names):
                 row = [category]
