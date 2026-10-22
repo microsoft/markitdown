@@ -10,6 +10,63 @@ from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 # Pattern for MasterFormat-style partial numbering (e.g., ".1", ".2", ".10")
 PARTIAL_NUMBERING_PATTERN = re.compile(r"^\.\d+$")
 
+# Characters that legitimately end a sentence/clause. A paragraph break is
+# only treated as a genuine paragraph boundary if the preceding text ends
+# with one of these.
+_SENTENCE_END_CHARS = ".!?:;\"'”’"
+
+# Short lettered/numbered list markers (e.g. "a)", "(i)", "1.") that must
+# stay on their own paragraph even though they start with a lowercase letter.
+# No trailing whitespace is required after the marker, since PDF extraction
+# sometimes drops the space between a list marker and its text (e.g. "a)text").
+_LIST_MARKER_PATTERN = re.compile(r"^\(?[A-Za-z0-9]{1,4}[.)]")
+
+
+def _is_lowercase_continuation(para_stripped: str) -> bool:
+    """
+    True if `para_stripped` reads as a continuation of the previous sentence:
+    it starts (optionally after a single opening parenthesis) with a
+    lowercase letter, and isn't itself a list marker like "a)" or "(i)".
+    """
+    if not para_stripped or _LIST_MARKER_PATTERN.match(para_stripped):
+        return False
+
+    first_char = para_stripped[1:2] if para_stripped[0] == "(" else para_stripped[:1]
+    return first_char.islower()
+
+
+def _merge_wrapped_paragraph_breaks(text: str) -> str:
+    """
+    Post-process extracted text to merge paragraph breaks that PDF layout
+    analysis (pdfminer/pdfplumber) sometimes inserts in the middle of a
+    sentence because of small, spurious variations in line spacing.
+
+    A genuine paragraph never starts with a lowercase letter, so when a
+    blank-line-separated block starts with a lowercase word AND the previous
+    block doesn't end with sentence-ending punctuation, the "paragraph
+    break" is actually a wrapped line from the same sentence -- join the two
+    with a single space instead of a blank line.
+    """
+    paragraphs = text.split("\n\n")
+    if len(paragraphs) < 2:
+        return text
+
+    merged = [paragraphs[0]]
+    for para in paragraphs[1:]:
+        prev_stripped = merged[-1].rstrip()
+        para_stripped = para.lstrip()
+
+        if (
+            prev_stripped
+            and prev_stripped[-1] not in _SENTENCE_END_CHARS
+            and _is_lowercase_continuation(para_stripped)
+        ):
+            merged[-1] = f"{prev_stripped} {para_stripped}"
+        else:
+            merged.append(para)
+
+    return "\n\n".join(merged)
+
 
 def _merge_partial_numbering_lines(text: str) -> str:
     """
@@ -585,5 +642,8 @@ class PdfConverter(DocumentConverter):
 
         # Post-process to merge MasterFormat-style partial numbering with following text
         markdown = _merge_partial_numbering_lines(markdown)
+
+        # Post-process to merge paragraph breaks spuriously inserted mid-sentence
+        markdown = _merge_wrapped_paragraph_breaks(markdown)
 
         return DocumentConverterResult(markdown=markdown)
