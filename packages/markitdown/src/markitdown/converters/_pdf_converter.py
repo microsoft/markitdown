@@ -5,7 +5,11 @@ from typing import BinaryIO, Any
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
-from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+from .._exceptions import (
+    MissingDependencyException,
+    MISSING_DEPENDENCY_MESSAGE,
+    CadPdfRejectedException,
+)
 
 # Pattern for MasterFormat-style partial numbering (e.g., ".1", ".2", ".10")
 PARTIAL_NUMBERING_PATTERN = re.compile(r"^\.\d+$")
@@ -62,6 +66,9 @@ _dependency_exc_info = None
 try:
     import pdfminer
     import pdfminer.high_level
+    from pdfminer.pdfdocument import PDFDocument
+    from pdfminer.pdfparser import PDFParser
+    from pdfminer.utils import decode_text
     import pdfplumber
 except ImportError:
     _dependency_exc_info = sys.exc_info()
@@ -498,6 +505,45 @@ class PdfConverter(DocumentConverter):
     Supports extracting tables into aligned Markdown format (via pdfplumber).
     Falls back to pdfminer if pdfplumber is missing or fails.
     """
+
+    @staticmethod
+    def cad_pdf_exporter(file_stream: BinaryIO) -> str | None:
+        """Identify a known exporter, without assessing drawing fidelity."""
+        if _dependency_exc_info is not None:
+            raise MissingDependencyException(
+                "CAD PDF detection requires the PDF dependencies. "
+                "Install 'markitdown[pdf]'."
+            ) from _dependency_exc_info[1]
+
+        position = file_stream.tell()
+        try:
+            document = PDFDocument(PDFParser(file_stream))
+            for metadata in document.info:
+                for field, value in metadata.items():
+                    # Revit exports may use /creator instead of /Creator.
+                    if field.casefold() not in ("creator", "producer"):
+                        continue
+                    if isinstance(value, bytes):
+                        value = decode_text(value)
+                    if isinstance(value, str) and re.search(
+                        r"\b(?:AutoCAD|Revit|SolidWorks|MicroStation)\b", value, re.I
+                    ):
+                        return value
+            return None
+        finally:
+            file_stream.seek(position)
+
+    @staticmethod
+    def reject_cad_pdf(file_stream: BinaryIO) -> None:
+        """Reject known CAD exporters; metadata is not a fidelity assessment."""
+        if PdfConverter.cad_pdf_exporter(file_stream) is not None:
+            raise CadPdfRejectedException(
+                "CAD-generated PDF rejected: Creator or Producer metadata "
+                "identifies a known CAD exporter. Text extraction cannot "
+                "preserve drawing geometry, dimensions, or spatial relationships. "
+                "Inspect the original PDF. Omit reject_cad_pdfs / "
+                "--reject-cad-pdfs only if partial text extraction is acceptable."
+            )
 
     def accepts(
         self,

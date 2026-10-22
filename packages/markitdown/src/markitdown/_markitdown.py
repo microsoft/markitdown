@@ -48,6 +48,7 @@ from ._base_converter import DocumentConverter, DocumentConverterResult
 
 from ._exceptions import (
     FileConversionException,
+    CadPdfRejectedException,
     UnsupportedFormatException,
     FailedConversionAttempt,
 )
@@ -602,6 +603,21 @@ class MarkItDown:
     def _convert(
         self, *, file_stream: BinaryIO, stream_info_guesses: List[StreamInfo], **kwargs
     ) -> DocumentConverterResult:
+        # Apply the requested policy before plugins, cloud services, and fallbacks.
+        cad_exporter = None
+        if any(
+            PdfConverter().accepts(file_stream, info) for info in stream_info_guesses
+        ):
+            if kwargs.get("reject_cad_pdfs"):
+                PdfConverter.reject_cad_pdf(file_stream)
+            else:
+                # A best-effort warning must not change successful custom/cloud
+                # conversion when PDF dependencies or inspectable metadata are absent.
+                try:
+                    cad_exporter = PdfConverter.cad_pdf_exporter(file_stream)
+                except Exception:
+                    pass
+
         res: Union[None, DocumentConverterResult] = None
 
         # Keep track of which converters throw exceptions
@@ -668,6 +684,8 @@ class MarkItDown:
                 if _accepts:
                     try:
                         res = converter.convert(file_stream, stream_info, **_kwargs)
+                    except CadPdfRejectedException:
+                        raise
                     except Exception:
                         failed_attempts.append(
                             FailedConversionAttempt(
@@ -678,6 +696,15 @@ class MarkItDown:
                         file_stream.seek(cur_pos)
 
                 if res is not None:
+                    if cad_exporter is not None:
+                        warn(
+                            "CAD PDF conversion may omit drawing geometry, dimensions, "
+                            "and spatial relationships. It is not lossless. Use "
+                            "reject_cad_pdfs=True / --reject-cad-pdfs to reject known "
+                            "CAD exporters instead of accepting partial extraction.",
+                            UserWarning,
+                            stacklevel=2,
+                        )
                     # Normalize the content
                     res.text_content = "\n".join(
                         [line.rstrip() for line in re.split(r"\r?\n", res.text_content)]

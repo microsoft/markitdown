@@ -23,6 +23,46 @@ MarkItDown currently supports the conversion from:
 - EPubs
 - ... and more!
 
+## CAD-exported PDFs
+
+PDF text extraction does not preserve drawing geometry, dimensions, or spatial
+relationships. A CAD drawing can therefore produce incomplete text or empty
+output without a parsing error; OCR does not guarantee faithful reconstruction.
+
+When a known CAD exporter is detected, successful conversion emits a Python
+`UserWarning` (stderr in the CLI) about potential information loss. The Markdown
+content remains unchanged. This warning is best-effort: missing PDF dependencies
+or uninspectable metadata do not block otherwise successful conversion.
+
+For workflows that must reject known CAD exporters, install the PDF dependencies
+and opt into the metadata policy:
+
+```bash
+pip install 'markitdown[pdf]'
+markitdown drawing.pdf --reject-cad-pdfs
+```
+
+```python
+from markitdown import MarkItDown
+
+result = MarkItDown().convert("drawing.pdf", reject_cad_pdfs=True)
+```
+
+This raises `UnsupportedFormatException` when a PDF's Creator or Producer metadata
+names AutoCAD, Revit, SolidWorks, or MicroStation, before any plugin or cloud
+converter runs. The check is local, also applies to stdin, and rejection occurs
+before the CLI writes output. A rejected CAD PDF inside a ZIP, including nested
+ZIPs, fails conversion instead of silently omitting that member. Existing partial
+extraction remains available by
+omitting the option.
+
+This is an exporter policy, not a drawing classifier: it also rejects text-heavy
+PDFs from those exporters. Missing, changed, or unrecognized metadata can evade
+detection, and passing the check does not establish conversion fidelity. Malformed
+PDFs that cannot be inspected fail rather than bypassing the requested check.
+For ZIP input, the existing archive behavior still skips unsupported members.
+Inspect the original rendered PDF when drawing content matters.
+
 ## Why Markdown?
 
 Markdown is extremely close to plain text, with minimal markup or formatting, but still
