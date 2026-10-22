@@ -602,6 +602,18 @@ class MarkItDown:
     def _convert(
         self, *, file_stream: BinaryIO, stream_info_guesses: List[StreamInfo], **kwargs
     ) -> DocumentConverterResult:
+        if kwargs.get("pdf_drawing_mode") is True and any(
+            PdfConverter().accepts(file_stream, info) for info in stream_info_guesses
+        ):
+            # Drawing failures must not fall back to a successful text-only result.
+            position = file_stream.tell()
+            try:
+                return PdfConverter().convert(
+                    file_stream, StreamInfo(extension=".pdf"), **kwargs
+                )
+            finally:
+                file_stream.seek(position)
+
         res: Union[None, DocumentConverterResult] = None
 
         # Keep track of which converters throw exceptions

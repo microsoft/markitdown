@@ -105,8 +105,10 @@ class ZipConverter(DocumentConverter):
             if key not in ("file_extension", "url")
         }
 
+        assets: dict[str, bytes] = {}
+        reports: list[str] = []
         with zipfile.ZipFile(file_stream, "r") as zipObj:
-            for entry in zipObj.infolist():
+            for member_index, entry in enumerate(zipObj.infolist(), 1):
                 name = entry.filename
                 try:
                     z_file_stream = io.BytesIO(zipObj.read(entry))
@@ -121,10 +123,29 @@ class ZipConverter(DocumentConverter):
                     )
                     if result is not None:
                         md_content += f"## File: {name}\n\n"
-                        md_content += result.markdown + "\n\n"
+                        content = result.markdown
+                        prefix = f"member-{member_index}"
+                        for asset_name, data in result.assets.items():
+                            prefixed = f"{prefix}/{asset_name}"
+                            assets[prefixed] = data
+                            content = content.replace(
+                                f"]({asset_name})", f"]({prefixed})"
+                            )
+                        md_content += content + "\n\n"
+                        if result.conversion_report:
+                            reports.append(
+                                f"## Archive member {member_index}\n\n"
+                                + result.conversion_report
+                            )
                 except UnsupportedFormatException:
                     pass
                 except FileConversionException:
+                    if kwargs.get("pdf_drawing_mode"):
+                        raise
                     pass
 
-        return DocumentConverterResult(markdown=md_content.strip())
+        return DocumentConverterResult(
+            markdown=md_content.strip(),
+            assets=assets,
+            conversion_report="\n\n".join(reports) if reports else None,
+        )

@@ -534,6 +534,13 @@ class PdfConverter(DocumentConverter):
                 _dependency_exc_info[2]
             )  # type: ignore[union-attr]
 
+        if kwargs.get("pdf_drawing_mode") is True:
+            from ._pdf_drawing import convert_drawing
+
+            return convert_drawing(
+                file_stream, inline_images=kwargs.get("keep_data_uris") is True
+            )
+
         assert isinstance(file_stream, io.IOBase)
 
         # Read file stream into BytesIO for compatibility with pdfplumber

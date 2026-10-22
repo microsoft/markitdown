@@ -10,6 +10,8 @@ class DocumentConverterResult:
         markdown: str,
         *,
         title: Optional[str] = None,
+        assets: Optional[dict[str, bytes]] = None,
+        conversion_report: Optional[str] = None,
     ):
         """
         Initialize the DocumentConverterResult.
@@ -20,9 +22,13 @@ class DocumentConverterResult:
         Parameters:
         - markdown: The converted Markdown text.
         - title: Optional title of the document.
+        - assets: Optional relative-name to binary-content mapping; no files are written.
+        - conversion_report: Optional Markdown report of extraction limitations.
         """
         self.markdown = markdown
         self.title = title
+        self.assets = assets if assets is not None else {}
+        self.conversion_report = conversion_report
 
     @property
     def text_content(self) -> str:
