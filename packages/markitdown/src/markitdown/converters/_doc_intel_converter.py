@@ -203,7 +203,14 @@ def _yaml_scalar(value: Any) -> str:
     if isinstance(value, bool):
         return "true" if value else "false"
     if isinstance(value, (int, float)):
-        return repr(value)
+        rendered = repr(value)
+        if isinstance(value, float) and "e" in rendered:
+            mantissa, exponent = rendered.split("e", 1)
+            # YAML 1.1 requires a decimal point in exponential float mantissas.
+            if "." not in mantissa:
+                mantissa += ".0"
+            rendered = f"{mantissa}e{exponent}"
+        return rendered
     s = str(value)
     # Quote when necessary: contains special chars, leading/trailing whitespace,
     # or characters that would confuse a YAML parser.

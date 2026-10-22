@@ -381,12 +381,14 @@ def test_fields_with_special_chars_are_quoted():
         "noncharacter\uffff",
         "tab\tnewline\nreturn\r",
         'quote"backslash\\',
-        "café U0001f600",
+        "café 😀",
         "00123",
         "[1, 2]",
         "- pending",
         "+12065550100",
         "on",
+        "1e-7",
+        "1e20",
     ],
 )
 def test_front_matter_string_keys_and_values_round_trip(text):
@@ -401,6 +403,35 @@ def test_front_matter_string_keys_and_values_round_trip(text):
     assert front_matter.startswith("---\n")
     assert front_matter.endswith("---\n\n")
     assert yaml.safe_load(front_matter[4:-5]) == {"fields": {text: text}}
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        1e-7,
+        -1e-7,
+        1e20,
+        -1e20,
+        1.25e-7,
+        5e-324,
+        1.7976931348623157e308,
+        1.25,
+        0.0,
+        -0.0,
+    ],
+)
+def test_front_matter_floats_round_trip(value):
+    doc = AnalyzedDocument(
+        doc_type="custom",
+        fields={"Measurement": DocumentField(type="number", value_number=value)},
+        spans=[],
+        confidence=1.0,
+    )
+
+    front_matter = _fields_to_front_matter([doc])
+    parsed = yaml.safe_load(front_matter[4:-5])["fields"]["Measurement"]
+    assert type(parsed) is float
+    assert repr(parsed) == repr(value)
 
 
 def test_yaml_dump_nested_dict():
