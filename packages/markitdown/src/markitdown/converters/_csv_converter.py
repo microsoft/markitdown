@@ -2,6 +2,7 @@ import csv
 import io
 import re
 from typing import BinaryIO, Any
+from warnings import warn
 from charset_normalizer import from_bytes
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
@@ -105,6 +106,11 @@ class CsvConverter(DocumentConverter):
         _trim_outer_blank_rows(rows)
 
         if not rows:
+            warn(
+                "CSV input is empty or contains only blank rows; producing empty markdown.",
+                UserWarning,
+                stacklevel=2,
+            )
             return DocumentConverterResult(markdown="")
 
         # Pad all rows, including the header, to preserve the widest row.
