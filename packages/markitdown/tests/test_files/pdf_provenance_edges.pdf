@@ -1,0 +1,123 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R /PageLabels << /Nums [0 << /S /r >> 2 << /S /D /St 27 >>] >> >>
+endobj
+2 0 obj
+<< /Type /Pages /Count 6 /Kids [5 0 R 7 0 R 9 0 R 11 0 R 13 0 R 15 0 R] >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding /ToUnicode 4 0 R >>
+endobj
+4 0 obj
+<< /Length 327 >>
+stream
+/CIDInit /ProcSet findresource begin
+12 dict begin
+begincmap
+/CIDSystemInfo << /Registry (Synthetic) /Ordering (Test) /Supplement 0 >> def
+/CMapName /Synthetic def
+/CMapType 2 def
+1 begincodespacerange
+<00> <FF>
+endcodespacerange
+1 beginbfchar
+<01> <000C>
+endbfchar
+endcmap
+CMapName currentdict /CMap defineresource pop
+end
+end
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 6 0 R >>
+endobj
+6 0 obj
+<< /Length 0 >>
+stream
+
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 8 0 R >>
+endobj
+8 0 obj
+<< /Length 64 >>
+stream
+BT /F1 12 Tf 72 720 Td (Synthetic cover. Printed page i.) Tj ET
+
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 10 0 R >>
+endobj
+10 0 obj
+<< /Length 0 >>
+stream
+
+endstream
+endobj
+11 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 12 0 R >>
+endobj
+12 0 obj
+<< /Length 322 >>
+stream
+BT /F1 12 Tf 72 720 Td (Item) Tj ET
+BT /F1 12 Tf 220 720 Td (Count) Tj ET
+BT /F1 12 Tf 380 720 Td (Cost) Tj ET
+BT /F1 12 Tf 72 700 Td (ALPHA) Tj ET
+BT /F1 12 Tf 220 700 Td (2) Tj ET
+BT /F1 12 Tf 380 700 Td (10) Tj ET
+BT /F1 12 Tf 72 680 Td (BETA) Tj ET
+BT /F1 12 Tf 220 680 Td (3) Tj ET
+BT /F1 12 Tf 380 680 Td (15) Tj ET
+
+endstream
+endobj
+13 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 14 0 R >>
+endobj
+14 0 obj
+<< /Length 164 >>
+stream
+BT /F1 12 Tf 72 720 Td (Synthetic prose. Printed page 28.) Tj ET
+BT /F1 12 Tf 72 680 Td (.1) Tj ET
+BT /F1 12 Tf 72 660 Td (Keep this numbered text together.) Tj ET
+
+endstream
+endobj
+15 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 16 0 R >>
+endobj
+16 0 obj
+<< /Length 0 >>
+stream
+
+endstream
+endobj
+xref
+0 17
+0000000000 65535 f 
+0000000015 00000 n 
+0000000125 00000 n 
+0000000215 00000 n 
+0000000329 00000 n 
+0000000707 00000 n 
+0000000833 00000 n 
+0000000882 00000 n 
+0000001008 00000 n 
+0000001122 00000 n 
+0000001249 00000 n 
+0000001299 00000 n 
+0000001427 00000 n 
+0000001801 00000 n 
+0000001929 00000 n 
+0000002145 00000 n 
+0000002273 00000 n 
+trailer
+<< /Size 17 /Root 1 0 R >>
+startxref
+2323
+%%EOF

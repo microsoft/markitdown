@@ -3,7 +3,7 @@ import io
 import re
 from typing import BinaryIO, Any
 
-from .._base_converter import DocumentConverter, DocumentConverterResult
+from .._base_converter import DocumentConverter, DocumentConverterResult, PageInfo
 from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 
@@ -63,6 +63,10 @@ try:
     import pdfminer
     import pdfminer.high_level
     import pdfplumber
+    from pdfminer.converter import TextConverter
+    from pdfminer.layout import LAParams
+    from pdfminer.pdfinterp import PDFPageInterpreter, PDFResourceManager
+    from pdfminer.pdfpage import PDFPage
 except ImportError:
     _dependency_exc_info = sys.exc_info()
 
@@ -492,6 +496,31 @@ def _extract_tables_from_words(page: Any) -> list[list[list[str]]]:
     return [table_rows]
 
 
+def _extract_text_pages(file_stream: BinaryIO) -> tuple[str, list[str]]:
+    """Return normal pdfminer text and physical page readings in one pass.
+
+    Reuse the normal text converter and interpreter, capturing each page before
+    processing the next. Parser boundaries, rather than form-feed splitting,
+    keep empty pages and form-feed characters inside a page distinct. Errors
+    propagate; document-level text cannot substitute for page provenance.
+    """
+    file_stream.seek(0)
+    raw_pages: list[str] = []
+    with io.StringIO() as output:
+        resources = PDFResourceManager()
+        device = TextConverter(resources, output, laparams=LAParams())
+        try:
+            interpreter = PDFPageInterpreter(resources, device)
+            for page in PDFPage.get_pages(file_stream):
+                interpreter.process_page(page)
+                raw_pages.append(output.getvalue())
+                output.seek(0)
+                output.truncate(0)
+        finally:
+            device.close()
+    return "".join(raw_pages), raw_pages
+
+
 class PdfConverter(DocumentConverter):
     """
     Converts PDFs to Markdown.
@@ -536,8 +565,13 @@ class PdfConverter(DocumentConverter):
 
         assert isinstance(file_stream, io.IOBase)
 
+        extract_pages = kwargs.get("extract_pages", False)
         # Read file stream into BytesIO for compatibility with pdfplumber
         pdf_bytes = io.BytesIO(file_stream.read())
+        page_contents = [] if extract_pages else None
+        page_count = None
+        use_pdfminer = False
+        markdown = ""
 
         try:
             # Single pass: check every page for form-style content.
@@ -550,40 +584,75 @@ class PdfConverter(DocumentConverter):
             plain_page_indices: list[int] = []
 
             with pdfplumber.open(pdf_bytes) as pdf:
+                page_count = len(pdf.pages)
                 for page_idx, page in enumerate(pdf.pages):
-                    page_content = _extract_form_content_from_words(page)
+                    try:
+                        page_content = _extract_form_content_from_words(page)
 
-                    if page_content is not None:
-                        form_page_count += 1
-                        if page_content.strip():
-                            markdown_chunks.append(page_content)
-                    else:
-                        plain_page_indices.append(page_idx)
-                        text = page.extract_text()
-                        if text and text.strip():
-                            markdown_chunks.append(text.strip())
+                        if page_content is not None:
+                            form_page_count += 1
+                            if page_content.strip():
+                                markdown_chunks.append(page_content)
+                        else:
+                            plain_page_indices.append(page_idx)
+                            page_content = (page.extract_text() or "").strip()
+                            if page_content:
+                                markdown_chunks.append(page_content)
 
-                    page.close()  # Free cached page data immediately
+                        if page_contents is not None:
+                            page_contents.append(page_content)
+                    finally:
+                        page.close()  # Free cached data even when extraction fails
 
             # If no pages had form-style content, use pdfminer for
             # the whole document (better text spacing for prose).
             if form_page_count == 0:
-                pdf_bytes.seek(0)
-                markdown = pdfminer.high_level.extract_text(pdf_bytes)
+                if extract_pages:
+                    use_pdfminer = True
+                else:
+                    pdf_bytes.seek(0)
+                    markdown = pdfminer.high_level.extract_text(pdf_bytes)
             else:
                 markdown = "\n\n".join(markdown_chunks).strip()
 
         except Exception:
-            # Fallback if pdfplumber fails
-            pdf_bytes.seek(0)
-            markdown = pdfminer.high_level.extract_text(pdf_bytes)
+            # Discard the partial pass and recover with pdfminer.
+            page_contents = None
+            if extract_pages:
+                use_pdfminer = True
+            else:
+                pdf_bytes.seek(0)
+                markdown = pdfminer.high_level.extract_text(pdf_bytes)
+
+        # Keep page-aware extraction outside the pdfplumber exception handler:
+        # a page failure must propagate rather than invent a page attribution.
+        if use_pdfminer:
+            markdown, page_contents = _extract_text_pages(pdf_bytes)
 
         # Fallback if still empty
         if not markdown:
             pdf_bytes.seek(0)
-            markdown = pdfminer.high_level.extract_text(pdf_bytes)
+            if extract_pages:
+                markdown, page_contents = _extract_text_pages(pdf_bytes)
+            else:
+                markdown = pdfminer.high_level.extract_text(pdf_bytes)
 
         # Post-process to merge MasterFormat-style partial numbering with following text
         markdown = _merge_partial_numbering_lines(markdown)
 
-        return DocumentConverterResult(markdown=markdown)
+        pages = None
+        if extract_pages:
+            assert page_contents is not None
+            if page_count is not None and len(page_contents) != page_count:
+                raise ValueError(
+                    f"PDF page extraction returned {len(page_contents)} records "
+                    f"for {page_count} physical pages"
+                )
+            pages = [
+                PageInfo(
+                    page_number=index + 1,
+                    content=_merge_partial_numbering_lines(content).strip(),
+                )
+                for index, content in enumerate(page_contents)
+            ]
+        return DocumentConverterResult(markdown=markdown, pages=pages)

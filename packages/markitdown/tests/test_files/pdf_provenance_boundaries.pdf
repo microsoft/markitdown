@@ -1,0 +1,95 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R /PageLabels << /Nums [0 << /S /r >> 2 << /S /D /St 27 >>] >> >>
+endobj
+2 0 obj
+<< /Type /Pages /Count 4 /Kids [5 0 R 7 0 R 9 0 R 11 0 R] >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding /ToUnicode 4 0 R >>
+endobj
+4 0 obj
+<< /Length 327 >>
+stream
+/CIDInit /ProcSet findresource begin
+12 dict begin
+begincmap
+/CIDSystemInfo << /Registry (Synthetic) /Ordering (Test) /Supplement 0 >> def
+/CMapName /Synthetic def
+/CMapType 2 def
+1 begincodespacerange
+<00> <FF>
+endcodespacerange
+1 beginbfchar
+<01> <000C>
+endbfchar
+endcmap
+CMapName currentdict /CMap defineresource pop
+end
+end
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 6 0 R >>
+endobj
+6 0 obj
+<< /Length 93 >>
+stream
+BT /F1 12 Tf 72 720 Td (End of first physical page.) Tj ET
+BT /F1 12 Tf 72 680 Td (.1) Tj ET
+
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 8 0 R >>
+endobj
+8 0 obj
+<< /Length 67 >>
+stream
+BT /F1 12 Tf 72 720 Td (continuation on next physical page.) Tj ET
+
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 10 0 R >>
+endobj
+10 0 obj
+<< /Length 147 >>
+stream
+BT /F1 12 Tf 72 720 Td (.2) Tj ET
+BT /F1 12 Tf 72 700 Td (This continuation is on the same page.) Tj ET
+BT /F1 12 Tf 72 660 Td (unfinished-) Tj ET
+
+endstream
+endobj
+11 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 12 0 R >>
+endobj
+12 0 obj
+<< /Length 80 >>
+stream
+BT /F1 12 Tf 72 720 Td (lowercase continuation stays on the fourth page.) Tj ET
+
+endstream
+endobj
+xref
+0 13
+0000000000 65535 f 
+0000000015 00000 n 
+0000000125 00000 n 
+0000000201 00000 n 
+0000000315 00000 n 
+0000000693 00000 n 
+0000000819 00000 n 
+0000000962 00000 n 
+0000001088 00000 n 
+0000001205 00000 n 
+0000001332 00000 n 
+0000001531 00000 n 
+0000001659 00000 n 
+trailer
+<< /Size 13 /Root 1 0 R >>
+startxref
+1790
+%%EOF
