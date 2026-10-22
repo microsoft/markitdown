@@ -152,17 +152,13 @@ def test_convert_uses_overridden_model_id():
 # --------- Phase 3: configurable features ---------------------------------
 
 
-def test_default_features_preserve_existing_addons():
+def test_no_features_are_enabled_by_default():
     conv = _bare_converter()
     features = conv._analysis_features(
         StreamInfo(extension=".pdf", mimetype="application/pdf")
     )
 
-    assert features == [
-        di_mod.DocumentAnalysisFeature.FORMULAS,
-        di_mod.DocumentAnalysisFeature.OCR_HIGH_RESOLUTION,
-        di_mod.DocumentAnalysisFeature.STYLE_FONT,
-    ]
+    assert features == []
 
 
 def test_empty_features_disable_all_addons():

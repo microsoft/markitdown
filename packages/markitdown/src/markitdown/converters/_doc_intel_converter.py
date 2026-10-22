@@ -351,9 +351,8 @@ class DocumentIntelligenceConverter(DocumentConverter):
             model_id (str): The Document Intelligence model ID to use (e.g., "prebuilt-layout",
                 "prebuilt-invoice", "prebuilt-receipt", or a custom model ID). Defaults to "prebuilt-layout".
             features (List[str] | None): Analysis add-on features to request for OCR-supported
-                file types. Defaults to None, which uses formulas, high-resolution OCR, and font
-                styling. Pass an empty list to disable all default add-ons. Query fields
-                automatically add the required ``queryFields`` feature.
+                file types. No add-ons are enabled by default. Query fields automatically add
+                the required ``queryFields`` feature.
             query_fields (List[str] | None): Optional list of field names to extract via the DI
                 ``queryFields`` add-on. Only applied to OCR-supported file types (PDF/images).
             file_types (List[DocumentIntelligenceFileType]): The file types to accept. Defaults to all supported file types.
@@ -437,14 +436,7 @@ class DocumentIntelligenceConverter(DocumentConverter):
             if mimetype.startswith(prefix):
                 return []
 
-        if self._features is None:
-            features = [
-                DocumentAnalysisFeature.FORMULAS,
-                DocumentAnalysisFeature.OCR_HIGH_RESOLUTION,
-                DocumentAnalysisFeature.STYLE_FONT,
-            ]
-        else:
-            features = list(self._features)
+        features = list(self._features) if self._features is not None else []
 
         if self._query_fields and DocumentAnalysisFeature.QUERY_FIELDS not in features:
             features.append(DocumentAnalysisFeature.QUERY_FIELDS)

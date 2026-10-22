@@ -30,6 +30,24 @@ def test_version() -> None:
     assert __version__ in result.stdout, f"Version not found in output: {result.stdout}"
 
 
+def test_docintel_help_lists_features_and_charges() -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", "markitdown", "--help"],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, f"CLI exited with error: {result.stderr}"
+    help_text = " ".join(result.stdout.split())
+    assert (
+        "barcodes, formulas, keyValuePairs, languages, ocrHighResolution, and styleFont"
+        in help_text
+    )
+    assert "incur additional charges" in help_text
+    assert "No add-ons are enabled by default" in help_text
+    assert "billable Document Intelligence queryFields add-on" in help_text
+
+
 def test_invalid_flag() -> None:
     result = subprocess.run(
         [sys.executable, "-m", "markitdown", "--foobar"],

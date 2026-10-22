@@ -270,9 +270,18 @@ markitdown document.pdf --use-docintel \
   --docintel-query-fields "Title,Author"
 ```
 
-Use `--docintel-features none` to disable the default `formulas`,
-`ocrHighResolution`, and `styleFont` add-ons. Analysis add-ons and query fields
-apply only to OCR-supported inputs such as PDFs and images.
+No analysis add-ons are enabled by default. Use `--docintel-features` to opt in,
+or `--docintel-features none` to explicitly request no add-ons. Analysis add-ons
+and query fields apply only to OCR-supported inputs such as PDFs and images.
+
+Available feature values are `barcodes`, `formulas`, `keyValuePairs`,
+`languages`, `ocrHighResolution`, and `styleFont`. The `formulas`,
+`ocrHighResolution`, and `styleFont` features incur additional charges, as does
+the `queryFields` add-on, which is priced differently from the other add-ons.
+See the
+[Document Intelligence add-on documentation](https://learn.microsoft.com/azure/ai-services/document-intelligence/concept/add-on-capabilities?view=doc-intel-4.0.0)
+and [pricing](https://azure.microsoft.com/pricing/details/document-intelligence/)
+for details.
 
 More information about how to set up an Azure Document Intelligence Resource can be found [here](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/how-to-guides/create-document-intelligence-resource?view=doc-intel-4.0.0)
 
@@ -324,8 +333,9 @@ result = md.convert("test.pdf")
 print(result.markdown)
 ```
 
-Set `docintel_features=[]` to disable all default add-ons. When query fields are
-provided, MarkItDown automatically enables the required `queryFields` add-on.
+Omit `docintel_features` or set `docintel_features=[]` to request no analysis
+add-ons. When query fields are provided, MarkItDown automatically enables the
+required `queryFields` add-on.
 Models that return structured fields prepend them to the Markdown as YAML front
 matter. A single document uses a top-level `fields` mapping. When the service
 returns multiple documents, the front matter instead contains a `documents`

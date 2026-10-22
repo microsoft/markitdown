@@ -18,7 +18,8 @@ def main():
         description="Convert various file formats to markdown.",
         prog="markitdown",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        usage=dedent("""
+        usage=dedent(
+            """
             SYNTAX:
 
                 markitdown <OPTIONAL: FILENAME>
@@ -43,7 +44,8 @@ def main():
                 OR
 
                 markitdown example.pdf > example.md
-            """).strip(),
+            """
+        ).strip(),
     )
 
     parser.add_argument(
@@ -132,14 +134,20 @@ def main():
         "--docintel-query-fields",
         type=str,
         default=None,
-        help="Comma-separated list of field names to extract via the Document Intelligence queryFields add-on (OCR file types only).",
+        help="Comma-separated list of field names to extract via the billable Document Intelligence queryFields add-on (OCR file types only).",
     )
 
     parser.add_argument(
         "--docintel-features",
         type=str,
         default=None,
-        help="Comma-separated Document Intelligence analysis add-ons for OCR file types. Use 'none' to disable the default add-ons.",
+        help=(
+            "Comma-separated Document Intelligence analysis add-ons for OCR file types. "
+            "Available values: barcodes, formulas, keyValuePairs, languages, "
+            "ocrHighResolution, and styleFont. The formulas, ocrHighResolution, and "
+            "styleFont incur additional charges. No add-ons are enabled by default; "
+            "use 'none' to explicitly request none."
+        ),
     )
 
     parser.add_argument(
