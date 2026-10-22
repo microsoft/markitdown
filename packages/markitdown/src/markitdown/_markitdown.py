@@ -3,6 +3,7 @@ import os
 import re
 import sys
 import shutil
+import threading
 import traceback
 import io
 from dataclasses import dataclass
@@ -108,6 +109,7 @@ PRIORITY_GENERIC_FILE_FORMAT = (
 
 
 _plugins: Union[None, List[Any]] = None  # If None, plugins have not been loaded yet.
+_plugin_loading = threading.local()
 
 
 def _load_plugins() -> Union[None, List[Any]]:
@@ -118,16 +120,29 @@ def _load_plugins() -> Union[None, List[Any]]:
     if _plugins is not None:
         return _plugins
 
-    # Load plugins
-    _plugins = []
-    for entry_point in entry_points(group="markitdown.plugin"):
-        try:
-            _plugins.append(entry_point.load())
-        except Exception:
-            tb = traceback.format_exc()
-            warn(f"Plugin '{entry_point.name}' failed to load ... skipping:\n{tb}")
+    # A plugin may construct another instance during its own import. Preserve
+    # already loaded plugins for that reentrant call without exposing them to threads
+    # that are independently discovering plugins.
+    pending = getattr(_plugin_loading, "plugins", None)
+    if pending is not None:
+        return pending
 
-    return _plugins
+    plugins = []
+    _plugin_loading.plugins = plugins
+    try:
+        for entry_point in entry_points(group="markitdown.plugin"):
+            try:
+                plugins.append(entry_point.load())
+            except Exception:
+                tb = traceback.format_exc()
+                warn(f"Plugin '{entry_point.name}' failed to load ... skipping:\n{tb}")
+
+        # Publish only completed discovery so concurrent instances cannot see a
+        # partial list while another thread is importing a plugin.
+        _plugins = plugins
+        return plugins
+    finally:
+        del _plugin_loading.plugins
 
 
 @dataclass(kw_only=True, frozen=True)
