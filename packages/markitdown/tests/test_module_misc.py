@@ -31,6 +31,23 @@ from markitdown._uri_utils import (
 
 # Library behavior and remaining formats
 
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "before  \nafter\n",
+        "```text\nkept  \n\n\nnext\n```\n",
+        "````text\n```\nkept  \n\n\nnext\n````\n",
+    ],
+)
+def test_markdown_preserves_hard_breaks_and_fenced_content(text: str) -> None:
+    result = MarkItDown().convert_stream(
+        io.BytesIO(text.encode("utf-8")),
+        stream_info=StreamInfo(extension=".md", mimetype="text/markdown"),
+    )
+    assert result.text_content == text
+
+
 skip_remote = (
     True if os.environ.get("GITHUB_ACTIONS") else False
 )  # Don't run these tests in CI
