@@ -22,6 +22,18 @@ def _convert_html(html: str, **kwargs) -> str:
 
 
 @pytest.mark.parametrize(
+    ("href", "expected"),
+    [
+        ("mailto:test@example.org", "mailto:test@example.org"),
+        ("tel:+123456789", "tel:+123456789"),
+        ("docs/a b.txt", "docs/a%20b.txt"),
+    ],
+)
+def test_contact_links_preserve_relative_path_escaping(href: str, expected: str) -> None:
+    assert f"[link]({expected})" in _convert_html(f'<a href="{href}">link</a>')
+
+
+@pytest.mark.parametrize(
     "whitespace", ["", " ", "  ", "\t", "\n", "\r\n", "\u00a0", " \t\n\u00a0 "]
 )
 def test_underline_preserves_whitespace_verbatim(whitespace: str) -> None:
