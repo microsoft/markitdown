@@ -11,6 +11,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 import pytest
+from azure.ai.documentintelligence.models import AnalyzedDocument, DocumentField
 
 from markitdown._stream_info import StreamInfo
 from markitdown.converters import _doc_intel_converter as di_mod
@@ -239,6 +240,85 @@ def test_field_value_falls_back_to_content():
 def test_field_value_array_of_scalars():
     items = [_mock_field(value_string="A"), _mock_field(value_string="B")]
     assert _field_value(_mock_field(value_array=items)) == ["A", "B"]
+
+
+@pytest.mark.parametrize("content", [None, ":selected: :unselected:"])
+def test_selection_group_preserves_selected_values_in_front_matter(content):
+    field = DocumentField(
+        type="selectionGroup", value_selection_group=["Email", "SMS"], content=content
+    )
+    doc = AnalyzedDocument(
+        doc_type="custom", fields={"ContactPreference": field}, spans=[], confidence=1.0
+    )
+
+    assert _field_value(field) == ["Email", "SMS"]
+    assert _fields_to_front_matter([doc]) == (
+        "---\nfields:\n  ContactPreference:\n    - Email\n    - SMS\n---\n\n"
+    )
+
+
+def test_empty_selection_group_does_not_fall_back_to_content():
+    field = DocumentField(
+        type="selectionGroup", value_selection_group=[], content=":unselected:"
+    )
+    assert _field_value(field) == []
+
+
+def test_front_matter_preserves_separate_documents():
+    documents = [
+        AnalyzedDocument(
+            doc_type="invoice",
+            fields={
+                "VendorName": DocumentField(type="string", value_string="Vendor A"),
+                "InvoiceTotal": DocumentField(type="number", value_number=100.0),
+            },
+            spans=[],
+            confidence=1.0,
+        ),
+        AnalyzedDocument(
+            doc_type="invoice",
+            fields={
+                "VendorName": DocumentField(type="string", value_string="Vendor B"),
+                "InvoiceId": DocumentField(type="string", value_string="INV-B"),
+            },
+            spans=[],
+            confidence=1.0,
+        ),
+    ]
+
+    assert _fields_to_front_matter(documents, "prebuilt-invoice") == (
+        "---\n"
+        "modelId: prebuilt-invoice\n"
+        "documents:\n"
+        "  -\n"
+        "    fields:\n"
+        "      VendorName: Vendor A\n"
+        "      InvoiceTotal: 100.0\n"
+        "  -\n"
+        "    fields:\n"
+        "      VendorName: Vendor B\n"
+        "      InvoiceId: INV-B\n"
+        "---\n\n"
+    )
+
+
+def test_front_matter_preserves_empty_document_positions():
+    empty = SimpleNamespace(fields={})
+    populated = SimpleNamespace(fields={"Name": _mock_field(value_string="Contoso")})
+
+    assert _fields_to_front_matter([empty, populated, empty]) == (
+        "---\n"
+        "documents:\n"
+        "  -\n"
+        "    fields: {}\n"
+        "  -\n"
+        "    fields:\n"
+        "      Name: Contoso\n"
+        "  -\n"
+        "    fields: {}\n"
+        "---\n\n"
+    )
+    assert _fields_to_front_matter([empty, empty]) == ""
 
 
 def test_fields_to_front_matter_empty_when_no_documents():

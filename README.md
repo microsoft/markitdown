@@ -327,7 +327,12 @@ print(result.markdown)
 Set `docintel_features=[]` to disable all default add-ons. When query fields are
 provided, MarkItDown automatically enables the required `queryFields` add-on.
 Models that return structured fields prepend them to the Markdown as YAML front
-matter.
+matter. A single document uses a top-level `fields` mapping. When the service
+returns multiple documents, the front matter instead contains a `documents`
+list in service order, with a separate `fields` mapping for each document.
+Documents without extracted fields retain an empty mapping in that list; no
+front matter is emitted when all documents have empty fields. Selection groups
+are represented as lists of selected values.
 
 To use Large Language Models for image descriptions (currently only for pptx and image files), provide `llm_client` and `llm_model`:
 

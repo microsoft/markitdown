@@ -177,6 +177,11 @@ def _field_value(field: Any) -> Any:
     if addr is not None:
         return getattr(field, "content", None) or str(addr)
 
+    # Selection groups contain the selected labels, not DocumentField objects.
+    selection_group = getattr(field, "value_selection_group", None)
+    if selection_group is not None:
+        return list(selection_group)
+
     # Array of fields -> list of values.
     arr = getattr(field, "value_array", None)
     if arr is not None:
@@ -257,11 +262,11 @@ def _fields_to_front_matter(documents: Any, model_id: Optional[str] = None) -> s
     Build a YAML front matter block from ``AnalyzeResult.documents[*].fields``.
 
     Returns an empty string when there are no documents or no non-empty fields.
-    Multiple documents are merged into a single ``fields`` mapping; on duplicate
-    keys, the value from the later document wins.
+    A single document uses a ``fields`` mapping. Multiple documents use an
+    ordered ``documents`` list, each with its own ``fields`` mapping, so values
+    from different documents cannot overwrite or be combined with one another.
 
-    The shape mirrors the Content Understanding converter's front matter so that
-    downstream consumers (e.g., LLM pipelines) can parse both uniformly:
+    A single document has the following shape:
 
         ---
         modelId: prebuilt-invoice
@@ -273,22 +278,27 @@ def _fields_to_front_matter(documents: Any, model_id: Optional[str] = None) -> s
     if not documents:
         return ""
 
-    merged: dict = {}
+    document_fields: List[dict] = []
     for doc in documents:
+        extracted: dict = {}
         fields = getattr(doc, "fields", None) or {}
         for name, field in fields.items():
             value = _field_value(field)
             if value is None or value == "" or value == [] or value == {}:
                 continue
-            merged[name] = value
+            extracted[name] = value
+        document_fields.append(extracted)
 
-    if not merged:
+    if not any(document_fields):
         return ""
 
     payload: dict = {}
     if model_id:
         payload["modelId"] = model_id
-    payload["fields"] = merged
+    if len(document_fields) == 1:
+        payload["fields"] = document_fields[0]
+    else:
+        payload["documents"] = [{"fields": fields} for fields in document_fields]
 
     body = _yaml_dump(payload)
     return f"---\n{body}\n---\n\n"
