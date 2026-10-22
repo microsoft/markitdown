@@ -678,11 +678,33 @@ class MarkItDown:
                         file_stream.seek(cur_pos)
 
                 if res is not None:
-                    # Normalize the content
-                    res.text_content = "\n".join(
-                        [line.rstrip() for line in re.split(r"\r?\n", res.text_content)]
+                    # Normalize the content while preserving whitespace and blank-line runs inside fenced code blocks
+                    fence_pattern = re.compile(
+                        r"(^[ \t]*(?P<fence>`{3,}|~{3,})[^\n]*\n[\s\S]*?\n[ \t]*(?P=fence)[ \t]*$)",
+                        re.MULTILINE,
                     )
-                    res.text_content = re.sub(r"\n{3,}", "\n\n", res.text_content)
+                    normalized_parts = []
+                    last_end = 0
+                    for match in fence_pattern.finditer(res.text_content):
+                        start, end = match.span()
+                        outside = res.text_content[last_end:start]
+                        outside_norm = "\n".join(
+                            [line.rstrip() for line in re.split(r"\r?\n", outside)]
+                        )
+                        outside_norm = re.sub(r"\n{3,}", "\n\n", outside_norm)
+                        normalized_parts.append(outside_norm)
+                        # Inside fenced code blocks, normalize CRLF to LF without stripping spaces or blank lines
+                        normalized_parts.append(match.group(1).replace("\r\n", "\n"))
+                        last_end = end
+
+                    outside = res.text_content[last_end:]
+                    outside_norm = "\n".join(
+                        [line.rstrip() for line in re.split(r"\r?\n", outside)]
+                    )
+                    outside_norm = re.sub(r"\n{3,}", "\n\n", outside_norm)
+                    normalized_parts.append(outside_norm)
+
+                    res.text_content = "".join(normalized_parts)
                     return res
 
         # If we got this far without success, report any exceptions
