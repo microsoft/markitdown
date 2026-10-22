@@ -1,6 +1,7 @@
 import csv
 import io
 import re
+import threading
 from typing import BinaryIO, Any
 from charset_normalizer import from_bytes
 from .._base_converter import DocumentConverter, DocumentConverterResult
@@ -17,6 +18,9 @@ ACCEPTED_FILE_EXTENSIONS = [".csv"]
 # of it, so that run can be doubled before the pipe is escaped.
 # The lookbehind avoids retrying from each position inside a backslash run.
 _PIPE_ESCAPE_RE = re.compile(r"(?<!\\)(\\*)\|")
+
+# Serialize converter-owned changes to the process-wide CSV field limit.
+_CSV_FIELD_LIMIT_LOCK = threading.Lock()
 
 
 def _escape_table_cell(value: str) -> str:
@@ -57,6 +61,11 @@ def _trim_outer_blank_rows(rows: list[list[str]]) -> None:
 class CsvConverter(DocumentConverter):
     """
     Converts CSV files to Markdown tables.
+
+    Oversized fields are parsed with a temporarily raised process-wide CSV
+    field limit. The lock coordinates CsvConverter instances only; unrelated
+    CSV readers can observe the temporary limit, and changes made by other
+    code to that limit are not synchronized with this converter.
     """
 
     def __init__(self):
@@ -100,8 +109,18 @@ class CsvConverter(DocumentConverter):
         content = content.lstrip("\ufeff")
 
         # Parse CSV content
-        reader = csv.reader(io.StringIO(content, newline=""))
-        rows = list(reader)
+        with _CSV_FIELD_LIMIT_LOCK:
+            try:
+                rows = list(csv.reader(io.StringIO(content, newline="")))
+            except csv.Error:
+                original_limit = csv.field_size_limit()
+                if len(content) <= original_limit:
+                    raise
+                try:
+                    csv.field_size_limit(len(content))
+                    rows = list(csv.reader(io.StringIO(content, newline="")))
+                finally:
+                    csv.field_size_limit(original_limit)
         _trim_outer_blank_rows(rows)
 
         if not rows:
