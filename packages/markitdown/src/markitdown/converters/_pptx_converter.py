@@ -30,6 +30,190 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 
 ACCEPTED_FILE_EXTENSIONS = [".pptx"]
 
+# Minimum vertical overlap, as a fraction of the shorter shape's height, for two
+# shapes to count as the same row.
+_SAME_ROW_OVERLAP_RATIO = 0.5
+
+# A shape at least this tall relative to its band is a full-height "spanner".
+_SPANNING_BAND_FRACTION = 0.75
+
+# A shape at least this wide relative to its band is a full-width "header".
+_BAND_HEADER_WIDTH_FRACTION = 0.8
+
+# A header may start this far below the band top (fraction of band height) and
+# still lead, absorbing real decks' vertical jitter.
+_BAND_TOP_TOLERANCE_FRACTION = 0.05
+
+
+def _sort_shapes_reading_order(shapes: Any) -> list[Any]:
+    """Order shapes in reading order: top-to-bottom, left-to-right within a row.
+
+    A strict ``sorted(key=(top, left))`` reads same-row shapes top-first, so a
+    two-column body comes out right-then-left when its columns start at slightly
+    different heights. Shapes that overlap vertically are grouped into row bands,
+    read top-to-bottom and left-to-right within a band; no shape is added or
+    dropped. A full-height spanner (a sidebar) sharing a band with a grid is lifted
+    out onto its horizontal side so the grid stays row-major, and a full-width
+    header (a title or caption sharing a chart's or table's frame) is read on the
+    correct side of it.
+    """
+
+    def top_of(s: Any) -> float:
+        return s.top if s.top is not None else float("-inf")
+
+    def left_of(s: Any) -> float:
+        return s.left if s.left is not None else float("-inf")
+
+    def bottom_of(s: Any) -> float:
+        if s.top is None:
+            return float("-inf")
+        return s.top + (s.height or 0)
+
+    def right_of(s: Any) -> float:
+        if s.left is None:
+            return float("-inf")
+        return s.left + (s.width or 0)
+
+    def group_into_bands(shape_list: Any) -> list[dict[str, Any]]:
+        bands: list[dict[str, Any]] = []  # {"top", "bottom", "anchor_*", "shapes"}
+        for shape in sorted(shape_list, key=lambda s: (top_of(s), left_of(s))):
+            top, bottom = top_of(shape), bottom_of(shape)
+            best_band = None
+            best_overlap = 0.0
+            if shape.top is not None and bottom > top:
+                for band in bands:
+                    # Compare against the band's tallest member, not the growing
+                    # union, so overlaps cannot chain down a staircase.
+                    a_top, a_bottom = band["anchor_top"], band["anchor_bottom"]
+                    overlap = min(bottom, a_bottom) - max(top, a_top)
+                    shorter = min(bottom - top, a_bottom - a_top)
+                    if (
+                        shorter > 0
+                        and overlap >= shorter * _SAME_ROW_OVERLAP_RATIO
+                        and overlap > best_overlap
+                    ):
+                        best_band = band
+                        best_overlap = overlap
+            if best_band is not None:
+                best_band["shapes"].append(shape)
+                best_band["top"] = min(best_band["top"], top)
+                best_band["bottom"] = max(best_band["bottom"], bottom)
+                if bottom - top > best_band["anchor_bottom"] - best_band["anchor_top"]:
+                    best_band["anchor_top"] = top
+                    best_band["anchor_bottom"] = bottom
+            else:
+                bands.append(
+                    {
+                        "top": top,
+                        "bottom": bottom,
+                        "anchor_top": top,
+                        "anchor_bottom": bottom,
+                        "shapes": [shape],
+                    }
+                )
+        return bands
+
+    ordered_bands: list[dict[str, Any]] = []
+    for band in sorted(group_into_bands(shapes), key=lambda b: b["top"]):
+        band_height = band["bottom"] - band["top"]
+        spanners = [
+            s
+            for s in band["shapes"]
+            if band_height > 0
+            and (bottom_of(s) - top_of(s)) >= _SPANNING_BAND_FRACTION * band_height
+        ]
+        rest = [s for s in band["shapes"] if s not in spanners]
+        sub_bands = group_into_bands(rest) if rest else []
+        positioned = all(
+            s.left is not None and s.width is not None for s in spanners + rest
+        )
+        if spanners and sub_bands and positioned:
+            spanner_band: dict[str, Any] = {
+                "top": min(top_of(s) for s in spanners),
+                "bottom": max(bottom_of(s) for s in spanners),
+                "shapes": spanners,
+            }
+            should_split = len(sub_bands) >= 2
+            single_contained_row = False
+            if not should_split:
+                # Split a single full-width row out of a frame it starts inside.
+                row = sub_bands[0]
+                band_left = min(left_of(s) for s in band["shapes"])
+                band_right = max(right_of(s) for s in band["shapes"])
+                band_width = band_right - band_left
+                row_width = max(right_of(s) for s in row["shapes"]) - min(
+                    left_of(s) for s in row["shapes"]
+                )
+                starts_within = (
+                    spanner_band["top"] <= row["top"] <= spanner_band["bottom"]
+                )
+                if (
+                    starts_within
+                    and band_width > 0
+                    and row_width >= _BAND_HEADER_WIDTH_FRACTION * band_width
+                ):
+                    should_split = True
+                    single_contained_row = True
+            if should_split:
+                sub_bands = sorted(sub_bands, key=lambda b: b["top"])
+                if single_contained_row:
+                    # A row riding at the frame's top (a title) reads first; a row
+                    # that starts lower (a caption or footer) reads after the frame.
+                    # The tolerance keeps a title starting a few EMU down leading.
+                    height = spanner_band["bottom"] - spanner_band["top"]
+                    cutoff = spanner_band["top"] + _BAND_TOP_TOLERANCE_FRACTION * height
+                    if sub_bands[0]["top"] <= cutoff:
+                        ordered_bands.extend(sub_bands)
+                        ordered_bands.append(spanner_band)
+                    else:
+                        ordered_bands.append(spanner_band)
+                        ordered_bands.extend(sub_bands)
+                else:
+                    content_left = min(left_of(s) for s in rest)
+                    content_right = max(right_of(s) for s in rest)
+                    tallest = max(spanners, key=lambda s: bottom_of(s) - top_of(s))
+                    if right_of(tallest) <= content_left:  # spanner left of content
+                        ordered_bands.append(spanner_band)
+                        ordered_bands.extend(sub_bands)
+                    elif left_of(tallest) >= content_right:  # spanner right of content
+                        ordered_bands.extend(sub_bands)
+                        ordered_bands.append(spanner_band)
+                    else:  # overlaps horizontally: fall back to top order
+                        ordered_bands.extend(
+                            sorted(sub_bands + [spanner_band], key=lambda b: b["top"])
+                        )
+                continue
+        ordered_bands.append(band)
+
+    def order_within_band(band_shapes: list[Any]) -> list[Any]:
+        # Left-to-right, but a full-width shape starting at the band top leads.
+        if len(band_shapes) <= 1:
+            return list(band_shapes)
+        band_left = min(left_of(s) for s in band_shapes)
+        band_right = max(right_of(s) for s in band_shapes)
+        band_width = band_right - band_left
+        band_top = min(top_of(s) for s in band_shapes)
+        band_bottom = max(bottom_of(s) for s in band_shapes)
+        top_cutoff = band_top + _BAND_TOP_TOLERANCE_FRACTION * (band_bottom - band_top)
+        headers = [
+            s
+            for s in band_shapes
+            if top_of(s) <= top_cutoff
+            and band_width > 0
+            and (right_of(s) - left_of(s)) >= _BAND_HEADER_WIDTH_FRACTION * band_width
+        ]
+        rest = [s for s in band_shapes if s not in headers]
+        if not headers or not rest:
+            return sorted(band_shapes, key=lambda s: (left_of(s), top_of(s)))
+        return sorted(headers, key=lambda s: (top_of(s), left_of(s))) + sorted(
+            rest, key=lambda s: (left_of(s), top_of(s))
+        )
+
+    ordered: list[Any] = []
+    for band in ordered_bands:
+        ordered.extend(order_within_band(band["shapes"]))
+    return ordered
+
 
 class PptxConverter(DocumentConverter):
     """
@@ -114,24 +298,10 @@ class PptxConverter(DocumentConverter):
 
                 # Group Shapes
                 if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.GROUP:
-                    sorted_shapes = sorted(
-                        shape.shapes,
-                        key=lambda x: (
-                            float("-inf") if x.top is None else x.top,
-                            float("-inf") if x.left is None else x.left,
-                        ),
-                    )
-                    for subshape in sorted_shapes:
+                    for subshape in _sort_shapes_reading_order(shape.shapes):
                         get_shape_content(subshape, **kwargs)
 
-            sorted_shapes = sorted(
-                slide.shapes,
-                key=lambda x: (
-                    float("-inf") if x.top is None else x.top,
-                    float("-inf") if x.left is None else x.left,
-                ),
-            )
-            for shape in sorted_shapes:
+            for shape in _sort_shapes_reading_order(slide.shapes):
                 get_shape_content(shape, **kwargs)
 
             md_content = md_content.strip()
