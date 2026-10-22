@@ -6,11 +6,12 @@ from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
 
 ACCEPTED_MIME_TYPE_PREFIXES = [
+    "image/gif",
     "image/jpeg",
     "image/png",
 ]
 
-ACCEPTED_FILE_EXTENSIONS = [".jpg", ".jpeg", ".png"]
+ACCEPTED_FILE_EXTENSIONS = [".gif", ".jpg", ".jpeg", ".png"]
 
 
 class ImageConverter(DocumentConverter):
