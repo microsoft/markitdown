@@ -338,6 +338,40 @@ GENERAL_TEST_VECTORS = [
         ],
         must_not_include=[],
     ),
+    FileTestVector(
+        filename="test.odt",
+        mimetype="application/vnd.oasis.opendocument.text",
+        charset=None,
+        url=None,
+        must_include=[
+            "# Release notes",
+            "[changelog](https://example.com/changelog)",
+            "- First item",
+            "  - Nested",
+            "| Component | Status |",
+            r"| parser | ready \| shipped |",
+            "Trailing paragraph.",
+        ],
+        must_not_include=[
+            # The empty tail every LibreOffice row carries must not become columns.
+            "16384",
+        ],
+    ),
+    FileTestVector(
+        filename="test.ods",
+        mimetype="application/vnd.oasis.opendocument.spreadsheet",
+        charset=None,
+        url=None,
+        must_include=[
+            "## Inventory",
+            "| Item | Qty | Price |",
+            "| Widget | 3 | 1.50 |",
+            "| Gadget | 1 | 9.99 |",
+        ],
+        must_not_include=[
+            "16384",
+        ],
+    ),
 ]
 
 
