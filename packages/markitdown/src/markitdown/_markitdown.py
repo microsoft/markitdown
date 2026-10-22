@@ -1,6 +1,8 @@
+import ipaddress
 import mimetypes
 import os
 import re
+import socket
 import sys
 import shutil
 import traceback
@@ -11,7 +13,7 @@ from email.utils import collapse_rfc2231_value
 from importlib.metadata import entry_points
 from typing import Any, List, Dict, Optional, Union, BinaryIO
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 from warnings import warn
 import requests
 import magika
@@ -51,6 +53,69 @@ from ._exceptions import (
     UnsupportedFormatException,
     FailedConversionAttempt,
 )
+
+
+# Explicit (connect, read) timeout, in seconds, applied to every outbound HTTP(S)
+# fetch. Without a finite timeout a stalled peer can pin a worker thread forever.
+_DEFAULT_HTTP_TIMEOUT = (10, 30)
+
+# Maximum number of HTTP redirects we are willing to follow manually.
+_MAX_HTTP_REDIRECTS = 5
+
+
+def _is_non_public_ip(ip: Union[ipaddress.IPv4Address, ipaddress.IPv6Address]) -> bool:
+    """Return True when ``ip`` is not a globally routable unicast address.
+
+    This rejects loopback, link-local (including the cloud metadata address
+    169.254.169.254), RFC1918 private space, IPv6 ULA/link-local, multicast,
+    reserved, unspecified and documentation ranges.
+    """
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        return _is_non_public_ip(ip.ipv4_mapped)
+    return not ip.is_global
+
+
+def _validate_fetch_destination(
+    uri: str, allow_private_networks: bool = False
+) -> None:
+    """Validate that an HTTP(S) URI targets an allowed, publicly routable host.
+
+    Raises ``ValueError`` for unsupported schemes, missing hosts, unresolvable
+    hosts, or (unless ``allow_private_networks`` is set) any host that resolves
+    to a non-public address. This is re-applied to every redirect hop so an open
+    redirect cannot pivot into the internal network.
+    """
+    parsed = urlparse(uri)
+    scheme = parsed.scheme.lower()
+    if scheme not in ("http", "https"):
+        raise ValueError(
+            f"Unsupported URI scheme for remote fetch: {scheme!r}. "
+            "Only 'http' and 'https' are permitted."
+        )
+
+    host = parsed.hostname
+    if not host:
+        raise ValueError(f"URI has no host: {uri!r}")
+
+    port = parsed.port or (443 if scheme == "https" else 80)
+    try:
+        infos = socket.getaddrinfo(
+            host, port, proto=socket.IPPROTO_TCP
+        )
+    except socket.gaierror as exc:
+        raise ValueError(f"Could not resolve host {host!r}: {exc}") from exc
+
+    if allow_private_networks:
+        return
+
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0])
+        if _is_non_public_ip(ip):
+            raise ValueError(
+                f"Refusing to fetch {uri!r}: host {host!r} resolves to "
+                f"non-public address {ip}. Set allow_private_networks=True "
+                "to permit non-public destinations explicitly."
+            )
 
 
 def _get_content_disposition_filename(content_disposition: str) -> Optional[str]:
@@ -151,6 +216,10 @@ class MarkItDown:
     ):
         self._builtins_enabled = False
         self._plugins_enabled = False
+
+        # Outbound HTTP(S) fetching refuses non-public destinations by default.
+        # Operators who explicitly need to reach a private endpoint must opt in.
+        self._allow_private_networks = bool(kwargs.get("allow_private_networks", False))
 
         requests_session = kwargs.get("requests_session")
         if requests_session is None:
@@ -512,7 +581,7 @@ class MarkItDown:
             )
         # HTTP/HTTPS URIs
         elif scheme in ("http", "https"):
-            response = self._requests_session.get(uri, stream=True)
+            response = self._fetch_http(uri)
             response.raise_for_status()
             return self.convert_response(
                 response,
@@ -525,6 +594,33 @@ class MarkItDown:
             raise ValueError(
                 f"Unsupported URI scheme: {uri.split(':')[0]}. Supported schemes are: file:, data:, http:, https:"
             )
+
+    def _fetch_http(self, uri: str) -> requests.Response:
+        """Fetch an HTTP(S) URI with destination validation and bounded redirects.
+
+        The destination policy is enforced on the original URI and re-applied on
+        every redirect hop, ``requests`` is told not to follow redirects itself,
+        and every request carries an explicit connect/read timeout.
+        """
+        current = uri
+        for _ in range(_MAX_HTTP_REDIRECTS + 1):
+            _validate_fetch_destination(current, self._allow_private_networks)
+            response = self._requests_session.get(
+                current,
+                stream=True,
+                allow_redirects=False,
+                timeout=_DEFAULT_HTTP_TIMEOUT,
+            )
+            if not response.is_redirect and not response.is_permanent_redirect:
+                return response
+            location = response.headers.get("Location")
+            response.close()
+            if not location:
+                return response
+            current = urljoin(current, location)
+        raise ValueError(
+            f"Too many redirects (more than {_MAX_HTTP_REDIRECTS}) while fetching {uri!r}"
+        )
 
     def convert_response(
         self,
