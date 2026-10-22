@@ -137,9 +137,13 @@ def _pre_process_math(content: bytes) -> bytes:
         bytes: The processed content with OMML elements replaced by their LaTeX equivalents, encoded as bytes.
     """
     soup = BeautifulSoup(content.decode(), features="xml")
-    for tag in soup.find_all("oMathPara"):
-        _replace_equations(tag)
-    for tag in soup.find_all("oMath"):
+    # Traverse the document once and skip the nested ``oMath`` nodes that are
+    # already covered by the parent ``oMathPara`` conversion. This keeps the
+    # existing behavior while avoiding a second full tree walk over every math
+    # block in large DOCX files.
+    for tag in soup.find_all(["oMathPara", "oMath"]):
+        if tag.name == "oMath" and tag.find_parent("oMathPara") is not None:
+            continue
         _replace_equations(tag)
     return str(soup).encode()
 
