@@ -681,6 +681,58 @@ def test_windows_local_drive_uri(authority: str, uri_path: str, expected: str) -
     assert path == expected
 
 
+# ExifTool discovery
+
+
+def _discovered_exiftool(monkeypatch: pytest.MonkeyPatch, found: str):
+    monkeypatch.delenv("EXIFTOOL_PATH", raising=False)
+    monkeypatch.setattr(
+        "markitdown._markitdown.shutil.which",
+        lambda name: found if name == "exiftool" else None,
+    )
+    return MarkItDown()._exiftool_path
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows paths are case-insensitive")
+@pytest.mark.parametrize(
+    "found",
+    [
+        r"C:\Windows\System32\exiftool.exe",
+        # The default Windows PATH spells System32 like this.
+        r"C:\WINDOWS\system32\exiftool.exe",
+        r"c:\program files\exiftool.exe",
+        "C:/Program Files (x86)/exiftool.exe",
+    ],
+)
+def test_exiftool_found_in_windows_directory_of_any_case(
+    monkeypatch: pytest.MonkeyPatch, found: str
+) -> None:
+    assert _discovered_exiftool(monkeypatch, found) == os.path.abspath(found)
+
+
+@pytest.mark.parametrize(
+    "found",
+    [
+        r"C:\Windows\Temp\exiftool.exe",
+        r"C:\WINDOWS\system32\tools\exiftool.exe",
+        "/home/user/bin/exiftool",
+        "/usr/bin/tools/exiftool",
+    ],
+)
+def test_exiftool_outside_trusted_directories_is_ignored(
+    monkeypatch: pytest.MonkeyPatch, found: str
+) -> None:
+    assert _discovered_exiftool(monkeypatch, found) is None
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX paths are case-sensitive")
+def test_exiftool_posix_directory_match_is_exact(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert _discovered_exiftool(monkeypatch, "/usr/bin/exiftool") == "/usr/bin/exiftool"
+    assert _discovered_exiftool(monkeypatch, "/USR/BIN/exiftool") is None
+
+
 # Charset sampling
 
 
