@@ -301,6 +301,92 @@ def test_subscript_with_missing_text_run_does_not_crash():
     assert "1" in result.latex
 
 
+# Delimiters with several arguments
+
+# `<m:e>` may repeat inside `<m:d>`, with `<m:sepChr>` naming the separator.
+# Previously only the last argument was kept and `sepChr` was never read.
+
+
+def _r(text: str) -> str:
+    return f"<m:r><m:t>{text}</m:t></m:r>"
+
+
+def _delimiter_latex(xml_fragment: str) -> str:
+    return oMath2Latex(_parse_omath(xml_fragment)).latex
+
+
+def test_delimiter_explicit_separator_keeps_every_argument():
+    xml = (
+        _r("f")
+        + '<m:d><m:dPr><m:sepChr m:val=","/></m:dPr>'
+        + f"<m:e>{_r('x')}</m:e><m:e>{_r('y')}</m:e></m:d>"
+    )
+    assert _delimiter_latex(xml) == "f\\left(x,y\\right)"
+
+
+def test_delimiter_default_separator_is_vertical_bar():
+    xml = (
+        '<m:d><m:dPr><m:begChr m:val="{"/><m:endChr m:val="}"/></m:dPr>'
+        f"<m:e>{_r('x')}</m:e><m:e>{_r('x>0')}</m:e></m:d>"
+    )
+    assert _delimiter_latex(xml) == "\\left\\{x|x>0\\right\\}"
+
+
+def test_delimiter_three_arguments_with_semicolon():
+    xml = (
+        '<m:d><m:dPr><m:sepChr m:val=";"/></m:dPr>'
+        f"<m:e>{_r('a')}</m:e><m:e>{_r('b')}</m:e><m:e>{_r('c')}</m:e></m:d>"
+    )
+    assert _delimiter_latex(xml) == "\\left(a;b;c\\right)"
+
+
+def test_delimiter_empty_separator_means_no_separator():
+    xml = (
+        '<m:d><m:dPr><m:sepChr m:val=""/></m:dPr>'
+        f"<m:e>{_r('a')}</m:e><m:e>{_r('b')}</m:e></m:d>"
+    )
+    assert _delimiter_latex(xml) == "\\left(ab\\right)"
+
+
+def test_delimiter_separator_without_val_uses_default():
+    # `m:val` is required on `<m:sepChr>`; when a document omits it anyway, the
+    # parent's default applies (ECMA-376 `val`: "When it is omitted, the parent
+    # uses its assigned default"), so the separator is "|", not nothing.
+    xml = (
+        "<m:d><m:dPr><m:sepChr/></m:dPr>"
+        f"<m:e>{_r('a')}</m:e><m:e>{_r('b')}</m:e></m:d>"
+    )
+    assert _delimiter_latex(xml) == "\\left(a|b\\right)"
+
+
+def test_delimiter_single_argument_is_unchanged():
+    xml = f"<m:d><m:dPr/><m:e>{_r('x')}</m:e></m:d>"
+    assert _delimiter_latex(xml) == "\\left(x\\right)"
+
+
+def test_delimiter_without_properties_uses_defaults():
+    # `<m:dPr>` is optional; this used to raise KeyError: 'dPr'.
+    xml = f"<m:d><m:e>{_r('a')}</m:e><m:e>{_r('b')}</m:e></m:d>"
+    assert _delimiter_latex(xml) == "\\left(a|b\\right)"
+
+
+def test_delimiter_without_arguments_is_empty():
+    # This used to raise KeyError: 'e'.
+    assert _delimiter_latex("<m:d><m:dPr/></m:d>") == "\\left(\\right)"
+
+
+def test_docx_delimiter_keeps_every_argument():
+    equation = (
+        "<m:oMath>"
+        + _r("f")
+        + '<m:d><m:dPr><m:sepChr m:val=","/></m:dPr>'
+        + f"<m:e>{_r('x')}</m:e><m:e>{_r('y')}</m:e></m:d>"
+        + "</m:oMath>"
+    )
+    result = DocxConverter().convert(_docx(_paragraph(equation)), _INFO)
+    assert "$f\\left(x,y\\right)$" in result.markdown
+
+
 # Stylesheet repair
 
 WORD_NAMESPACE = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
