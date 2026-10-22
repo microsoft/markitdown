@@ -57,14 +57,18 @@ class HtmlConverter(DocumentConverter):
         for script in soup(["script", "style"]):
             script.extract()
 
+        # Capture document title before head removal
+        doc_title = None if soup.title is None else soup.title.string
+
+        # Remove <head> tag and its contents so metadata does not leak into body
+        head_elm = soup.find("head")
+        if head_elm:
+            head_elm.extract()
+
         # Print only the main content
-        body_elm = soup.find("body")
         webpage_text = ""
         try:
-            if body_elm:
-                webpage_text = _CustomMarkdownify(**kwargs).convert_soup(body_elm)
-            else:
-                webpage_text = _CustomMarkdownify(**kwargs).convert_soup(soup)
+            webpage_text = _CustomMarkdownify(**kwargs).convert_soup(soup)
         except RecursionError:
             if strict:
                 raise
@@ -77,8 +81,7 @@ class HtmlConverter(DocumentConverter):
                 "(RecursionError). Falling back to plain-text extraction.",
                 stacklevel=2,
             )
-            target = body_elm if body_elm else soup
-            webpage_text = target.get_text("\n", strip=True)
+            webpage_text = soup.get_text("\n", strip=True)
 
         assert isinstance(webpage_text, str)
 
@@ -87,7 +90,7 @@ class HtmlConverter(DocumentConverter):
 
         return DocumentConverterResult(
             markdown=webpage_text,
-            title=None if soup.title is None else soup.title.string,
+            title=doc_title,
         )
 
     def convert_string(
