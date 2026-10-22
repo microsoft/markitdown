@@ -333,7 +333,14 @@ class PptxConverter(DocumentConverter):
                 md += f": {chart.chart_title.text_frame.text}"
             md += "\n\n"
             data = []
-            category_names = [c.label for c in chart.plots[0].categories]
+            categories_obj = chart.plots[0].categories
+            if hasattr(categories_obj, "flattened_labels"):
+                category_names = [
+                    " / ".join(str(lbl) for lbl in path if str(lbl).strip())
+                    for path in categories_obj.flattened_labels
+                ]
+            else:
+                category_names = [c.label for c in categories_obj]
             series_list = list(chart.series)
             series_names = [s.name for s in series_list]
             data.append(["Category"] + series_names)
