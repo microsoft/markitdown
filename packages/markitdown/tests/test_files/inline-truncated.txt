@@ -1,0 +1,5 @@
+Synthetic PDFs generated with PyMuPDF 1.28.2. No real documents or personal data.
+An inline 16x16 one-bit image uses ASCII85+Flate with a bare ~ terminator.
+PyMuPDF tolerates this malformed terminator; pdfminer consumes following text.
+False/True denote uncompressed/Flate-compressed page content streams.
+The mixed fixture adds long prose and a four-row three-column table.

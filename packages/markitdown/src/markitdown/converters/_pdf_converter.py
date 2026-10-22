@@ -492,6 +492,45 @@ def _extract_tables_from_words(page: Any) -> list[list[list[str]]]:
     return [table_rows]
 
 
+def _recover_inline_image_pages(
+    pdf_bytes: io.BytesIO, plain_pages: dict[int, str]
+) -> dict[int, str]:
+    """Recover truncated plain pages when the optional PyMuPDF extra is installed."""
+    try:
+        import pymupdf
+    except ImportError:
+        return {}
+
+    recovered: dict[int, str] = {}
+    try:
+        with pymupdf.open(stream=pdf_bytes.getvalue(), filetype="pdf") as pdf:
+            for page_index, primary in plain_pages.items():
+                try:
+                    page = pdf[page_index]
+                    # Inspect decoded page images, including compressed content
+                    # streams. Inline images have no indirect object reference.
+                    if not any(
+                        image["xref"] == 0 for image in page.get_image_info(xrefs=True)
+                    ):
+                        continue
+                    candidate = page.get_text("text", sort=True).strip()
+                    primary_words = primary.split()
+                    candidate_words = candidate.split()
+                    # Only accept a strict continuation of the primary text;
+                    # length alone can select unrelated or reordered content.
+                    if (
+                        len(candidate_words) > len(primary_words)
+                        and candidate_words[: len(primary_words)] == primary_words
+                    ):
+                        recovered[page_index] = candidate
+                except Exception:
+                    # Recovery must not discard an otherwise usable page.
+                    continue
+    except Exception:
+        pass
+    return recovered
+
+
 class PdfConverter(DocumentConverter):
     """
     Converts PDFs to Markdown.
@@ -547,7 +586,7 @@ class PdfConverter(DocumentConverter):
             # keep memory usage constant regardless of page count.
             markdown_chunks: list[str] = []
             form_page_count = 0
-            plain_page_indices: list[int] = []
+            plain_pages: dict[int, str] = {}
 
             with pdfplumber.open(pdf_bytes) as pdf:
                 for page_idx, page in enumerate(pdf.pages):
@@ -555,23 +594,26 @@ class PdfConverter(DocumentConverter):
 
                     if page_content is not None:
                         form_page_count += 1
-                        if page_content.strip():
-                            markdown_chunks.append(page_content)
+                        markdown_chunks.append(page_content.strip())
                     else:
-                        plain_page_indices.append(page_idx)
-                        text = page.extract_text()
-                        if text and text.strip():
-                            markdown_chunks.append(text.strip())
+                        text = (page.extract_text() or "").strip()
+                        plain_pages[page_idx] = text
+                        markdown_chunks.append(text)
 
                     page.close()  # Free cached page data immediately
 
             # If no pages had form-style content, use pdfminer for
             # the whole document (better text spacing for prose).
-            if form_page_count == 0:
+            recovered = _recover_inline_image_pages(pdf_bytes, plain_pages)
+            for page_idx, text in recovered.items():
+                markdown_chunks[page_idx] = text
+            if form_page_count == 0 and not recovered:
                 pdf_bytes.seek(0)
                 markdown = pdfminer.high_level.extract_text(pdf_bytes)
             else:
-                markdown = "\n\n".join(markdown_chunks).strip()
+                markdown = "\n\n".join(
+                    chunk for chunk in markdown_chunks if chunk
+                ).strip()
 
         except Exception:
             # Fallback if pdfplumber fails
