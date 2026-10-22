@@ -5,7 +5,6 @@ import re
 from unittest.mock import patch
 
 import pytest
-
 from markitdown import MarkItDown
 from markitdown.converters._pdf_converter import (
     PARTIAL_NUMBERING_PATTERN,
@@ -1381,6 +1380,59 @@ def test_markitdown_remote() -> None:
     result = markitdown.convert(PDF_TEST_URL)
     for test_string in PDF_TEST_STRINGS:
         assert test_string in result.text_content
+
+
+def test_pdf_embedded_images_are_captioned_with_llm() -> None:
+    from unittest.mock import MagicMock
+
+    pdf_path = os.path.join(
+        TEST_FILES_DIR, "REPAIR-2022-INV-001_multipage.pdf"
+    )
+    client = MagicMock()
+    client.chat.completions.create.return_value.choices[0].message.content = (
+        "Chart summary: quarterly values increased."
+    )
+    prompt = "Describe this PDF image."
+
+    result = MarkItDown(
+        llm_client=client,
+        llm_model="test-model",
+        llm_prompt=prompt,
+    ).convert(pdf_path)
+
+    assert client.chat.completions.create.call_count == 2
+    assert "### Image on page 1" in result.text_content
+    assert "### Image on page 2" in result.text_content
+    assert result.text_content.count(
+        "Chart summary: quarterly values increased."
+    ) == 2
+    for call in client.chat.completions.create.call_args_list:
+        assert call.kwargs["model"] == "test-model"
+        assert call.kwargs["messages"][0]["content"][0]["text"] == prompt
+
+
+def test_pdf_embedded_images_use_chart_extraction_prompt_by_default() -> None:
+    from unittest.mock import MagicMock
+
+    pdf_path = os.path.join(
+        TEST_FILES_DIR, "REPAIR-2022-INV-001_multipage.pdf"
+    )
+    client = MagicMock()
+    client.chat.completions.create.return_value.choices[0].message.content = (
+        "Chart data extracted."
+    )
+
+    MarkItDown(
+        llm_client=client,
+        llm_model="test-model",
+    ).convert(pdf_path)
+
+    assert client.chat.completions.create.call_count == 2
+    for call in client.chat.completions.create.call_args_list:
+        prompt = call.kwargs["messages"][0]["content"][0]["text"]
+        assert "chart or graph" in prompt
+        assert "Markdown table" in prompt
+        assert "Do not invent unreadable values" in prompt
 
 
 if __name__ == "__main__":

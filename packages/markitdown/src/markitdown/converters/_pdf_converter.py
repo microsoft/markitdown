@@ -1,11 +1,12 @@
-import sys
 import io
 import re
-from typing import BinaryIO, Any
+import sys
+from typing import Any, BinaryIO
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
+from .._exceptions import MISSING_DEPENDENCY_MESSAGE, MissingDependencyException
 from .._stream_info import StreamInfo
-from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+from ._llm_caption import llm_caption
 
 # Pattern for MasterFormat-style partial numbering (e.g., ".1", ".2", ".10")
 PARTIAL_NUMBERING_PATTERN = re.compile(r"^\.\d+$")
@@ -492,6 +493,39 @@ def _extract_tables_from_words(page: Any) -> list[list[list[str]]]:
     return [table_rows]
 
 
+def _extract_pdf_image_payload(image: dict[str, Any]) -> tuple[bytes, str, str] | None:
+    """Return image bytes and MIME metadata when the embedded format is recognized."""
+    from pdfminer.pdfexceptions import PDFException
+
+    image_stream = image.get("stream")
+    if image_stream is None:
+        return None
+
+    try:
+        data = image_stream.get_data()
+    except PDFException:
+        return None
+
+    if not isinstance(data, bytes) or not data:
+        return None
+
+    signatures = (
+        (b"\xff\xd8\xff", "image/jpeg", ".jpg"),
+        (b"\x89PNG\r\n\x1a\n", "image/png", ".png"),
+        (b"GIF87a", "image/gif", ".gif"),
+        (b"GIF89a", "image/gif", ".gif"),
+        (b"II*\x00", "image/tiff", ".tif"),
+        (b"MM\x00*", "image/tiff", ".tif"),
+        (b"RIFF", "image/webp", ".webp"),
+    )
+    for signature, mimetype, extension in signatures:
+        if data.startswith(signature) and (
+            mimetype != "image/webp" or data[8:12] == b"WEBP"
+        ):
+            return data, mimetype, extension
+    return None
+
+
 class PdfConverter(DocumentConverter):
     """
     Converts PDFs to Markdown.
@@ -539,6 +573,8 @@ class PdfConverter(DocumentConverter):
         # Read file stream into BytesIO for compatibility with pdfplumber
         pdf_bytes = io.BytesIO(file_stream.read())
 
+        embedded_images: list[tuple[int, bytes, str, str]] = []
+
         try:
             # Single pass: check every page for form-style content.
             # Pages with tables/forms get rich extraction; plain-text
@@ -563,6 +599,14 @@ class PdfConverter(DocumentConverter):
                         if text and text.strip():
                             markdown_chunks.append(text.strip())
 
+                    for image in page.images:
+                        payload = _extract_pdf_image_payload(image)
+                        if payload is not None:
+                            image_data, mimetype, extension = payload
+                            embedded_images.append(
+                                (page_idx + 1, image_data, mimetype, extension)
+                            )
+
                     page.close()  # Free cached page data immediately
 
             # If no pages had form-style content, use pdfminer for
@@ -582,6 +626,40 @@ class PdfConverter(DocumentConverter):
         if not markdown:
             pdf_bytes.seek(0)
             markdown = pdfminer.high_level.extract_text(pdf_bytes)
+
+        # Analyze embedded PDF images when an LLM client is configured.
+        llm_client = kwargs.get("llm_client")
+        llm_model = kwargs.get("llm_model")
+
+        if llm_client is not None and llm_model and embedded_images:
+            image_prompt = kwargs.get("llm_prompt") or (
+                "Analyze this image from a PDF. If it contains a chart or graph, "
+                "extract its data into a Markdown table, preserving labels, units, "
+                "and legible values. Do not invent unreadable values. Otherwise, "
+                "provide a concise description of the image."
+            )
+            image_chunks: list[str] = []
+
+            for page_number, image_data, mimetype, extension in embedded_images:
+                caption = llm_caption(
+                    io.BytesIO(image_data),
+                    StreamInfo(mimetype=mimetype, extension=extension),
+                    client=llm_client,
+                    model=llm_model,
+                    prompt=image_prompt,
+                )
+                if caption and caption.strip():
+                    image_chunks.append(
+                        f"### Image on page {page_number}\n\n{caption.strip()}"
+                    )
+
+            if image_chunks:
+                image_markdown = "\n\n".join(image_chunks)
+                markdown = (
+                    f"{markdown.rstrip()}\n\n{image_markdown}"
+                    if markdown and markdown.strip()
+                    else image_markdown
+                )
 
         # Post-process to merge MasterFormat-style partial numbering with following text
         markdown = _merge_partial_numbering_lines(markdown)
