@@ -23,7 +23,9 @@ from markitdown_ocr._ocr_service import OCRResult  # noqa: E402
 from markitdown_ocr._pdf_converter_with_ocr import (  # noqa: E402
     PdfConverterWithOCR,
 )
-from markitdown import StreamInfo  # noqa: E402
+from markitdown import MarkItDown, StreamInfo  # noqa: E402
+from markitdown.converters import PdfConverter  # noqa: E402
+from markitdown_ocr import register_converters  # noqa: E402
 
 TEST_DATA_DIR = Path(__file__).parent / "ocr_test_data"
 
@@ -246,3 +248,33 @@ def test_pdf_no_ocr_service_no_tags() -> None:
         md = converter.convert(f, StreamInfo(extension=".pdf")).text_content
     assert "*[Image OCR]" not in md
     assert "[End OCR]*" not in md
+
+
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "SPARSE-2024-INV-1234_borderless_table.pdf",
+        "pdf_cleanup_plain.pdf",
+        "masterformat_partial_numbering.pdf",
+    ],
+)
+def test_pdf_without_ocr_preserves_builtin_conversion(filename: str) -> None:
+    path = (
+        Path(__file__).resolve().parents[2]
+        / "markitdown"
+        / "tests"
+        / "test_files"
+        / filename
+    )
+    expected = MarkItDown().convert(path).markdown
+    converter = MarkItDown()
+    register_converters(converter)
+
+    assert converter.convert(path).markdown == expected
+
+    with path.open("rb") as stream:
+        expected_direct = PdfConverter().convert(stream, StreamInfo(extension=".pdf"))
+        stream.seek(0)
+        stream.read(1)
+        actual = PdfConverterWithOCR().convert(stream, StreamInfo(extension=".pdf"))
+    assert actual.markdown == expected_direct.markdown
