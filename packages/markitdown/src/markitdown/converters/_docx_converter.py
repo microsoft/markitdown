@@ -29,6 +29,13 @@ ACCEPTED_FILE_EXTENSIONS = [".docx"]
 
 _UNDERLINE_STYLE_MAP = "u => u"
 
+# Mammoth's default style map only handles Heading 1-6. Word defines Heading
+# styles 1 through 9; markdown has no level past 6, so clamp 7-9 to h6 rather
+# than losing the heading structure entirely.
+_HEADING_7_to_9_STYLE_MAP = "\n".join(
+    f"p[style-name='Heading {n}'] => h6:fresh" for n in range(7, 10)
+)
+
 
 def _read_embedded_style_map(file_stream: BinaryIO) -> Optional[str]:
     """Read the style map embedded in a .docx, if it has one."""
@@ -97,6 +104,7 @@ class DocxConverter(HtmlConverter):
             for part in (
                 caller_style_map,
                 embedded_style_map,
+                _HEADING_7_to_9_STYLE_MAP,
                 _UNDERLINE_STYLE_MAP,
             )
             if part
