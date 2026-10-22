@@ -98,6 +98,13 @@ def _read_charset_sample(file_stream: BinaryIO) -> bytes:
     return sample
 
 
+def _rstrip_preserving_hard_break(line: str) -> str:
+    """Retain Markdown input's two-space break syntax on nonblank lines."""
+    if line.endswith("  ") and line.strip():
+        return line
+    return line.rstrip()
+
+
 # Lower priority values are tried first.
 PRIORITY_SPECIFIC_FILE_FORMAT = (
     0.0  # e.g., .docx, .pdf, .xlsx, Or specific pages, e.g., wikipedia
@@ -678,9 +685,21 @@ class MarkItDown:
                         file_stream.seek(cur_pos)
 
                 if res is not None:
+                    preserve_hard_breaks = isinstance(
+                        converter, PlainTextConverter
+                    ) and (
+                        (stream_info.extension or "").lower() in (".md", ".markdown")
+                        or (stream_info.mimetype or "").split(";", 1)[0].strip().lower()
+                        in ("text/markdown", "application/markdown")
+                    )
                     # Normalize the content
                     res.text_content = "\n".join(
-                        [line.rstrip() for line in re.split(r"\r?\n", res.text_content)]
+                        [
+                            _rstrip_preserving_hard_break(line)
+                            if preserve_hard_breaks
+                            else line.rstrip()
+                            for line in re.split(r"\r?\n", res.text_content)
+                        ]
                     )
                     res.text_content = re.sub(r"\n{3,}", "\n\n", res.text_content)
                     return res
