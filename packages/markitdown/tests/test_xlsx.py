@@ -3,6 +3,7 @@
 import inspect
 import io
 import zipfile
+from datetime import datetime
 from pathlib import Path
 from typing import Any, BinaryIO, Callable, Optional
 from unittest.mock import Mock
@@ -467,6 +468,138 @@ def test_missing_dependencies_and_legacy_xls_stay_separate(
 
 
 # Conversion regressions
+
+
+@pytest.mark.parametrize(
+    "error", ["#DIV/0!", "#REF!", "#VALUE!", "#N/A", "#NUM!", "#NAME?", "#NULL!"]
+)
+@pytest.mark.parametrize("legacy_sheetview", [False, True])
+def test_xlsx_preserves_error_cells(error: str, legacy_sheetview: bool) -> None:
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = "Results"
+    sheet.append(["Case", "Result"])
+    sheet.append(["Valid", 42])
+    sheet.append(["Calculation", error])
+    sheet.append(["Blank", None])
+    sheet.append(["Literal", error])
+    sheet["B5"].data_type = "s"
+    stream = io.BytesIO()
+    workbook.save(stream)
+    workbook.close()
+    data = stream.getvalue()
+    if legacy_sheetview:
+        data = _rewrite(
+            data,
+            lambda name, content: (
+                content.replace(b"<sheetView ", b'<sheetView showZeroes="0" ', 1)
+                if name == "xl/worksheets/sheet1.xml"
+                else content
+            ),
+        )
+
+    source = io.BytesIO(data)
+    result = MarkItDown(enable_plugins=False).convert_stream(source, stream_info=_INFO)
+
+    assert f"| Calculation | {error} |" in result.markdown
+    # Do not change the separate NA-text / blank-cell behavior here.
+    assert "| Blank | NaN |" in result.markdown
+    assert not source.closed and source.getvalue() == data
+
+
+def test_xlsx_preserves_error_headers_and_sparse_positions() -> None:
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = "Sparse"
+    sheet.append(["#REF!", "Label", "#REF!"])
+    sheet.append([11, "First", "#DIV/0!"])
+    sheet.append([None, None, None])
+    sheet.append(["#N/A", "Last", 33])
+    only_errors = workbook.create_sheet("Errors only")
+    only_errors.append(["#VALUE!"])
+    only_errors.append(["#NUM!"])
+    stream = io.BytesIO()
+    workbook.save(stream)
+    workbook.close()
+
+    markdown = _convert(XlsxConverter(), stream.getvalue())
+
+    assert "| #REF! | Label | #REF! |" in markdown
+    assert "| 11.0 | First | #DIV/0! |" in markdown
+    assert "| NaN | NaN | NaN |" in markdown
+    assert "| #N/A | Last | 33.0 |" in markdown
+    assert "## Errors only\n| #VALUE! |\n| --- |\n| #NUM! |" in markdown
+
+
+def test_xlsx_preserves_cached_formula_error_without_evaluating() -> None:
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.append(["Case", "Result"])
+    sheet.append(["Formula", "#DIV/0!"])
+    stream = io.BytesIO()
+    workbook.save(stream)
+    workbook.close()
+    data = _rewrite(
+        stream.getvalue(),
+        lambda name, content: (
+            content.replace(b"<v>#DIV/0!</v>", b"<f>1/0</f><v>#DIV/0!</v>")
+            if name == "xl/worksheets/sheet1.xml"
+            else content
+        ),
+    )
+    cached = openpyxl.load_workbook(io.BytesIO(data), data_only=True)
+    assert cached.active["B2"].data_type == "e"
+    assert cached.active["B2"].value == "#DIV/0!"
+    cached.close()
+
+    assert "| Formula | #DIV/0! |" in _convert(XlsxConverter(), data)
+
+
+@pytest.mark.parametrize("position", ["A1", "D7"])
+def test_xlsx_empty_error_cells_keep_blank_behavior(position: str) -> None:
+    workbook = openpyxl.Workbook()
+    workbook.active.append(["Header"])
+    workbook.active.append([1])
+    workbook.active[position] = "#REF!"
+    stream = io.BytesIO()
+    workbook.save(stream)
+    workbook.close()
+    data = _rewrite(
+        stream.getvalue(),
+        lambda name, content: (
+            content.replace(b"<v>#REF!</v>", b"")
+            if name == "xl/worksheets/sheet1.xml"
+            else content
+        ),
+    )
+    frame = _xlsx_converter.pd.read_excel(io.BytesIO(data), engine="openpyxl")
+    converter = XlsxConverter()
+    expected = converter._html_converter.convert_string(frame.to_html(index=False))
+    assert _convert(converter, data) == "## Sheet\n" + expected.markdown.strip()
+
+
+@pytest.mark.parametrize(
+    "value",
+    [0.000000123456, 0.00000000123456, 12345678.123456, datetime(2026, 1, 2)],
+)
+def test_xlsx_error_cells_preserve_other_value_formatting(value: Any) -> None:
+    workbook = openpyxl.Workbook()
+    workbook.active.append(["Case", "Result"])
+    workbook.active.append(["Value", value])
+    workbook.active.append(["Error", "#REF!"])
+    stream = io.BytesIO()
+    workbook.save(stream)
+    workbook.close()
+    data = stream.getvalue()
+    frame = _xlsx_converter.pd.read_excel(io.BytesIO(data), engine="openpyxl")
+    converter = XlsxConverter()
+    baseline = converter._html_converter.convert_string(frame.to_html(index=False))
+    # The whole table must retain pandas' numeric/date rendering, except for the
+    # saved error itself. Inserting strings before to_html can round floats to 0.
+    expected = baseline.markdown.strip().replace("| Error | NaN |", "| Error | #REF! |")
+    expected = expected.replace("| Error | NaT |", "| Error | #REF! |")
+    assert "| Error | #REF! |" in expected
+    assert _convert(converter, data) == "## Sheet\n" + expected
 
 
 def test_xlsx_legacy_show_zeroes_sheetview(tmp_path) -> None:
