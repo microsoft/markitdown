@@ -13,19 +13,30 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 ACCEPTED_FILE_EXTENSIONS = [".csv"]
 
 
-# Matches a pipe together with the (possibly empty) run of backslashes in front
-# of it, so that run can be doubled before the pipe is escaped.
-# The lookbehind avoids retrying from each position inside a backslash run.
-_PIPE_ESCAPE_RE = re.compile(r"(?<!\\)(\\*)\|")
+# Consume a whole backslash run and any following Markdown-escapable ASCII
+# punctuation, or a bare pipe. The lookbehind avoids restarting within a run.
+_CELL_ESCAPE_RE = re.compile(r"(?<!\\)(\\+)([!\"#$%&'()*+,\-./:;<=>?@\[\]^_`{|}~])?|\|")
+
+
+def _escape_cell_match(match: re.Match[str]) -> str:
+    backslashes, punctuation = match.groups()
+    if backslashes is None:
+        return r"\|"
+    if len(backslashes) == 1 and punctuation is None:
+        # Single backslashes before letters (e.g. Windows paths) are literal.
+        return backslashes
+    return backslashes * 2 + ("\\" + punctuation if punctuation else "")
 
 
 def _escape_table_cell(value: str) -> str:
     r"""Escape a CSV value so it is safe inside a Markdown table cell.
 
+    Preserve backslashes that Markdown would otherwise consume as escapes.
+    A following punctuation character also needs escaping so it stays literal.
     A pipe is a column separator, so it must be escaped.
     Line breaks would end the row early, so they collapse to a single space.
     """
-    value = _PIPE_ESCAPE_RE.sub(lambda m: m.group(1) * 2 + r"\|", value)
+    value = _CELL_ESCAPE_RE.sub(_escape_cell_match, value)
     return value.replace("\r\n", " ").replace("\n", " ").replace("\r", " ")
 
 
