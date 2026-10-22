@@ -190,6 +190,24 @@ def test_data_uris() -> None:
     assert attributes["charset"] == "utf-8"
     assert data == b"Hello, World!"
 
+    # A raw '#' starts the URI fragment and is not part of the payload
+    data_uri = "data:text/plain,Hello#section"
+    mime_type, attributes, data = parse_data_uri(data_uri)
+    assert mime_type == "text/plain"
+    assert len(attributes) == 0
+    assert data == b"Hello"
+
+    data_uri = "data:text/plain;base64,SGVsbG8h#AAAA"
+    mime_type, attributes, data = parse_data_uri(data_uri)
+    assert mime_type == "text/plain"
+    assert data == b"Hello!"
+
+    # An escaped '#' is payload, and a query separator stays in the payload
+    data_uri = "data:text/plain,Hello%23World?"
+    mime_type, attributes, data = parse_data_uri(data_uri)
+    assert mime_type == "text/plain"
+    assert data == b"Hello#World?"
+
 
 def test_file_uris() -> None:
     expected_path = os.path.abspath("/path/to/file.txt")
