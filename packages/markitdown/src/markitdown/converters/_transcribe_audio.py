@@ -1,6 +1,6 @@
 import io
 import sys
-from typing import BinaryIO
+from typing import Any, BinaryIO
 from .._exceptions import MissingDependencyException
 
 # Try loading optional (but in this case, required) dependencies
@@ -27,8 +27,28 @@ except ImportError:
 
 
 def transcribe_audio(
-    file_stream: BinaryIO, *, audio_format: str = "wav", language: str = "en-US"
+    file_stream: BinaryIO,
+    *,
+    audio_format: str = "wav",
+    language: str = "en-US",
+    client: Any = None,
+    model: str = "whisper-1",
 ) -> str:
+    create_transcription = getattr(
+        getattr(getattr(client, "audio", None), "transcriptions", None), "create", None
+    )
+    if callable(create_transcription):
+        # An explicit provider stays selected, including on authentication/network
+        # errors. Upload the original encoding with its filename and media type;
+        # this path does not need the legacy Google or local decoder dependencies.
+        media_type = {"mp3": "audio/mpeg"}.get(audio_format, f"audio/{audio_format}")
+        transcription = create_transcription(
+            model=model,
+            file=(f"audio.{audio_format}", file_stream, media_type),
+        )
+        transcript = transcription.text.strip()
+        return "[No speech detected]" if not transcript else transcript
+
     # Check for installed dependencies
     if _dependency_exc_info is not None:
         raise MissingDependencyException(
