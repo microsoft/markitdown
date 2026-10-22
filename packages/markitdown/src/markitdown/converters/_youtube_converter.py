@@ -115,25 +115,27 @@ class YouTubeConverter(DocumentConverter):
                         metadata[key] = content
                     break
 
-        # Try reading the description
-        try:
-            for script in soup(["script"]):
-                if not isinstance(script, bs4.Tag):
-                    continue
-                if not script.string:  # Skip empty scripts
-                    continue
-                content = script.string
-                if "ytInitialData" in content:
-                    match = re.search(r"var ytInitialData = ({.*?});", content)
-                    if match:
-                        data = json.loads(match.group(1))
-                        attrdesc = self._findKey(data, "attributedDescriptionBodyText")
-                        if attrdesc and isinstance(attrdesc, dict):
-                            metadata["description"] = str(attrdesc.get("content", ""))
-                    break
-        except Exception as e:
-            print(f"Error extracting description: {e}")
-            pass
+        # Parse the JSON value after the assignment. A regex ending at "};"
+        # can stop inside a quoted description, losing the rest of the data.
+        for script in soup(["script"]):
+            if not isinstance(script, bs4.Tag) or not script.string:
+                continue
+            match = re.search(r"\bvar\s+ytInitialData\s*=\s*", script.string)
+            if match is None:
+                continue
+            try:
+                data, _ = json.JSONDecoder().raw_decode(
+                    script.string[match.end() :].lstrip()
+                )
+                attrdesc = self._findKey(data, "attributedDescriptionBodyText")
+            except (ValueError, RecursionError):
+                continue
+            description = (
+                attrdesc.get("content") if isinstance(attrdesc, dict) else None
+            )
+            if isinstance(description, str) and description:
+                metadata["description"] = description
+                break
 
         # Start preparing the page
         webpage_text = ""

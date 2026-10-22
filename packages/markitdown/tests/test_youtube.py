@@ -136,6 +136,65 @@ def test_youtube_preserves_metadata_output(
     transcript_api.assert_not_called()
 
 
+def test_youtube_description_keeps_json_string_with_script_terminator(
+    transcript_api: MagicMock,
+) -> None:
+    html = (
+        "<html><head><title>Video title</title>"
+        '<script>var ytInitialData = {"attributedDescriptionBodyText": '
+        '{"content": "A code sample contains }; inside the text"}};</script>'
+        "</head><body></body></html>"
+    )
+    result = YouTubeConverter().convert(
+        io.BytesIO(html.encode("utf-8")),
+        StreamInfo(url="https://www.youtube.com/watch?v=12345"),
+    )
+
+    assert (
+        "### Description\nA code sample contains }; inside the text\n"
+        in result.markdown
+    )
+    transcript_api.assert_not_called()
+
+
+def test_youtube_description_skips_unrelated_script(
+    transcript_api: MagicMock,
+) -> None:
+    html = (
+        "<html><head><title>Video title</title>"
+        '<script>console.log("ytInitialData");</script>'
+        '<script>var ytInitialData = {"attributedDescriptionBodyText": '
+        '{"content": "Full description"}};</script>'
+        "</head><body></body></html>"
+    )
+    result = YouTubeConverter().convert(
+        io.BytesIO(html.encode("utf-8")),
+        StreamInfo(url="https://www.youtube.com/watch?v=12345"),
+    )
+
+    assert "### Description\nFull description\n" in result.markdown
+    transcript_api.assert_not_called()
+
+
+def test_youtube_empty_initial_description_keeps_meta_fallback(
+    transcript_api: MagicMock,
+) -> None:
+    html = (
+        "<html><head><title>Video title</title>"
+        '<meta name="description" content="Metadata description">'
+        '<script>var ytInitialData = {"attributedDescriptionBodyText": '
+        '{"content": ""}};</script>'
+        "</head><body></body></html>"
+    )
+    result = YouTubeConverter().convert(
+        io.BytesIO(html.encode("utf-8")),
+        StreamInfo(url="https://www.youtube.com/watch?v=12345"),
+    )
+
+    assert "### Description\nMetadata description\n" in result.markdown
+    transcript_api.assert_not_called()
+
+
 @pytest.mark.parametrize("title", ["", "Video title"])
 def test_youtube_preserves_library_transcript(
     title: str,
