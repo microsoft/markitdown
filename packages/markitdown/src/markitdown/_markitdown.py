@@ -678,9 +678,15 @@ class MarkItDown:
                         file_stream.seek(cur_pos)
 
                 if res is not None:
-                    # Normalize the content
+                    # Normalize the content. Trailing spaces of 2 or more are a
+                    # Markdown hard line break (e.g. from <br> or a Word line
+                    # break rendered by markdownify) and must be preserved;
+                    # any other trailing whitespace is stripped.
                     res.text_content = "\n".join(
-                        [line.rstrip() for line in re.split(r"\r?\n", res.text_content)]
+                        [
+                            line if line.endswith("  ") else line.rstrip()
+                            for line in re.split(r"\r?\n", res.text_content)
+                        ]
                     )
                     res.text_content = re.sub(r"\n{3,}", "\n\n", res.text_content)
                     return res
