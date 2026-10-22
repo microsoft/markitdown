@@ -29,8 +29,24 @@ def _escape_table_cell(value: str) -> str:
     return value.replace("\r\n", " ").replace("\n", " ").replace("\r", " ")
 
 
+def _is_padding_row(row: list[str]) -> bool:
+    """Whether a parsed row carries only padded, empty cells.
+
+    Writers that pad every record to the column width emit a blank row as
+    "," or ",," rather than as an empty line -- ``pandas.DataFrame.to_csv``
+    does this for all-NaN rows -- so a run of empty (or whitespace-only)
+    cells is the same blank row. This is the same reading the PDF table
+    builder already uses in ``_pdf_converter._to_markdown_table``.
+
+    Only rows that follow the header can be judged this way: in the first
+    row, empty fields are indistinguishable from a header whose column
+    names are empty, so the leading run keeps the "no fields at all" test.
+    """
+    return all(not cell.strip() for cell in row)
+
+
 def _trim_outer_blank_rows(rows: list[list[str]]) -> None:
-    """Remove empty rows from the beginning and end, and immediately after the header. This operation is performed in-place."""
+    """Remove empty rows from the beginning and end, and immediately after the header. Once the header is known, a row of only empty cells counts as empty just as an absent one does. This operation is performed in-place."""
     start = 0
     while start < len(rows) and not rows[start]:
         start += 1
@@ -41,11 +57,11 @@ def _trim_outer_blank_rows(rows: list[list[str]]) -> None:
 
     header_index = start
     start += 1
-    while start < len(rows) and not rows[start]:
+    while start < len(rows) and _is_padding_row(rows[start]):
         start += 1
 
     end = len(rows)
-    while end > start and not rows[end - 1]:
+    while end > start and _is_padding_row(rows[end - 1]):
         end -= 1
 
     # Remove each blank run at once, rather than shifting the list per row.
