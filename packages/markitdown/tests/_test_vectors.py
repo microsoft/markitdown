@@ -32,6 +32,19 @@ GENERAL_TEST_VECTORS = [
         ],
     ),
     FileTestVector(
+        filename="test.doc",
+        mimetype="application/msword",
+        charset=None,
+        url=None,
+        must_include=[
+            "7f3a92b1-4d8e-4c6f-a1b2-9e0d5c3f2a11",
+            "b8e4d2c0-1f7a-4b9e-8c3d-6a2f0e5b1d98",
+            "The quick brown fox jumps over the lazy dog.",
+        ],
+        must_not_include=[],
+    ),
+
+    FileTestVector(
         filename="test.xlsx",
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         charset=None,
