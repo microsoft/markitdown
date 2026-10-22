@@ -1,0 +1,3 @@
+Synthetic BIFF8 workbook generated with xlwt 1.3.0.
+One sheet named Precision; A1 = value, A2 = 123456789.123, A3 = 0.1, A4 = 1e-10.
+No real user data. The committed fixture avoids adding an XLS writer to test or runtime dependencies.
