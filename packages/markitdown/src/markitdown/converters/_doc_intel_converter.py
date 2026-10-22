@@ -203,10 +203,9 @@ def _yaml_scalar(value: Any) -> str:
     # Quote when necessary: contains special chars, leading/trailing whitespace,
     # or characters that would confuse a YAML parser.
     if (
-        s == ""
+        not re.fullmatch(r"[A-Za-z_][A-Za-z0-9 _./-]*", s)
         or s != s.strip()
-        or any(c in s for c in ":#&*!|>'\"%@`\n\r\t")
-        or s.lower() in ("null", "true", "false", "yes", "no", "~")
+        or s.lower() in ("null", "true", "false", "yes", "no", "on", "off", "y", "n")
     ):
         # Escape backslashes and double quotes; collapse newlines.
         escaped = (
