@@ -232,6 +232,7 @@ When `cu_analyzer_id` is set, the converter automatically scopes it to compatibl
 **Cost note:** Each `convert()` call for a CU-routed format is a billable Azure API call. Use `cu_file_types` to restrict which formats route to CU:
 
 ```python
+from markitdown import MarkItDown
 from markitdown.converters import ContentUnderstandingFileType
 
 md = MarkItDown(
