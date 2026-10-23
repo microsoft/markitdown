@@ -363,6 +363,27 @@ def test_exceptions() -> None:
     assert type(exc_info.value.attempts[0].converter).__name__ == "PptxConverter"
 
 
+def test_legacy_doc_with_excel_mimetype_is_not_sent_to_xls_converter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    markitdown = MarkItDown()
+    monkeypatch.setattr(
+        markitdown._magika,
+        "identify_stream",
+        MagicMock(return_value=SimpleNamespace(status="unknown")),
+    )
+
+    with pytest.raises(UnsupportedFormatException):
+        markitdown.convert_stream(
+            io.BytesIO(b"\x00\x01\x02\x03" * 64),
+            stream_info=StreamInfo(
+                filename="legacy.doc",
+                extension=".doc",
+                mimetype="application/vnd.ms-excel",
+            ),
+        )
+
+
 def test_markitdown_llm_parameters() -> None:
     """Test that LLM parameters are correctly passed to the client."""
     mock_client = MagicMock()
