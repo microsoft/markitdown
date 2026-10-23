@@ -1,7 +1,7 @@
 import sys
 import io
 import re
-from typing import BinaryIO, Any
+from typing import BinaryIO, Any, Optional
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
@@ -62,9 +62,128 @@ _dependency_exc_info = None
 try:
     import pdfminer
     import pdfminer.high_level
+    from pdfminer.pdfparser import PDFParser
+    from pdfminer.pdfdocument import PDFDocument
     import pdfplumber
 except ImportError:
     _dependency_exc_info = sys.exc_info()
+
+
+# Metadata fields to extract, in display order
+_PDF_METADATA_FIELDS = [
+    ("Title", "Title"),
+    ("Author", "Author"),
+    ("Subject", "Subject"),
+    ("Keywords", "Keywords"),
+    ("Creator", "Creator"),
+    ("Producer", "Producer"),
+    ("CreationDate", "Created"),
+    ("ModDate", "Modified"),
+]
+
+
+def _decode_pdf_metadata_value(value: Any) -> Optional[str]:
+    """Decode a PDF metadata value to a string.
+
+    PDF metadata values may be bytes (possibly with a UTF-16 BOM or
+    PDFDocEncoding), Python strings, or other types. Returns None if
+    the value is empty or cannot be decoded.
+    """
+    if value is None:
+        return None
+
+    if isinstance(value, bytes):
+        # Try UTF-16 first (PDF strings often use UTF-16 BOM)
+        if value.startswith(b"\xfe\xff") or value.startswith(b"\xff\xfe"):
+            try:
+                decoded = value.decode("utf-16")
+                return decoded.strip() or None
+            except (UnicodeDecodeError, ValueError):
+                pass
+        # Try UTF-8
+        try:
+            decoded = value.decode("utf-8")
+            return decoded.strip() or None
+        except (UnicodeDecodeError, ValueError):
+            pass
+        # Fall back to latin-1 (PDFDocEncoding is close to latin-1)
+        try:
+            decoded = value.decode("latin-1")
+            return decoded.strip() or None
+        except (UnicodeDecodeError, ValueError):
+            return None
+
+    if isinstance(value, str):
+        return value.strip() or None
+
+    return None
+
+
+def _format_pdf_date(raw: str) -> str:
+    """Convert a PDF date string to a human-readable format.
+
+    PDF dates follow the format D:YYYYMMDDHHmmSSOHH'mm.
+    Returns the original string if parsing fails.
+    """
+    m = re.match(
+        r"D:(\d{4})(\d{2})?(\d{2})?(\d{2})?(\d{2})?(\d{2})?", raw
+    )
+    if not m:
+        return raw
+
+    year = m.group(1)
+    month = m.group(2) or "01"
+    day = m.group(3) or "01"
+    hour = m.group(4)
+    minute = m.group(5)
+    second = m.group(6)
+
+    date_str = f"{year}-{month}-{day}"
+    if hour and minute:
+        date_str += f" {hour}:{minute}"
+        if second:
+            date_str += f":{second}"
+
+    return date_str
+
+
+def _extract_pdf_metadata(file_stream: BinaryIO) -> dict[str, str]:
+    """Extract metadata from a PDF file stream.
+
+    Returns a dict of field label → decoded string value for
+    non-empty metadata fields.  The stream position is restored
+    after reading.
+    """
+    cur_pos = file_stream.tell()
+    try:
+        parser = PDFParser(file_stream)
+        doc = PDFDocument(parser)
+
+        metadata: dict[str, str] = {}
+        for info_dict in doc.info:
+            for pdf_key, display_label in _PDF_METADATA_FIELDS:
+                if display_label in metadata:
+                    continue  # already found
+                raw = info_dict.get(pdf_key)
+                decoded = _decode_pdf_metadata_value(raw)
+                if decoded:
+                    if pdf_key in ("CreationDate", "ModDate"):
+                        decoded = _format_pdf_date(decoded)
+                    metadata[display_label] = decoded
+
+        return metadata
+    except Exception:
+        return {}
+    finally:
+        file_stream.seek(cur_pos)
+
+
+def _format_metadata_block(metadata: dict[str, str]) -> str:
+    """Format metadata dict as a Markdown block."""
+    lines = []
+    for label, value in metadata.items():
+        lines.append(f"- **{label}:** {value}")
+    return "\n".join(lines)
 
 
 ACCEPTED_MIME_TYPE_PREFIXES = [
@@ -536,6 +655,9 @@ class PdfConverter(DocumentConverter):
 
         assert isinstance(file_stream, io.IOBase)
 
+        # Extract metadata before reading the stream for content extraction
+        metadata = _extract_pdf_metadata(file_stream)
+
         # Read file stream into BytesIO for compatibility with pdfplumber
         pdf_bytes = io.BytesIO(file_stream.read())
 
@@ -586,4 +708,10 @@ class PdfConverter(DocumentConverter):
         # Post-process to merge MasterFormat-style partial numbering with following text
         markdown = _merge_partial_numbering_lines(markdown)
 
-        return DocumentConverterResult(markdown=markdown)
+        # Prepend metadata block if metadata was found and there is body text
+        title = metadata.get("Title")
+        if metadata and markdown.strip():
+            metadata_block = _format_metadata_block(metadata)
+            markdown = metadata_block + "\n\n---\n\n" + markdown
+
+        return DocumentConverterResult(markdown=markdown, title=title)
