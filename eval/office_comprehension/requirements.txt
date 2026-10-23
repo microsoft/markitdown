@@ -1,0 +1,2 @@
+markitdown[all]>=0.1.0,<1
+openai>=1.66.0,<4

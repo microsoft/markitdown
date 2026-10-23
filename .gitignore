@@ -166,3 +166,7 @@ cython_debug/
 src/.DS_Store
 .DS_Store
 .cursorrules
+
+# Evaluation files
+eval/office_comprehension/data
+eval/office_comprehension/runs
