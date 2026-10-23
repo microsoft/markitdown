@@ -334,8 +334,12 @@ class PptxConverter(DocumentConverter):
                 md += f": {chart.chart_title.text_frame.text}"
             md += "\n\n"
             data = []
-            category_names = [c.label for c in chart.plots[0].categories]
-            if chart._chartSpace.xpath("./c:chart/c:plotArea/c:dateAx"):
+            plot = chart.plots[0]
+            category_names = [c.label for c in plot.categories]
+            date_axis_ids = chart._chartSpace.xpath(
+                "./c:chart/c:plotArea/c:dateAx/c:axId/@val"
+            )
+            if set(date_axis_ids).intersection(plot._element.xpath("./c:axId/@val")):
                 date_1904 = any(
                     element.get("val", "1") in ("1", "true")
                     for element in chart._chartSpace.xpath("./c:date1904")

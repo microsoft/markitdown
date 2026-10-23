@@ -4,6 +4,7 @@ import base64
 import inspect
 import io
 import os
+from copy import deepcopy
 from datetime import date
 from pathlib import Path
 from typing import Any, BinaryIO, Callable, Optional
@@ -972,6 +973,87 @@ def test_pptx_chart_numeric_categories_remain_numbers(chart_type) -> None:
 )
 def test_pptx_date_category_boundaries(label: str, expected: str) -> None:
     assert PptxConverter._format_date_category(label, False) == expected
+
+
+@pytest.mark.parametrize("primary_dates", [False, True])
+def test_pptx_combo_chart_uses_the_first_plots_axis(primary_dates: bool) -> None:
+    dates = [date(2026, 1, 1), date(2026, 2, 1)]
+    numbers = [46023, 46054]
+    primary = dates if primary_dates else numbers
+    secondary = numbers if primary_dates else dates
+    presentation = Presentation(
+        _category_chart_presentation(
+            primary,
+            XL_CHART_TYPE.LINE if primary_dates else XL_CHART_TYPE.COLUMN_CLUSTERED,
+        )
+    )
+    chart = presentation.slides[0].shapes[0].chart
+    other = (
+        Presentation(
+            _category_chart_presentation(
+                secondary,
+                XL_CHART_TYPE.COLUMN_CLUSTERED if primary_dates else XL_CHART_TYPE.LINE,
+            )
+        )
+        .slides[0]
+        .shapes[0]
+        .chart
+    )
+    plot = deepcopy(other.plots[0]._element)
+    axes = [
+        deepcopy(axis)
+        for axis in other._chartSpace.xpath(
+            "./c:chart/c:plotArea/c:catAx | "
+            "./c:chart/c:plotArea/c:dateAx | "
+            "./c:chart/c:plotArea/c:valAx"
+        )
+    ]
+    axis_ids = {
+        value: str(1000 + index)
+        for index, value in enumerate(plot.xpath("./c:axId/@val"))
+    }
+    for element in [plot, *axes]:
+        for axis_id in element.xpath(".//c:axId | .//c:crossAx"):
+            axis_id.set("val", axis_ids[axis_id.get("val")])
+    for tag in ("idx", "order"):
+        plot.xpath(f"./c:ser/c:{tag}")[0].set("val", "1")
+    plot.xpath("./c:ser/c:tx/c:strRef/c:f")[0].text = "Sheet1!$D$1"
+    plot.xpath("./c:ser/c:tx/c:strRef/c:strCache/c:pt/c:v")[0].text = "Trend"
+    plot.xpath("./c:ser/c:cat/c:numRef/c:f")[0].text = "Sheet1!$C$2:$C$3"
+    plot.xpath("./c:ser/c:val/c:numRef/c:f")[0].text = "Sheet1!$D$2:$D$3"
+    for value, amount in zip(
+        plot.xpath("./c:ser/c:val/c:numRef/c:numCache/c:pt/c:v"), [90, 110]
+    ):
+        value.text = str(amount)
+    chart.plots[0]._element.addnext(plot)
+    for axis in axes:
+        chart._chartSpace.plotArea.append(axis)
+
+    workbook_stream = io.BytesIO()
+    with xlsxwriter.Workbook(workbook_stream, {"in_memory": True}) as workbook:
+        sheet = workbook.add_worksheet()
+        sheet.write_row(0, 0, ["Primary", "Revenue", "Secondary", "Trend"])
+        date_format = workbook.add_format({"num_format": "yyyy-mm-dd"})
+        for row, (first, second) in enumerate(zip(primary, secondary), start=1):
+            for column, category in [(0, first), (2, second)]:
+                if isinstance(category, date):
+                    sheet.write_datetime(row, column, category, date_format)
+                else:
+                    sheet.write_number(row, column, category)
+            sheet.write_number(row, 1, [100, 120][row - 1])
+            sheet.write_number(row, 3, [90, 110][row - 1])
+    chart.part.chart_workbook.update_from_xlsx_blob(workbook_stream.getvalue())
+    source = io.BytesIO()
+    presentation.save(source)
+    source.seek(0)
+
+    markdown = MarkItDown().convert_stream(source, file_extension=".pptx").markdown
+
+    assert "| Category | Revenue | Trend |" in markdown
+    first = "2026-01-01" if primary_dates else "46023"
+    second = "2026-02-01" if primary_dates else "46054"
+    assert f"| {first} | 100.0 | 90.0 |" in markdown
+    assert f"| {second} | 120.0 | 110.0 |" in markdown
 
 
 if __name__ == "__main__":
