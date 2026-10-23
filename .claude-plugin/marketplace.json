@@ -1,0 +1,17 @@
+{
+  "name": "markitdown",
+  "owner": {
+    "name": "MarkItDown contributors"
+  },
+  "metadata": {
+    "description": "Claude Code plugins for MarkItDown."
+  },
+  "plugins": [
+    {
+      "name": "markitdown",
+      "source": "./plugins/markitdown",
+      "description": "Convert documents, spreadsheets, slides, images, audio and web pages to Markdown with MarkItDown, including batch conversion and LLM-vision OCR.",
+      "category": "productivity"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "name": "markitdown",
+  "version": "0.1.0",
+  "description": "Convert PDF, Word, PowerPoint, Excel, images, audio, HTML, EPUB, ZIP and more to Markdown with MarkItDown. Bundles the markitdown-mcp server (with the OCR and RTF sample plugins), plus batch conversion and LLM-vision OCR.",
+  "author": {
+    "name": "MarkItDown contributors"
+  },
+  "homepage": "https://github.com/microsoft/markitdown",
+  "repository": "https://github.com/mn526zwwfc-sketch/markitdown",
+  "license": "MIT",
+  "keywords": ["markdown", "pdf", "docx", "pptx", "xlsx", "ocr", "conversion", "mcp"]
+}
