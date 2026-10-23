@@ -4,6 +4,7 @@ import io
 import os
 import struct
 import zipfile
+import zlib
 from typing import Any, BinaryIO, Optional
 
 import pytest
@@ -264,6 +265,30 @@ def test_zip_keeps_readable_members_when_one_has_a_bad_crc() -> None:
     raw[start] = ord("X")
 
     with pytest.raises(zipfile.BadZipFile):
+        with zipfile.ZipFile(io.BytesIO(bytes(raw))) as archive:
+            archive.read("damaged.txt")
+
+    markdown = _convert_archive(bytes(raw))
+
+    assert "readable content" in markdown
+    assert "## File: damaged.txt" in markdown
+    assert "could not be read" in markdown
+
+
+def test_zip_keeps_readable_members_when_one_has_a_damaged_deflate_stream() -> None:
+    """Damaged compressed data raises zlib.error, which zipfile does not wrap."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("plain.txt", "readable content")
+        archive.writestr("damaged.txt", "compressible text " * 20)
+    raw = bytearray(buffer.getvalue())
+    with zipfile.ZipFile(io.BytesIO(bytes(raw))) as archive:
+        header_offset = archive.getinfo("damaged.txt").header_offset
+    name_len, extra_len = struct.unpack_from("<HH", raw, header_offset + 26)
+    # Block type 11 is reserved in deflate, so decompression fails on the first byte.
+    raw[header_offset + 30 + name_len + extra_len] = 0x07
+
+    with pytest.raises(zlib.error):
         with zipfile.ZipFile(io.BytesIO(bytes(raw))) as archive:
             archive.read("damaged.txt")
 

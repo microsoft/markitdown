@@ -1,4 +1,5 @@
 import zipfile
+import zlib
 import io
 import os
 
@@ -126,10 +127,12 @@ class ZipConverter(DocumentConverter):
                     zipfile.BadZipFile,
                     NotImplementedError,
                     EOFError,
+                    zlib.error,
                 ) as exc:
-                    # A bad CRC, a truncated entry, or a compression method this build does
-                    # not carry. One such member must not cost the reader every other file
-                    # in the archive, so it is reported in place and the rest continues.
+                    # A bad CRC, a damaged deflate stream, a truncated entry, or a
+                    # compression method this build does not carry. One such member must
+                    # not cost the reader every other file in the archive, so it is
+                    # reported in place and the rest continues.
                     md_content += f"## File: {name}\n\n"
                     md_content += f"This entry could not be read: {exc}\n\n"
                     continue
