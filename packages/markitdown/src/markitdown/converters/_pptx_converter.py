@@ -4,6 +4,7 @@ import os
 import io
 import re
 import html
+from datetime import datetime, timedelta
 
 from typing import BinaryIO, Any, Optional
 
@@ -333,7 +334,20 @@ class PptxConverter(DocumentConverter):
                 md += f": {chart.chart_title.text_frame.text}"
             md += "\n\n"
             data = []
-            category_names = [c.label for c in chart.plots[0].categories]
+            plot = chart.plots[0]
+            category_names = [c.label for c in plot.categories]
+            date_axis_ids = chart._chartSpace.xpath(
+                "./c:chart/c:plotArea/c:dateAx/c:axId/@val"
+            )
+            if set(date_axis_ids).intersection(plot._element.xpath("./c:axId/@val")):
+                date_1904 = any(
+                    element.get("val", "1") in ("1", "true")
+                    for element in chart._chartSpace.xpath("./c:date1904")
+                )
+                category_names = [
+                    self._format_date_category(label, date_1904)
+                    for label in category_names
+                ]
             series_list = list(chart.series)
             series_names = [s.name for s in series_list]
             data.append(["Category"] + series_names)
@@ -362,3 +376,23 @@ class PptxConverter(DocumentConverter):
         except Exception:
             # Catch any other exceptions that might occur
             return "\n\n[unsupported chart]\n\n"
+
+    @staticmethod
+    def _format_date_category(label: str, date_1904: bool) -> str:
+        try:
+            serial = float(label)
+            epoch = datetime(1904, 1, 1) if date_1904 else datetime(1899, 12, 31)
+            # Excel's 1900 system includes a fictitious February 29.
+            if not date_1904:
+                if 60 <= serial < 61:
+                    return label
+                if serial >= 61:
+                    serial -= 1
+            value = epoch + timedelta(days=serial)
+        except (ValueError, OverflowError):
+            return label
+        return (
+            value.date().isoformat()
+            if value.time() == datetime.min.time()
+            else value.isoformat()
+        )
