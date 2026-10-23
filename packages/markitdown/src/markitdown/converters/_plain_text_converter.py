@@ -63,4 +63,10 @@ class PlainTextConverter(DocumentConverter):
                 else data.decode("utf-8", errors="ignore")
             )
 
+        # Editors and Windows tooling prepend a UTF-8 BOM to otherwise plain
+        # files. It is part of the encoding, not of the document, so strip it
+        # instead of emitting it as the first character of the Markdown (where
+        # it would, for example, stop "# Title" from being a heading).
+        text_content = text_content.lstrip("\ufeff")
+
         return DocumentConverterResult(markdown=text_content)
