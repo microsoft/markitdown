@@ -2,6 +2,7 @@ import io
 import os
 import posixpath
 import zipfile
+import zlib
 from urllib.parse import unquote
 from defusedxml import minidom
 from xml.dom.minidom import Document
@@ -113,10 +114,12 @@ class EpubConverter(HtmlConverter):
                     zipfile.BadZipFile,
                     NotImplementedError,
                     EOFError,
+                    zlib.error,
                 ) as exc:
-                    # One unreadable chapter -- encrypted, a bad CRC, a truncated entry, or a
-                    # compression method this build does not carry -- must not cost the reader
-                    # the rest of the book, so it is reported in place and the spine continues.
+                    # One unreadable chapter -- encrypted, a bad CRC, a damaged deflate
+                    # stream, a truncated entry, or a compression method this build does not
+                    # carry -- must not cost the reader the rest of the book, so it is
+                    # reported in place and the spine continues.
                     markdown_content.append(f"This part could not be read: {exc}")
                     continue
 

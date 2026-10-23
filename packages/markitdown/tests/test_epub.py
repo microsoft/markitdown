@@ -1,7 +1,9 @@
 """EPUB conversion, archive paths, metadata, and embedded images."""
 
 import io
+import struct
 import zipfile
+import zlib
 
 import pytest
 
@@ -146,6 +148,51 @@ def test_unreadable_spine_item_does_not_cost_the_rest_of_the_book() -> None:
     assert "FIRST_BODY" in markdown
     assert "THIRD_BODY" in markdown
     assert "DAMAGED_BODY" not in markdown
+    assert "could not be read" in markdown
+    assert markdown.index("FIRST_BODY") < markdown.index("THIRD_BODY")
+
+
+def _deflate_and_damage_entry(stream: io.BytesIO, name: str) -> io.BytesIO:
+    """Store `name` deflated, then give its first deflate block the reserved type 11."""
+    repacked = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(stream.getvalue())) as source:
+        with zipfile.ZipFile(repacked, "w") as target:
+            for info in source.infolist():
+                compression = (
+                    zipfile.ZIP_DEFLATED
+                    if info.filename == name
+                    else info.compress_type
+                )
+                target.writestr(info, source.read(info), compress_type=compression)
+    raw = bytearray(repacked.getvalue())
+    with zipfile.ZipFile(io.BytesIO(bytes(raw))) as archive:
+        header_offset = archive.getinfo(name).header_offset
+    name_len, extra_len = struct.unpack_from("<HH", raw, header_offset + 26)
+    raw[header_offset + 30 + name_len + extra_len] = 0x07
+    return io.BytesIO(bytes(raw))
+
+
+def test_damaged_deflate_chapter_does_not_cost_the_rest_of_the_book() -> None:
+    """Damaged compressed data raises zlib.error, which zipfile does not wrap."""
+    stream = _build_epub(
+        manifest_items=[("c1", "c1.xhtml"), ("c2", "c2.xhtml"), ("c3", "c3.xhtml")],
+        spine_ids=["c1", "c2", "c3"],
+        documents={
+            "OEBPS/c1.xhtml": ("First", "FIRST_BODY"),
+            "OEBPS/c2.xhtml": ("Second", "DAMAGED_BODY"),
+            "OEBPS/c3.xhtml": ("Third", "THIRD_BODY"),
+        },
+    )
+    damaged = _deflate_and_damage_entry(stream, "OEBPS/c2.xhtml")
+
+    with pytest.raises(zlib.error):
+        with zipfile.ZipFile(io.BytesIO(damaged.getvalue())) as archive:
+            archive.read("OEBPS/c2.xhtml")
+
+    markdown = _convert(damaged)
+
+    assert "FIRST_BODY" in markdown
+    assert "THIRD_BODY" in markdown
     assert "could not be read" in markdown
     assert markdown.index("FIRST_BODY") < markdown.index("THIRD_BODY")
 
