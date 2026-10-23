@@ -5,7 +5,11 @@ from typing import BinaryIO, Any
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
-from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+from .._exceptions import (
+    MissingDependencyException,
+    FileConversionException,
+    MISSING_DEPENDENCY_MESSAGE,
+)
 
 # Pattern for MasterFormat-style partial numbering (e.g., ".1", ".2", ".10")
 PARTIAL_NUMBERING_PATTERN = re.compile(r"^\.\d+$")
@@ -62,6 +66,7 @@ _dependency_exc_info = None
 try:
     import pdfminer
     import pdfminer.high_level
+    from pdfminer.pdfdocument import PDFPasswordIncorrect
     import pdfplumber
 except ImportError:
     _dependency_exc_info = sys.exc_info()
@@ -539,6 +544,9 @@ class PdfConverter(DocumentConverter):
         # Read file stream into BytesIO for compatibility with pdfplumber
         pdf_bytes = io.BytesIO(file_stream.read())
 
+        # Extract password from kwargs (for password-protected PDFs)
+        password = kwargs.get("password")
+
         try:
             # Single pass: check every page for form-style content.
             # Pages with tables/forms get rich extraction; plain-text
@@ -549,7 +557,11 @@ class PdfConverter(DocumentConverter):
             form_page_count = 0
             plain_page_indices: list[int] = []
 
-            with pdfplumber.open(pdf_bytes) as pdf:
+            pdfplumber_kwargs: dict[str, Any] = {}
+            if password is not None:
+                pdfplumber_kwargs["password"] = password
+
+            with pdfplumber.open(pdf_bytes, **pdfplumber_kwargs) as pdf:
                 for page_idx, page in enumerate(pdf.pages):
                     page_content = _extract_form_content_from_words(page)
 
@@ -569,19 +581,47 @@ class PdfConverter(DocumentConverter):
             # the whole document (better text spacing for prose).
             if form_page_count == 0:
                 pdf_bytes.seek(0)
-                markdown = pdfminer.high_level.extract_text(pdf_bytes)
+                pdfminer_kwargs: dict[str, Any] = {}
+                if password is not None:
+                    pdfminer_kwargs["password"] = password
+                markdown = pdfminer.high_level.extract_text(
+                    pdf_bytes, **pdfminer_kwargs
+                )
             else:
                 markdown = "\n\n".join(markdown_chunks).strip()
 
+        except PDFPasswordIncorrect:
+            raise FileConversionException(
+                "The PDF is password-protected and the provided password is "
+                "incorrect. Use the 'password' parameter to supply the correct "
+                "password."
+            )
         except Exception:
             # Fallback if pdfplumber fails
             pdf_bytes.seek(0)
-            markdown = pdfminer.high_level.extract_text(pdf_bytes)
+            pdfminer_fallback_kwargs: dict[str, Any] = {}
+            if password is not None:
+                pdfminer_fallback_kwargs["password"] = password
+            try:
+                markdown = pdfminer.high_level.extract_text(
+                    pdf_bytes, **pdfminer_fallback_kwargs
+                )
+            except PDFPasswordIncorrect:
+                raise FileConversionException(
+                    "The PDF is password-protected and the provided password "
+                    "is incorrect. Use the 'password' parameter to supply the "
+                    "correct password."
+                )
 
         # Fallback if still empty
         if not markdown:
             pdf_bytes.seek(0)
-            markdown = pdfminer.high_level.extract_text(pdf_bytes)
+            pdfminer_empty_kwargs: dict[str, Any] = {}
+            if password is not None:
+                pdfminer_empty_kwargs["password"] = password
+            markdown = pdfminer.high_level.extract_text(
+                pdf_bytes, **pdfminer_empty_kwargs
+            )
 
         # Post-process to merge MasterFormat-style partial numbering with following text
         markdown = _merge_partial_numbering_lines(markdown)
