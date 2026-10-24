@@ -117,6 +117,116 @@ def _to_markdown_table(table: list[list[str]], include_separator: bool = True) -
     return "\n".join(md)
 
 
+def _format_extracted_pdf_table(table: list[list[str | None]]) -> str | None:
+    """Format a pdfplumber table without dropping uneven or empty cells."""
+    if not table:
+        return None
+
+    rows = [
+        [" ".join(str(cell or "").split()).replace("|", r"\|") for cell in row]
+        for row in table
+    ]
+    rows = [row for row in rows if any(cell for cell in row)]
+    if len(rows) < 2:
+        return None
+
+    column_count = max(len(row) for row in rows)
+    if column_count < 2:
+        return None
+    rows = [row + [""] * (column_count - len(row)) for row in rows]
+
+    # A ruled rectangle can still contain decorative lines or a single label.
+    # Require multiple rows to contain at least two populated cells.
+    populated_rows = sum(sum(bool(cell) for cell in row) >= 2 for row in rows)
+    if populated_rows < 2:
+        return None
+
+    return _to_markdown_table(rows)
+
+
+def _has_sparse_markdown_table(content: str) -> bool:
+    """Identify form output whose inferred columns contain repeated empty cells."""
+    table_rows: list[list[str]] = []
+    candidate_tables: list[list[list[str]]] = []
+
+    def finish_table() -> None:
+        nonlocal table_rows
+        if len(table_rows) >= 2:
+            candidate_tables.append(table_rows)
+        table_rows = []
+
+    for line in content.splitlines():
+        stripped = line.strip()
+        if not (stripped.startswith("|") and stripped.endswith("|")):
+            finish_table()
+            continue
+        cells = [cell.strip() for cell in stripped.split("|")[1:-1]]
+        if cells and all(re.fullmatch(r":?-{3,}:?", cell) for cell in cells):
+            continue
+        table_rows.append(cells)
+    finish_table()
+
+    for rows in candidate_tables:
+        column_count = max(len(row) for row in rows)
+        if column_count < 4:
+            continue
+        total_cells = sum(len(row) for row in rows)
+        empty_cells = sum(not cell for row in rows for cell in row)
+        if total_cells and empty_cells / total_cells >= 0.25:
+            return True
+    return False
+
+
+def _extract_page_with_ruled_tables(page: Any) -> str | None:
+    """Use detected ruled tables when positional form parsing creates sparse columns."""
+    try:
+        detected_tables = page.find_tables()
+        words = page.extract_words(
+            keep_blank_chars=True, x_tolerance=3, y_tolerance=3
+        )
+    except Exception:
+        return None
+
+    tables: list[tuple[float, tuple[float, float, float, float], str]] = []
+    for table in detected_tables:
+        markdown = _format_extracted_pdf_table(table.extract() or [])
+        if markdown:
+            tables.append((table.bbox[1], table.bbox, markdown))
+    if not tables or not words:
+        return None
+
+    rows_by_y: dict[float, list[dict]] = {}
+    for word in words:
+        center_x = (word["x0"] + word["x1"]) / 2
+        center_y = (word["top"] + word["bottom"]) / 2
+        if any(
+            x0 <= center_x <= x1 and top <= center_y <= bottom
+            for _, (x0, top, x1, bottom), _ in tables
+        ):
+            continue
+        y_key = round(word["top"] / 5) * 5
+        rows_by_y.setdefault(y_key, []).append(word)
+
+    events: list[tuple[float, int, str]] = []
+    for y_key, row in rows_by_y.items():
+        line_words = sorted(row, key=lambda word: word["x0"])
+        line_text = " ".join(word["text"] for word in line_words)
+        events.append((y_key, 1, line_text))
+    events.extend((top, 0, markdown) for top, _, markdown in tables)
+    events.sort(key=lambda event: (event[0], event[1]))
+
+    output: list[str] = []
+    for _, event_type, text in events:
+        if event_type == 0:
+            if output and output[-1]:
+                output.append("")
+            output.append(text)
+            output.append("")
+        else:
+            output.append(text)
+    return "\n".join(output).strip()
+
+
 def _extract_form_content_from_words(page: Any) -> str | None:
     """
     Extract form-style content from a PDF page by analyzing word positions.
@@ -392,7 +502,12 @@ def _extract_form_content_from_words(page: Any) -> str | None:
                 result_lines.append(info["text"])
             idx += 1
 
-    return "\n".join(result_lines)
+    content = "\n".join(result_lines)
+    if _has_sparse_markdown_table(content):
+        ruled_table_content = _extract_page_with_ruled_tables(page)
+        if ruled_table_content is not None:
+            return ruled_table_content
+    return content
 
 
 def _extract_tables_from_words(page: Any) -> list[list[list[str]]]:

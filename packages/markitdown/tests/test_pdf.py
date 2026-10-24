@@ -277,6 +277,33 @@ class TestPdfTableExtraction:
             positions["second_table"] < positions["recommendations"]
         ), "Second table should come before Recommendations"
 
+    def test_ruled_table_recovery_preserves_columns_and_context(self, markitdown):
+        pdf_path = os.path.join(TEST_FILES_DIR, "ruled_table_column_drift.pdf")
+        result = markitdown.convert(pdf_path)
+        text = result.text_content
+        tables = extract_markdown_tables(text)
+
+        assert len(tables) == 2
+        assert tables[1][0] == ["Name", "Description", "Address"]
+        assert all(len(row) == 3 for row in tables[1])
+        assert tables[1][1] == [
+            "REG_CTRL",
+            "Primary device control",
+            "0x00",
+        ]
+        assert tables[1][-1] == [
+            "REG_EXT",
+            "Extended option control",
+            "0x14",
+        ]
+        assert text.index("Device register map") < text.index(
+            "Table 2 Device Register Map"
+        )
+        caption_position = text.index("Table 2 Device Register Map")
+        target_table_position = text.index("|Name", caption_position)
+        assert caption_position < target_table_position
+        assert target_table_position < text.index("Additional notes follow.")
+
     def test_borderless_table_no_duplication(self, markitdown):
         """Each SKU reference appears once, without missing or duplicated content."""
         pdf_path = os.path.join(
