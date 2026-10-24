@@ -1,0 +1,247 @@
+[
+  {
+    "id": "basic_sentence",
+    "category": "basic",
+    "blocks": [
+      "این یک سند آزمایشی برای بررسی استخراج متن فارسی است."
+    ],
+    "intent": "Exact Persian sentence and final punctuation",
+    "direction": "rtl",
+    "page": 1
+  },
+  {
+    "id": "sentences",
+    "category": "basic",
+    "blocks": [
+      "این جمله اول است. این جمله دوم است."
+    ],
+    "intent": "Sentence order within one line",
+    "direction": "rtl",
+    "page": 2
+  },
+  {
+    "id": "paragraphs",
+    "category": "layout",
+    "blocks": [
+      "این بند اول است.",
+      "این بند دوم است."
+    ],
+    "intent": "Distinct paragraph boundaries",
+    "direction": "rtl",
+    "page": 3
+  },
+  {
+    "id": "heading",
+    "category": "layout",
+    "blocks": [
+      "گزارش آزمایش",
+      "این متن گزارش است."
+    ],
+    "intent": "Heading precedes body; no requirement to infer Markdown heading level",
+    "direction": "rtl",
+    "page": 4
+  },
+  {
+    "id": "python_version",
+    "category": "mixed",
+    "blocks": [
+      "این پروژه از Python 3.12 استفاده می‌کند."
+    ],
+    "intent": "English term, version, ZWNJ",
+    "direction": "rtl",
+    "page": 5
+  },
+  {
+    "id": "file_identifier",
+    "category": "mixed",
+    "blocks": [
+      "شناسه فایل DOC-2026-A15 است."
+    ],
+    "intent": "Hyphenated identifier remains intact",
+    "direction": "rtl",
+    "page": 6
+  },
+  {
+    "id": "model_identifier",
+    "category": "mixed",
+    "blocks": [
+      "مدل GPT-4o برای پردازش متن استفاده شد."
+    ],
+    "intent": "Mixed-case model identifier",
+    "direction": "rtl",
+    "page": 7
+  },
+  {
+    "id": "contract_date",
+    "category": "mixed",
+    "blocks": [
+      "شماره قرارداد ABC-123 در تاریخ ۱۴۰۵/۰۷/۳۰ ثبت شد."
+    ],
+    "intent": "Identifier and Persian date in logical positions",
+    "direction": "rtl",
+    "page": 8
+  },
+  {
+    "id": "letter_variants",
+    "category": "unicode",
+    "blocks": [
+      "ی ي ک ك"
+    ],
+    "intent": "Do not normalize Persian/Arabic Yeh or Kaf",
+    "direction": "rtl",
+    "page": 9
+  },
+  {
+    "id": "zwnj",
+    "category": "unicode",
+    "blocks": [
+      "می‌روم کتاب‌ها برنامه‌نویسی"
+    ],
+    "intent": "Preserve all U+200C characters",
+    "direction": "rtl",
+    "page": 10
+  },
+  {
+    "id": "persian_digits",
+    "category": "numeric",
+    "blocks": [
+      "۰۱۲۳۴۵۶۷۸۹"
+    ],
+    "intent": "Persian digit sequence",
+    "direction": "rtl",
+    "page": 11
+  },
+  {
+    "id": "arabic_digits",
+    "category": "numeric",
+    "blocks": [
+      "٠١٢٣٤٥٦٧٨٩"
+    ],
+    "intent": "Arabic-Indic digit sequence",
+    "direction": "rtl",
+    "page": 12
+  },
+  {
+    "id": "ascii_digits",
+    "category": "numeric",
+    "blocks": [
+      "0123456789"
+    ],
+    "intent": "ASCII digit sequence in RTL paragraph",
+    "direction": "rtl",
+    "page": 13
+  },
+  {
+    "id": "diacritics",
+    "category": "unicode",
+    "blocks": [
+      "سَلام"
+    ],
+    "intent": "Combining fatha is retained in its original sequence",
+    "direction": "rtl",
+    "page": 14
+  },
+  {
+    "id": "url",
+    "category": "embedded",
+    "blocks": [
+      "برای اطلاعات بیشتر به https://example.com مراجعه کنید."
+    ],
+    "intent": "URL and surrounding logical order",
+    "direction": "rtl",
+    "page": 15
+  },
+  {
+    "id": "email",
+    "category": "embedded",
+    "blocks": [
+      "نشانی test@example.com است."
+    ],
+    "intent": "Email and punctuation",
+    "direction": "rtl",
+    "page": 16
+  },
+  {
+    "id": "decimal_unit",
+    "category": "embedded",
+    "blocks": [
+      "مقدار آزمایش برابر با 3.75 mg/L است."
+    ],
+    "intent": "Decimal and unit",
+    "direction": "rtl",
+    "page": 17
+  },
+  {
+    "id": "parentheses_math",
+    "category": "embedded",
+    "blocks": [
+      "رابطه (x + 2 = 5) درست است."
+    ],
+    "intent": "Parentheses and mathematical expression",
+    "direction": "rtl",
+    "page": 18
+  },
+  {
+    "id": "rtl_table",
+    "category": "table",
+    "blocks": [],
+    "intent": "Rightmost column is product name; headers and each row read right to left",
+    "direction": "rtl",
+    "table": [
+      [
+        "نام محصول",
+        "کد محصول",
+        "مقدار"
+      ],
+      [
+        "پلی‌اتیلن",
+        "PE-101",
+        "۲۵"
+      ],
+      [
+        "پلی‌پروپیلن",
+        "PP-202",
+        "۴۰"
+      ]
+    ],
+    "page": 19
+  },
+  {
+    "id": "two_column_rtl",
+    "category": "layout",
+    "blocks": [
+      "ستون راست بالا",
+      "ستون راست پایین",
+      "ستون چپ بالا",
+      "ستون چپ پایین"
+    ],
+    "intent": "Read right column top to bottom, then left column",
+    "direction": "rtl",
+    "columns": true,
+    "page": 20
+  },
+  {
+    "id": "ltr_sentence",
+    "category": "control",
+    "blocks": [
+      "The identifier DOC-2026-A15 uses Python 3.12."
+    ],
+    "intent": "English exact-match control",
+    "direction": "ltr",
+    "page": 21
+  },
+  {
+    "id": "two_column_ltr",
+    "category": "control",
+    "blocks": [
+      "Left top",
+      "Left bottom",
+      "Right top",
+      "Right bottom"
+    ],
+    "intent": "Read left column top to bottom, then right column",
+    "direction": "ltr",
+    "columns": true,
+    "page": 22
+  }
+]
