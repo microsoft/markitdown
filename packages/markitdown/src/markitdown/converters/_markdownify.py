@@ -21,6 +21,51 @@ def _quote_path_preserving_percent_encoded_octets(path: str) -> str:
     return "".join(parts)
 
 
+def _flatten_nested_table(table: Any, soup: Any) -> None:
+    """Replace a table nested inside another table with inline content.
+
+    Markdown has no nested tables: converted in place, the inner rows are read
+    as rows of the outer table, so the outer table grows columns (one row ends
+    up holding the inner table's delimiter row) and the inner table's structure
+    is destroyed. Flatten it into the cell that holds it instead -- cells
+    separated by an escaped pipe, rows by a line break.
+    """
+    flattened = soup.new_tag("span")
+
+    caption = table.find("caption", recursive=False)
+    if caption is not None:
+        flattened.append(soup.new_string(caption.get_text(" ", strip=True) + " "))
+
+    first_row = True
+    for row in table.find_all("tr"):
+        if row.find_parent("table") is not table:
+            # A row of a deeper table, flattened when that table is reached.
+            continue
+
+        cells = row.find_all(["td", "th"], recursive=False)
+        if not cells:
+            continue
+
+        if not first_row:
+            flattened.append(soup.new_string("<br>"))
+        first_row = False
+
+        for index, cell in enumerate(cells):
+            if index:
+                flattened.append(soup.new_string(r" \| "))
+            for child in list(cell.contents):
+                flattened.append(child.extract())
+
+    table.replace_with(flattened)
+
+
+def _flatten_nested_tables(root: Any) -> None:
+    """Flatten every table that sits inside another table, innermost first."""
+    for table in reversed(root.find_all("table")):
+        if table.find_parent("table") is not None:
+            _flatten_nested_table(table, root)
+
+
 class _CustomMarkdownify(markdownify.MarkdownConverter):
     """
     A custom version of markdownify's MarkdownConverter. Changes include:
@@ -175,4 +220,5 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         return self.convert_s(el, text, *args, **kwargs)  # type: ignore
 
     def convert_soup(self, soup: Any) -> str:
+        _flatten_nested_tables(soup)
         return super().convert_soup(soup)  # type: ignore

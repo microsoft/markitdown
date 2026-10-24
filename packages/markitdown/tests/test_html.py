@@ -1,6 +1,7 @@
 """HTML conversion, link handling, and Wikipedia pages."""
 
 import io
+import re
 
 import pytest
 from bs4 import BeautifulSoup
@@ -342,6 +343,72 @@ def test_deeply_nested_html_fallback() -> None:
     assert "bold text" in result.markdown
     assert "<div" not in result.markdown
     assert "<p>" not in result.markdown
+
+
+# Nested tables
+
+
+def _table_rows(markdown: str) -> list[str]:
+    return [line for line in markdown.splitlines() if line.lstrip().startswith("|")]
+
+
+def _column_count(row: str) -> int:
+    """Cells a Markdown table row declares, ignoring escaped pipes."""
+    return len(re.findall(r"(?<!\\)\|", row)) - 1
+
+
+def test_nested_table_does_not_add_columns_to_the_outer_table() -> None:
+    html = (
+        "<table>"
+        "<tr><td>OUT-A</td><td>OUT-B</td></tr>"
+        "<tr><td>OUT-C</td><td>"
+        "<table><tr><td>IN-A</td><td>IN-B</td></tr>"
+        "<tr><td>IN-C</td><td>IN-D</td></tr></table>"
+        "</td></tr>"
+        "</table>"
+    )
+
+    markdown = _convert_html(html)
+    rows = _table_rows(markdown)
+
+    # Every row of the outer table must keep the outer table's two columns.
+    assert {_column_count(row) for row in rows} == {2}, markdown
+
+
+def test_nested_table_content_is_kept_inside_its_outer_cell() -> None:
+    html = (
+        "<table>"
+        "<tr><td>OUT-A</td><td>OUT-B</td></tr>"
+        "<tr><td>OUT-C</td><td>"
+        "<table><tr><td>IN-A</td><td>IN-B</td></tr>"
+        "<tr><td>IN-C</td><td>IN-D</td></tr></table>"
+        "</td></tr>"
+        "</table>"
+    )
+
+    markdown = _convert_html(html)
+
+    # The inner rows are flattened into the cell, keeping their order.
+    assert r"| OUT-C | IN-A \| IN-B<br>IN-C \| IN-D |" in markdown
+    assert markdown.index("OUT-A") < markdown.index("IN-A") < markdown.index("IN-D")
+
+
+def test_nested_table_in_the_first_row_keeps_the_header_delimiter() -> None:
+    html = (
+        "<table>"
+        "<tr><td>OUT-A</td><td>"
+        "<table><tr><td>IN-A</td><td>IN-B</td></tr></table>"
+        "</td></tr>"
+        "<tr><td>OUT-C</td><td>OUT-D</td></tr>"
+        "</table>"
+    )
+
+    markdown = _convert_html(html)
+    rows = _table_rows(markdown)
+
+    separator = next(row for row in rows if "---" in row)
+    assert separator.count("|") == 3, markdown
+    assert {_column_count(row) for row in rows} == {2}, markdown
 
 
 if __name__ == "__main__":
