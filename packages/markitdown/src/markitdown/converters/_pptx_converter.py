@@ -110,7 +110,16 @@ class PptxConverter(DocumentConverter):
                         if text.strip():
                             md_content += "# " + text.lstrip() + "\n"
                     else:
-                        md_content += text + "\n"
+                        # Each PowerPoint paragraph is a separate Markdown
+                        # paragraph: a single newline is only a soft break and
+                        # would merge the paragraphs into one line.
+                        md_content += (
+                            "\n\n".join(
+                                paragraph.text
+                                for paragraph in shape.text_frame.paragraphs
+                            )
+                            + "\n"
+                        )
 
                 # Group Shapes
                 if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.GROUP:
