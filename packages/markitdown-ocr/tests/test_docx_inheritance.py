@@ -18,7 +18,6 @@ import markitdown._markitdown as markitdown_module
 from markitdown_ocr._docx_converter_with_ocr import DocxConverterWithOCR
 from markitdown_ocr._ocr_service import OCRResult
 
-
 _INFO = StreamInfo(extension=".docx")
 
 
