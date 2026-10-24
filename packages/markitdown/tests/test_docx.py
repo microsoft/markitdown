@@ -96,6 +96,35 @@ def test_omml_known_function_split_across_runs():
     assert str(results[0]) == r"\sin(x)"
 
 
+def test_omml_delimiter_multiple_arguments():
+    """A delimiter with several <m:e> arguments keeps all of them, joined."""
+    M = 'xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"'
+    r = lambda t: f"<m:r><m:t>{t}</m:t></m:r>"
+
+    def latex(fragment):
+        elm = ET.fromstring(f"<m:oMath {M}>{fragment}</m:oMath>")
+        return oMath2Latex(elm).latex
+
+    # Explicit separator ","
+    assert latex(
+        r("f")
+        + '<m:d><m:dPr><m:sepChr m:val=","/></m:dPr>'
+        + f"<m:e>{r('x')}</m:e><m:e>{r('y')}</m:e></m:d>"
+    ) == r"f\left(x,y\right)"
+
+    # Braces, no sepChr -> default "|"
+    assert latex(
+        '<m:d><m:dPr><m:begChr m:val="{"/><m:endChr m:val="}"/></m:dPr>'
+        + f"<m:e>{r('x')}</m:e><m:e>{r('x>0')}</m:e></m:d>"
+    ) == r"\left\{x|x>0\right\}"
+
+    # Three arguments with ";"
+    assert latex(
+        '<m:d><m:dPr><m:sepChr m:val=";"/></m:dPr>'
+        + f"<m:e>{r('a')}</m:e><m:e>{r('b')}</m:e><m:e>{r('c')}</m:e></m:d>"
+    ) == r"\left(a;b;c\right)"
+
+
 # Math accents
 
 # Tests for DOCX math accent templates.
