@@ -1,0 +1,614 @@
+{
+  "commit": "7482c092d9c0074a89803c9fdb63a969e7fe17fc",
+  "python": "3.13.5",
+  "os": "macOS-26.7.1-x86_64-i386-64bit-Mach-O",
+  "converter_source_sha256": {
+    "_pdf_converter.py": "f76f07247c5ac77b384619c979277f7d60555a16c69901a18a6df42af1b1000f",
+    "_pdf_layout.py": "0c9da196a76f5f559898b03a4e13e1e4b0ea60a4f1e8a1f3e346b0f3a7adb91c"
+  },
+  "versions": {
+    "markitdown": "0.1.9",
+    "pdfplumber": "0.11.10",
+    "pdfminer.six": "20260107",
+    "fpdf2": "2.8.9",
+    "uharfbuzz": "0.57.0",
+    "fonttools": "4.67.0",
+    "pytest": "9.1.1"
+  },
+  "fixtures": [
+    {
+      "id": "basic_sentence",
+      "category": "basic",
+      "sha256": "fd0fb28ed991a8707fcfbb8d76906f4b0c97c3d23ae277bde69f5e67583b55d1",
+      "page": 1,
+      "expected": "این یک سند آزمایشی برای بررسی استخراج متن فارسی است.",
+      "actual": "این یک سند آزمایشی برای بررسی استخراج متن فارسی است.",
+      "metrics": {
+        "pass": true,
+        "cer": 0.0,
+        "wer": 0.0,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 1.0,
+        "unicode_sequence_preservation": {
+          "ی": true,
+          "ک": true
+        }
+      },
+      "pdfminer": ".تسا یسراف نتم جارختسا یسررب یارب یشیامزآ دنس کی نیا\n\n\f",
+      "pdfplumber": ".تسا یسراف نتم جارختسا یسررب یارب یشیامزآ دنس کی نیا",
+      "classification": null
+    },
+    {
+      "id": "sentences",
+      "category": "basic",
+      "sha256": "fd0fb28ed991a8707fcfbb8d76906f4b0c97c3d23ae277bde69f5e67583b55d1",
+      "page": 2,
+      "expected": "این جمله اول است. این جمله دوم است.",
+      "actual": "این جمله اول است. این جمله دوم است.",
+      "metrics": {
+        "pass": true,
+        "cer": 0.0,
+        "wer": 0.0,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 1.0,
+        "unicode_sequence_preservation": {
+          "ی": true
+        }
+      },
+      "pdfminer": ".تسا مود هلمج نیا .تسا لوا هلمج نیا\n\n\f",
+      "pdfplumber": ".تسا مود هلمج نیا .تسا لوا هلمج نیا",
+      "classification": null
+    },
+    {
+      "id": "paragraphs",
+      "category": "layout",
+      "sha256": "fd0fb28ed991a8707fcfbb8d76906f4b0c97c3d23ae277bde69f5e67583b55d1",
+      "page": 3,
+      "expected": "این بند اول است.\n\nاین بند دوم است.",
+      "actual": "این بند اول است.\n\nاین بند دوم است.",
+      "metrics": {
+        "pass": true,
+        "cer": 0.0,
+        "wer": 0.0,
+        "reading_order_accuracy": 1.0,
+        "exact_span_preservation": 1.0,
+        "unicode_sequence_preservation": {
+          "ی": true
+        }
+      },
+      "pdfminer": ".تسا لوا دنب نیا\n\n.تسا مود دنب نیا\n\n\f",
+      "pdfplumber": ".تسا لوا دنب نیا\n.تسا مود دنب نیا",
+      "classification": null
+    },
+    {
+      "id": "heading",
+      "category": "layout",
+      "sha256": "fd0fb28ed991a8707fcfbb8d76906f4b0c97c3d23ae277bde69f5e67583b55d1",
+      "page": 4,
+      "expected": "گزارش آزمایش\n\nاین متن گزارش است.",
+      "actual": "گزارش آزمایش\n\nاین متن گزارش است.",
+      "metrics": {
+        "pass": true,
+        "cer": 0.0,
+        "wer": 0.0,
+        "reading_order_accuracy": 1.0,
+        "exact_span_preservation": 1.0,
+        "unicode_sequence_preservation": {
+          "ی": true
+        }
+      },
+      "pdfminer": "شیامزآ شرازگ\n\n.تسا شرازگ نتم نیا\n\n\f",
+      "pdfplumber": "شیامزآ شرازگ\n.تسا شرازگ نتم نیا",
+      "classification": null
+    },
+    {
+      "id": "python_version",
+      "category": "mixed",
+      "sha256": "fd0fb28ed991a8707fcfbb8d76906f4b0c97c3d23ae277bde69f5e67583b55d1",
+      "page": 5,
+      "expected": "این پروژه از Python 3.12 استفاده می‌کند.",
+      "actual": "این پروژه از Python 3.12 استفاده می‌کند.",
+      "metrics": {
+        "pass": true,
+        "cer": 0.0,
+        "wer": 0.0,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 1.0,
+        "unicode_sequence_preservation": {
+          "ی": true,
+          "Python": true,
+          "3.12": true,
+          "‌": true,
+          "ک": true
+        }
+      },
+      "pdfminer": ".دنک‌یم هدافتسا Python 3.12 زا هژورپ نیا\n\n\f",
+      "pdfplumber": "Python\n.دنک‌یم هدافتسا 3.12 زا هژورپ نیا",
+      "classification": null
+    },
+    {
+      "id": "file_identifier",
+      "category": "mixed",
+      "sha256": "fd0fb28ed991a8707fcfbb8d76906f4b0c97c3d23ae277bde69f5e67583b55d1",
+      "page": 6,
+      "expected": "شناسه فایل DOC-2026-A15 است.",
+      "actual": "شناسه فایل DOC-2026-A15 است.",
+      "metrics": {
+        "pass": true,
+        "cer": 0.0,
+        "wer": 0.0,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 1.0,
+        "unicode_sequence_preservation": {
+          "ی": true,
+          "DOC-2026-A15": true
+        }
+      },
+      "pdfminer": ".تسا DOC-2026-A15 لیاف هسانش\n\n\f",
+      "pdfplumber": "DOC A\n.تسا -2026- 15 لیاف هسانش",
+      "classification": null
+    },
+    {
+      "id": "model_identifier",
+      "category": "mixed",
+      "sha256": "fd0fb28ed991a8707fcfbb8d76906f4b0c97c3d23ae277bde69f5e67583b55d1",
+      "page": 7,
+      "expected": "مدل GPT-4o برای پردازش متن استفاده شد.",
+      "actual": "مدل GPT-4o برای پردازش متن استفاده شد.",
+      "metrics": {
+        "pass": true,
+        "cer": 0.0,
+        "wer": 0.0,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 1.0,
+        "unicode_sequence_preservation": {
+          "GPT-4o": true,
+          "ی": true
+        }
+      },
+      "pdfminer": ".دش هدافتسا نتم شزادرپ یارب GPT-4o لدم\n\n\f",
+      "pdfplumber": "GPT o\n.دش هدافتسا نتم شزادرپ یارب -4 لدم",
+      "classification": null
+    },
+    {
+      "id": "contract_date",
+      "category": "mixed",
+      "sha256": "fd0fb28ed991a8707fcfbb8d76906f4b0c97c3d23ae277bde69f5e67583b55d1",
+      "page": 8,
+      "expected": "شماره قرارداد ABC-123 در تاریخ ۱۴۰۵/۰۷/۳۰ ثبت شد.",
+      "actual": "شماره قرارداد ABC-123 در تاریخ ۱۴۰۵/۰۷/۳۰ ثبت شد.",
+      "metrics": {
+        "pass": true,
+        "cer": 0.0,
+        "wer": 0.0,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 1.0,
+        "unicode_sequence_preservation": {
+          "ABC-123": true,
+          "ی": true,
+          "۱": true,
+          "۴": true,
+          "۰": true,
+          "۵": true,
+          "۷": true,
+          "۳": true
+        }
+      },
+      "pdfminer": ".دش تبث ۱۴۰۵/۰۷/۳۰ خیرات رد ABC-123 دادرارق هرامش\n\n\f",
+      "pdfplumber": "/ / ABC\n.دش تبث ۱۴۰۵ ۰۷ ۳۰ خیرات رد -123 دادرارق هرامش",
+      "classification": null
+    },
+    {
+      "id": "letter_variants",
+      "category": "unicode",
+      "sha256": "fd0fb28ed991a8707fcfbb8d76906f4b0c97c3d23ae277bde69f5e67583b55d1",
+      "page": 9,
+      "expected": "ی ي ک ك",
+      "actual": "ی ي ک ك",
+      "metrics": {
+        "pass": true,
+        "cer": 0.0,
+        "wer": 0.0,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 1.0,
+        "unicode_sequence_preservation": {
+          "ی": true,
+          "ي": true,
+          "ک": true,
+          "ك": true
+        }
+      },
+      "pdfminer": "ك ک ي ی\n\n\f",
+      "pdfplumber": "ك ک ي ی",
+      "classification": null
+    },
+    {
+      "id": "zwnj",
+      "category": "unicode",
+      "sha256": "fd0fb28ed991a8707fcfbb8d76906f4b0c97c3d23ae277bde69f5e67583b55d1",
+      "page": 10,
+      "expected": "می‌روم کتاب‌ها برنامه‌نویسی",
+      "actual": "می‌روم کتاب‌ها برنامه‌نویسی",
+      "metrics": {
+        "pass": true,
+        "cer": 0.0,
+        "wer": 0.0,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 1.0,
+        "unicode_sequence_preservation": {
+          "ی": true,
+          "‌": true,
+          "ک": true
+        }
+      },
+      "pdfminer": "یسیون‌همانرب اه‌باتک مور‌یم\n\n\f",
+      "pdfplumber": "یسیونه‌ مانرب اه‌باتک مور‌یم",
+      "classification": null
+    },
+    {
+      "id": "persian_digits",
+      "category": "numeric",
+      "sha256": "fd0fb28ed991a8707fcfbb8d76906f4b0c97c3d23ae277bde69f5e67583b55d1",
+      "page": 11,
+      "expected": "۰۱۲۳۴۵۶۷۸۹",
+      "actual": "۰۱۲۳۴۵۶۷۸۹\n\n",
+      "metrics": {
+        "pass": true,
+        "cer": 0.0,
+        "wer": 0.0,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 1.0,
+        "unicode_sequence_preservation": {
+          "۰": true,
+          "۱": true,
+          "۲": true,
+          "۳": true,
+          "۴": true,
+          "۵": true,
+          "۶": true,
+          "۷": true,
+          "۸": true,
+          "۹": true
+        }
+      },
+      "pdfminer": "۰۱۲۳۴۵۶۷۸۹\n\n\f",
+      "pdfplumber": "۰۱۲۳۴۵۶۷۸۹",
+      "classification": null
+    },
+    {
+      "id": "arabic_digits",
+      "category": "numeric",
+      "sha256": "fd0fb28ed991a8707fcfbb8d76906f4b0c97c3d23ae277bde69f5e67583b55d1",
+      "page": 12,
+      "expected": "٠١٢٣٤٥٦٧٨٩",
+      "actual": "٠١٢٣٤٥٦٧٨٩\n\n",
+      "metrics": {
+        "pass": true,
+        "cer": 0.0,
+        "wer": 0.0,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 1.0,
+        "unicode_sequence_preservation": {
+          "٠": true,
+          "١": true,
+          "٢": true,
+          "٣": true,
+          "٤": true,
+          "٥": true,
+          "٦": true,
+          "٧": true,
+          "٨": true,
+          "٩": true
+        }
+      },
+      "pdfminer": "٠١٢٣٤٥٦٧٨٩\n\n\f",
+      "pdfplumber": "٠١٢٣٤٥٦٧٨٩",
+      "classification": null
+    },
+    {
+      "id": "ascii_digits",
+      "category": "numeric",
+      "sha256": "fd0fb28ed991a8707fcfbb8d76906f4b0c97c3d23ae277bde69f5e67583b55d1",
+      "page": 13,
+      "expected": "0123456789",
+      "actual": "0123456789\n\n",
+      "metrics": {
+        "pass": true,
+        "cer": 0.0,
+        "wer": 0.0,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 1.0,
+        "unicode_sequence_preservation": {
+          "0123456789": true
+        }
+      },
+      "pdfminer": "0123456789\n\n\f",
+      "pdfplumber": "0123456789",
+      "classification": null
+    },
+    {
+      "id": "diacritics",
+      "category": "unicode",
+      "sha256": "fd0fb28ed991a8707fcfbb8d76906f4b0c97c3d23ae277bde69f5e67583b55d1",
+      "page": 14,
+      "expected": "سَلام",
+      "actual": "سَلام",
+      "metrics": {
+        "pass": true,
+        "cer": 0.0,
+        "wer": 0.0,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 1.0,
+        "unicode_sequence_preservation": {
+          "َ": true
+        }
+      },
+      "pdfminer": "ملاَس\n\n\f",
+      "pdfplumber": "ملاَس",
+      "classification": null
+    },
+    {
+      "id": "url",
+      "category": "embedded",
+      "sha256": "fd0fb28ed991a8707fcfbb8d76906f4b0c97c3d23ae277bde69f5e67583b55d1",
+      "page": 15,
+      "expected": "برای اطلاعات بیشتر به https://example.com مراجعه کنید.",
+      "actual": "برای اطلاعات بیشتر به https://example.com مراجعه کنید.",
+      "metrics": {
+        "pass": true,
+        "cer": 0.0,
+        "wer": 0.0,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 1.0,
+        "unicode_sequence_preservation": {
+          "ی": true,
+          "https://example.com": true,
+          "ک": true
+        }
+      },
+      "pdfminer": ".دینک هعجارم https://example.com هب رتشیب تاعلاطا یارب\n\n\f",
+      "pdfplumber": "https //example com\n.دینک هعجارم : . هب رتشیب تاعلاطا یارب",
+      "classification": null
+    },
+    {
+      "id": "email",
+      "category": "embedded",
+      "sha256": "fd0fb28ed991a8707fcfbb8d76906f4b0c97c3d23ae277bde69f5e67583b55d1",
+      "page": 16,
+      "expected": "نشانی test@example.com است.",
+      "actual": "نشانی test@example.com است.",
+      "metrics": {
+        "pass": true,
+        "cer": 0.0,
+        "wer": 0.0,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 1.0,
+        "unicode_sequence_preservation": {
+          "ی": true,
+          "test@example.com": true
+        }
+      },
+      "pdfminer": ".تسا test@example.com یناشن\n\n\f",
+      "pdfplumber": "test@example com\n.تسا . یناشن",
+      "classification": null
+    },
+    {
+      "id": "decimal_unit",
+      "category": "embedded",
+      "sha256": "fd0fb28ed991a8707fcfbb8d76906f4b0c97c3d23ae277bde69f5e67583b55d1",
+      "page": 17,
+      "expected": "مقدار آزمایش برابر با 3.75 mg/L است.",
+      "actual": "مقدار آزمایش برابر با 3.75 mg/L است.",
+      "metrics": {
+        "pass": true,
+        "cer": 0.0,
+        "wer": 0.0,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 1.0,
+        "unicode_sequence_preservation": {
+          "ی": true,
+          "3.75": true,
+          "mg/L": true
+        }
+      },
+      "pdfminer": ".تسا mg/L 3.75 اب ربارب شیامزآ رادقم\n\n\f",
+      "pdfplumber": "mg/L\n.تسا 3.75 اب ربارب شیامزآ رادقم",
+      "classification": null
+    },
+    {
+      "id": "parentheses_math",
+      "category": "embedded",
+      "sha256": "fd0fb28ed991a8707fcfbb8d76906f4b0c97c3d23ae277bde69f5e67583b55d1",
+      "page": 18,
+      "expected": "رابطه (x + 2 = 5) درست است.",
+      "actual": "رابطه (x + 2 = 5) درست است.",
+      "metrics": {
+        "pass": true,
+        "cer": 0.0,
+        "wer": 0.0,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 1.0,
+        "unicode_sequence_preservation": {
+          "x": true,
+          "2": true,
+          "5": true
+        }
+      },
+      "pdfminer": ".تسا تسرد )x + 2 = 5( هطبار\n\n\f",
+      "pdfplumber": ")x + = (\n.تسا تسرد 2 5 هطبار",
+      "classification": null
+    },
+    {
+      "id": "rtl_table",
+      "category": "table",
+      "sha256": "fd0fb28ed991a8707fcfbb8d76906f4b0c97c3d23ae277bde69f5e67583b55d1",
+      "page": 19,
+      "expected": [
+        [
+          "نام محصول",
+          "کد محصول",
+          "مقدار"
+        ],
+        [
+          "پلی‌اتیلن",
+          "PE-101",
+          "۲۵"
+        ],
+        [
+          "پلی‌پروپیلن",
+          "PP-202",
+          "۴۰"
+        ]
+      ],
+      "actual": "| نام محصول | کد محصول | مقدار |\n| --- | --- | --- |\n| پلی‌اتیلن | PE-101 | ۲۵ |\n| پلی‌پروپیلن | PP-202 | ۴۰ |",
+      "metrics": {
+        "pass": true,
+        "cer": 0.0,
+        "wer": 0.0,
+        "reading_order_accuracy": 1.0,
+        "exact_span_preservation": 1.0,
+        "unicode_sequence_preservation": {
+          "ک": true,
+          "ی": true,
+          "‌": true,
+          "PE-101": true,
+          "۲": true,
+          "۵": true,
+          "PP-202": true,
+          "۴": true,
+          "۰": true
+        },
+        "table_structure_accuracy": 1.0,
+        "table_shape_correct": true
+      },
+      "pdfminer": "رادقم\n\nلوصحم دک\n\nلوصحم مان\n\n۲۵\n\n۴۰\n\nPE-101\n\nPP-202\n\nنلیتا‌یلپ\n\nنلیپورپ‌یلپ\n\n\f",
+      "pdfplumber": "رادقم لوصحم دک لوصحم مان\nPE\n۲۵ -101 نلیتا‌یلپ\nPP\n۴۰ -202 نلیپورپ‌یلپ",
+      "classification": null
+    },
+    {
+      "id": "two_column_rtl",
+      "category": "layout",
+      "sha256": "fd0fb28ed991a8707fcfbb8d76906f4b0c97c3d23ae277bde69f5e67583b55d1",
+      "page": 20,
+      "expected": "ستون راست بالا\n\nستون راست پایین\n\nستون چپ بالا\n\nستون چپ پایین",
+      "actual": "ستون راست بالا\n\nستون راست پایین\n\nستون چپ بالا\n\nستون چپ پایین",
+      "metrics": {
+        "pass": true,
+        "cer": 0.0,
+        "wer": 0.0,
+        "reading_order_accuracy": 1.0,
+        "exact_span_preservation": 1.0,
+        "unicode_sequence_preservation": {
+          "ی": true
+        }
+      },
+      "pdfminer": "لااب پچ نوتس\n\nلااب تسار نوتس\n\nنییاپ پچ نوتس\n\nنییاپ تسار نوتس\n\n\f",
+      "pdfplumber": "لااب پچ نوتس لااب تسار نوتس\nنییاپ پچ نوتس نییاپ تسار نوتس",
+      "classification": null
+    },
+    {
+      "id": "ltr_sentence",
+      "category": "control",
+      "sha256": "fd0fb28ed991a8707fcfbb8d76906f4b0c97c3d23ae277bde69f5e67583b55d1",
+      "page": 21,
+      "expected": "The identifier DOC-2026-A15 uses Python 3.12.",
+      "actual": "The identifier DOC-2026-A15 uses Python 3.12.\n\n",
+      "metrics": {
+        "pass": true,
+        "cer": 0.0,
+        "wer": 0.0,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 1.0,
+        "unicode_sequence_preservation": {
+          "The": true,
+          "identifier": true,
+          "DOC-2026-A15": true,
+          "uses": true,
+          "Python": true,
+          "3.12.": true
+        }
+      },
+      "pdfminer": "The identifier DOC-2026-A15 uses Python 3.12.\n\n\f",
+      "pdfplumber": "The identifier DOC-2026-A15 uses Python 3.12.",
+      "classification": null
+    },
+    {
+      "id": "two_column_ltr",
+      "category": "control",
+      "sha256": "fd0fb28ed991a8707fcfbb8d76906f4b0c97c3d23ae277bde69f5e67583b55d1",
+      "page": 22,
+      "expected": "Left top\n\nLeft bottom\n\nRight top\n\nRight bottom",
+      "actual": "Left top\n\nLeft bottom\n\nRight top\n\nRight bottom",
+      "metrics": {
+        "pass": true,
+        "cer": 0.0,
+        "wer": 0.0,
+        "reading_order_accuracy": 1.0,
+        "exact_span_preservation": 1.0,
+        "unicode_sequence_preservation": {
+          "Left": true,
+          "top": true,
+          "bottom": true,
+          "Right": true
+        }
+      },
+      "pdfminer": "Left top\n\nRight top\n\nLeft bottom\n\nRight bottom\n\n\f",
+      "pdfplumber": "Left top Right top\nLeft bottom Right bottom",
+      "classification": null
+    }
+  ],
+  "categories": {
+    "basic": {
+      "count": 2,
+      "passed": 2,
+      "cer": 0.0,
+      "wer": 0.0
+    },
+    "layout": {
+      "count": 3,
+      "passed": 3,
+      "cer": 0.0,
+      "wer": 0.0,
+      "reading_order_accuracy": 1.0
+    },
+    "mixed": {
+      "count": 4,
+      "passed": 4,
+      "cer": 0.0,
+      "wer": 0.0
+    },
+    "unicode": {
+      "count": 3,
+      "passed": 3,
+      "cer": 0.0,
+      "wer": 0.0
+    },
+    "numeric": {
+      "count": 3,
+      "passed": 3,
+      "cer": 0.0,
+      "wer": 0.0
+    },
+    "embedded": {
+      "count": 4,
+      "passed": 4,
+      "cer": 0.0,
+      "wer": 0.0
+    },
+    "table": {
+      "count": 1,
+      "passed": 1,
+      "cer": 0.0,
+      "wer": 0.0,
+      "reading_order_accuracy": 1.0,
+      "table_structure_accuracy": 1.0
+    },
+    "control": {
+      "count": 2,
+      "passed": 2,
+      "cer": 0.0,
+      "wer": 0.0,
+      "reading_order_accuracy": 1.0
+    }
+  }
+}

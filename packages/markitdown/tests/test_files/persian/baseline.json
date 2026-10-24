@@ -1,0 +1,660 @@
+{
+  "commit": "7482c092d9c0074a89803c9fdb63a969e7fe17fc",
+  "python": "3.13.5",
+  "os": "macOS-26.7.1-x86_64-i386-64bit-Mach-O",
+  "versions": {
+    "markitdown": "0.1.9",
+    "pdfplumber": "0.11.10",
+    "pdfminer.six": "20260107",
+    "fpdf2": "2.8.9",
+    "uharfbuzz": "0.57.0",
+    "fonttools": "4.67.0",
+    "pytest": "9.1.1"
+  },
+  "fixtures": [
+    {
+      "id": "basic_sentence",
+      "category": "basic",
+      "sha256": "950618e8f26965253f59ccdae7347a2b53a612d2c13f6c2dd8b3c881f0eefd23",
+      "expected": "این یک سند آزمایشی برای بررسی استخراج متن فارسی است.",
+      "actual": ".تسا یسراف نتم جارختسا یسررب یارب یشیامزآ دنس کی نیا\n\n",
+      "metrics": {
+        "pass": false,
+        "cer": 0.8076923076923077,
+        "wer": 1.0,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 0.0,
+        "unicode_sequence_preservation": {
+          "ی": true,
+          "ک": true
+        }
+      },
+      "pdfminer": ".تسا یسراف نتم جارختسا یسررب یارب یشیامزآ دنس کی نیا\n\n\f",
+      "pdfplumber": ".تسا یسراف نتم جارختسا یسررب یارب یشیامزآ دنس کی نیا",
+      "classification": {
+        "issue": "ISSUES.md#rtl-001",
+        "category": "Character reversal",
+        "description": "Persian character order is reversed; original logical Unicode sequence is not preserved."
+      }
+    },
+    {
+      "id": "sentences",
+      "category": "basic",
+      "sha256": "50164fe1fd9574d7e1114ac50ecb6e9b287c524727486dd23621c8215801d7f7",
+      "expected": "این جمله اول است. این جمله دوم است.",
+      "actual": ".تسا مود هلمج نیا .تسا لوا هلمج نیا\n\n",
+      "metrics": {
+        "pass": false,
+        "cer": 0.8571428571428571,
+        "wer": 1.0,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 0.0,
+        "unicode_sequence_preservation": {
+          "ی": true
+        }
+      },
+      "pdfminer": ".تسا مود هلمج نیا .تسا لوا هلمج نیا\n\n\f",
+      "pdfplumber": ".تسا مود هلمج نیا .تسا لوا هلمج نیا",
+      "classification": {
+        "issue": "ISSUES.md#rtl-001",
+        "category": "Character reversal",
+        "description": "Persian character order is reversed; original logical Unicode sequence is not preserved."
+      }
+    },
+    {
+      "id": "paragraphs",
+      "category": "layout",
+      "sha256": "b6e72efddc2d4147d7ac6aac735f86af12e1b87704ba8a92bc8a0ac68f09a0d0",
+      "expected": "این بند اول است.\n\nاین بند دوم است.",
+      "actual": ".تسا لوا دنب نیا\n\n.تسا مود دنب نیا\n\n",
+      "metrics": {
+        "pass": false,
+        "cer": 0.7647058823529411,
+        "wer": 1.0,
+        "reading_order_accuracy": 0.0,
+        "exact_span_preservation": 0.0,
+        "unicode_sequence_preservation": {
+          "ی": true
+        }
+      },
+      "pdfminer": ".تسا لوا دنب نیا\n\n.تسا مود دنب نیا\n\n\f",
+      "pdfplumber": ".تسا لوا دنب نیا\n.تسا مود دنب نیا",
+      "classification": {
+        "issue": "ISSUES.md#rtl-001",
+        "category": "Character reversal",
+        "description": "Persian character order is reversed; original logical Unicode sequence is not preserved."
+      }
+    },
+    {
+      "id": "heading",
+      "category": "layout",
+      "sha256": "fd7324fae4300809ede057953df28b5a16b2dd89cf92c6e708487a9b4f2ae8ad",
+      "expected": "گزارش آزمایش\n\nاین متن گزارش است.",
+      "actual": "شیامزآ شرازگ\n\n.تسا شرازگ نتم نیا\n\n",
+      "metrics": {
+        "pass": false,
+        "cer": 0.8125,
+        "wer": 1.0,
+        "reading_order_accuracy": 0.0,
+        "exact_span_preservation": 0.0,
+        "unicode_sequence_preservation": {
+          "ی": true
+        }
+      },
+      "pdfminer": "شیامزآ شرازگ\n\n.تسا شرازگ نتم نیا\n\n\f",
+      "pdfplumber": "شیامزآ شرازگ\n.تسا شرازگ نتم نیا",
+      "classification": {
+        "issue": "ISSUES.md#rtl-001",
+        "category": "Character reversal",
+        "description": "Persian character order is reversed; original logical Unicode sequence is not preserved."
+      }
+    },
+    {
+      "id": "python_version",
+      "category": "mixed",
+      "sha256": "bf7b6efeb54eed2abeb0a85f849359a938bedc4328fdd48ff2b2f55186cb5843",
+      "expected": "این پروژه از Python 3.12 استفاده می‌کند.",
+      "actual": ".دنک‌یم هدافتسا Python 3.12 زا هژورپ نیا\n\n",
+      "metrics": {
+        "pass": false,
+        "cer": 0.6,
+        "wer": 0.8571428571428571,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 0.0,
+        "unicode_sequence_preservation": {
+          "ی": true,
+          "Python": true,
+          "3.12": true,
+          "‌": true,
+          "ک": true
+        }
+      },
+      "pdfminer": ".دنک‌یم هدافتسا Python 3.12 زا هژورپ نیا\n\n\f",
+      "pdfplumber": "Python\n.دنک‌یم هدافتسا 3.12 زا هژورپ نیا",
+      "classification": {
+        "issue": "ISSUES.md#rtl-001",
+        "category": "Bidirectional corruption",
+        "description": "Persian runs reverse and mixed runs do not preserve logical sentence order."
+      }
+    },
+    {
+      "id": "file_identifier",
+      "category": "mixed",
+      "sha256": "6e0edda973960e36c1ba02218b6d89812eab414427bebaa2443ce5a1b688f92f",
+      "expected": "شناسه فایل DOC-2026-A15 است.",
+      "actual": ".تسا DOC-2026-A15 لیاف هسانش\n\n",
+      "metrics": {
+        "pass": false,
+        "cer": 0.5714285714285714,
+        "wer": 1.0,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 0.0,
+        "unicode_sequence_preservation": {
+          "ی": true,
+          "DOC-2026-A15": true
+        }
+      },
+      "pdfminer": ".تسا DOC-2026-A15 لیاف هسانش\n\n\f",
+      "pdfplumber": "DOC A\n.تسا -2026- 15 لیاف هسانش",
+      "classification": {
+        "issue": "ISSUES.md#rtl-001",
+        "category": "Bidirectional corruption",
+        "description": "Persian runs reverse and mixed runs do not preserve logical sentence order."
+      }
+    },
+    {
+      "id": "model_identifier",
+      "category": "mixed",
+      "sha256": "f83fc711898d8ac01a638920331f0ba330b5ed8c46907f1276a58735d0ce3637",
+      "expected": "مدل GPT-4o برای پردازش متن استفاده شد.",
+      "actual": ".دش هدافتسا نتم شزادرپ یارب GPT-4o لدم\n\n",
+      "metrics": {
+        "pass": false,
+        "cer": 0.8421052631578947,
+        "wer": 1.0,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 0.0,
+        "unicode_sequence_preservation": {
+          "GPT-4o": true,
+          "ی": true
+        }
+      },
+      "pdfminer": ".دش هدافتسا نتم شزادرپ یارب GPT-4o لدم\n\n\f",
+      "pdfplumber": "GPT o\n.دش هدافتسا نتم شزادرپ یارب -4 لدم",
+      "classification": {
+        "issue": "ISSUES.md#rtl-001",
+        "category": "Bidirectional corruption",
+        "description": "Persian runs reverse and mixed runs do not preserve logical sentence order."
+      }
+    },
+    {
+      "id": "contract_date",
+      "category": "mixed",
+      "sha256": "c4beaa218fe9cc3ea2c1da51c1ea940a02e86de31ce93f183096f4d448385025",
+      "expected": "شماره قرارداد ABC-123 در تاریخ ۱۴۰۵/۰۷/۳۰ ثبت شد.",
+      "actual": "|              | / / ABC         |                    |\n| ------------ | --------------- | ------------------ |\n| .دش تبث ۱۴۰۵ | ۰۷ ۳۰ خیرات رد  | -123 دادرارق هرامش |",
+      "metrics": {
+        "pass": false,
+        "cer": 2.979591836734694,
+        "wer": 3.5,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 0.0,
+        "unicode_sequence_preservation": {
+          "ABC-123": false,
+          "ی": true,
+          "۱": true,
+          "۴": true,
+          "۰": true,
+          "۵": true,
+          "۷": true,
+          "۳": true
+        }
+      },
+      "pdfminer": ".دش تبث ۱۴۰۵/۰۷/۳۰ خیرات رد ABC-123 دادرارق هرامش\n\n\f",
+      "pdfplumber": "/ / ABC\n.دش تبث ۱۴۰۵ ۰۷ ۳۰ خیرات رد -123 دادرارق هرامش",
+      "classification": {
+        "issue": "ISSUES.md#rtl-002",
+        "category": "Layout corruption",
+        "description": "Single prose line is incorrectly emitted as a table, splitting embedded expressions."
+      }
+    },
+    {
+      "id": "letter_variants",
+      "category": "unicode",
+      "sha256": "a3b9399d8ee457ac5098a7d03e363375a9c64a9098bc92440ac8e4fb0f2a44e3",
+      "expected": "ی ي ک ك",
+      "actual": "ك ک ي ی\n\n",
+      "metrics": {
+        "pass": false,
+        "cer": 0.5714285714285714,
+        "wer": 1.0,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 0.0,
+        "unicode_sequence_preservation": {
+          "ی": true,
+          "ي": true,
+          "ک": true,
+          "ك": true
+        }
+      },
+      "pdfminer": "ك ک ي ی\n\n\f",
+      "pdfplumber": "ك ک ي ی",
+      "classification": {
+        "issue": "ISSUES.md#rtl-001",
+        "category": "Character reversal",
+        "description": "Persian character order is reversed; original logical Unicode sequence is not preserved."
+      }
+    },
+    {
+      "id": "zwnj",
+      "category": "unicode",
+      "sha256": "52ac0a62d4f68c25a7b3ce3c07f247597c8a9e86e1e09608047843575db52ee5",
+      "expected": "می‌روم کتاب‌ها برنامه‌نویسی",
+      "actual": "یسیون‌همانرب اه‌باتک مور‌یم\n\n",
+      "metrics": {
+        "pass": false,
+        "cer": 0.8148148148148148,
+        "wer": 1.0,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 0.0,
+        "unicode_sequence_preservation": {
+          "ی": true,
+          "‌": true,
+          "ک": true
+        }
+      },
+      "pdfminer": "یسیون‌همانرب اه‌باتک مور‌یم\n\n\f",
+      "pdfplumber": "یسیونه‌ مانرب اه‌باتک مور‌یم",
+      "classification": {
+        "issue": "ISSUES.md#rtl-001",
+        "category": "Character reversal",
+        "description": "Persian character order is reversed; original logical Unicode sequence is not preserved."
+      }
+    },
+    {
+      "id": "persian_digits",
+      "category": "numeric",
+      "sha256": "3924b649f73a555193217533f45651902af34484f8c473ada0bca398e1fa317b",
+      "expected": "۰۱۲۳۴۵۶۷۸۹",
+      "actual": "۰۱۲۳۴۵۶۷۸۹\n\n",
+      "metrics": {
+        "pass": true,
+        "cer": 0.0,
+        "wer": 0.0,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 1.0,
+        "unicode_sequence_preservation": {
+          "۰": true,
+          "۱": true,
+          "۲": true,
+          "۳": true,
+          "۴": true,
+          "۵": true,
+          "۶": true,
+          "۷": true,
+          "۸": true,
+          "۹": true
+        }
+      },
+      "pdfminer": "۰۱۲۳۴۵۶۷۸۹\n\n\f",
+      "pdfplumber": "۰۱۲۳۴۵۶۷۸۹",
+      "classification": null
+    },
+    {
+      "id": "arabic_digits",
+      "category": "numeric",
+      "sha256": "93db62ef9f99cbfcb442e4d9f04bcc9f1a90a103221b2092a0ec46f00886091b",
+      "expected": "٠١٢٣٤٥٦٧٨٩",
+      "actual": "٠١٢٣٤٥٦٧٨٩\n\n",
+      "metrics": {
+        "pass": true,
+        "cer": 0.0,
+        "wer": 0.0,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 1.0,
+        "unicode_sequence_preservation": {
+          "٠": true,
+          "١": true,
+          "٢": true,
+          "٣": true,
+          "٤": true,
+          "٥": true,
+          "٦": true,
+          "٧": true,
+          "٨": true,
+          "٩": true
+        }
+      },
+      "pdfminer": "٠١٢٣٤٥٦٧٨٩\n\n\f",
+      "pdfplumber": "٠١٢٣٤٥٦٧٨٩",
+      "classification": null
+    },
+    {
+      "id": "ascii_digits",
+      "category": "numeric",
+      "sha256": "28cbe89045f0954a9939432c0a65cde56d877046c783dc195551a8ec6f185a78",
+      "expected": "0123456789",
+      "actual": "0123456789\n\n",
+      "metrics": {
+        "pass": true,
+        "cer": 0.0,
+        "wer": 0.0,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 1.0,
+        "unicode_sequence_preservation": {
+          "0123456789": true
+        }
+      },
+      "pdfminer": "0123456789\n\n\f",
+      "pdfplumber": "0123456789",
+      "classification": null
+    },
+    {
+      "id": "diacritics",
+      "category": "unicode",
+      "sha256": "0f96ec82f0d8546492d163e766a4bba46e8dc0b74c52470252837d165dfdec26",
+      "expected": "سَلام",
+      "actual": "ملاَس\n\n",
+      "metrics": {
+        "pass": false,
+        "cer": 0.8,
+        "wer": 1.0,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 0.0,
+        "unicode_sequence_preservation": {
+          "َ": true
+        }
+      },
+      "pdfminer": "ملاَس\n\n\f",
+      "pdfplumber": "ملاَس",
+      "classification": {
+        "issue": "ISSUES.md#rtl-001",
+        "category": "Character reversal",
+        "description": "Persian character order is reversed; original logical Unicode sequence is not preserved."
+      }
+    },
+    {
+      "id": "url",
+      "category": "embedded",
+      "sha256": "734fab3ba1b160c0b3945851f5e348c9dc9fde79180de503452f5150ae68ace2",
+      "expected": "برای اطلاعات بیشتر به https://example.com مراجعه کنید.",
+      "actual": "| https         | //example | com                      |\n| ------------- | --------- | ------------------------ |\n| .دینک هعجارم  | :         | .  هب رتشیب تاعلاطا یارب |",
+      "metrics": {
+        "pass": false,
+        "cer": 2.9444444444444446,
+        "wer": 3.7142857142857144,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 0.0,
+        "unicode_sequence_preservation": {
+          "ی": true,
+          "https://example.com": false,
+          "ک": true
+        }
+      },
+      "pdfminer": ".دینک هعجارم https://example.com هب رتشیب تاعلاطا یارب\n\n\f",
+      "pdfplumber": "https //example com\n.دینک هعجارم : . هب رتشیب تاعلاطا یارب",
+      "classification": {
+        "issue": "ISSUES.md#rtl-002",
+        "category": "Layout corruption",
+        "description": "Single prose line is incorrectly emitted as a table, splitting embedded expressions."
+      }
+    },
+    {
+      "id": "email",
+      "category": "embedded",
+      "sha256": "1698e17b8330daca7c16a79958ca4aa20b2569c8468ecda1bb57a2efc1eee767",
+      "expected": "نشانی test@example.com است.",
+      "actual": ".تسا test@example.com یناشن\n\n",
+      "metrics": {
+        "pass": false,
+        "cer": 0.37037037037037035,
+        "wer": 0.6666666666666666,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 0.0,
+        "unicode_sequence_preservation": {
+          "ی": true,
+          "test@example.com": true
+        }
+      },
+      "pdfminer": ".تسا test@example.com یناشن\n\n\f",
+      "pdfplumber": "test@example com\n.تسا . یناشن",
+      "classification": {
+        "issue": "ISSUES.md#rtl-001",
+        "category": "Bidirectional corruption",
+        "description": "Persian runs reverse and mixed runs do not preserve logical sentence order."
+      }
+    },
+    {
+      "id": "decimal_unit",
+      "category": "embedded",
+      "sha256": "26c2bfeb42bd79c62bae288aac01355959546dbbe599b6a9973175316ee2a5d1",
+      "expected": "مقدار آزمایش برابر با 3.75 mg/L است.",
+      "actual": ".تسا mg/L 3.75 اب ربارب شیامزآ رادقم\n\n",
+      "metrics": {
+        "pass": false,
+        "cer": 0.8333333333333334,
+        "wer": 1.0,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 0.0,
+        "unicode_sequence_preservation": {
+          "ی": true,
+          "3.75": true,
+          "mg/L": true
+        }
+      },
+      "pdfminer": ".تسا mg/L 3.75 اب ربارب شیامزآ رادقم\n\n\f",
+      "pdfplumber": "mg/L\n.تسا 3.75 اب ربارب شیامزآ رادقم",
+      "classification": {
+        "issue": "ISSUES.md#rtl-001",
+        "category": "Bidirectional corruption",
+        "description": "Persian runs reverse and mixed runs do not preserve logical sentence order."
+      }
+    },
+    {
+      "id": "parentheses_math",
+      "category": "embedded",
+      "sha256": "788b127b06b8eb051c81f9bf1778076d41fd347d84d5296b4ca7275c709cae3f",
+      "expected": "رابطه (x + 2 = 5) درست است.",
+      "actual": "|            | )x + = | (         |\n| ---------- | ------ | --------- |\n| .تسا تسرد  |    2   |  5  هطبار |",
+      "metrics": {
+        "pass": false,
+        "cer": 3.5185185185185186,
+        "wer": 2.75,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 0.0,
+        "unicode_sequence_preservation": {
+          "x": true,
+          "2": true,
+          "5": true
+        }
+      },
+      "pdfminer": ".تسا تسرد )x + 2 = 5( هطبار\n\n\f",
+      "pdfplumber": ")x + = (\n.تسا تسرد 2 5 هطبار",
+      "classification": {
+        "issue": "ISSUES.md#rtl-002",
+        "category": "Layout corruption",
+        "description": "Single prose line is incorrectly emitted as a table, splitting embedded expressions."
+      }
+    },
+    {
+      "id": "rtl_table",
+      "category": "table",
+      "sha256": "f5f1e2a0fa9d6d0c55445356cc818b4d7ca2bb50cb883a06b08f8352808a38c1",
+      "expected": [
+        [
+          "نام محصول",
+          "کد محصول",
+          "مقدار"
+        ],
+        [
+          "پلی‌اتیلن",
+          "PE-101",
+          "۲۵"
+        ],
+        [
+          "پلی‌پروپیلن",
+          "PP-202",
+          "۴۰"
+        ]
+      ],
+      "actual": "| رادقم | لوصحم دک | لوصحم مان |\n| ----- | -------- | --------- |\nPE\n| ۲۵  | -101 | نلیتا‌یلپ |\n| --- | ---- | --------- |\nPP\n| ۴۰  | -202 | نلیپورپ‌یلپ |\n| --- | ---- | ----------- |",
+      "metrics": {
+        "pass": false,
+        "cer": 0.717948717948718,
+        "wer": 0.7058823529411765,
+        "reading_order_accuracy": 0.027777777777777776,
+        "exact_span_preservation": 0.2222222222222222,
+        "unicode_sequence_preservation": {
+          "ک": true,
+          "ی": true,
+          "‌": true,
+          "PE-101": false,
+          "۲": true,
+          "۵": true,
+          "PP-202": false,
+          "۴": true,
+          "۰": true
+        },
+        "table_structure_accuracy": 0.0,
+        "table_shape_correct": true
+      },
+      "pdfminer": "رادقم\n\nلوصحم دک\n\nلوصحم مان\n\n۲۵\n\n۴۰\n\nPE-101\n\nPP-202\n\nنلیتا‌یلپ\n\nنلیپورپ‌یلپ\n\n\f",
+      "pdfplumber": "رادقم لوصحم دک لوصحم مان\nPE\n۲۵ -101 نلیتا‌یلپ\nPP\n۴۰ -202 نلیپورپ‌یلپ",
+      "classification": {
+        "issue": "ISSUES.md#rtl-004",
+        "category": "Table corruption",
+        "description": "Header and cell ordering is reversed and Latin codes are split outside rows."
+      }
+    },
+    {
+      "id": "two_column_rtl",
+      "category": "layout",
+      "sha256": "0fd494acca5503b1f470386427d5cba4402f18b7125f9471bf256a870a770de0",
+      "expected": "ستون راست بالا\n\nستون راست پایین\n\nستون چپ بالا\n\nستون چپ پایین",
+      "actual": "لااب پچ نوتس\n\nلااب تسار نوتس\n\nنییاپ پچ نوتس\n\nنییاپ تسار نوتس\n\n",
+      "metrics": {
+        "pass": false,
+        "cer": 0.8,
+        "wer": 1.0,
+        "reading_order_accuracy": 0.0,
+        "exact_span_preservation": 0.0,
+        "unicode_sequence_preservation": {
+          "ی": true
+        }
+      },
+      "pdfminer": "لااب پچ نوتس\n\nلااب تسار نوتس\n\nنییاپ پچ نوتس\n\nنییاپ تسار نوتس\n\n\f",
+      "pdfplumber": "لااب پچ نوتس لااب تسار نوتس\nنییاپ پچ نوتس نییاپ تسار نوتس",
+      "classification": {
+        "issue": "ISSUES.md#rtl-003",
+        "category": "Layout corruption",
+        "description": "Columns are interleaved left before right; Persian text also reverses."
+      }
+    },
+    {
+      "id": "ltr_sentence",
+      "category": "control",
+      "sha256": "6a79f90e362a2b08d77d6396abb908cbf0263ae5eadce05af70c003d0dd001b8",
+      "expected": "The identifier DOC-2026-A15 uses Python 3.12.",
+      "actual": "The identifier DOC-2026-A15 uses Python 3.12.\n\n",
+      "metrics": {
+        "pass": true,
+        "cer": 0.0,
+        "wer": 0.0,
+        "reading_order_accuracy": null,
+        "exact_span_preservation": 1.0,
+        "unicode_sequence_preservation": {
+          "The": true,
+          "identifier": true,
+          "DOC-2026-A15": true,
+          "uses": true,
+          "Python": true,
+          "3.12.": true
+        }
+      },
+      "pdfminer": "The identifier DOC-2026-A15 uses Python 3.12.\n\n\f",
+      "pdfplumber": "The identifier DOC-2026-A15 uses Python 3.12.",
+      "classification": null
+    },
+    {
+      "id": "two_column_ltr",
+      "category": "control",
+      "sha256": "4c8e2eb539366bc29a50e642a816ab3496de0cdbd96f85442e663398c4678b57",
+      "expected": "Left top\n\nLeft bottom\n\nRight top\n\nRight bottom",
+      "actual": "Left top\n\nRight top\n\nLeft bottom\n\nRight bottom\n\n",
+      "metrics": {
+        "pass": false,
+        "cer": 0.34782608695652173,
+        "wer": 0.5,
+        "reading_order_accuracy": 0.8333333333333334,
+        "exact_span_preservation": 1.0,
+        "unicode_sequence_preservation": {
+          "Left": true,
+          "top": true,
+          "bottom": true,
+          "Right": true
+        }
+      },
+      "pdfminer": "Left top\n\nRight top\n\nLeft bottom\n\nRight bottom\n\n\f",
+      "pdfplumber": "Left top Right top\nLeft bottom Right bottom",
+      "classification": {
+        "issue": "ISSUES.md#rtl-003",
+        "category": "Layout corruption",
+        "description": "LTR columns interleave by row instead of reading the left column top to bottom first."
+      }
+    }
+  ],
+  "categories": {
+    "basic": {
+      "count": 2,
+      "passed": 0,
+      "cer": 0.8324175824175823,
+      "wer": 1.0
+    },
+    "layout": {
+      "count": 3,
+      "passed": 0,
+      "cer": 0.7924019607843137,
+      "wer": 1.0,
+      "reading_order_accuracy": 0.0
+    },
+    "mixed": {
+      "count": 4,
+      "passed": 0,
+      "cer": 1.2482814178302901,
+      "wer": 1.5892857142857142
+    },
+    "unicode": {
+      "count": 3,
+      "passed": 0,
+      "cer": 0.7287477954144621,
+      "wer": 1.0
+    },
+    "numeric": {
+      "count": 3,
+      "passed": 3,
+      "cer": 0.0,
+      "wer": 0.0
+    },
+    "embedded": {
+      "count": 4,
+      "passed": 0,
+      "cer": 1.9166666666666667,
+      "wer": 2.0327380952380953
+    },
+    "table": {
+      "count": 1,
+      "passed": 0,
+      "cer": 0.717948717948718,
+      "wer": 0.7058823529411765,
+      "reading_order_accuracy": 0.027777777777777776,
+      "table_structure_accuracy": 0.0
+    },
+    "control": {
+      "count": 2,
+      "passed": 1,
+      "cer": 0.17391304347826086,
+      "wer": 0.25,
+      "reading_order_accuracy": 0.8333333333333334
+    }
+  }
+}
