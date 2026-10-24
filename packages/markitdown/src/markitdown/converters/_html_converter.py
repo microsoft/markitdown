@@ -3,7 +3,11 @@ import warnings
 from typing import Any, BinaryIO, Optional
 from bs4 import BeautifulSoup
 
-from .._base_converter import DocumentConverter, DocumentConverterResult
+from .._base_converter import (
+    ConversionDiagnostics,
+    DocumentConverter,
+    DocumentConverterResult,
+)
 from .._stream_info import StreamInfo
 from ._markdownify import _CustomMarkdownify
 
@@ -48,6 +52,8 @@ class HtmlConverter(DocumentConverter):
         # Pop our own keyword before forwarding the rest to markdownify.
         # strict=True raises RecursionError instead of falling back to plain text.
         strict: bool = kwargs.pop("strict", False)
+        include_diagnostics = kwargs.pop("include_diagnostics", False)
+        diagnostic_warnings = ()
 
         # Parse the stream
         encoding = "utf-8" if stream_info.charset is None else stream_info.charset
@@ -79,6 +85,7 @@ class HtmlConverter(DocumentConverter):
             )
             target = body_elm if body_elm else soup
             webpage_text = target.get_text("\n", strip=True)
+            diagnostic_warnings = ("html_recursion_plain_text_fallback",)
 
         assert isinstance(webpage_text, str)
 
@@ -88,6 +95,13 @@ class HtmlConverter(DocumentConverter):
         return DocumentConverterResult(
             markdown=webpage_text,
             title=None if soup.title is None else soup.title.string,
+            diagnostics=(
+                ConversionDiagnostics(
+                    converter=type(self).__name__, warnings=diagnostic_warnings
+                )
+                if include_diagnostics
+                else None
+            ),
         )
 
     def convert_string(

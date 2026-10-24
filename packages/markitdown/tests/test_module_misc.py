@@ -4,6 +4,7 @@ import io
 import json
 import ntpath
 import os
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -14,6 +15,9 @@ from charset_normalizer import from_bytes
 
 import markitdown._uri_utils as uri_utils
 from markitdown import (
+    ConversionDiagnostics,
+    DocumentConverter,
+    DocumentConverterResult,
     FileConversionException,
     MarkItDown,
     StreamInfo,
@@ -23,6 +27,8 @@ from markitdown._markitdown import (
     _get_content_disposition_filename,
     _read_charset_sample,
 )
+from markitdown.converters import HtmlConverter
+from markitdown.converters._markdownify import _CustomMarkdownify
 from markitdown._uri_utils import (
     _is_unc_or_device_path,
     file_uri_to_path,
@@ -873,6 +879,93 @@ def test_a_declared_charset_still_wins() -> None:
         stream_info=StreamInfo(extension=".csv", charset="gb18030"),
     )
     assert "浦发银行" in result.markdown
+
+
+def _convert_with_diagnostics(md, enabled=False):
+    return md.convert_stream(
+        io.BytesIO(b"<html><body><h1>Hello</h1></body></html>"),
+        stream_info=StreamInfo(extension=".html", mimetype="text/html"),
+        include_diagnostics=enabled,
+    )
+
+
+def test_opt_in_preserves_markdown_and_title():
+    md = MarkItDown(enable_plugins=False)
+    plain = _convert_with_diagnostics(md)
+    measured = _convert_with_diagnostics(md, True)
+    assert plain.diagnostics is None
+    assert vars(plain) == {"markdown": plain.markdown, "title": plain.title}
+    assert json.loads(json.dumps(vars(plain))) == vars(plain)
+    assert measured.diagnostics == ConversionDiagnostics(converter="HtmlConverter")
+    assert (measured.markdown, measured.title, str(measured)) == (
+        plain.markdown,
+        plain.title,
+        str(plain),
+    )
+
+
+def test_html_fallback_reports_stable_code(monkeypatch):
+    def fail(*args, **kwargs):
+        raise RecursionError("private document contents")
+
+    monkeypatch.setattr(_CustomMarkdownify, "convert_soup", fail)
+    with pytest.warns(UserWarning, match="deeply nested"):
+        result = _convert_with_diagnostics(MarkItDown(enable_plugins=False), True)
+    assert result.markdown == "Hello"
+    assert result.diagnostics.warnings == ("html_recursion_plain_text_fallback",)
+    assert "private" not in repr(result.diagnostics)
+    with pytest.raises(RecursionError):
+        HtmlConverter().convert_string(
+            "<p>hello</p>", strict=True, include_diagnostics=True
+        )
+
+
+def test_old_custom_converter_and_warning_preservation():
+    supplied = ConversionDiagnostics(converter="Custom", warnings=("custom_code",))
+
+    class Custom(DocumentConverter):
+        def accepts(self, stream, info, **kwargs):
+            return True
+
+        def convert(self, stream, info, **kwargs):
+            return DocumentConverterResult("custom", diagnostics=supplied)
+
+    class Legacy(Custom):
+        def convert(self, stream, info, **kwargs):
+            return DocumentConverterResult("legacy")
+
+    for converter, codes in [(Custom(), ("custom_code",)), (Legacy(), ())]:
+        md = MarkItDown(enable_builtins=False, enable_plugins=False)
+        md.register_converter(converter)
+        result = _convert_with_diagnostics(md, True)
+        assert result.diagnostics.converter == type(converter).__name__
+        assert result.diagnostics.warnings == codes
+        if codes:
+            assert result.diagnostics is supplied
+
+
+def test_diagnostics_are_immutable():
+    from dataclasses import FrozenInstanceError
+
+    diagnostics = ConversionDiagnostics(converter="HtmlConverter")
+    with pytest.raises(FrozenInstanceError):
+        diagnostics.converter = "Other"
+    result = DocumentConverterResult("hello", diagnostics=diagnostics)
+    result.diagnostics = None
+    assert result.diagnostics is None
+    assert vars(result) == {"markdown": "hello", "title": None}
+
+
+def test_concurrent_opt_in_does_not_leak():
+    md = MarkItDown(enable_plugins=False)
+    flags = [False, True] * 8
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        results = list(
+            executor.map(lambda flag: _convert_with_diagnostics(md, flag), flags)
+        )
+    assert [r.diagnostics is not None for r in results] == flags
+    enabled = [r.diagnostics for r in results if r.diagnostics is not None]
+    assert len({id(d) for d in enabled}) == len(enabled)
 
 
 if __name__ == "__main__":
