@@ -356,6 +356,8 @@ result = md.convert("example.jpg")
 print(result.markdown)
 ```
 
+With the default prompt, an image's description follows a `# Description:` heading. A custom `llm_prompt` controls the description's language and format, so MarkItDown adds it without that heading.
+
 `max_retries` controls the OpenAI client's automatic retries for retryable errors (the default is 2); `5` allows up to six attempts with backoff. See the [OpenAI SDK retry documentation](https://github.com/openai/openai-python#retries).
 
 If any attempt succeeds, image conversion continues normally. If the client raises an error after exhausting its retries, or encounters a non-retryable error, MarkItDown tries other applicable converters and raises `FileConversionException` only if none succeeds.
