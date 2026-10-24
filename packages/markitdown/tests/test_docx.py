@@ -484,7 +484,12 @@ def _paragraph(content: str) -> str:
 _BODY = _paragraph(_text("Before") + _image() + _text("After"))
 
 
-def _docx(body: str = _BODY, *, embedded_style_map: Optional[str] = None) -> io.BytesIO:
+def _docx(
+    body: str = _BODY,
+    *,
+    embedded_style_map: Optional[str] = None,
+    styles: Optional[str] = None,
+) -> io.BytesIO:
     stream = io.BytesIO()
     with zipfile.ZipFile(stream, "w") as archive:
         archive.writestr(
@@ -524,6 +529,8 @@ def _docx(body: str = _BODY, *, embedded_style_map: Optional[str] = None) -> io.
         )
         archive.writestr("word/media/image.png", _PNG)
         archive.writestr("word/media/image.gif", _GIF)
+        if styles is not None:
+            archive.writestr("word/styles.xml", styles)
     if embedded_style_map is not None:
         stream.seek(0)
         mammoth.embed_style_map(stream, embedded_style_map)
@@ -1171,6 +1178,45 @@ def test_docx_caller_style_map_overrides_embedded_style_map(tmp_path) -> None:
     result = MarkItDown(style_map="u => strong").convert(docx_file)
 
     assert "plain **underlined**" in result.markdown
+
+
+# Style IDs are localized (these are the ones test.docx uses), so only the style
+# names identify Word's built-in Title and Subtitle styles.
+_TITLE_STYLES = """<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:style w:type="paragraph" w:styleId="a3"><w:name w:val="Title"/></w:style>
+  <w:style w:type="paragraph" w:styleId="a5"><w:name w:val="Subtitle"/></w:style>
+</w:styles>"""
+
+
+def _styled_paragraph(style_id: str, text: str) -> str:
+    return _paragraph(f'<w:pPr><w:pStyle w:val="{style_id}"/></w:pPr>' + _text(text))
+
+
+_TITLE_BODY = (
+    _styled_paragraph("a3", "Quarterly Report")
+    + _styled_paragraph("a5", "Results for the third quarter")
+    + _paragraph(_text("Body text."))
+)
+
+
+def test_docx_title_and_subtitle_styles_become_headings() -> None:
+    result = MarkItDown().convert_stream(
+        _docx(_TITLE_BODY, styles=_TITLE_STYLES), stream_info=_INFO
+    )
+
+    assert result.markdown == (
+        "# Quarterly Report\n\n## Results for the third quarter\n\nBody text."
+    )
+
+
+def test_docx_caller_style_map_overrides_title_default() -> None:
+    result = MarkItDown(style_map="p[style-name='Subtitle'] => p:fresh").convert_stream(
+        _docx(_TITLE_BODY, styles=_TITLE_STYLES), stream_info=_INFO
+    )
+
+    assert result.markdown == (
+        "# Quarterly Report\n\nResults for the third quarter\n\nBody text."
+    )
 
 
 def test_docx_equations() -> None:
