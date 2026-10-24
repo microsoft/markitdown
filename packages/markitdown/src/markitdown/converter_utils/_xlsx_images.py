@@ -12,7 +12,6 @@ from defusedxml import ElementTree as ET
 from .._stream_info import StreamInfo
 from ._image import _parse_image_html
 
-
 _NS = {
     "s": "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
     "r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",

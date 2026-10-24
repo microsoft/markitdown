@@ -176,8 +176,8 @@ Content Understanding is ideal when you need capabilities beyond what built-in o
 | Capability | Built-in converters | Azure Document Intelligence | Azure Content Understanding |
 |------------|---------------------|-----------------------------|-----------------------------|
 | Document conversion | Offline, format-specific extraction | Cloud layout extraction | Cloud multimodal extraction |
-| Structured fields | Not available | Not exposed by this integration | YAML front matter from analyzer fields |
-| Custom analyzers | Not available | Not configurable in this integration | Supported with `cu_analyzer_id` |
+| Structured fields | Not available | YAML front matter from model or query fields | YAML front matter from analyzer fields |
+| Custom analyzers/models | Not available | Supported with `docintel_model_id` | Supported with `cu_analyzer_id` |
 | Audio and video | Basic audio, no video | Not supported | Audio and video analyzers |
 | Cost | Local compute only | Billable Azure API calls | Billable Azure API calls |
 
@@ -247,6 +247,7 @@ More information about Azure Content Understanding can be found [here](https://l
 To use Microsoft Document Intelligence for conversion:
 
 ```bash
+export AZURE_API_KEY="<document_intelligence_api_key>"
 markitdown path-to-file.pdf -o document.md -d -e "<document_intelligence_endpoint>"
 ```
 
@@ -256,6 +257,31 @@ The endpoint can also be set once in the environment, so callers only need `-d`:
 export MARKITDOWN_DOCINTEL_ENDPOINT="<document_intelligence_endpoint>"
 markitdown path-to-file.pdf -o document.md -d
 ```
+
+If `AZURE_API_KEY` is not set, MarkItDown uses `DefaultAzureCredential`.
+
+Select a model, configure analysis add-ons, or request fields from the CLI:
+
+```bash
+markitdown document.pdf --use-docintel \
+  --endpoint "<document_intelligence_endpoint>" \
+  --docintel-model-id prebuilt-layout \
+  --docintel-features "ocrHighResolution,styleFont" \
+  --docintel-query-fields "Title,Author"
+```
+
+No analysis add-ons are enabled by default. Use `--docintel-features` to opt in,
+or `--docintel-features none` to explicitly request no add-ons. Analysis add-ons
+and query fields apply only to OCR-supported inputs such as PDFs and images.
+
+Available feature values are `barcodes`, `formulas`, `keyValuePairs`,
+`languages`, `ocrHighResolution`, and `styleFont`. The `formulas`,
+`ocrHighResolution`, and `styleFont` features incur additional charges, as does
+the `queryFields` add-on, which is priced differently from the other add-ons.
+See the
+[Document Intelligence add-on documentation](https://learn.microsoft.com/azure/ai-services/document-intelligence/concept/add-on-capabilities?view=doc-intel-4.0.0)
+and [pricing](https://azure.microsoft.com/pricing/details/document-intelligence/)
+for details.
 
 More information about how to set up an Azure Document Intelligence Resource can be found [here](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/how-to-guides/create-document-intelligence-resource?view=doc-intel-4.0.0)
 
@@ -271,15 +297,52 @@ result = md.convert("test.xlsx")
 print(result.markdown)
 ```
 
-Document Intelligence conversion in Python:
+Document Intelligence conversion in Python using an API key:
 
 ```python
+from azure.core.credentials import AzureKeyCredential
 from markitdown import MarkItDown
 
-md = MarkItDown(docintel_endpoint="<document_intelligence_endpoint>")
+md = MarkItDown(
+    docintel_endpoint="<document_intelligence_endpoint>",
+    docintel_credential=AzureKeyCredential("<document_intelligence_api_key>"),
+)
 result = md.convert("test.pdf")
 print(result.markdown)
 ```
+
+Omit `docintel_credential` to use `AZURE_API_KEY` when it is set, or
+`DefaultAzureCredential` otherwise.
+
+Configure the model, analysis add-ons, and structured query fields:
+
+```python
+from azure.ai.documentintelligence.models import DocumentAnalysisFeature
+from markitdown import MarkItDown
+
+md = MarkItDown(
+    docintel_endpoint="<document_intelligence_endpoint>",
+    docintel_model_id="prebuilt-layout",
+    docintel_features=[
+        DocumentAnalysisFeature.OCR_HIGH_RESOLUTION,
+        DocumentAnalysisFeature.STYLE_FONT,
+    ],
+    docintel_query_fields=["Title", "Author"],
+)
+result = md.convert("test.pdf")
+print(result.markdown)
+```
+
+Omit `docintel_features` or set `docintel_features=[]` to request no analysis
+add-ons. When query fields are provided, MarkItDown automatically enables the
+required `queryFields` add-on.
+Models that return structured fields prepend them to the Markdown as YAML front
+matter. A single document uses a top-level `fields` mapping. When the service
+returns multiple documents, the front matter instead contains a `documents`
+list in service order, with a separate `fields` mapping for each document.
+Documents without extracted fields retain an empty mapping in that list; no
+front matter is emitted when all documents have empty fields. Selection groups
+are represented as lists of selected values.
 
 To use Large Language Models for image descriptions (currently only for pptx and image files), provide `llm_client` and `llm_model`:
 

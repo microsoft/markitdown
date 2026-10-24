@@ -8,7 +8,6 @@ from pathlib import Path
 from pptx import Presentation
 from pptx.util import Inches
 
-
 FIXTURES = Path(__file__).resolve().parent
 
 
@@ -18,9 +17,9 @@ def _missing_text_presentation() -> Presentation:
     slide = presentation.slides.add_slide(presentation.slide_layouts[1])
     slide.shapes.title.text = "Preserved slide title"
     slide.placeholders[1].text = "Preserved body text"
-    slide.shapes.add_textbox(
-        Inches(1), Inches(5), Inches(5), Inches(1)
-    ).text = "Text after empty shape"
+    slide.shapes.add_textbox(Inches(1), Inches(5), Inches(5), Inches(1)).text = (
+        "Text after empty shape"
+    )
     slide.notes_slide.notes_text_frame.text = "Preserved speaker notes"
     return presentation
 
