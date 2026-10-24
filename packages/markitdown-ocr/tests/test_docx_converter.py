@@ -61,7 +61,7 @@ def _convert(filename: str, ocr_service: MockOCRService) -> str:
 
 def test_docx_image_start(svc: MockOCRService) -> None:
     expected = (
-        "Document with Image at Start\n\n"
+        "# Document with Image at Start\n\n"
         f"{_MOCK_BLOCK}\n\n"
         "This is the main content after the header image.\n\n"
         "More text content here."
@@ -93,7 +93,7 @@ def test_docx_image_middle(svc: MockOCRService) -> None:
 
 def test_docx_image_end(svc: MockOCRService) -> None:
     expected = (
-        "Report\n\n"
+        "# Report\n\n"
         "Main findings of the report.\n\n"
         "Details and analysis.\n\n"
         "Recommendations.\n\n"
@@ -109,7 +109,7 @@ def test_docx_image_end(svc: MockOCRService) -> None:
 
 def test_docx_multiple_images(svc: MockOCRService) -> None:
     expected = (
-        "Multi-Image Document\n\n"
+        "# Multi-Image Document\n\n"
         "First section\n\n"
         f"{_MOCK_BLOCK}\n\n"
         "Second section with another image\n\n"
@@ -153,7 +153,7 @@ def test_docx_multipage(svc: MockOCRService) -> None:
 
 def test_docx_complex_layout(svc: MockOCRService) -> None:
     expected = (
-        "Complex Document\n\n"
+        "# Complex Document\n\n"
         "|  |  |\n"
         "| --- | --- |\n"
         "| Feature | Status |\n"
