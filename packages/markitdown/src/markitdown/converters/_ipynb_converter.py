@@ -11,6 +11,34 @@ CANDIDATE_MIME_TYPE_PREFIXES = [
 
 ACCEPTED_FILE_EXTENSIONS = [".ipynb"]
 
+# A notebook that declares no language at all is overwhelmingly a Python one,
+# and Python is the label this converter has always written.
+DEFAULT_CODE_LANGUAGE = "python"
+
+
+def _code_language(notebook_content: dict) -> str:
+    """The language the notebook's code cells are written in.
+
+    nbformat records it in ``metadata.language_info.name``, which is what
+    nbconvert reads; ``metadata.kernelspec.language`` is the kernel's own
+    declaration, and is all some producers write.
+    """
+    metadata = notebook_content.get("metadata")
+    if not isinstance(metadata, dict):
+        return DEFAULT_CODE_LANGUAGE
+
+    for section, key in (("language_info", "name"), ("kernelspec", "language")):
+        declaration = metadata.get(section)
+        if not isinstance(declaration, dict):
+            continue
+        language = declaration.get(key)
+        # A fence's info string ends at the first whitespace, so only the
+        # first word of the declaration can label the block.
+        if isinstance(language, str) and language.split():
+            return language.split()[0]
+
+    return DEFAULT_CODE_LANGUAGE
+
 
 class IpynbConverter(DocumentConverter):
     """Converts Jupyter Notebook (.ipynb) files to Markdown."""
@@ -66,6 +94,7 @@ class IpynbConverter(DocumentConverter):
         try:
             md_output = []
             title = None
+            language = _code_language(notebook_content)
 
             for cell in notebook_content.get("cells", []):
                 cell_type = cell.get("cell_type", "")
@@ -83,7 +112,7 @@ class IpynbConverter(DocumentConverter):
 
                 elif cell_type == "code":
                     # Code cells are wrapped in Markdown code blocks
-                    md_output.append(f"```python\n{''.join(source_lines)}\n```")
+                    md_output.append(f"```{language}\n{''.join(source_lines)}\n```")
                 elif cell_type == "raw":
                     md_output.append(f"```\n{''.join(source_lines)}\n```")
 
