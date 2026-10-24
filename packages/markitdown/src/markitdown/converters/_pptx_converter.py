@@ -10,6 +10,7 @@ from typing import BinaryIO, Any, Optional
 from ._html_converter import HtmlConverter
 from ._llm_caption import llm_caption
 from ..converter_utils._image import _parse_image_html
+from ..converter_utils._ooxml import _raise_if_encrypted
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
@@ -79,6 +80,7 @@ class PptxConverter(DocumentConverter):
             )
 
         # Perform the conversion
+        _raise_if_encrypted(file_stream, ".pptx")
         presentation = pptx.Presentation(file_stream)
         md_content = ""
         slide_num = 0

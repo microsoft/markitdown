@@ -5,6 +5,7 @@ import zipfile
 from contextlib import contextmanager
 from typing import BinaryIO, Any, Iterator, Optional
 from ._html_converter import HtmlConverter
+from ..converter_utils._ooxml import _raise_if_encrypted
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 from .._stream_info import StreamInfo
@@ -140,6 +141,7 @@ class XlsxConverter(DocumentConverter):
                 _xlsx_dependency_exc_info[2]
             )
 
+        _raise_if_encrypted(file_stream, ".xlsx")
         md_content = ""
         with _read_xlsx_sheets(file_stream) as (sheets, workbook_stream):
             images = None
