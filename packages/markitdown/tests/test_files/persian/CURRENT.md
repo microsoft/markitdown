@@ -23,10 +23,11 @@ The RTL table has structure accuracy 1.0 and the correct shape. All reported
 Unicode occurrence checks pass; exact assertions additionally check positions.
 
 Validation: the consolidated `test_persian_pdf.py` and existing `test_pdf.py`
-run together with `--runxfail`: **86 passed**, including the remote PDF test.
-The consolidated Persian suite alone reports **49 passed**, with no skips or expected failures.
+run together: **106 passed**, including the remote PDF test.
+The Persian suite alone reports **69 passed**, with no skips or expected failures.
 The full package suite with all optional extras installed passed
-**1,212 tests with 12 existing skips and no failures**. `black --check` is clean
+**1,232 tests with 12 existing skips and no failures**. An 11-page
+Chromium-produced corpus (`chrome/`) was added; see README.md. `black --check` is clean
 and `current.json` is byte-identical to a fresh `report_persian_pdf` run.
 The original 18 guards requiring defective output to remain unchanged were
 removed once their corresponding acceptance cases passed. The 22 separate PDFs

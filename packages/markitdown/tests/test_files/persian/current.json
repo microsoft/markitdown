@@ -4,7 +4,7 @@
   "os": "macOS-26.7.1-x86_64-i386-64bit-Mach-O",
   "converter_source_sha256": {
     "_pdf_converter.py": "f76f07247c5ac77b384619c979277f7d60555a16c69901a18a6df42af1b1000f",
-    "_pdf_layout.py": "0c9da196a76f5f559898b03a4e13e1e4b0ea60a4f1e8a1f3e346b0f3a7adb91c"
+    "_pdf_layout.py": "8bb03f2bd15b744cc3eb4d6c7eeeffa0a967ce726af2543f5f5589f81c12f333"
   },
   "versions": {
     "markitdown": "0.1.9",

@@ -139,8 +139,31 @@ identifiers, dates, URL/email punctuation and numeric sequences survive. Ruled
 RTL tables use cell geometry and header direction rather than inferred words.
 Sparse two-column pages need a persistent gutter of at least 20% of page width,
 two segments on every line, and at least two lines; ruled pages are excluded.
-Existing prose/form extraction remains the fallback for LTR and unsupported
-layouts, including rotated text and complex columns with spanning headings.
+Wrapped RTL columns are also recognized when exactly one vertical band at least
+one line-height wide is free of text across the whole page and both sides hold
+two or more lines. Existing prose/form extraction remains the fallback for LTR
+and unsupported layouts, including rotated text and columns with spanning
+headings.
+
+Found with Chromium/Skia output (see below), the reconstruction also:
+
+- maps Arabic Presentation Forms (U+FB50-FDFF, U+FE70-FEFF), which that
+  producer reports for shaped glyphs, to their base letters. This is the one
+  deliberate normalization; ordinary letters (including Yeh/Kaf variants), ZWNJ
+  and digits are never changed;
+- restores ZWNJ when a font shares one glyph between space and U+200C and the
+  PDF text layer can only say U+0020. A space glyph whose box the next letter
+  starts inside (zero advance) is a ZWNJ; a real space advances the pen;
+- keeps positioned combining marks (tanwin, hamza) on the line of the base
+  letter they overlap instead of giving them their own line;
+- derives paragraph breaks from the page's regular line pitch, so generous line
+  spacing is not paragraph spacing, and starts a new block on a size change or a
+  list marker such as `1.` or a bullet;
+- takes the base direction of a wrapped paragraph from its letter counts rather
+  than from one line's rightmost character, so a line that starts with Latin
+  text keeps its Persian order;
+- treats a bracket pair enclosing left-to-right text as part of that text, and
+  restores brackets and guillemets that a shaper drew mirrored inside RTL text.
 
 This is heuristic reconstruction, not a complete inverse Unicode bidi algorithm.
 An untagged PDF may lose the metadata needed to distinguish logically different
@@ -150,7 +173,38 @@ as `mg/L` displayed before a number is interpreted as quantity-before-unit;
 versions and URLs are excluded from that rule. Ambiguous neutral punctuation,
 explicit bidi controls, borderless RTL tables, arbitrary scripts, narrow-gutter
 columns, and legacy broken encodings require additional real-document coverage.
+Wrapped lines are joined with a single line break; hyphenation, footnotes, nested
+lists, headers repeated on every page and Word/LaTeX encodings are untested.
 All fixture tests passing does not establish correctness for every Persian PDF.
+
+## Chromium-produced corpus
+
+`chrome/` holds authored HTML (`cases.html`), the PDF printed from it with
+headless Chrome (`chrome_cases.pdf`, producer Skia/PDF) and the logical ground
+truth `chrome/expected.json`. A second producer matters because encodings differ:
+Skia reports presentation forms, folds ZWNJ into the space glyph, mirrors
+brackets and positions marks with offsets, none of which the fpdf2 pages show.
+The 11 pages cover wrapped justified prose, headings, a numbered list, a ruled
+table, mixed Latin/URL/email text, two-column pages with 40pt and 14pt gutters,
+a footer page number, quotation marks and percent signs, bracketed math, and a
+multi-paragraph page.
+
+The ground truth is parsed from the HTML source by `chrome/generate.py`, never
+from extraction results, and a test asserts the committed file equals that
+parse. Soft line wraps inside one paragraph are folded to a space before
+comparison because wrap positions are layout; paragraph boundaries, ZWNJ, digits
+and punctuation are compared exactly. Skia embeds a creation date, so
+regenerating changes the PDF bytes: the committed PDF is the fixture and is
+hashed in `sha256.json`. Regenerate only deliberately:
+
+```sh
+CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+    python packages/markitdown/tests/test_files/persian/chrome/generate.py
+```
+
+The content and HTML are authored for this repository (MIT); the bundled Noto
+fonts keep their OFL licenses. This remains synthetic: it adds a producer, not
+real-world documents.
 
 ## Remaining dataset work
 

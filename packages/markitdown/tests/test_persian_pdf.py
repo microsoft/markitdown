@@ -9,8 +9,12 @@ from unittest.mock import patch
 import pytest
 from markitdown import MarkItDown, StreamInfo
 from markitdown.converters._pdf_layout import (
+    _Line,
+    _base_letters,
     _lines,
     _logical_line,
+    _paragraphs,
+    _zero_advance_spaces,
     extract_ordered_content,
 )
 
@@ -245,3 +249,143 @@ def test_complete_persian_bundle(converter):
             truth = "\n".join(rows)
         pages.append(truth)
     assert body(converter.convert(str(BUNDLE)).markdown) == "\n\n".join(pages)
+
+
+# Chromium (Skia) producer: authored HTML, logical ground truth derived from it
+
+CHROME = ROOT / "chrome"
+CHROME_TRUTH = json.loads((CHROME / "expected.json").read_text(encoding="utf-8"))
+
+
+def chrome_page(index):
+    import io
+
+    import pypdfium2
+
+    output = io.BytesIO()
+    with pypdfium2.PdfDocument(CHROME / "chrome_cases.pdf") as source:
+        with pypdfium2.PdfDocument.new() as selected:
+            selected.import_pages(source, pages=[index])
+            selected.save(output)
+    output.seek(0)
+    return output
+
+
+def chrome_blocks(markdown):
+    # Soft line wraps inside one paragraph are layout, not content; paragraph
+    # boundaries, ZWNJ, digits and punctuation are compared exactly.
+    return [block.replace("\n", " ") for block in body(markdown).split("\n\n")]
+
+
+@pytest.mark.parametrize("index", range(len(CHROME_TRUTH)))
+def test_chrome_persian_pdf(index, converter):
+    case_id, truth = list(CHROME_TRUTH.items())[index]
+    actual = converter.convert_stream(
+        chrome_page(index), stream_info=StreamInfo(extension=".pdf")
+    ).markdown
+    if "table" in truth:
+        assert table_rows(actual) == truth["table"], f"{case_id}: {actual!r}"
+    else:
+        assert chrome_blocks(actual) == truth["blocks"], f"{case_id}: {actual!r}"
+
+
+def test_complete_chrome_bundle(converter):
+    pages = []
+    for truth in CHROME_TRUTH.values():
+        if "table" in truth:
+            rows = truth["table"]
+            pages.append(
+                " ".join(
+                    ["| " + " | ".join(rows[0]) + " |"]
+                    + ["| " + " | ".join("---" for _ in rows[0]) + " |"]
+                    + ["| " + " | ".join(row) + " |" for row in rows[1:]]
+                )
+            )
+        else:
+            pages.extend(truth["blocks"])
+    actual = converter.convert(str(CHROME / "chrome_cases.pdf")).markdown
+    assert "\n\n".join(chrome_blocks(actual)) == "\n\n".join(pages)
+
+
+def test_chrome_ground_truth_comes_from_the_authored_html():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "chrome_generate", CHROME / "generate.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    parser = module.Truth()
+    parser.feed((CHROME / "cases.html").read_text(encoding="utf-8"))
+    assert parser.cases == CHROME_TRUTH
+    assert len(CHROME_TRUTH) >= 8
+
+
+# Layout behaviour found with Chromium output
+
+
+def test_presentation_forms_become_base_letters():
+    assert _base_letters("ﻻ") == "لا"
+    assert _base_letters("ﮔﺰارش") == "گزارش"
+    assert _base_letters("می‌روم 123 ۱۲") == "می‌روم 123 ۱۲"
+    chars = [glyph(c, 7 * i) for i, c in enumerate(["ﻡ", "ﻼ", "ﺳ"])]
+    page = SimpleNamespace(chars=chars, width=600, edges=[], find_tables=lambda: [])
+    assert extract_ordered_content(page) == "سلام"
+
+
+def test_zero_advance_space_is_a_zwnj():
+    chars = [glyph("ی", 0), glyph("ر", 20)]
+    chars.insert(1, dict(glyph(" ", 7), x1=11))  # next letter starts inside it
+    chars[2]["x0"] = 8
+    chars[2]["x1"] = 15
+    out = _zero_advance_spaces(chars)
+    assert [c["text"] for c in out] == ["ی", "‌", "ر"]
+    spaced = [glyph("ی", 0), glyph(" ", 7), glyph("ر", 14)]
+    spaced[1]["x1"] = 12
+    assert [c["text"] for c in _zero_advance_spaces(spaced)] == ["ی", " ", "ر"]
+
+
+def test_vertically_offset_mark_stays_on_its_line():
+    base = glyph("ق", 0)
+    mark = glyph("ً", 2, baseline=706)  # raised by positioning, same horizontal spot
+    lines = _lines([base, mark])
+    assert len(lines) == 1 and len(lines[0].chars) == 2
+
+
+def test_generous_line_spacing_is_not_paragraph_spacing():
+    def row(text, baseline):
+        return _Line(painted(list(text)), baseline)
+
+    wrapped = [row("سلام", 700), row("دنیا", 675), row("خوب", 650), row("بود", 570)]
+    assert _paragraphs(wrapped).count("\n\n") == 1
+    assert _paragraphs(wrapped[:3]).count("\n\n") == 0
+
+
+def test_numbered_item_starts_a_new_block():
+    def row(marker, text, baseline):
+        chars = [glyph(c, 100 - 7 * i) for i, c in enumerate(marker)]
+        chars += [glyph(c, 80 - 7 * i) for i, c in enumerate(text)]
+        return _Line(chars, baseline)
+
+    lines = [row("1.", "اول", 700), row("2.", "دوم", 676)]
+    assert _paragraphs(lines).count("\n\n") == 1
+
+
+def test_mirrored_brackets_are_restored_inside_rtl_text():
+    # Glyphs left to right: the mirrored shapes enclose a right-to-left word.
+    visual = list("(مالس) مالس")
+    assert _logical_line(painted(visual), True) == "سلام (سلام)"
+
+
+def test_narrow_gutter_pages_read_one_column_at_a_time():
+    left = [glyph(w, 60, 700 - 24 * r) for r, w in enumerate("اب")]
+    right = [glyph(w, 300, 700 - 24 * r) for r, w in enumerate("تث")]
+    page = SimpleNamespace(
+        chars=left + right, width=600, edges=[], find_tables=lambda: []
+    )
+    assert extract_ordered_content(page) == "ت\nث\n\nا\nب"
+    # A spanning line removes the single clear gutter, so the page defers
+    # to line-by-line reading instead of guessing.
+    span = [glyph(c, 60 + 40 * i, 760) for i, c in enumerate("عنوانطولانی")]
+    page.chars = span + left + right
+    assert "\n\n" not in (extract_ordered_content(page) or "").split("\n")[0]
