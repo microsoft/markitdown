@@ -34,6 +34,7 @@ from markitdown.converter_utils.docx.math.latex_dict import (
 from markitdown.converter_utils.docx.math.omml import OMML_NS, load_string, oMath2Latex
 from markitdown.converter_utils.docx.pre_process import _pre_process_styles
 from markitdown.converters import DocxConverter, HtmlConverter, _docx_converter
+from markitdown.converters._markdownify import _unescape_math_spans
 
 # Math functions
 
@@ -1184,6 +1185,22 @@ def test_docx_equations() -> None:
     # Find block equations wrapped with double $$ and check if they are present
     block_equations = re.findall(r"\$\$(.+?)\$\$", result.text_content)
     assert block_equations, "No block equations found in the document."
+
+
+def test_unescape_math_spans() -> None:
+    """markdownify must not escape ``_`` / ``*`` inside LaTeX math spans."""
+    # Subscripts and asterisks inside $…$ and $$…$$ are unescaped…
+    text = (
+        "Inline: $\\sum\\_{i=1}^{n}x\\_{i}$ and display "
+        "$$\\sum\\_{i=1}^{n}x\\_{i}$$ and $a\\*b$."
+    )
+    got = _unescape_math_spans(text)
+    assert "\\sum_{i=1}^{n}x_{i}" in got
+    assert "$a*b$" in got
+
+    # …but escaping in ordinary prose is left alone.
+    prose = "this\\_is\\_prose and a\\*b outside math"
+    assert _unescape_math_spans(prose) == prose
 
 
 def test_docx_zip_filename_casing_mismatch() -> None:

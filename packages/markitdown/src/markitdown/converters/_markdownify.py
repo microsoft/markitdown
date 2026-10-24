@@ -6,6 +6,21 @@ from urllib.parse import quote, urlparse, urlunparse
 
 _PERCENT_ENCODED_OCTET = re.compile(r"%[0-9A-Fa-f]{2}")
 
+# LaTeX math spans inserted by the DOCX pre-processor ($…$ and $$…$$). markdownify
+# escapes `_` and `*` inside them as if they were prose, but in LaTeX `\_` means a
+# literal underscore (breaking subscripts) and `\*` a literal asterisk.
+_MATH_SPAN = re.compile(r"(\${1,2})(.+?)(\${1,2})", re.DOTALL)
+
+
+def _unescape_math_spans(text: str) -> str:
+    """Unescape ``\\_`` and ``\\*`` inside ``$…$`` / ``$$…$$`` spans only."""
+
+    def _fix(match: re.Match[str]) -> str:
+        open_delim, body, close_delim = match.group(1), match.group(2), match.group(3)
+        return open_delim + body.replace(r"\_", "_").replace(r"\*", "*") + close_delim
+
+    return _MATH_SPAN.sub(_fix, text)
+
 
 def _quote_path_preserving_percent_encoded_octets(path: str) -> str:
     """Quote a URL path while preserving existing %HH byte encodings."""
@@ -175,4 +190,4 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         return self.convert_s(el, text, *args, **kwargs)  # type: ignore
 
     def convert_soup(self, soup: Any) -> str:
-        return super().convert_soup(soup)  # type: ignore
+        return _unescape_math_spans(super().convert_soup(soup))  # type: ignore
