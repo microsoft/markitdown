@@ -1,5 +1,6 @@
 import sys
 import io
+import re
 from warnings import warn
 
 from typing import BinaryIO, Any, Optional
@@ -28,6 +29,21 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 ACCEPTED_FILE_EXTENSIONS = [".docx"]
 
 _UNDERLINE_STYLE_MAP = "u => u"
+
+# oMath equations are injected as $...$ / $$...$$ text runs, so the
+# HTML-to-Markdown step escapes LaTeX `_` and `*` as `\_` and `\*`,
+# breaking the math (microsoft/markitdown#2744). Restore the raw LaTeX
+# inside math spans only; typed text outside spans keeps its escapes.
+_MATH_BLOCK_RE = re.compile(r"\$\$(.+?)\$\$", re.DOTALL)
+_MATH_INLINE_RE = re.compile(r"(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)")
+
+
+def _unescape_math_spans(text: str) -> str:
+    def _fix(match: "re.Match[str]") -> str:
+        return match.group(0).replace("\\_", "_").replace("\\*", "*")
+
+    text = _MATH_BLOCK_RE.sub(_fix, text)
+    return _MATH_INLINE_RE.sub(_fix, text)
 
 
 def _read_embedded_style_map(file_stream: BinaryIO) -> Optional[str]:
@@ -120,7 +136,9 @@ class DocxConverter(HtmlConverter):
         if image_adapter is not None:
             html_result = image_adapter.replace_images(html_result)
 
-        return self._html_converter.convert_string(html_result, **kwargs)
+        result = self._html_converter.convert_string(html_result, **kwargs)
+        result.text_content = _unescape_math_spans(result.text_content)
+        return result
 
     def _image_to_html(
         self,
