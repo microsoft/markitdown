@@ -1482,5 +1482,49 @@ def test_convert_docx_with_style_missing_type(tmp_path):
     assert "# Abstract" in result.markdown
 
 
+def test_docx_math_no_markdown_escapes() -> None:
+    """LaTeX from equations must not carry Markdown escapes (issue #2744)."""
+    import zipfile
+    from io import BytesIO
+
+    nary = (
+        '<m:nary><m:naryPr><m:chr m:val="∑"/></m:naryPr>'
+        "<m:sub><m:r><m:t>i=1</m:t></m:r></m:sub>"
+        "<m:sup><m:r><m:t>n</m:t></m:r></m:sup>"
+        "<m:e><m:sSub><m:e><m:r><m:t>x</m:t></m:r></m:e>"
+        "<m:sub><m:r><m:t>i</m:t></m:r></m:sub></m:sSub></m:e></m:nary>"
+    )
+    docx_xml = (
+        '<w:document xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" '
+        'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        "<w:body>"
+        f"<w:p><w:r><w:t>Inline: </w:t></w:r><m:oMath>{nary}</m:oMath></w:p>"
+        f"<w:p><m:oMathPara><m:oMath>{nary}</m:oMath></m:oMathPara></w:p>"
+        "</w:body></w:document>"
+    )
+
+    buf = BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("word/document.xml", docx_xml.encode("utf-8"))
+        z.writestr(
+            "[Content_Types].xml",
+            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+            '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+            '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+            "</Types>",
+        )
+        z.writestr(
+            "_rels/.rels",
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>'
+            "</Relationships>",
+        )
+    buf.seek(0)
+
+    result = MarkItDown().convert(buf)
+    assert "$\\sum_{i=1}^{n}x_{i}$" in result.markdown
+    assert "$$\\sum_{i=1}^{n}x_{i}$$" in result.markdown
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
