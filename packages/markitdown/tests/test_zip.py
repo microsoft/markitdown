@@ -181,5 +181,69 @@ def test_zip_stream_no_filename_header() -> None:
     assert "Hello world" in result.markdown
 
 
+def _create_zip_with_raw_filename(raw_bytes: bytes, content: str) -> io.BytesIO:
+    """Create an in-memory ZIP archive whose entry filename has bit 11 unset."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zinfo = zipfile.ZipInfo()
+        # Use an ASCII placeholder so Python's zipfile does not set UTF-8 bit 11
+        zinfo.filename = "A" * len(raw_bytes)
+        zinfo.flag_bits = 0
+        zf.writestr(zinfo, content)
+
+    data = bytearray(buf.getvalue())
+    placeholder = b"A" * len(raw_bytes)
+    idx = 0
+    while True:
+        pos = data.find(placeholder, idx)
+        if pos == -1:
+            break
+        data[pos : pos + len(raw_bytes)] = raw_bytes
+        idx = pos + len(raw_bytes)
+
+    return io.BytesIO(bytes(data))
+
+
+@pytest.mark.parametrize(
+    "filename, encoding, content",
+    [
+        ("测试文档.txt", "gbk", "Chinese text in zip"),
+        ("日本語ドキュメント.txt", "cp932", "Japanese text in zip"),
+        ("café_déjà_vu.txt", "utf-8", "Accented text in zip"),
+    ],
+    ids=["chinese_gbk", "japanese_cp932", "utf8_no_bit11"],
+)
+def test_zip_filename_decoding_without_bit_11(
+    filename: str, encoding: str, content: str
+) -> None:
+    """Non-ASCII ZIP member filenames without bit 11 set must decode correctly."""
+    raw_bytes = filename.encode(encoding)
+    buf = _create_zip_with_raw_filename(raw_bytes, content)
+
+    result = MarkItDown().convert_stream(
+        buf,
+        stream_info=StreamInfo(extension=".zip", filename="test_enc.zip"),
+    )
+
+    assert f"## File: {filename}" in result.markdown
+    assert content in result.markdown
+
+
+def test_zip_metadata_encoding_override() -> None:
+    """Explicit metadata_encoding parameter overrides automatic detection."""
+    filename = "许甫荣理力2016秋期末.txt"
+    raw_bytes = filename.encode("gbk")
+    buf = _create_zip_with_raw_filename(raw_bytes, "Physics notes")
+
+    result = MarkItDown().convert_stream(
+        buf,
+        stream_info=StreamInfo(extension=".zip", filename="override.zip"),
+        metadata_encoding="gbk",
+    )
+
+    assert f"## File: {filename}" in result.markdown
+    assert "Physics notes" in result.markdown
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
