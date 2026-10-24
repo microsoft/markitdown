@@ -8,7 +8,6 @@ from markitdown.converters._doc_intel_converter import (
     DocumentIntelligenceFileType,
 )
 
-
 # Document Intelligence
 
 
