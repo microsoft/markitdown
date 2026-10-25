@@ -110,6 +110,43 @@ At the moment, the following optional dependencies are available:
 * `[audio-transcription]` Installs dependencies for audio transcription of wav and mp3 files
 * `[youtube-transcription]` Installs dependencies for fetching YouTube video transcription
 
+### XLSX values and display formatting
+
+For numeric cells, the [built-in XLSX converter](packages/markitdown/src/markitdown/converters/_xlsx_converter.py) renders extracted values rather than applying Excel custom number formats. For example:
+
+| Stored number | Excel number format | Example display | Markdown cell |
+| ---: | --- | ---: | ---: |
+| 123 | `00000` | `00123` | `123` |
+| 1234.5 | `#,##0.00` | `1,234.50` | `1234.5` |
+| 0.125 | `0.0%` | `12.5%` | `0.125` |
+
+The display examples use a decimal point and comma grouping. Install the XLSX dependencies with `pip install 'markitdown[xlsx]'`. This in-memory example creates a workbook and prints its conversion:
+
+```python
+from io import BytesIO
+
+import openpyxl
+from markitdown import MarkItDown, StreamInfo
+
+workbook = openpyxl.Workbook()
+sheet = workbook.active
+sheet.append(["Identifier", "Amount", "Rate"])
+sheet.append([123, 1234.5, 0.125])
+sheet["A2"].number_format = "00000"
+sheet["B2"].number_format = "#,##0.00"
+sheet["C2"].number_format = "0.0%"
+stream = BytesIO()
+workbook.save(stream)
+stream.seek(0)
+
+result = MarkItDown(enable_plugins=False).convert_stream(
+    stream, stream_info=StreamInfo(extension=".xlsx")
+)
+print(result.markdown)
+```
+
+Before ingestion, check identifier width, percentage units, and required decimal places against the original workbook. Preserve the workbook and sheet context: a successful conversion does not establish that the Markdown values match the desired display.
+
 ### Plugins
 
 MarkItDown also supports 3rd-party plugins. Plugins are disabled by default. To list installed plugins:
