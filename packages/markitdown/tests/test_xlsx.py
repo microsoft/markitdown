@@ -570,6 +570,26 @@ def test_xlsx_empty_cells_render_as_empty_cells(tmp_path) -> None:
     assert "NaN" not in markdown
 
 
+def test_xlsx_empty_cells_in_date_columns_render_as_empty(tmp_path) -> None:
+    # na_rep only covers the NaN formatter; a datetime column's NaT would
+    # otherwise surface as literal "NaT" text (reporter's case).
+    from datetime import date
+
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.append(["Name", "When"])
+    sheet.append(["Bob", date(2024, 1, 1)])
+    sheet.append(["Alice", None])
+    path = tmp_path / "date-cells.xlsx"
+    workbook.save(str(path))
+
+    markdown = MarkItDown().convert(str(path)).markdown
+
+    assert "| Bob |" in markdown
+    assert "| Alice |  |" in markdown
+    assert "NaT" not in markdown
+
+
 def test_xls_empty_cells_render_as_empty_cells(tmp_path) -> None:
     pytest.importorskip("xlrd")
     markdown = _convert_workbook(

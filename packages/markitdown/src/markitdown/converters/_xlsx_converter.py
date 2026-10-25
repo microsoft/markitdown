@@ -149,8 +149,13 @@ class XlsxConverter(DocumentConverter):
                 images = _XlsxImages(workbook_stream)
 
             for s in sheets:
+                # na_rep only covers the NaN formatter; datetime columns render
+                # their NaT through the datetime formatter, so empty cells in a
+                # date column would surface as literal "NaT" text. Replace every
+                # missing value on the way to object dtype instead.
+                sheets[s] = sheets[s].astype(object).where(sheets[s].notna(), "")
                 md_content += f"## {s}\n"
-                html_content = sheets[s].to_html(index=False, na_rep="")
+                html_content = sheets[s].to_html(index=False)
                 md_content += (
                     self._html_converter.convert_string(
                         html_content, **kwargs
@@ -240,8 +245,11 @@ class XlsConverter(DocumentConverter):
         sheets = pd.read_excel(file_stream, sheet_name=None, engine="xlrd")
         md_content = ""
         for s in sheets:
+            # Same missing-value hardening as XlsxConverter: na_rep misses NaT
+            # in datetime columns.
+            sheets[s] = sheets[s].astype(object).where(sheets[s].notna(), "")
             md_content += f"## {s}\n"
-            html_content = sheets[s].to_html(index=False, na_rep="")
+            html_content = sheets[s].to_html(index=False)
             md_content += (
                 self._html_converter.convert_string(
                     html_content, **kwargs
