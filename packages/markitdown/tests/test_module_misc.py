@@ -456,6 +456,57 @@ def test_ipynb_heading_title_preserves_leading_hash() -> None:
     assert result.title == "#hashtag campaign results"
 
 
+def test_ipynb_string_source_extracts_title() -> None:
+    """nbformat allows `source` to be a single string; the title must still be found.
+
+    Regression for https://github.com/microsoft/markitdown/issues/2762
+    """
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    notebook = {
+        "nbformat": 4,
+        "nbformat_minor": 5,
+        "metadata": {},
+        "cells": [
+            {
+                "cell_type": "markdown",
+                "source": "# My Title\nhello",
+                "metadata": {},
+            }
+        ],
+    }
+
+    result = IpynbConverter()._convert(notebook)
+
+    assert result.title == "My Title"
+    assert result.markdown == "# My Title\nhello"
+
+
+def test_ipynb_string_and_list_sources_convert_identically() -> None:
+    """Both valid nbformat source forms must produce the same output."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    cells = [
+        {"cell_type": "markdown", "source": "# Title\n\nSome *text*\n", "metadata": {}},
+        {"cell_type": "code", "source": "print('hello')\n", "metadata": {}},
+        {"cell_type": "raw", "source": "raw text", "metadata": {}},
+    ]
+    list_cells = [
+        {**cell, "source": cell["source"].splitlines(keepends=True)} for cell in cells
+    ]
+
+    converter = IpynbConverter()
+    string_result = converter._convert(
+        {"nbformat": 4, "nbformat_minor": 5, "metadata": {}, "cells": cells}
+    )
+    list_result = converter._convert(
+        {"nbformat": 4, "nbformat_minor": 5, "metadata": {}, "cells": list_cells}
+    )
+
+    assert string_result.markdown == list_result.markdown
+    assert string_result.title == "Title"
+
+
 _UTF8_BOM = b"\xef\xbb\xbf"
 
 _BOM_NOTEBOOK = {
