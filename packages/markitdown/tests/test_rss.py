@@ -525,6 +525,94 @@ def test_rss_content_namespace_alias_and_field_ownership() -> None:
     assert result.markdown == "# Feed\n\n## Entry\nBefore **nested** after."
 
 
+def _rss1_feed(prefix: str = "") -> bytes:
+    """An RSS 1.0 (RDF Site Summary) feed, optionally with prefixed elements."""
+    p = f"{prefix}:" if prefix else ""
+    xmlns = f"xmlns:{prefix}" if prefix else "xmlns"
+    return f"""<?xml version="1.0" encoding="utf-8"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    {xmlns}="http://purl.org/rss/1.0/"
+    xmlns:dc="http://purl.org/dc/elements/1.1/"
+    xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <{p}channel rdf:about="https://example.com/">
+    <{p}title>Example channel</{p}title>
+    <{p}link>https://example.com/</{p}link>
+    <{p}description>Channel description.</{p}description>
+    <{p}items><rdf:Seq>
+      <rdf:li rdf:resource="https://example.com/1"/>
+      <rdf:li rdf:resource="https://example.com/2"/>
+    </rdf:Seq></{p}items>
+  </{p}channel>
+  <{p}image rdf:about="https://example.com/logo.png">
+    <{p}title>Wrong image title</{p}title>
+  </{p}image>
+  <{p}item rdf:about="https://example.com/1">
+    <{p}title>First item</{p}title>
+    <{p}link>https://example.com/1</{p}link>
+    <{p}description>&lt;p&gt;An &lt;b&gt;item&lt;/b&gt; summary.&lt;/p&gt;</{p}description>
+    <dc:date>2026-10-01T09:00:00Z</dc:date>
+  </{p}item>
+  <{p}item rdf:about="https://example.com/2">
+    <{p}title>Second item</{p}title>
+    <{p}link>https://example.com/2</{p}link>
+    <content:encoded><![CDATA[<p>Full <em>content</em>.</p>]]></content:encoded>
+  </{p}item>
+</rdf:RDF>
+""".encode("utf-8")
+
+
+@pytest.mark.parametrize("prefix", ["", "rss"])
+@pytest.mark.parametrize(
+    "stream_info",
+    [
+        StreamInfo(extension=".rss"),
+        StreamInfo(extension=".rdf"),
+        StreamInfo(extension=".xml"),
+        StreamInfo(mimetype="application/rss+xml"),
+        StreamInfo(mimetype="application/rdf+xml"),
+    ],
+)
+def test_rss1_rdf_feed_is_converted(prefix: str, stream_info: StreamInfo) -> None:
+    # RSS 1.0 wraps the channel in rdf:RDF and lists items beside the channel.
+    feed = _rss1_feed(prefix)
+    converter = RssConverter()
+    stream = io.BytesIO(feed)
+
+    assert converter.accepts(stream, stream_info)
+    assert stream.tell() == 0
+    result = converter.convert(stream, stream_info)
+
+    assert result.title == "Example channel"
+    assert result.markdown.startswith("# Example channel\nChannel description.\n")
+    assert (
+        "## First item\nPublished on: 2026-10-01T09:00:00Z\nAn **item** summary."
+        in result.markdown
+    )
+    assert "## Second item\nFull *content*." in result.markdown
+    assert "Wrong" not in result.markdown
+    assert "rdf:" not in result.markdown
+
+    # The public API must recognize the feed instead of falling back to raw XML.
+    converted = MarkItDown().convert_stream(io.BytesIO(feed), stream_info=stream_info)
+    assert converted.markdown == result.markdown
+
+
+def test_rdf_document_that_is_not_a_feed_is_not_claimed() -> None:
+    document = b"""<?xml version="1.0"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <rdf:Description rdf:about="https://example.com/">
+    <dc:title>Not a feed</dc:title>
+  </rdf:Description>
+</rdf:RDF>
+"""
+    stream_info = StreamInfo(mimetype="application/rdf+xml", extension=".rdf")
+    stream = io.BytesIO(document)
+
+    assert not RssConverter().accepts(stream, stream_info)
+    assert stream.tell() == 0
+
+
 @pytest.mark.parametrize(
     "field", ["rss-description", "rss-content", "atom-summary", "atom-content"]
 )
