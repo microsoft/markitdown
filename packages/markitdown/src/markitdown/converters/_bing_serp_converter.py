@@ -1,7 +1,7 @@
 import re
 import base64
 import binascii
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import ParseResult, parse_qs, urlparse
 from typing import Any, BinaryIO
 from bs4 import BeautifulSoup
 
@@ -18,6 +18,18 @@ ACCEPTED_FILE_EXTENSIONS = [
     ".html",
     ".htm",
 ]
+
+
+def _is_bing_redirect(parsed_href: ParseResult) -> bool:
+    """Return True only for Bing's own `/ck/a` redirect links.
+
+    A normal result may use `u=` for its own purpose. So the base64 payload is
+    decoded only when the link is one that Bing wrapped.
+    """
+    host = (parsed_href.netloc or "").lower()
+    if host != "bing.com" and not host.endswith(".bing.com"):
+        return False
+    return parsed_href.path == "/ck/a"
 
 
 class BingSerpConverter(DocumentConverter):
@@ -87,6 +99,12 @@ class BingSerpConverter(DocumentConverter):
             # Rewrite redirect urls
             for a in result.find_all("a", href=True):
                 parsed_href = urlparse(a["href"])
+
+                # Keep normal result URLs as they are. Only Bing's redirect
+                # links carry the base64 `u` payload.
+                if not _is_bing_redirect(parsed_href):
+                    continue
+
                 qs = parse_qs(parsed_href.query)
 
                 # The destination is contained in the u parameter,
