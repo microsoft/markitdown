@@ -6,7 +6,6 @@
 > [!IMPORTANT]
 > MarkItDown performs I/O with the privileges of the current process. Like open() or requests.get(), it will access resources that the process itself can access. Sanitize your inputs in untrusted environments, and call the narrowest `convert_*` function needed for your use case (e.g., `convert_stream()`, or `convert_local()`). See the [Security Considerations](#security-considerations) section of the documentation for more information.
 
-MarkItDown is a lightweight Python utility for converting various files to Markdown for use with LLMs and related text analysis pipelines. To this end, it is most comparable to [textract](https://github.com/deanmalmgren/textract), but with a focus on preserving important document structure and content as Markdown (including: headings, lists, tables, links, etc.) While the output is often reasonably presentable and human-friendly, it is meant to be consumed by text analysis tools -- and may not be the best option for high-fidelity document conversions for human consumption.
 
 MarkItDown currently supports the conversion from:
 
@@ -274,86 +273,6 @@ No analysis add-ons are enabled by default. Use `--docintel-features` to opt in,
 or `--docintel-features none` to explicitly request no add-ons. Analysis add-ons
 and query fields apply only to OCR-supported inputs such as PDFs and images.
 
-Available feature values are `barcodes`, `formulas`, `keyValuePairs`,
-`languages`, `ocrHighResolution`, and `styleFont`. The `formulas`,
-`ocrHighResolution`, and `styleFont` features incur additional charges, as does
-the `queryFields` add-on, which is priced differently from the other add-ons.
-See the
-[Document Intelligence add-on documentation](https://learn.microsoft.com/azure/ai-services/document-intelligence/concept/add-on-capabilities?view=doc-intel-4.0.0)
-and [pricing](https://azure.microsoft.com/pricing/details/document-intelligence/)
-for details.
-
-More information about how to set up an Azure Document Intelligence Resource can be found [here](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/how-to-guides/create-document-intelligence-resource?view=doc-intel-4.0.0)
-
-### Python API
-
-Basic usage in Python:
-
-```python
-from markitdown import MarkItDown
-
-md = MarkItDown(enable_plugins=False) # Set to True to enable plugins
-result = md.convert("test.xlsx")
-print(result.markdown)
-```
-
-Document Intelligence conversion in Python using an API key:
-
-```python
-from azure.core.credentials import AzureKeyCredential
-from markitdown import MarkItDown
-
-md = MarkItDown(
-    docintel_endpoint="<document_intelligence_endpoint>",
-    docintel_credential=AzureKeyCredential("<document_intelligence_api_key>"),
-)
-result = md.convert("test.pdf")
-print(result.markdown)
-```
-
-Omit `docintel_credential` to use `AZURE_API_KEY` when it is set, or
-`DefaultAzureCredential` otherwise.
-
-Configure the model, analysis add-ons, and structured query fields:
-
-```python
-from azure.ai.documentintelligence.models import DocumentAnalysisFeature
-from markitdown import MarkItDown
-
-md = MarkItDown(
-    docintel_endpoint="<document_intelligence_endpoint>",
-    docintel_model_id="prebuilt-layout",
-    docintel_features=[
-        DocumentAnalysisFeature.OCR_HIGH_RESOLUTION,
-        DocumentAnalysisFeature.STYLE_FONT,
-    ],
-    docintel_query_fields=["Title", "Author"],
-)
-result = md.convert("test.pdf")
-print(result.markdown)
-```
-
-Omit `docintel_features` or set `docintel_features=[]` to request no analysis
-add-ons. When query fields are provided, MarkItDown automatically enables the
-required `queryFields` add-on.
-Models that return structured fields prepend them to the Markdown as YAML front
-matter. A single document uses a top-level `fields` mapping. When the service
-returns multiple documents, the front matter instead contains a `documents`
-list in service order, with a separate `fields` mapping for each document.
-Documents without extracted fields retain an empty mapping in that list; no
-front matter is emitted when all documents have empty fields. Selection groups
-are represented as lists of selected values.
-
-To use Large Language Models for image descriptions (currently only for pptx and image files), provide `llm_client` and `llm_model`:
-
-```python
-from markitdown import MarkItDown
-from openai import OpenAI
-
-client = OpenAI(max_retries=5)
-md = MarkItDown(llm_client=client, llm_model="gpt-4o", llm_prompt="optional custom prompt")
-result = md.convert("example.jpg")
-print(result.markdown)
 ```
 
 `max_retries` controls the OpenAI client's automatic retries for retryable errors (the default is 2); `5` allows up to six attempts with backoff. See the [OpenAI SDK retry documentation](https://github.com/openai/openai-python#retries).
@@ -367,32 +286,7 @@ docker build -t markitdown:latest .
 docker run --rm -i markitdown:latest < ~/your-file.pdf > output.md
 ```
 
-## Contributing
 
-Before starting significant work, please read [What to Contribute](#what-to-contribute), which describes what is in and out of scope for this repository.
-
-This project welcomes contributions and suggestions. Most contributions require you to agree to a
-Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
-the rights to use your contribution. For details, visit https://cla.opensource.microsoft.com.
-
-When you submit a pull request, a CLA bot will automatically determine whether you need to provide
-a CLA and decorate the PR appropriately (e.g., status check, comment). Simply follow the instructions
-provided by the bot. You will only need to do this once across all repos using our CLA.
-
-This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
-For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
-contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
-
-### What to Contribute
-
-MarkItDown is a Python utility for converting files to Markdown for use with LLMs and related text analysis pipelines. This repository is intended to provide Python libraries that can be incorporated into other systems — not the end-user applications built on top of them.
-
-#### In scope
-
-- Improvements to the fidelity of existing converters (New formats are added sparingly -- especially if they incur new dependencies. In most cases, new formats can be better supported via [3rd-party plugins](#extending-markitdown-without-changing-this-repository).)
-- Bug fixes, performance improvements, and security fixes
-- The `markitdown` command-line interface
-- The `markitdown-mcp` package
 - Tests, documentation, and developer tooling
 
 #### Out of scope
