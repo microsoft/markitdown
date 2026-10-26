@@ -191,6 +191,20 @@ def test_data_uris() -> None:
     assert data == b"Hello, World!"
 
 
+@pytest.mark.parametrize(
+    ("uri", "expected"),
+    [
+        ("data:text/plain,Hello#section", b"Hello"),
+        ("data:text/plain;base64,SGVsbG8h#AAAA", b"Hello!"),
+        ("data:text/plain,Hello%23section", b"Hello#section"),
+        ("data:text/plain,Hello?section", b"Hello?section"),
+    ],
+)
+def test_data_uri_payload_excludes_fragment(uri: str, expected: bytes) -> None:
+    assert parse_data_uri(uri)[2] == expected
+    assert MarkItDown(enable_plugins=False).convert_uri(uri).text_content == expected.decode()
+
+
 def test_file_uris() -> None:
     expected_path = os.path.abspath("/path/to/file.txt")
 
