@@ -25,7 +25,6 @@ import markitdown._markitdown as markitdown_module
 from markitdown_ocr._ocr_service import OCRResult
 from markitdown_ocr._xlsx_converter_with_ocr import XlsxConverterWithOCR
 
-
 _INFO = StreamInfo(extension=".xlsx")
 
 
