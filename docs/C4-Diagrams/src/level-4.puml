@@ -1,0 +1,153 @@
+@startuml
+!define RECTANGLE class
+!define INTERFACE interface
+
+' Main CLI entry point
+RECTANGLE Main {
+  __main__.py
+  --
+  +main()
+  +_handle_output()
+  +_exit_with_error()
+}
+
+' Core conversion orchestrator
+RECTANGLE MarkItDown {
+  _markitdown.py
+  --
+  +convert()
+  +convert_local()
+  +convert_stream()
+  +convert_url()
+  +convert_response()
+  +register_converter()
+  +enable_builtins()
+  +enable_plugins()
+  -_get_stream_info_guesses()
+}
+
+' Abstract base for all converters
+INTERFACE DocumentConverter {
+  _base_converter.py
+  --
+  +accepts(file_stream, stream_info, **kwargs)
+  +convert(file_stream, stream_info, **kwargs)
+}
+
+RECTANGLE DocumentConverterResult {
+  _base_converter.py
+  --
+  +markdown
+  +title
+  +text_content
+}
+
+' Generic converter representation
+package "Document Converters" {
+  RECTANGLE "Built-in Converters" as BuiltinConverters {
+    Various format converters
+    implementing DocumentConverter
+    --
+    See converter list below
+  }
+}
+
+' Stream info utility
+RECTANGLE StreamInfo {
+  _stream_info.py
+  --
+  +mimetype
+  +extension
+  +charset
+  +filename
+  +local_path
+  +url
+  +copy_and_update()
+}
+
+' Exception hierarchy
+RECTANGLE MarkItDownException {
+  _exceptions.py
+}
+RECTANGLE MissingDependencyException {
+  _exceptions.py
+}
+RECTANGLE UnsupportedFormatException {
+  _exceptions.py
+}
+RECTANGLE FileConversionException {
+  _exceptions.py
+  --
+  +attempts
+}
+RECTANGLE FailedConversionAttempt {
+  _exceptions.py
+  --
+  +converter
+  +exc_info
+}
+
+' Converter Utils (DOCX Math)
+package "converter_utils" {
+  package "docx" {
+    RECTANGLE pre_process_docx {
+      pre_process.py
+      --
+      +pre_process_docx(input_docx)
+      +_pre_process_math(content)
+      +_replace_equations(tag)
+      +_get_omath_tag_replacement(tag, block)
+      +_convert_omath_to_latex(tag)
+    }
+    package "math" {
+      RECTANGLE oMath2Latex {
+        omml.py
+        --
+        +oMath2Latex(element)
+        +Tag2Method
+        +Pr
+        +OMML_NS
+      }
+      RECTANGLE latex_dict {
+        latex_dict.py
+        --
+        +CHARS
+        +CHR
+        +CHR_BO
+        +T
+        +FUNC
+        +D
+        +RAD
+        +... (Latex symbol mappings)
+      }
+    }
+  }
+}
+
+' Relationships
+Main ..> MarkItDown : uses
+Main ..> StreamInfo : uses
+MarkItDown ..> DocumentConverter : registers/uses
+MarkItDown ..> DocumentConverterResult : returns
+MarkItDown ..> StreamInfo : uses
+MarkItDown ..> BuiltinConverters : registers
+
+BuiltinConverters ..|> DocumentConverter
+BuiltinConverters ..> DocumentConverterResult : returns
+BuiltinConverters ..> StreamInfo : uses
+
+' Exception relationships
+MarkItDown ..> MarkItDownException : raises
+MarkItDown ..> MissingDependencyException : raises
+MarkItDown ..> UnsupportedFormatException : raises
+MarkItDown ..> FileConversionException : raises
+FileConversionException ..> FailedConversionAttempt : has
+
+' Converter utils relationships
+BuiltinConverters ..> pre_process_docx : uses (DocxConverter)
+pre_process_docx ..> oMath2Latex : uses
+oMath2Latex ..> latex_dict : uses
+
+note right of BuiltinConverters : **Available Converters:**\n• PlainTextConverter\n• HtmlConverter\n• RssConverter\n• YouTubeConverter\n• IpynbConverter\n• BingSerpConverter\n• PdfConverter\n• DocxConverter\n• XlsxConverter\n• XlsConverter\n• PptxConverter\n• ImageConverter\n• AudioConverter\n• OutlookMsgConverter\n• ZipConverter\n• DocumentIntelligenceConverter\n• EpubConverter\n• WikipediaConverter
+
+@enduml
