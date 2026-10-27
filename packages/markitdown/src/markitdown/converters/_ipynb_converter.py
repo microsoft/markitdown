@@ -12,6 +12,15 @@ CANDIDATE_MIME_TYPE_PREFIXES = [
 ACCEPTED_FILE_EXTENSIONS = [".ipynb"]
 
 
+def _as_line_list(source: Any) -> list[str]:
+    """nbformat allows a cell's source to be a string or a list of strings."""
+    if isinstance(source, str):
+        return source.splitlines(keepends=True)
+    if isinstance(source, list):
+        return [str(line) for line in source]
+    return []
+
+
 class IpynbConverter(DocumentConverter):
     """Converts Jupyter Notebook (.ipynb) files to Markdown."""
 
@@ -69,7 +78,7 @@ class IpynbConverter(DocumentConverter):
 
             for cell in notebook_content.get("cells", []):
                 cell_type = cell.get("cell_type", "")
-                source_lines = cell.get("source", [])
+                source_lines = _as_line_list(cell.get("source", []))
 
                 if cell_type == "markdown":
                     md_output.append("".join(source_lines))
