@@ -8,7 +8,6 @@ import pytest
 from markitdown import MarkItDown, StreamInfo
 from markitdown.converters import EpubConverter
 
-
 # Archive href resolution
 
 CONTAINER_XML = """<?xml version="1.0"?>
