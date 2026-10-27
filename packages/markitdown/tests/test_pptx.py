@@ -895,3 +895,50 @@ def test_pptx_chart_title_text_frame(title: str | None) -> None:
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
+
+
+def test_table_shape_is_terminated_before_the_next_shape() -> None:
+    """A table must close its Markdown block, or the next shape is read into it."""
+    prs = pptx.Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    table = slide.shapes.add_table(2, 2, Inches(1), Inches(1), Inches(4), Inches(1)).table
+    for cell, value in zip(
+        (table.cell(0, 0), table.cell(0, 1), table.cell(1, 0), table.cell(1, 1)),
+        ("h1", "h2", "1", "2"),
+    ):
+        cell.text = value
+    slide.shapes.add_textbox(Inches(1), Inches(3), Inches(4), Inches(1)).text_frame.text = (
+        "Follow-up analysis."
+    )
+    buf = io.BytesIO()
+    prs.save(buf)
+    buf.seek(0)
+    markdown = (
+        MarkItDown()
+        .convert_stream(buf, stream_info=StreamInfo(extension=".pptx"))
+        .markdown
+    )
+
+    assert "| 1 | 2 |\n\nFollow-up analysis." in markdown
+
+    # Two tables in a row must stay two tables rather than collapsing into one.
+    prs = pptx.Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    for top in (Inches(1), Inches(3)):
+        table = slide.shapes.add_table(2, 2, Inches(1), top, Inches(4), Inches(1)).table
+        for cell, value in zip(
+            (table.cell(0, 0), table.cell(0, 1), table.cell(1, 0), table.cell(1, 1)),
+            ("a", "b", "3", "4"),
+        ):
+            cell.text = value
+    buf = io.BytesIO()
+    prs.save(buf)
+    buf.seek(0)
+    markdown = (
+        MarkItDown()
+        .convert_stream(buf, stream_info=StreamInfo(extension=".pptx"))
+        .markdown
+    )
+
+    assert markdown.count("| --- | --- |") == 2
+    assert "| 3 | 4 |\n\n| a | b |" in markdown
