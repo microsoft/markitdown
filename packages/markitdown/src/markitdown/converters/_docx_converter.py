@@ -102,10 +102,42 @@ class DocxConverter(HtmlConverter):
             if part
         )
 
+        image_adapter = None
+        mammoth_kwargs: dict[str, Any] = {}
+        if type(self)._image_to_html is not DocxConverter._image_to_html:
+            from ..converter_utils.docx._images import _DocxImages
+
+            image_adapter = _DocxImages(self._image_to_html, kwargs)
+            mammoth_kwargs["convert_image"] = image_adapter.convert_image
+
         html_result = mammoth.convert_to_html(
             pre_process_stream,
             style_map=style_map,
             include_embedded_style_map=False,
+            **mammoth_kwargs,
         ).value
 
+        if image_adapter is not None:
+            html_result = image_adapter.replace_images(html_result)
+
         return self._html_converter.convert_string(html_result, **kwargs)
+
+    def _image_to_html(
+        self,
+        image_stream: BinaryIO,
+        stream_info: StreamInfo,
+        **kwargs: Any,
+    ) -> Optional[str]:
+        """Override to render an embedded image as an HTML fragment.
+
+        The stream is borrowed, seekable, and positioned at zero; do not close
+        or retain it. StreamInfo describes the image, not the document. Existing
+        conversion options are forwarded through kwargs.
+
+        Return None or blank text to retain the native image representation.
+        Otherwise return HTML, escaping any literal text. Inline HTML stays
+        inline; block HTML splits enclosing paragraph/inline wrappers but stays
+        inside its table cell or list item. Hook failures propagate through the
+        normal conversion failure path.
+        """
+        return None

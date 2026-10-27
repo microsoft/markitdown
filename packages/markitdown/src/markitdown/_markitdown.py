@@ -271,6 +271,18 @@ class MarkItDown:
                 if docintel_version is not None:
                     docintel_args["api_version"] = docintel_version
 
+                docintel_model_id = kwargs.get("docintel_model_id")
+                if docintel_model_id is not None:
+                    docintel_args["model_id"] = docintel_model_id
+
+                docintel_features = kwargs.get("docintel_features")
+                if docintel_features is not None:
+                    docintel_args["features"] = docintel_features
+
+                docintel_query_fields = kwargs.get("docintel_query_fields")
+                if docintel_query_fields is not None:
+                    docintel_args["query_fields"] = docintel_query_fields
+
                 self.register_converter(
                     DocumentIntelligenceConverter(**docintel_args),
                 )
@@ -437,11 +449,7 @@ class MarkItDown:
         # Check if we have a seekable stream. If not, load the entire stream into memory.
         if not stream.seekable():
             buffer = io.BytesIO()
-            while True:
-                chunk = stream.read(4096)
-                if not chunk:
-                    break
-                buffer.write(chunk)
+            shutil.copyfileobj(stream, buffer)
             buffer.seek(0)
             stream = buffer
 
@@ -595,7 +603,7 @@ class MarkItDown:
 
         # Read into BytesIO
         buffer = io.BytesIO()
-        for chunk in response.iter_content(chunk_size=512):
+        for chunk in response.iter_content(chunk_size=65536):
             buffer.write(chunk)
         buffer.seek(0)
 
