@@ -6,7 +6,6 @@ import pytest
 
 from markitdown import MarkItDown, StreamInfo
 
-
 # Record separators
 
 

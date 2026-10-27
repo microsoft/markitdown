@@ -10,7 +10,6 @@ import markitdown.converters._youtube_converter as youtube_module
 from markitdown import MarkItDown, StreamInfo
 from markitdown.converters import HtmlConverter, YouTubeConverter
 
-
 # Extraction and fallback
 
 
