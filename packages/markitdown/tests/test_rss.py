@@ -11,6 +11,48 @@ from markitdown.converters import RssConverter
 # Feed bodies and links
 
 
+@pytest.mark.parametrize("prefix", ["", "a:"])
+@pytest.mark.parametrize("extension", [".xml", ".atom"])
+def test_atom_without_entries_preserves_metadata(prefix: str, extension: str) -> None:
+    namespace = "xmlns:a" if prefix else "xmlns"
+    feed = f"""<{prefix}feed {namespace}="http://www.w3.org/2005/Atom">
+  <{prefix}title>New feed</{prefix}title>
+  <{prefix}subtitle>No posts yet.</{prefix}subtitle>
+  <{prefix}id>urn:example:empty-feed</{prefix}id>
+  <{prefix}updated>2026-01-01T00:00:00Z</{prefix}updated>
+  <{prefix}author><{prefix}name>Example author</{prefix}name></{prefix}author>
+</{prefix}feed>""".encode("utf-8")
+    stream_info = StreamInfo(extension=extension)
+    stream = io.BytesIO(feed)
+    converter = RssConverter()
+
+    assert converter.accepts(stream, stream_info)
+    assert stream.tell() == 0
+    result = converter.convert(stream, stream_info)
+    assert result.title == "New feed"
+    assert result.markdown.strip() == "# New feed\nNo posts yet."
+
+    result = MarkItDown().convert_stream(io.BytesIO(feed), stream_info=stream_info)
+    assert result.title == "New feed"
+    assert result.markdown.strip() == "# New feed\nNo posts yet."
+
+
+@pytest.mark.parametrize(
+    "feed",
+    [
+        b'<feed xmlns="urn:example:not-atom"><title>Not Atom</title></feed>',
+        b'<document xmlns="http://www.w3.org/2005/Atom"><title>Not a feed</title></document>',
+        b"<feed><title>Unidentified feed</title></feed>",
+    ],
+)
+def test_non_atom_xml_is_not_accepted(feed: bytes) -> None:
+    stream = io.BytesIO(feed)
+    converter = RssConverter()
+
+    assert not converter.accepts(stream, StreamInfo(extension=".xml"))
+    assert stream.tell() == 0
+
+
 @pytest.mark.parametrize(
     "root_prefix, child_prefix",
     [("", ""), ("a:", "a:"), ("a:", "b:"), ("a:", ""), ("", "a:")],
