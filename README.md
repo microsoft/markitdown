@@ -87,6 +87,18 @@ You can also pipe content:
 cat path-to-file.pdf | markitdown
 ```
 
+To convert several files at once, wrap the command in a small shell function. For example, in `~/.zshrc` or `~/.bashrc`:
+
+```bash
+md() {
+  for f in "$@"; do
+    markitdown "$f" -o "$HOME/Desktop/$(basename "${f%.*}").md"
+  done
+}
+```
+
+Then run `md report.pdf slides.pptx` (or drag the files onto the terminal).
+
 ### Optional Dependencies
 MarkItDown has optional dependencies for activating various file formats. Earlier in this document, we installed all optional dependencies with the `[all]` option. However, you can also install them individually for more control. For example:
 
