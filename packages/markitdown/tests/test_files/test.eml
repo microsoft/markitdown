@@ -1,0 +1,9 @@
+From: Test Sender <test.sender@example.com>
+To: Test Recipient <test.recipient@example.com>
+Date: Fri, 15 May 2026 10:00:00 -0700
+Subject: Test EML Message
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+
+This is the body of the test EML message.
+It has multiple lines.
