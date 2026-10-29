@@ -220,6 +220,29 @@ def test_csv_pipe_in_header_is_escaped() -> None:
     assert "| a \\| b | c |" in result
 
 
+@pytest.mark.parametrize(
+    "value,escaped",
+    [
+        ("<tag>", r"\<tag\>"),
+        ("&copy;", r"\&copy;"),
+        ("&#65;", r"\&#65;"),
+        ("`<tag>`", r"\`\<tag\>\`"),
+        ("``&copy;``", r"\`\`\&copy;\`\`"),
+        ("`ordinary code`", r"\`ordinary code\`"),
+    ],
+)
+@pytest.mark.parametrize("backslashes", ["", "\\", "\\\\"])
+def test_csv_html_syntax_preserves_preceding_backslashes(
+    value: str, escaped: str, backslashes: str
+) -> None:
+    cell = backslashes + value
+    expected = backslashes * 2 + escaped
+
+    result = _convert_csv(f"{cell}\n{cell}\n".encode("utf-8"), charset="utf-8")
+
+    assert result == f"| {expected} |\n| --- |\n| {expected} |"
+
+
 def test_csv_plain_values_are_unchanged() -> None:
     # Guards against over-escaping ordinary content.
     result = _convert_csv(b"name,description\nWidget,cheap and fast\n")
