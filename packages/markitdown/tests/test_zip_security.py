@@ -9,7 +9,9 @@ import pytest
 from markitdown import MarkItDown, StreamInfo
 
 
-def _make_zip_with_entry(name: str, data: bytes, compress_type: int = zipfile.ZIP_STORED) -> io.BytesIO:
+def _make_zip_with_entry(
+    name: str, data: bytes, compress_type: int = zipfile.ZIP_STORED
+) -> io.BytesIO:
     """Create a ZIP archive in memory with a single entry."""
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", compression=compress_type) as zf:
@@ -18,7 +20,9 @@ def _make_zip_with_entry(name: str, data: bytes, compress_type: int = zipfile.ZI
     return buf
 
 
-def _make_zip_with_spoofed_size(name: str, data: bytes, fake_file_size: int) -> io.BytesIO:
+def _make_zip_with_spoofed_size(
+    name: str, data: bytes, fake_file_size: int
+) -> io.BytesIO:
     """Create a ZIP archive where file_size in the header is spoofed to a large value.
 
     This simulates what a zip bomb's metadata looks like without actually
@@ -107,33 +111,21 @@ class TestZipBombProtection:
 
     def test_cumulative_size_limit(self):
         """Total decompressed size across all files should be capped."""
-        from markitdown.converters._zip_converter import MAX_TOTAL_DECOMPRESSED_SIZE
+        from markitdown.converters._zip_converter import ZipConverter
 
         md = MarkItDown()
+        # A small cumulative cap so real entries trip it without spoofed
+        # headers, which would hit the per-file and ratio checks first.
+        converter = ZipConverter(markitdown=md, max_total_size=250)
 
-        # Create a ZIP where each entry reports a large (but within per-file limit) size
-        # and the total exceeds the cumulative limit
-        per_file = MAX_TOTAL_DECOMPRESSED_SIZE // 3
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w") as zf:
             for i in range(5):
                 zf.writestr(f"file{i}.txt", b"x" * 100)
+        buf.seek(0)
 
-        # Patch each entry to report a large file_size
-        raw = bytearray(buf.getvalue())
-        for sig, offset in [(b"PK\x03\x04", 22), (b"PK\x01\x02", 24)]:
-            start = 0
-            while True:
-                idx = raw.find(sig, start)
-                if idx < 0:
-                    break
-                struct.pack_into("<I", raw, idx + offset, per_file)
-                start = idx + 1
-
-        patched = io.BytesIO(bytes(raw))
-        patched.seek(0)
-
-        # Should not crash - graceful degradation with truncation note
-        result = md.convert_stream(patched, stream_info=ZIP_STREAM_INFO)
-        assert result.markdown is not None
+        result = converter.convert(buf, ZIP_STREAM_INFO)
         assert "Extraction stopped early" in result.markdown
+        assert "file0.txt" in result.markdown
+        assert "file1.txt" in result.markdown
+        assert "file2.txt" not in result.markdown
