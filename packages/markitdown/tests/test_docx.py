@@ -1482,5 +1482,69 @@ def test_convert_docx_with_style_missing_type(tmp_path):
     assert "# Abstract" in result.markdown
 
 
+# OMML limit functions: an unknown limLow function name falls back to
+# \operatorname instead of raising NotImplementedError.
+
+
+def _omml_latex_for_fragment(fragment: str) -> str:
+    omml_xml = (
+        '<m:oMathPara xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">'
+        f"<m:oMath>{fragment}</m:oMath>"
+        "</m:oMathPara>"
+    )
+    results = list(load_string(omml_xml))
+    assert len(results) == 1
+    return str(results[0])
+
+
+def test_omml_limlow_with_unknown_function_uses_operatorname_fallback():
+    latex = _omml_latex_for_fragment(
+        "<m:limLow><m:e><m:r><m:t>myfunc</m:t></m:r></m:e>"
+        "<m:lim><m:r><m:t>0</m:t></m:r></m:lim></m:limLow>"
+    )
+    assert latex == r"\operatorname{myfunc}_{0}"
+
+
+# Math pre-processing: one bad equation must not abort the others
+
+
+_MATH_DOC_TEMPLATE = (
+    '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
+    'xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">'
+    "<w:body>{body}</w:body></w:document>"
+)
+
+# A func element with no fName raises during conversion, which makes it
+# a stable "bad equation" for exercising the per-equation guard.
+_BAD_EQUATION = "<m:oMath><m:func><m:e><m:r><m:t>x</m:t></m:r></m:e></m:func></m:oMath>"
+_GOOD_EQUATION = "<m:oMath><m:r><m:t>E=mc2</m:t></m:r></m:oMath>"
+
+
+def test_pre_process_math_bad_equation_does_not_abort_good_equation():
+    from markitdown.converter_utils.docx.pre_process import _pre_process_math
+
+    doc = _MATH_DOC_TEMPLATE.format(
+        body=f"<w:p>{_GOOD_EQUATION}</w:p><w:p>{_BAD_EQUATION}</w:p>"
+    )
+    out = _pre_process_math(doc.encode()).decode()
+    # The good equation still converts...
+    assert "$E=mc2$" in out
+    # ...and the bad one keeps its original OMML instead of being dropped.
+    assert "<m:oMath>" in out
+    assert "<m:func>" in out
+
+
+def test_pre_process_math_bad_equation_in_omathpara_is_preserved():
+    from markitdown.converter_utils.docx.pre_process import _pre_process_math
+
+    doc = _MATH_DOC_TEMPLATE.format(
+        body=f"<m:oMathPara>{_GOOD_EQUATION}{_BAD_EQUATION}</m:oMathPara>"
+    )
+    out = _pre_process_math(doc.encode()).decode()
+    assert "$$E=mc2$$" in out
+    assert "<m:oMath>" in out
+    assert "<m:func>" in out
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
