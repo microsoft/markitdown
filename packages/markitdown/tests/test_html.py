@@ -411,5 +411,29 @@ def test_nested_table_in_the_first_row_keeps_the_header_delimiter() -> None:
     assert {_column_count(row) for row in rows} == {2}, markdown
 
 
+def test_nested_table_caption_keeps_its_links_and_inline_code() -> None:
+    html = (
+        "<table>"
+        "<tr><th>Outer</th><th>Value</th></tr>"
+        "<tr><td>row</td><td>"
+        "<table>"
+        '<caption><a href="https://example.org/source">Source</a> '
+        "and <code>x_y</code></caption>"
+        "<tr><td>A</td><td>B</td></tr>"
+        "</table>"
+        "</td></tr>"
+        "</table>"
+    )
+
+    markdown = _convert_html(html)
+    rows = _table_rows(markdown)
+
+    # The caption keeps its link and inline code instead of becoming plain text.
+    assert (
+        r"| row | [Source](https://example.org/source) and `x_y` A \| B |" in markdown
+    ), markdown
+    assert {_column_count(row) for row in rows} == {2}, markdown
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))

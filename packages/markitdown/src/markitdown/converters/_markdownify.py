@@ -34,7 +34,11 @@ def _flatten_nested_table(table: Any, soup: Any) -> None:
 
     caption = table.find("caption", recursive=False)
     if caption is not None:
-        flattened.append(soup.new_string(caption.get_text(" ", strip=True) + " "))
+        # Move the caption's children rather than its text, so links and inline
+        # formatting are converted instead of being flattened away.
+        for child in list(caption.contents):
+            flattened.append(child.extract())
+        flattened.append(soup.new_string(" "))
 
     first_row = True
     for row in table.find_all("tr"):
