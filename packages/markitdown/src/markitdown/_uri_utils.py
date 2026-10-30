@@ -1,4 +1,5 @@
 import base64
+import binascii
 import ntpath
 import os
 from typing import Tuple, Dict
@@ -70,6 +71,21 @@ def parse_data_uri(uri: str) -> Tuple[str | None, Dict[str, str], bytes]:
         elif len(part) > 0:
             attributes[part.lower()] = ""
 
-    content = base64.b64decode(data) if is_base64 else unquote_to_bytes(data)
+    if is_base64:
+        # Whitespace is not part of the base64 alphabet, but decoders skip it
+        # and data URIs copied out of HTML or email are often wrapped across
+        # lines or space separated. Drop it first so that only genuinely
+        # malformed payloads are rejected below.
+        payload = "".join(data.split())
+        try:
+            # validate=True: without it, non-alphabet characters are silently
+            # discarded and malformed payloads decode to empty/truncated bytes.
+            content = base64.b64decode(payload, validate=True)
+        except binascii.Error as e:
+            raise ValueError(
+                f"Malformed base64 payload in data URI: {payload!r}"
+            ) from e
+    else:
+        content = unquote_to_bytes(data)
 
     return mime_type, attributes, content
