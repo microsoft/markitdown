@@ -110,14 +110,26 @@ class ZipConverter(DocumentConverter):
         stream_info: StreamInfo,
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
-        file_path = stream_info.url or stream_info.local_path or stream_info.filename
+        file_path = (
+            stream_info.url
+            or stream_info.local_path
+            or stream_info.filename
+            or "(unknown)"
+        )
         md_content = f"Content from the zip file `{file_path}`:\n\n"
+
+        # Drop the metadata describing the outer *archive*
+        member_kwargs = {
+            key: value
+            for key, value in kwargs.items()
+            if key not in ("file_extension", "url")
+        }
 
         with zipfile.ZipFile(file_stream, "r") as zipObj:
             total_decompressed = 0
 
-            for name in zipObj.namelist():
-                info = zipObj.getinfo(name)
+            for info in zipObj.infolist():
+                name = info.filename
 
                 # Skip directories
                 if info.is_dir():
@@ -168,7 +180,7 @@ class ZipConverter(DocumentConverter):
                     break
 
                 try:
-                    z_file_stream = io.BytesIO(zipObj.read(name))
+                    z_file_stream = io.BytesIO(zipObj.read(info))
                     z_file_stream_info = StreamInfo(
                         extension=os.path.splitext(name)[1],
                         filename=os.path.basename(name),
@@ -176,6 +188,7 @@ class ZipConverter(DocumentConverter):
                     result = self._markitdown.convert_stream(
                         stream=z_file_stream,
                         stream_info=z_file_stream_info,
+                        **member_kwargs,
                     )
                     if result is not None:
                         md_content += f"## File: {name}\n\n"

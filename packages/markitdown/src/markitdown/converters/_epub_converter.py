@@ -1,9 +1,11 @@
 import os
+import posixpath
 import zipfile
+from urllib.parse import unquote
 from defusedxml import minidom
 from xml.dom.minidom import Document
 
-from typing import BinaryIO, Any, Dict, List
+from typing import BinaryIO, Any, Dict, List, Set
 
 from ._html_converter import HtmlConverter
 from .._base_converter import DocumentConverterResult
@@ -25,7 +27,7 @@ MIME_TYPE_MAPPING = {
 
 class EpubConverter(HtmlConverter):
     """
-    Converts EPUB files to Markdown. Style information (e.g.m headings) and tables are preserved where possible.
+    Converts EPUB files to Markdown. Style information (e.g., headings) and tables are preserved where possible.
     """
 
     def __init__(self):
@@ -57,7 +59,7 @@ class EpubConverter(HtmlConverter):
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
         with zipfile.ZipFile(file_stream, "r") as z:
-            # Extracts metadata (title, authors, language, publisher, date, description, cover) from an EPUB file."""
+            # Extracts metadata (title, authors, language, publisher, date, description, cover) from an EPUB file.
 
             # Locate content.opf
             container_dom = minidom.parse(z.open("META-INF/container.xml"))
@@ -91,8 +93,9 @@ class EpubConverter(HtmlConverter):
             base_path = "/".join(
                 opf_path.split("/")[:-1]
             )  # Get base directory of content.opf
+            zip_names = set(z.namelist())
             spine = [
-                f"{base_path}/{manifest[item_id]}" if base_path else manifest[item_id]
+                self._resolve_manifest_href(manifest[item_id], base_path, zip_names)
                 for item_id in spine_order
                 if item_id in manifest
             ]
@@ -112,6 +115,7 @@ class EpubConverter(HtmlConverter):
                                 extension=extension,
                                 filename=filename,
                             ),
+                            **kwargs,
                         )
                         markdown_content.append(converted_content.markdown.strip())
 
@@ -129,6 +133,29 @@ class EpubConverter(HtmlConverter):
                 markdown="\n\n".join(markdown_content), title=metadata["title"]
             )
 
+    def _resolve_manifest_href(
+        self, href: str, base_path: str, zip_names: Set[str]
+    ) -> str:
+        """Resolve a manifest href to the matching ZIP entry name.
+
+        Manifest hrefs are URI references relative to the OPF, so reserved
+        characters such as spaces arrive percent-encoded, while ZIP entry names
+        are not encoded. Prefer the decoded form, but fall back to the raw href
+        so archives that store a literally-encoded name still resolve.
+        """
+        candidates: List[str] = []
+        for candidate in (unquote(href), href):
+            resolved = posixpath.join(base_path, candidate) if base_path else candidate
+            resolved = posixpath.normpath(resolved)
+            if resolved not in candidates:
+                candidates.append(resolved)
+
+        for candidate in candidates:
+            if candidate in zip_names:
+                return candidate
+
+        return candidates[0]
+
     def _get_text_from_node(self, dom: Document, tag_name: str) -> str | None:
         """Convenience function to extract a single occurrence of a tag (e.g., title)."""
         texts = self._get_all_texts_from_nodes(dom, tag_name)
@@ -141,6 +168,18 @@ class EpubConverter(HtmlConverter):
         """Helper function to extract all occurrences of a tag (e.g., multiple authors)."""
         texts: List[str] = []
         for node in dom.getElementsByTagName(tag_name):
-            if node.firstChild and hasattr(node.firstChild, "nodeValue"):
-                texts.append(node.firstChild.nodeValue.strip())
+            text_parts: List[str] = []
+            self._collect_node_text(node, text_parts)
+            text_val = "".join(text_parts).strip()
+            if text_val:
+                texts.append(text_val)
         return texts
+
+    def _collect_node_text(self, node: Any, text_parts: List[str]) -> None:
+        """Recursively collect text node values from a DOM node."""
+        for child in node.childNodes:
+            if child.nodeType in (child.TEXT_NODE, child.CDATA_SECTION_NODE):
+                if child.nodeValue:
+                    text_parts.append(child.nodeValue)
+            elif child.hasChildNodes():
+                self._collect_node_text(child, text_parts)
