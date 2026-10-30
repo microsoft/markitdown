@@ -52,6 +52,15 @@ from ._exceptions import (
     FailedConversionAttempt,
 )
 
+# Safeguards for the HTTP/HTTPS fetch path. convert_uri() applies a request
+# timeout so a stalled server cannot block a conversion indefinitely, and
+# convert_response() caps the cumulative body size so an unbounded (or
+# misleadingly labelled) response cannot exhaust memory while being
+# buffered. Both can be overridden per call with the ``http_timeout`` and
+# ``max_response_bytes`` keyword arguments.
+DEFAULT_HTTP_TIMEOUT_SECONDS = 30.0
+DEFAULT_MAX_RESPONSE_BYTES = 100 * 1024 * 1024  # 100 MiB
+
 
 def _get_content_disposition_filename(content_disposition: str) -> Optional[str]:
     message = Message()
@@ -524,7 +533,10 @@ class MarkItDown:
             )
         # HTTP/HTTPS URIs
         elif scheme in ("http", "https"):
-            response = self._requests_session.get(uri, stream=True)
+            http_timeout = kwargs.pop("http_timeout", DEFAULT_HTTP_TIMEOUT_SECONDS)
+            response = self._requests_session.get(
+                uri, stream=True, timeout=http_timeout
+            )
             response.raise_for_status()
             return self.convert_response(
                 response,
@@ -599,9 +611,24 @@ class MarkItDown:
             # Deprecated -- use stream_info
             base_guess = base_guess.copy_and_update(url=url)
 
-        # Read into BytesIO
+        # Read into BytesIO, enforcing a cumulative size cap. The cap is
+        # counted from the bytes actually received, so a missing or
+        # understated Content-Length header does not bypass it.
+        max_response_bytes = kwargs.pop(
+            "max_response_bytes", DEFAULT_MAX_RESPONSE_BYTES
+        )
         buffer = io.BytesIO()
+        total_bytes = 0
         for chunk in response.iter_content(chunk_size=65536):
+            if not chunk:
+                continue
+            total_bytes += len(chunk)
+            if max_response_bytes is not None and total_bytes > max_response_bytes:
+                raise FileConversionException(
+                    f"Response body from {response.url} exceeds the maximum "
+                    f"size of {max_response_bytes} bytes. Raise "
+                    f"max_response_bytes to convert larger responses."
+                )
             buffer.write(chunk)
         buffer.seek(0)
 
