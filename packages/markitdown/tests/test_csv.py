@@ -251,6 +251,36 @@ def test_csv_plain_values_are_unchanged() -> None:
     assert "\\" not in result
 
 
+@pytest.mark.parametrize(
+    "value,escaped",
+    [
+        ("`*literal*`", r"\`\*literal\*\`"),
+        ("``**bold**``", r"\`\`\*\*bold\*\*\`\`"),
+        ("`_under_`", r"\`\_under\_\`"),
+        ("`[label](https://example.test)`", r"\`\[label\](https://example.test)\`"),
+        ("`![alt](image.png)`", r"\`!\[alt\](image.png)\`"),
+        ("`~~gone~~`", r"\`\~\~gone\~\~\`"),
+        (r"`\\server\share`", r"\`\\\\server\\share\`"),
+        (r"`\*literal\*`", r"\`\\\*literal\\\*\`"),
+        ("`<b>*text*</b>`", r"\`\<b\>\*text\*\</b\>\`"),
+    ],
+)
+def test_csv_escaped_backticks_keep_their_content_literal(
+    value: str, escaped: str
+) -> None:
+    result = _convert_csv(f"{value}\n{value}\n".encode("utf-8"), charset="utf-8")
+
+    assert result == f"| {escaped} |\n| --- |\n| {escaped} |"
+
+
+def test_csv_markdown_without_backticks_is_unchanged() -> None:
+    value = r"*emphasis* _under_ [label](url) ![alt](image) ~~strike~~ \\server\share"
+
+    result = _convert_csv(f"{value}\n{value}\n".encode("utf-8"), charset="utf-8")
+
+    assert result == f"| {value} |\n| --- |\n| {value} |"
+
+
 def test_csv_backslash_without_a_pipe_is_left_alone() -> None:
     # Only backslashes that guard a pipe are doubled; a Windows path stays
     # readable.

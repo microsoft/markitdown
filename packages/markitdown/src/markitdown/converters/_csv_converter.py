@@ -16,7 +16,8 @@ ACCEPTED_FILE_EXTENSIONS = [".csv"]
 # Matches a delimiter together with the (possibly empty) run of backslashes in
 # front of it, so that run can be doubled before the delimiter is escaped.
 # The lookbehind avoids retrying from each position inside a backslash run.
-_CELL_ESCAPE_RE = re.compile(r"(?<!\\)(\\*)([|&<>`])")
+# The last alternative captures syntax protected only in cells with backticks.
+_CELL_ESCAPE_RE = re.compile(r"(?<!\\)(\\*)([|&<>`])|([\\*_[\]~])")
 
 
 def _escape_table_cell(value: str) -> str:
@@ -26,9 +27,19 @@ def _escape_table_cell(value: str) -> str:
     Angle brackets and ampersands can turn literal data into HTML, autolinks,
     or character references, so they must also be escaped.
     Escape backticks so code spans cannot make those escapes visible.
+    In cells with backticks, also protect content that code spans would have
+    kept literal, such as backslashes, emphasis, links, and images.
     Line breaks would end the row early, so they collapse to a single space.
     """
-    value = _CELL_ESCAPE_RE.sub(lambda m: m.group(1) * 2 + "\\" + m.group(2), value)
+    has_backticks = "`" in value
+    value = _CELL_ESCAPE_RE.sub(
+        lambda m: (
+            m.group(1) * 2 + "\\" + m.group(2)
+            if m.group(2) is not None
+            else ("\\" if has_backticks else "") + m.group(3)
+        ),
+        value,
+    )
     return value.replace("\r\n", " ").replace("\n", " ").replace("\r", " ")
 
 
