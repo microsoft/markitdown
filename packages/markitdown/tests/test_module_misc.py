@@ -1,85 +1,49 @@
-#!/usr/bin/env python3 -m pytest
+"""Library infrastructure, cross-format options, and remaining format regressions."""
+
 import io
+import json
+import ntpath
 import os
-import re
-import shutil
-import pytest
+from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from markitdown._uri_utils import parse_data_uri, file_uri_to_path
+import pytest
+import requests
+from charset_normalizer import from_bytes
 
+import markitdown._uri_utils as uri_utils
 from markitdown import (
-    MarkItDown,
-    UnsupportedFormatException,
     FileConversionException,
+    MarkItDown,
     StreamInfo,
+    UnsupportedFormatException,
+)
+from markitdown._markitdown import (
+    _get_content_disposition_filename,
+    _read_charset_sample,
+)
+from markitdown._uri_utils import (
+    _is_unc_or_device_path,
+    file_uri_to_path,
+    parse_data_uri,
 )
 
-# This file contains module tests that are not directly tested by the FileTestVectors.
-# This includes things like helper functions and runtime conversion options
-# (e.g., LLM clients, exiftool path, transcription services, etc.)
+# Library behavior and remaining formats
 
 skip_remote = (
     True if os.environ.get("GITHUB_ACTIONS") else False
 )  # Don't run these tests in CI
 
-
 # Don't run the llm tests without a key and the client library
 skip_llm = False if os.environ.get("OPENAI_API_KEY") else True
+
 try:
     import openai
 except ModuleNotFoundError:
     skip_llm = True
 
-# Skip exiftool tests if not installed
-skip_exiftool = shutil.which("exiftool") is None
-
 TEST_FILES_DIR = os.path.join(os.path.dirname(__file__), "test_files")
-
-JPG_TEST_EXIFTOOL = {
-    "Author": "AutoGen Authors",
-    "Title": "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation",
-    "Description": "AutoGen enables diverse LLM-based applications",
-    "ImageSize": "1615x1967",
-    "DateTimeOriginal": "2024:03:14 22:10:00",
-}
-
-MP3_TEST_EXIFTOOL = {
-    "Title": "f67a499e-a7d0-4ca3-a49b-358bd934ae3e",
-    "Artist": "Artist Name Test String",
-    "Album": "Album Name Test String",
-    "SampleRate": "48000",
-}
-
-PDF_TEST_URL = "https://arxiv.org/pdf/2308.08155v2.pdf"
-PDF_TEST_STRINGS = [
-    "While there is contemporaneous exploration of multi-agent approaches"
-]
-
-YOUTUBE_TEST_URL = "https://www.youtube.com/watch?v=V2qZ_lgxTzg"
-YOUTUBE_TEST_STRINGS = [
-    "## AutoGen FULL Tutorial with Python (Step-By-Step)",
-    "This is an intermediate tutorial for installing and using AutoGen locally",
-    "PT15M4S",
-    "the model we're going to be using today is GPT 3.5 turbo",  # From the transcript
-]
-
-DOCX_COMMENT_TEST_STRINGS = [
-    "314b0a30-5b04-470b-b9f7-eed2c2bec74a",
-    "49e168b7-d2ae-407f-a055-2167576f39a1",
-    "## d666f1f7-46cb-42bd-9a39-9a39cf2a509f",
-    "# Abstract",
-    "# Introduction",
-    "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation",
-    "This is a test comment. 12df-321a",
-    "Yet another comment in the doc. 55yiyi-asd09",
-]
-
-BLOG_TEST_URL = "https://microsoft.github.io/autogen/blog/2023/04/21/LLM-tuning-math"
-BLOG_TEST_STRINGS = [
-    "Large language models (LLMs) are powerful tools that can generate natural language texts for various applications, such as chatbots, summarization, translation, and more. GPT-4 is currently the state of the art LLM in the world. Is model selection irrelevant? What about inference parameters?",
-    "an example where high cost can easily prevent a generic complex",
-]
 
 LLM_TEST_STRINGS = [
     "5bda1dd6",
@@ -200,6 +164,13 @@ def test_data_uris() -> None:
     assert attributes["charset"] == "utf-8"
     assert data == b"Hello, World!"
 
+    data_uri = "data:text/plain;CHARSET=utf-8;BASE64,SGVsbG8sIFdvcmxkIQ=="
+    mime_type, attributes, data = parse_data_uri(data_uri)
+    assert mime_type == "text/plain"
+    assert len(attributes) == 1
+    assert attributes["charset"] == "utf-8"
+    assert data == b"Hello, World!"
+
     data_uri = "data:,Hello%2C%20World%21"
     mime_type, attributes, data = parse_data_uri(data_uri)
     assert mime_type is None
@@ -221,57 +192,71 @@ def test_data_uris() -> None:
 
 
 def test_file_uris() -> None:
+    expected_path = os.path.abspath("/path/to/file.txt")
+
     # Test file URI with an empty host
     file_uri = "file:///path/to/file.txt"
     netloc, path = file_uri_to_path(file_uri)
     assert netloc is None
-    assert path == "/path/to/file.txt"
+    assert path == expected_path
 
     # Test file URI with no host
     file_uri = "file:/path/to/file.txt"
     netloc, path = file_uri_to_path(file_uri)
     assert netloc is None
-    assert path == "/path/to/file.txt"
+    assert path == expected_path
 
     # Test file URI with localhost
     file_uri = "file://localhost/path/to/file.txt"
     netloc, path = file_uri_to_path(file_uri)
     assert netloc == "localhost"
-    assert path == "/path/to/file.txt"
+    assert path == expected_path
+
+    # URI schemes are case-insensitive
+    file_uri = "FILE:///path/to/file.txt"
+    netloc, path = file_uri_to_path(file_uri)
+    assert netloc is None
+    assert path == expected_path
+
+
+def test_convert_case_insensitive_uri_schemes(tmp_path) -> None:
+    markitdown = MarkItDown()
+    expected_path = os.path.abspath("/path/to/file.txt")
+
+    data_result = markitdown.convert("DATA:text/plain;base64,SGVsbG8sIFdvcmxkIQ==")
+    assert data_result.markdown == "Hello, World!"
+
+    text_file = tmp_path / "hello.txt"
+    text_file.write_text("Hello from file", encoding="utf-8")
+
+    file_result = markitdown.convert(text_file.as_uri().replace("file:", "FILE:", 1))
+    assert file_result.markdown == "Hello from file"
 
     # Test file URI with query parameters
     file_uri = "file:///path/to/file.txt?param=value"
     netloc, path = file_uri_to_path(file_uri)
     assert netloc is None
-    assert path == "/path/to/file.txt"
+    assert path == expected_path
 
     # Test file URI with fragment
     file_uri = "file:///path/to/file.txt#fragment"
     netloc, path = file_uri_to_path(file_uri)
     assert netloc is None
-    assert path == "/path/to/file.txt"
+    assert path == expected_path
 
 
-def test_docx_comments() -> None:
-    # Test DOCX processing, with comments and setting style_map on init
-    markitdown_with_style_map = MarkItDown(style_map="comment-reference => ")
-    result = markitdown_with_style_map.convert(
-        os.path.join(TEST_FILES_DIR, "test_with_comment.docx")
-    )
-    validate_strings(result, DOCX_COMMENT_TEST_STRINGS)
+def test_file_uri_with_percent_encoded_windows_drive(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from nturl2path import url2pathname as windows_url2pathname
 
+    monkeypatch.setattr(uri_utils, "os", SimpleNamespace(name="nt", path=ntpath))
+    monkeypatch.setattr(uri_utils, "url2pathname", windows_url2pathname)
 
-def test_docx_equations() -> None:
-    markitdown = MarkItDown()
-    docx_file = os.path.join(TEST_FILES_DIR, "equations.docx")
-    result = markitdown.convert(docx_file)
+    netloc, path = uri_utils.file_uri_to_path("file:///C%3A/Temp/example.md")
 
-    # Check for inline equation m=1 (wrapped with single $) is present
-    assert "$m=1$" in result.text_content, "Inline equation $m=1$ not found"
-
-    # Find block equations wrapped with double $$ and check if they are present
-    block_equations = re.findall(r"\$\$(.+?)\$\$", result.text_content)
-    assert block_equations, "No block equations found in the document."
+    assert netloc is None
+    assert path == r"C:\Temp\example.md"
 
 
 def test_input_as_strings() -> None:
@@ -288,168 +273,59 @@ def test_input_as_strings() -> None:
     assert "# Test" in result.text_content
 
 
-def test_pptx_chart_multi_series_conversion() -> None:
-    """Charts with multiple series and many categories must convert correctly.
+def _response(content_disposition: str) -> requests.Response:
+    response = requests.Response()
+    response.status_code = 200
+    response.headers["content-disposition"] = content_disposition
+    response.url = "https://example.com/download"
+    response.raw = io.BytesIO(b"name,value\nalpha,beta\n")
+    return response
 
-    Regression test for the slow path in PptxConverter._convert_chart_to_markdown,
-    where ``series.values[idx]`` was evaluated inside the (category x series) loop.
-    In python-pptx each ``series.values`` access rescans the cached points via
-    XPath (O(n) per lookup), so the old code was O(n^2) per series (and rebuilt
-    the whole tuple for every category), making large charts extremely slow.
 
-    The values are now materialized once per series. This test builds a chart
-    with enough categories that the regressed code path would be pathologically
-    slow, and verifies the resulting Markdown table is correct across series.
-    """
-    pptx = pytest.importorskip("pptx")
-    from pptx.util import Inches
-    from pptx.chart.data import CategoryChartData
-    from pptx.enum.chart import XL_CHART_TYPE
-
-    n_categories = 200
-    categories = [f"C{i}" for i in range(n_categories)]
-    series_a = [float(i) for i in range(n_categories)]
-    series_b = [float(i * 2) for i in range(n_categories)]
-
-    presentation = pptx.Presentation()
-    slide = presentation.slides.add_slide(presentation.slide_layouts[5])
-    chart_data = CategoryChartData()
-    chart_data.categories = categories
-    chart_data.add_series("Series A", series_a)
-    chart_data.add_series("Series B", series_b)
-    slide.shapes.add_chart(
-        XL_CHART_TYPE.COLUMN_CLUSTERED,
-        Inches(1),
-        Inches(1),
-        Inches(8),
-        Inches(5),
-        chart_data,
+def test_convert_response_uses_rfc5987_content_disposition_filename() -> None:
+    markitdown = MarkItDown()
+    result = markitdown.convert_response(
+        _response("attachment; filename*=UTF-8''data.csv")
     )
 
-    buffer = io.BytesIO()
-    presentation.save(buffer)
-    buffer.seek(0)
-
-    result = MarkItDown().convert_stream(buffer, file_extension=".pptx")
-    md = result.markdown
-
-    # Both series headers are present
-    assert "Series A" in md
-    assert "Series B" in md
-    # First and last categories are present (nothing truncated)
-    assert "| C0 |" in md
-    assert f"| C{n_categories - 1} |" in md
-    # A representative row carries the correct value for each series
-    assert "| C10 | 10.0 | 20.0 |" in md
-
-
-def test_deeply_nested_html_fallback() -> None:
-    """Large, deeply nested HTML should fall back to plain-text extraction
-    instead of silently returning unconverted HTML (issue #1636).
-
-    Note: This test uses sys.setrecursionlimit to guarantee a RecursionError
-    regardless of the host environment's default limit, making it deterministic
-    across different platforms and CI configurations.
-    """
-    import sys
-    import warnings
-
-    markitdown = MarkItDown()
-
-    # Use a small recursion limit so the test is environment-independent.
-    # We restore the original limit in a finally block to avoid side-effects.
-    original_limit = sys.getrecursionlimit()
-    low_limit = 200  # well below markdownify's traversal depth for depth=500
-
-    # Build HTML with nesting deep enough to trigger RecursionError
-    depth = 500
-    html = "<html><body>"
-    for _ in range(depth):
-        html += '<div style="margin-left:10px">'
-    html += "<p>Deep content with <b>bold text</b></p>"
-    for _ in range(depth):
-        html += "</div>"
-    html += "</body></html>"
-
-    try:
-        sys.setrecursionlimit(low_limit)
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            result = markitdown.convert_stream(
-                io.BytesIO(html.encode("utf-8")),
-                file_extension=".html",
-            )
-
-            # Should have emitted a warning about the fallback
-            recursion_warnings = [x for x in w if "deeply nested" in str(x.message)]
-            assert len(recursion_warnings) > 0
-    finally:
-        sys.setrecursionlimit(original_limit)
-
-    # The output should contain the text content, not raw HTML
-    assert "Deep content" in result.markdown
-    assert "bold text" in result.markdown
-    assert "<div" not in result.markdown
-    assert "<p>" not in result.markdown
-
-
-def test_doc_rlink() -> None:
-    # Test for: CVE-2025-11849
-    markitdown = MarkItDown()
-
-    # Document with rlink
-    docx_file = os.path.join(TEST_FILES_DIR, "rlink.docx")
-
-    # Directory containing the target rlink file
-    rlink_tmp_dir = os.path.abspath(os.sep + "tmp")
-
-    # Ensure the tmp directory exists
-    if not os.path.exists(rlink_tmp_dir):
-        pytest.skip(f"Skipping rlink test; {rlink_tmp_dir} directory does not exist.")
-        return
-
-    rlink_file_path = os.path.join(rlink_tmp_dir, "test_rlink.txt")
-    rlink_content = "de658225-569e-4e3d-9ed2-cfb6abf927fc"
-    b64_prefix = (
-        "ZGU2NTgyMjUtNTY5ZS00ZTNkLTllZDItY2ZiNmFiZjk"  # base64 prefix of rlink_content
+    assert result.markdown == "\n".join(
+        [
+            "| name | value |",
+            "| --- | --- |",
+            "| alpha | beta |",
+        ]
     )
 
-    if os.path.exists(rlink_file_path):
-        with open(rlink_file_path, "r", encoding="utf-8") as f:
-            existing_content = f.read()
-            if existing_content != rlink_content:
-                raise ValueError(
-                    f"Existing {rlink_file_path} content does not match expected content."
-                )
-    else:
-        with open(rlink_file_path, "w", encoding="utf-8") as f:
-            f.write(rlink_content)
 
-    try:
-        result = markitdown.convert(docx_file, keep_data_uris=True).text_content
-        assert (
-            b64_prefix not in result
-        )  # Make sure the target file was NOT embedded in the output
-    finally:
-        os.remove(rlink_file_path)
-
-
-@pytest.mark.skipif(
-    skip_remote,
-    reason="do not run tests that query external urls",
-)
-def test_markitdown_remote() -> None:
+def test_convert_response_prefers_extended_content_disposition_filename() -> None:
     markitdown = MarkItDown()
+    result = markitdown.convert_response(
+        _response("attachment; filename=fallback.txt; filename*=UTF-8''data.csv")
+    )
 
-    # By URL
-    result = markitdown.convert(PDF_TEST_URL)
-    for test_string in PDF_TEST_STRINGS:
-        assert test_string in result.text_content
+    assert result.markdown == "\n".join(
+        [
+            "| name | value |",
+            "| --- | --- |",
+            "| alpha | beta |",
+        ]
+    )
 
-    # Youtube
-    # result = markitdown.convert(YOUTUBE_TEST_URL)
-    # for test_string in YOUTUBE_TEST_STRINGS:
-    #    assert test_string in result.text_content
+
+def test_get_content_disposition_filename_decodes_rfc5987() -> None:
+    assert (
+        _get_content_disposition_filename(
+            "attachment; filename=fallback.txt; "
+            "filename*=UTF-8''d%C3%A1t%C3%A1%2Ecsv"
+        )
+        == "d\u00e1t\u00e1.csv"
+    )
+
+
+# Youtube
+# result = markitdown.convert(YOUTUBE_TEST_URL)
+# for test_string in YOUTUBE_TEST_STRINGS:
+#    assert test_string in result.text_content
 
 
 @pytest.mark.skipif(
@@ -485,36 +361,6 @@ def test_exceptions() -> None:
         )
     assert len(exc_info.value.attempts) == 1
     assert type(exc_info.value.attempts[0].converter).__name__ == "PptxConverter"
-
-
-@pytest.mark.skipif(
-    skip_exiftool,
-    reason="do not run if exiftool is not installed",
-)
-def test_markitdown_exiftool() -> None:
-    which_exiftool = shutil.which("exiftool")
-    assert which_exiftool is not None
-
-    # Test explicitly setting the location of exiftool
-    markitdown = MarkItDown(exiftool_path=which_exiftool)
-    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.jpg"))
-    for key in JPG_TEST_EXIFTOOL:
-        target = f"{key}: {JPG_TEST_EXIFTOOL[key]}"
-        assert target in result.text_content
-
-    # Test setting the exiftool path through an environment variable
-    os.environ["EXIFTOOL_PATH"] = which_exiftool
-    markitdown = MarkItDown()
-    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.jpg"))
-    for key in JPG_TEST_EXIFTOOL:
-        target = f"{key}: {JPG_TEST_EXIFTOOL[key]}"
-        assert target in result.text_content
-
-    # Test some other media types
-    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.mp3"))
-    for key in MP3_TEST_EXIFTOOL:
-        target = f"{key}: {MP3_TEST_EXIFTOOL[key]}"
-        assert target in result.text_content
 
 
 def test_markitdown_llm_parameters() -> None:
@@ -587,23 +433,447 @@ def test_markitdown_llm() -> None:
     validate_strings(result, PPTX_TEST_STRINGS)
 
 
+def test_ipynb_heading_title_preserves_leading_hash() -> None:
+    """Heading marker removal must not eat a leading '#' from the title text.
+
+    Regression for https://github.com/microsoft/markitdown/issues/2367
+    """
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    notebook = {
+        "nbformat": 4,
+        "nbformat_minor": 5,
+        "metadata": {},
+        "cells": [
+            {
+                "cell_type": "markdown",
+                "source": ["# #hashtag campaign results\n"],
+                "metadata": {},
+            }
+        ],
+    }
+    result = IpynbConverter()._convert(notebook)
+    assert result.title == "#hashtag campaign results"
+
+
+_UTF8_BOM = b"\xef\xbb\xbf"
+
+_BOM_NOTEBOOK = {
+    "nbformat": 4,
+    "nbformat_minor": 5,
+    "metadata": {},
+    "cells": [
+        {"cell_type": "markdown", "source": ["# Quarterly notes\n"], "metadata": {}},
+        {"cell_type": "code", "source": ["print('hello')\n"], "metadata": {}},
+    ],
+}
+
+
+def test_ipynb_with_a_utf8_bom_is_still_converted() -> None:
+    """A leading BOM must not stop the notebook from being parsed."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    data = _UTF8_BOM + json.dumps(_BOM_NOTEBOOK).encode("utf-8")
+
+    result = IpynbConverter().convert(
+        io.BytesIO(data), StreamInfo(extension=".ipynb", charset="utf-8")
+    )
+
+    assert "# Quarterly notes" in result.markdown
+    assert "```python\nprint('hello')" in result.markdown
+    assert result.title == "Quarterly notes"
+
+
+def test_ipynb_with_a_utf8_bom_is_not_emitted_as_raw_json() -> None:
+    """The whole stack must not fall through to the plain-text converter."""
+    data = _UTF8_BOM + json.dumps(_BOM_NOTEBOOK).encode("utf-8")
+
+    result = MarkItDown().convert_stream(
+        io.BytesIO(data), stream_info=StreamInfo(extension=".ipynb")
+    )
+
+    assert result.markdown.startswith("# Quarterly notes")
+    assert "nbformat" not in result.markdown
+
+
+def test_ipynb_without_a_bom_is_unchanged() -> None:
+    """The case that already worked must produce exactly the same markdown."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    data = json.dumps(_BOM_NOTEBOOK).encode("utf-8")
+
+    result = IpynbConverter().convert(
+        io.BytesIO(data), StreamInfo(extension=".ipynb", charset="utf-8")
+    )
+
+    assert result.markdown == "# Quarterly notes\n\n\n```python\nprint('hello')\n\n```"
+
+
+def test_ipynb_utf8_sig_charset_still_works() -> None:
+    """A charset that already consumes the BOM must not be double-stripped."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    data = _UTF8_BOM + json.dumps(_BOM_NOTEBOOK).encode("utf-8")
+
+    result = IpynbConverter().convert(
+        io.BytesIO(data), StreamInfo(extension=".ipynb", charset="utf-8-sig")
+    )
+
+    assert "# Quarterly notes" in result.markdown
+
+
+def test_ipynb_accepts_non_ascii() -> None:
+    """IpynbConverter.accepts() must not raise on non-ASCII binary content."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    converter = IpynbConverter()
+
+    # Binary content that is not valid UTF-8 (simulates non-ASCII file)
+    binary_data = b"\x80\x81\x82\x83"
+    stream_info = StreamInfo(mimetype="application/json", charset="utf-8")
+
+    # Should return False without raising
+    result = converter.accepts(io.BytesIO(binary_data), stream_info)
+    assert result is False
+
+    # French PDF content (UTF-8 bytes that would crash if decoded as ASCII)
+    french_bytes = "lettre d'information sur l'événement".encode("utf-8")
+    stream_info_ascii = StreamInfo(mimetype="application/json", charset="ascii")
+
+    result = converter.accepts(io.BytesIO(french_bytes), stream_info_ascii)
+    assert result is False
+
+    # Valid notebook content should still be accepted
+    notebook_bytes = b'{"nbformat": 4, "nbformat_minor": 5, "cells": []}'
+    stream_info_json = StreamInfo(mimetype="application/json", charset="utf-8")
+
+    result = converter.accepts(io.BytesIO(notebook_bytes), stream_info_json)
+    assert result is True
+
+
+# File URI validation
+
+UNC_URI_PATHS = [
+    "//server.example/share/x.txt",
+    "///server.example/share/x.txt",
+    "////server.example/share/x.txt",
+    r"/\server.example/share/x.txt",
+    r"\/server.example/share/x.txt",
+    r"\\server.example\share\x.txt",
+    "/%2Fserver.example/share/x.txt",
+    "/%2fserver.example/share/x.txt",
+    "/%5Cserver.example/share/x.txt",
+    "/%5cserver.example/share/x.txt",
+    "%2F%2Fserver.example/share/x.txt",
+    "%5C%5Cserver.example%5Cshare%5Cx.txt",
+    "/%5C%3F%5CUNC%5Cserver.example%5Cshare%5Cx.txt",
+    "/%5C.%5CUNC%5Cserver.example%5Cshare%5Cx.txt",
+    "/%5C%3F%5CC:%5CTemp%5Cx.txt",
+    "/%5C.%5CPhysicalDrive0",
+]
+
+BLOCKED_URIS = (
+    [
+        f"file://{authority}{path}"
+        for authority in ("", "localhost")
+        for path in UNC_URI_PATHS
+        # An authority must be followed by a slash to introduce its path.
+        if path.startswith("/")
+    ]
+    + [f"file:{path}" for path in UNC_URI_PATHS if not path.startswith("/")]
+    + [
+        "FILE:////server.example/share/x.txt",
+        "file:////C:/Temp/x.txt",
+    ]
+)
+
+
+@pytest.mark.parametrize("uri", BLOCKED_URIS)
+def test_file_uri_rejects_unc_or_device_path(uri: str) -> None:
+    with pytest.raises(ValueError, match="UNC"):
+        file_uri_to_path(uri)
+
+
+class _NoFileAccessMarkItDown(MarkItDown):
+    def convert_local(self, *args, **kwargs):
+        pytest.fail("Rejected file URIs must not reach convert_local()")
+
+
+@pytest.fixture(scope="module")
+def no_file_access_markitdown() -> MarkItDown:
+    return _NoFileAccessMarkItDown(enable_builtins=False)
+
+
+@pytest.mark.parametrize("method", ["convert", "convert_uri"])
+@pytest.mark.parametrize("uri", BLOCKED_URIS + ["file://server.example/share/x.txt"])
+def test_convert_rejects_remote_file_uri_before_file_access(
+    no_file_access_markitdown: MarkItDown, method: str, uri: str
+) -> None:
+    with pytest.raises(ValueError, match="Unsupported file URI"):
+        getattr(no_file_access_markitdown, method)(uri)
+
+
+@pytest.mark.parametrize(
+    "path, blocked",
+    [
+        (r"\\server\share\x.txt", True),
+        ("//server/share/x.txt", True),
+        (r"/\server/share/x.txt", True),
+        (r"\/server/share/x.txt", True),
+        (r"\\?\UNC\server\share\x.txt", True),
+        (r"\\?\C:\Temp\x.txt", True),
+        (r"\\.\PhysicalDrive0", True),
+        (r"C:\Temp\x.txt", False),
+        ("C:/Temp/x.txt", False),
+        ("/home/user/x.txt", False),
+        ("relative.txt", False),
+    ],
+)
+def test_resolved_path_validation(path: str, blocked: bool) -> None:
+    assert _is_unc_or_device_path(path) is blocked
+
+
+def test_file_uri_rejects_unc_after_conversion(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Check the final guard independently of the URI prefix check. Replace only
+    # the helper's converter binding, leaving the stdlib functions unchanged.
+    monkeypatch.setattr(
+        uri_utils, "url2pathname", lambda _: "//server.example/share/x.txt"
+    )
+
+    with pytest.raises(ValueError, match="UNC"):
+        file_uri_to_path("file:///local.txt")
+
+
+@pytest.mark.parametrize("filename", ["notes.txt", "notes café.txt", "%5C%5Cx.txt"])
+@pytest.mark.parametrize("authority", ["", "localhost"])
+def test_local_file_uri_conversion(
+    tmp_path: Path, filename: str, authority: str
+) -> None:
+    local_file = tmp_path / filename
+    local_file.write_text("Local file contents", encoding="utf-8")
+    uri = local_file.as_uri().replace("file://", f"file://{authority}", 1)
+
+    netloc, path = file_uri_to_path(uri)
+
+    assert netloc == (authority or None)
+    assert path == str(local_file)
+    markitdown = MarkItDown()
+    assert markitdown.convert(uri).markdown == "Local file contents"
+    assert markitdown.convert(str(local_file)).markdown == "Local file contents"
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Requires native Windows path conversion")
+@pytest.mark.parametrize("authority", ["", "localhost"])
+@pytest.mark.parametrize(
+    "uri_path, expected",
+    [
+        ("/C:/Temp/notes.txt", r"C:\Temp\notes.txt"),
+        ("/C%3A/Temp/notes.txt", r"C:\Temp\notes.txt"),
+        ("/C%3a/Temp/notes.txt", r"C:\Temp\notes.txt"),
+        ("/C:/Temp/notes%20caf%C3%A9.txt", "C:\\Temp\\notes café.txt"),
+        ("/C:/Temp/%255C%255Cx.txt", r"C:\Temp\%5C%5Cx.txt"),
+    ],
+)
+def test_windows_local_drive_uri(authority: str, uri_path: str, expected: str) -> None:
+    netloc, path = file_uri_to_path(f"file://{authority}{uri_path}")
+
+    assert netloc == (authority or None)
+    assert path == expected
+
+
+# Charset sampling
+
+
+def test_json_fixture_has_late_non_ascii_character() -> None:
+    data = (Path(TEST_FILES_DIR) / "json_late_non_ascii.json").read_bytes()
+    # Guard the regression setup: an 8 KiB sample must miss the first Unicode
+    # character, while the current 64 KiB sample must include it.
+    first_non_ascii = next(i for i, value in enumerate(data) if value >= 128)
+    assert 8192 < first_non_ascii < 65536
+
+
+_SAMPLE_SIZE = 65536
+
+_SPLIT_CHARACTERS = [
+    (character, split)
+    for character in ("\u00e9", "\u65e5", "\U0001f600")
+    for split in range(1, len(character.encode("utf-8")))
+]
+
+
+def _split_utf8_json(character: str, split: int) -> bytes:
+    prefix = '{"name":"r\u00e9sum\u00e9","notes":"'.encode("utf-8")
+    return (
+        prefix
+        + b"a" * (_SAMPLE_SIZE - split - len(prefix))
+        + (character + '"}').encode("utf-8")
+    )
+
+
+@pytest.fixture(scope="module")
+def markitdown() -> MarkItDown:
+    return MarkItDown()
+
+
+@pytest.mark.parametrize("character,split", _SPLIT_CHARACTERS)
+def test_charset_sample_completes_only_the_split_character(
+    character: str, split: int
+) -> None:
+    data = _split_utf8_json(character, split)
+    stream = io.BytesIO(data)
+    expected_size = _SAMPLE_SIZE + len(character.encode("utf-8")) - split
+
+    sample = _read_charset_sample(stream)
+
+    assert sample == data[:expected_size]
+    assert stream.tell() == expected_size
+    assert expected_size <= _SAMPLE_SIZE + 3
+    sample.decode("utf-8")
+
+
+@pytest.mark.parametrize("character,split", _SPLIT_CHARACTERS)
+def test_split_utf8_json_preserves_content(
+    markitdown: MarkItDown, character: str, split: int
+) -> None:
+    data = _split_utf8_json(character, split)
+    stream = io.BytesIO(data)
+
+    guesses = markitdown._get_stream_info_guesses(stream, StreamInfo())
+    assert guesses[0].charset == "utf-8"
+    assert stream.tell() == 0
+
+    result = markitdown.convert_stream(stream)
+
+    assert result.markdown == data.decode("utf-8")
+
+
+@pytest.mark.parametrize(
+    "sample,tail",
+    [
+        (b"", b""),
+        (b"ordinary text", b""),
+        (b"short incomplete \xc3", b""),
+        (b"a" * _SAMPLE_SIZE, b"\xc3\xa9"),
+        (b"a" * (_SAMPLE_SIZE - 2) + b"\xc3\xa9", b"\xf0\x9f\x98\x80"),
+        (b"a" * (_SAMPLE_SIZE - 1) + b"\xc3", b""),
+        (b"a" * (_SAMPLE_SIZE - 1) + b"\xf0", b"\x9f"),
+        (b"a" * (_SAMPLE_SIZE - 1) + b"\xc3", b"x"),
+        (b"a" * (_SAMPLE_SIZE - 1) + b"\xe0", b"\x80\x80"),
+        (b"a" * (_SAMPLE_SIZE - 1) + b"\xed", b"\xa0\x80"),
+        (b"\xff" + b"a" * (_SAMPLE_SIZE - 2) + b"\xc3", b"\xa9"),
+    ],
+    ids=[
+        "empty",
+        "short",
+        "short-incomplete",
+        "ascii",
+        "complete-utf8",
+        "incomplete-at-eof",
+        "incomplete-after-lookahead",
+        "invalid-continuation",
+        "overlong",
+        "surrogate",
+        "non-utf8-prefix",
+    ],
+)
+def test_other_charset_samples_are_unchanged(sample: bytes, tail: bytes) -> None:
+    stream = io.BytesIO(sample + tail)
+
+    assert _read_charset_sample(stream) == sample
+    assert stream.tell() <= _SAMPLE_SIZE + 3
+
+
+def test_charset_guesses_restore_nonzero_stream_position(
+    markitdown: MarkItDown,
+) -> None:
+    stream = io.BytesIO(b"prefix" + _split_utf8_json("\U0001f600", 1))
+    stream.seek(len(b"prefix"))
+
+    markitdown._get_stream_info_guesses(stream, StreamInfo())
+
+    assert stream.tell() == len(b"prefix")
+
+
+def test_explicit_charset_still_takes_precedence(markitdown: MarkItDown) -> None:
+    data = _split_utf8_json("\u00e9", 1)
+
+    result = markitdown.convert_stream(
+        io.BytesIO(data),
+        stream_info=StreamInfo(extension=".json", charset="cp1252"),
+    )
+
+    assert result.markdown == data.decode("cp1252")
+
+
+# Undetectable charsets
+
+# Tests for bytes no charset decodes.
+#
+# ``charset_normalizer.from_bytes(data).best()`` returns ``None`` when nothing
+# decodes the bytes, and ``str(None)`` is the four-character string ``"None"``,
+# so a binary file handed over with a text extension became a document whose
+# entire content was the word "None" -- four characters that were never in the
+# file.
+
+# Random bytes: no charset claims them, which is what makes `best()` answer None.
+# Fixed rather than generated, so the test does not depend on chance.
+UNDECODABLE = bytes((7 * i * i + 251 * i + 193) % 256 for i in range(4096))
+
+
+def test_the_fixture_really_is_undecodable() -> None:
+    """Guards the guard: if some charset claimed these bytes the rest would pass
+    for the wrong reason."""
+    assert from_bytes(UNDECODABLE).best() is None
+
+
+def test_binary_with_a_text_extension_is_not_the_word_none() -> None:
+    markitdown = MarkItDown()
+    for extension in (".txt", ".md"):
+        result = markitdown.convert_stream(
+            io.BytesIO(UNDECODABLE), file_extension=extension
+        )
+        assert result.markdown != "None"
+
+
+def test_binary_with_a_csv_extension_is_not_a_table_of_none() -> None:
+    markitdown = MarkItDown()
+    result = markitdown.convert_stream(io.BytesIO(UNDECODABLE), file_extension=".csv")
+    assert result.markdown != "| None |\n| --- |"
+
+
+def test_ordinary_text_is_unchanged() -> None:
+    """The fallback only runs when detection fails; everything else is as it was."""
+    markitdown = MarkItDown()
+
+    text = markitdown.convert_stream(
+        io.BytesIO(b"hello, world\n"), file_extension=".txt"
+    )
+    assert text.markdown == "hello, world\n"
+
+    table = markitdown.convert_stream(io.BytesIO(b"a,b\n1,2\n"), file_extension=".csv")
+    assert table.markdown == "| a | b |\n| --- | --- |\n| 1 | 2 |"
+
+
+def test_text_containing_the_word_none_survives() -> None:
+    """The bug was a whole document reading "None", not the word appearing in
+    one."""
+    markitdown = MarkItDown()
+    result = markitdown.convert_stream(
+        io.BytesIO(b"value,note\nNone,missing\n"), file_extension=".csv"
+    )
+    assert result.markdown == "| value | note |\n| --- | --- |\n| None | missing |"
+
+
+def test_a_declared_charset_still_wins() -> None:
+    """`stream_info.charset` short-circuits detection and is untouched."""
+    markitdown = MarkItDown()
+    body = "名称,代码\n浦发银行,600000\n".encode("gb18030")
+    result = markitdown.convert_stream(
+        io.BytesIO(body),
+        stream_info=StreamInfo(extension=".csv", charset="gb18030"),
+    )
+    assert "浦发银行" in result.markdown
+
+
 if __name__ == "__main__":
-    """Runs this file's tests from the command line."""
-    for test in [
-        test_stream_info_operations,
-        test_data_uris,
-        test_file_uris,
-        test_docx_comments,
-        test_input_as_strings,
-        test_markitdown_remote,
-        test_speech_transcription,
-        test_exceptions,
-        test_doc_rlink,
-        test_markitdown_exiftool,
-        test_markitdown_llm_parameters,
-        test_markitdown_llm,
-    ]:
-        print(f"Running {test.__name__}...", end="")
-        test()
-        print("OK")
-    print("All tests passed!")
+    raise SystemExit(pytest.main([__file__]))

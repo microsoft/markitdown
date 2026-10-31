@@ -1,0 +1,3 @@
+# Build a current release locally until Windows ARM64 wheels return to PyPI.
+# https://github.com/pyca/cryptography/pull/15350
+cryptography==50.0.2; sys_platform == "win32" and platform_machine == "ARM64"

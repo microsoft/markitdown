@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from markitdown_mcp.__main__ import convert_to_markdown, mcp
+from mcp.server.mcpserver.exceptions import ToolError
 
 URI = "file:///tmp/example.txt"
 MARKDOWN = "# Example\n\nConverted text with unicode: cafe \N{HOT BEVERAGE}.\n"
@@ -46,8 +47,12 @@ def test_convert_to_markdown_does_not_overwrite(monkeypatch, tmp_path: Path) -> 
 
     with patch("markitdown_mcp.__main__.MarkItDown") as markitdown:
         markitdown.return_value.convert_uri.return_value = MagicMock(markdown=MARKDOWN)
-        with pytest.raises(FileExistsError):
+        with pytest.raises(
+            ToolError, match="Could not write the output file"
+        ) as raised:
             asyncio.run(convert_to_markdown(URI, output_file=str(output_path)))
+
+    assert isinstance(raised.value.__cause__, FileExistsError)
 
     assert output_path.read_bytes() == b"existing"
 
@@ -61,8 +66,12 @@ def test_convert_to_markdown_removes_partial_file(monkeypatch, tmp_path: Path) -
         patch("markitdown_mcp.__main__.os.fdopen", side_effect=OSError("write failed")),
     ):
         markitdown.return_value.convert_uri.return_value = MagicMock(markdown=MARKDOWN)
-        with pytest.raises(OSError, match="write failed"):
+        with pytest.raises(
+            ToolError, match="Could not write the output file"
+        ) as raised:
             asyncio.run(convert_to_markdown(URI, output_file=str(output_path)))
+
+    assert str(raised.value.__cause__) == "write failed"
 
     assert not output_path.exists()
 
@@ -83,13 +92,13 @@ def test_mcp_schema_and_tool_call(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.delenv("MARKITDOWN_ENABLE_PLUGINS", raising=False)
     tools = asyncio.run(mcp.list_tools())
     tool = next(tool for tool in tools if tool.name == "convert_to_markdown")
-    output_schema = tool.inputSchema["properties"]["output_file"]
+    output_schema = tool.input_schema["properties"]["output_file"]
     assert output_schema == {
         "anyOf": [{"type": "string"}, {"type": "null"}],
         "default": None,
         "title": "Output File",
     }
-    assert tool.inputSchema["required"] == ["uri"]
+    assert tool.input_schema["required"] == ["uri"]
 
     output_path = tmp_path / "mcp-output.md"
     with patch("markitdown_mcp.__main__.MarkItDown") as markitdown:
@@ -101,7 +110,8 @@ def test_mcp_schema_and_tool_call(monkeypatch, tmp_path: Path) -> None:
             )
         )
 
-    assert len(result) == 1
-    assert result[0].type == "text"
-    assert result[0].text == str(output_path.resolve())
+    assert not result.is_error
+    assert len(result.content) == 1
+    assert result.content[0].type == "text"
+    assert result.content[0].text == str(output_path.resolve())
     assert output_path.read_bytes() == MARKDOWN.encode("utf-8")

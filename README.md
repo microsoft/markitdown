@@ -2,7 +2,6 @@
 
 [![PyPI](https://img.shields.io/pypi/v/markitdown.svg)](https://pypi.org/project/markitdown/)
 ![PyPI - Downloads](https://img.shields.io/pypi/dd/markitdown)
-[![Built by AutoGen Team](https://img.shields.io/badge/Built%20by-AutoGen%20Team-blue)](https://github.com/microsoft/autogen)
 
 > [!IMPORTANT]
 > MarkItDown performs I/O with the privileges of the current process. Like open() or requests.get(), it will access resources that the process itself can access. Sanitize your inputs in untrusted environments, and call the narrowest `convert_*` function needed for your use case (e.g., `convert_stream()`, or `convert_local()`). See the [Security Considerations](#security-considerations) section of the documentation for more information.
@@ -34,7 +33,7 @@ Markdown-formatted text, and understand it well. As a side benefit, Markdown con
 are also highly token-efficient.
 
 ## Prerequisites
-MarkItDown requires Python 3.10 or higher. It is recommended to use a virtual environment to avoid dependency conflicts.
+MarkItDown requires Python 3.10 through 3.14. It is recommended to use a virtual environment to avoid dependency conflicts.
 
 With the standard Python installation, you can create and activate a virtual environment using the following commands:
 
@@ -152,7 +151,7 @@ md = MarkItDown(
     llm_model="gpt-4o",
 )
 result = md.convert("document_with_images.pdf")
-print(result.text_content)
+print(result.markdown)
 ```
 
 If no `llm_client` is provided the plugin still loads, but OCR is silently skipped and the standard built-in converter is used instead.
@@ -177,8 +176,8 @@ Content Understanding is ideal when you need capabilities beyond what built-in o
 | Capability | Built-in converters | Azure Document Intelligence | Azure Content Understanding |
 |------------|---------------------|-----------------------------|-----------------------------|
 | Document conversion | Offline, format-specific extraction | Cloud layout extraction | Cloud multimodal extraction |
-| Structured fields | Not available | Not exposed by this integration | YAML front matter from analyzer fields |
-| Custom analyzers | Not available | Not configurable in this integration | Supported with `cu_analyzer_id` |
+| Structured fields | Not available | YAML front matter from model or query fields | YAML front matter from analyzer fields |
+| Custom analyzers/models | Not available | Supported with `docintel_model_id` | Supported with `cu_analyzer_id` |
 | Audio and video | Basic audio, no video | Not supported | Audio and video analyzers |
 | Cost | Local compute only | Billable Azure API calls | Billable Azure API calls |
 
@@ -186,6 +185,13 @@ Content Understanding is ideal when you need capabilities beyond what built-in o
 
 ```bash
 markitdown path-to-file.pdf --use-cu --cu-endpoint "<content_understanding_endpoint>"
+```
+
+The endpoint can also be set once in the environment, so callers only need `--use-cu`:
+
+```bash
+export MARKITDOWN_CU_ENDPOINT="<content_understanding_endpoint>"
+markitdown path-to-file.pdf --use-cu
 ```
 
 **Python API:**
@@ -241,8 +247,41 @@ More information about Azure Content Understanding can be found [here](https://l
 To use Microsoft Document Intelligence for conversion:
 
 ```bash
+export AZURE_API_KEY="<document_intelligence_api_key>"
 markitdown path-to-file.pdf -o document.md -d -e "<document_intelligence_endpoint>"
 ```
+
+The endpoint can also be set once in the environment, so callers only need `-d`:
+
+```bash
+export MARKITDOWN_DOCINTEL_ENDPOINT="<document_intelligence_endpoint>"
+markitdown path-to-file.pdf -o document.md -d
+```
+
+If `AZURE_API_KEY` is not set, MarkItDown uses `DefaultAzureCredential`.
+
+Select a model, configure analysis add-ons, or request fields from the CLI:
+
+```bash
+markitdown document.pdf --use-docintel \
+  --endpoint "<document_intelligence_endpoint>" \
+  --docintel-model-id prebuilt-layout \
+  --docintel-features "ocrHighResolution,styleFont" \
+  --docintel-query-fields "Title,Author"
+```
+
+No analysis add-ons are enabled by default. Use `--docintel-features` to opt in,
+or `--docintel-features none` to explicitly request no add-ons. Analysis add-ons
+and query fields apply only to OCR-supported inputs such as PDFs and images.
+
+Available feature values are `barcodes`, `formulas`, `keyValuePairs`,
+`languages`, `ocrHighResolution`, and `styleFont`. The `formulas`,
+`ocrHighResolution`, and `styleFont` features incur additional charges, as does
+the `queryFields` add-on, which is priced differently from the other add-ons.
+See the
+[Document Intelligence add-on documentation](https://learn.microsoft.com/azure/ai-services/document-intelligence/concept/add-on-capabilities?view=doc-intel-4.0.0)
+and [pricing](https://azure.microsoft.com/pricing/details/document-intelligence/)
+for details.
 
 More information about how to set up an Azure Document Intelligence Resource can be found [here](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/how-to-guides/create-document-intelligence-resource?view=doc-intel-4.0.0)
 
@@ -255,18 +294,55 @@ from markitdown import MarkItDown
 
 md = MarkItDown(enable_plugins=False) # Set to True to enable plugins
 result = md.convert("test.xlsx")
-print(result.text_content)
+print(result.markdown)
 ```
 
-Document Intelligence conversion in Python:
+Document Intelligence conversion in Python using an API key:
 
 ```python
+from azure.core.credentials import AzureKeyCredential
 from markitdown import MarkItDown
 
-md = MarkItDown(docintel_endpoint="<document_intelligence_endpoint>")
+md = MarkItDown(
+    docintel_endpoint="<document_intelligence_endpoint>",
+    docintel_credential=AzureKeyCredential("<document_intelligence_api_key>"),
+)
 result = md.convert("test.pdf")
-print(result.text_content)
+print(result.markdown)
 ```
+
+Omit `docintel_credential` to use `AZURE_API_KEY` when it is set, or
+`DefaultAzureCredential` otherwise.
+
+Configure the model, analysis add-ons, and structured query fields:
+
+```python
+from azure.ai.documentintelligence.models import DocumentAnalysisFeature
+from markitdown import MarkItDown
+
+md = MarkItDown(
+    docintel_endpoint="<document_intelligence_endpoint>",
+    docintel_model_id="prebuilt-layout",
+    docintel_features=[
+        DocumentAnalysisFeature.OCR_HIGH_RESOLUTION,
+        DocumentAnalysisFeature.STYLE_FONT,
+    ],
+    docintel_query_fields=["Title", "Author"],
+)
+result = md.convert("test.pdf")
+print(result.markdown)
+```
+
+Omit `docintel_features` or set `docintel_features=[]` to request no analysis
+add-ons. When query fields are provided, MarkItDown automatically enables the
+required `queryFields` add-on.
+Models that return structured fields prepend them to the Markdown as YAML front
+matter. A single document uses a top-level `fields` mapping. When the service
+returns multiple documents, the front matter instead contains a `documents`
+list in service order, with a separate `fields` mapping for each document.
+Documents without extracted fields retain an empty mapping in that list; no
+front matter is emitted when all documents have empty fields. Selection groups
+are represented as lists of selected values.
 
 To use Large Language Models for image descriptions (currently only for pptx and image files), provide `llm_client` and `llm_model`:
 
@@ -274,11 +350,15 @@ To use Large Language Models for image descriptions (currently only for pptx and
 from markitdown import MarkItDown
 from openai import OpenAI
 
-client = OpenAI()
+client = OpenAI(max_retries=5)
 md = MarkItDown(llm_client=client, llm_model="gpt-4o", llm_prompt="optional custom prompt")
 result = md.convert("example.jpg")
-print(result.text_content)
+print(result.markdown)
 ```
+
+`max_retries` controls the OpenAI client's automatic retries for retryable errors (the default is 2); `5` allows up to six attempts with backoff. See the [OpenAI SDK retry documentation](https://github.com/openai/openai-python#retries).
+
+If any attempt succeeds, image conversion continues normally. If the client raises an error after exhausting its retries, or encounters a non-retryable error, MarkItDown tries other applicable converters and raises `FileConversionException` only if none succeeds.
 
 ### Docker
 
@@ -288,6 +368,8 @@ docker run --rm -i markitdown:latest < ~/your-file.pdf > output.md
 ```
 
 ## Contributing
+
+Before starting significant work, please read [What to Contribute](#what-to-contribute), which describes what is in and out of scope for this repository.
 
 This project welcomes contributions and suggestions. Most contributions require you to agree to a
 Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
@@ -301,9 +383,42 @@ This project has adopted the [Microsoft Open Source Code of Conduct](https://ope
 For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
 contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
 
+### What to Contribute
+
+MarkItDown is a Python utility for converting files to Markdown for use with LLMs and related text analysis pipelines. This repository is intended to provide Python libraries that can be incorporated into other systems — not the end-user applications built on top of them.
+
+#### In scope
+
+- Improvements to the fidelity of existing converters (New formats are added sparingly -- especially if they incur new dependencies. In most cases, new formats can be better supported via [3rd-party plugins](#extending-markitdown-without-changing-this-repository).)
+- Bug fixes, performance improvements, and security fixes
+- The `markitdown` command-line interface
+- The `markitdown-mcp` package
+- Tests, documentation, and developer tooling
+
+#### Out of scope
+
+We cannot accept additional applications, services, or servers. This includes:
+
+- Web servers, REST or HTTP APIs, and hosted conversion services
+- Web frontends and browser-based user interfaces
+- Desktop and mobile applications (PyQt, PySide, Tkinter, Electron, Flutter, and similar)
+
+Projects like these are genuinely useful, and we would rather see them thrive than be turned away. If you are interested in providing a web service, API, or graphical application for MarkItDown, please maintain it as a separate package or project that depends on [`markitdown` from PyPI](https://pypi.org/project/markitdown/).
+
+### Extending MarkItDown Without Changing This Repository
+
+MarkItDown supports 3rd-party plugins, so support for a new format can be published and installed independently of this repository:
+
+```sh
+markitdown --list-plugins
+markitdown --use-plugins path-to-file.pdf
+```
+
+See `packages/markitdown-sample-plugin` to get started, and tag your repository `#markitdown-plugin` so that others can find it.
+
 ### How to Contribute
 
-You can help by looking at issues or helping review PRs. Any issue or PR is welcome, but we have also marked some as 'open for contribution' and 'open for reviewing' to help facilitate community contributions. These are of course just suggestions and you are welcome to contribute in any way you like.
+You can help by looking at issues or helping review PRs. We have also marked some issues as 'open for contribution' and PRs as 'open for reviewing' to help facilitate community contributions. These labels are suggestions; contributions within the scope described above are welcome.
 
 <div align="center">
 
@@ -346,10 +461,6 @@ MarkItDown performs I/O with the privileges of the current process. Like `open()
 **Sanitize your inputs:** Do not pass untrusted input directly to MarkItDown. If any part of the input may be controlled by an untrusted user or system, such as in hosted or server-side applications, it must be validated and restricted before calling MarkItDown. Depending on your environment, this may include restricting file paths, limiting URI schemes and network destinations, and blocking access to private, loopback, link-local, or metadata-service addresses.
 
 **Call only the conversion method you need:** Prefer the narrowest conversion API that fits your use case. MarkItDown's `convert()` method is intentionally permissive and can handle local files, remote URIs, and byte streams. If your application only needs to read local files, call `convert_local()` instead. If you need more control over URI fetching, call `requests.get()` yourself and pass the response object to `convert_response()`. For maximum control, open a stream to the input you want converted and call `convert_stream()`.
-
-### Contributing 3rd-party Plugins
-
-You can also contribute by creating and sharing 3rd party plugins. See `packages/markitdown-sample-plugin` for more details.
 
 ## Trademarks
 
