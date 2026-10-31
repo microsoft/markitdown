@@ -244,6 +244,21 @@ GENERAL_TEST_VECTORS = [
         must_not_include=[],
     ),
     FileTestVector(
+        filename="csv_literal_html.csv",
+        mimetype="text/csv",
+        charset="ascii",
+        url=None,
+        must_include=[
+            r"| name | \<field\> | \&copy; |",
+            r"| placeholder | \<redacted\> | \&#65; |",
+            r"| markup | \<em\>keep me\</em\> | \&amp; |",
+            r"| comment | \<!--keep me--\> | \&#x41; |",
+            r"| autolink | \<https://example.test\> | \&unknown; |",
+            r"| code | \`\<tag\>\` | \`\`\&copy;\`\` |",
+        ],
+        must_not_include=[],
+    ),
+    FileTestVector(
         filename="test.json",
         mimetype="application/json",
         charset="ascii",
