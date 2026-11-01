@@ -13,25 +13,25 @@ _USAGE = """SYNTAX:
     markitdown <OPTIONAL: FILENAME>
     If FILENAME is empty, markitdown reads from stdin.
 
-    EXAMPLE:
+EXAMPLE:
 
-        markitdown example.pdf
+    markitdown example.pdf
 
-        OR
+    OR
 
-        cat example.pdf | markitdown
+    cat example.pdf | markitdown
 
-        OR
+    OR
 
-        markitdown < example.pdf
+    markitdown < example.pdf
 
-        OR to save to a file use
+    OR to save to a file use
 
-        markitdown example.pdf -o example.md
+    markitdown example.pdf -o example.md
 
-        OR
+    OR
 
-        markitdown example.pdf > example.md"""
+    markitdown example.pdf > example.md"""
 
 _ARGUMENTS: list[tuple[tuple[str, ...], dict[str, Any], bool]] = [
     (

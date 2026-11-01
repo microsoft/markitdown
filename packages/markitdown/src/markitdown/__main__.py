@@ -46,11 +46,12 @@ def _list_plugins() -> None:
     plugin_entry_points = list(entry_points(group="markitdown.plugin"))
     if not plugin_entry_points:
         print("  * No 3rd-party plugins installed.")
+        print(
+            "\nFind plugins by searching for the hashtag #markitdown-plugin on GitHub.\n"
+        )
     else:
         for entry_point in plugin_entry_points:
             print(f"  * {entry_point.name:<16}\t(package: {entry_point.value})")
-    print("\nFind plugins by searching for the hashtag #markitdown-plugin on GitHub.\n")
-    if plugin_entry_points:
         print("\nUse the -p (or --use-plugins) option to enable 3rd-party plugins.\n")
 
 
