@@ -46,6 +46,87 @@ def test_html_underlined_content_is_preserved(content: str, expected: str) -> No
     assert _convert_html(f"<p>First<u>{content}</u>Last</p>") == expected
 
 
+# Table cells: pipes are escaped so tables stay well-formed (issue #2438)
+
+_TABLE_SHELL = (
+    "<table><thead><tr><th>h1</th><th>h2</th></tr></thead>"
+    "<tbody><tr>%s</tr></tbody></table>"
+)
+
+
+@pytest.mark.parametrize(
+    ("cell_html", "expected_cell"),
+    [
+        ("<td>Has a | pipe</td>", "Has a \\| pipe"),
+        ("<th>a|b</th>", "a\\|b"),
+        ("<td>x | y | z</td>", "x \\| y \\| z"),
+        # A pipe already escaped in the source stays literal: the backslash
+        # run is doubled before the pipe is escaped.
+        ("<td>x \\| y</td>", "x \\\\\\| y"),
+        # Backslashes without a pipe are left alone.
+        ("<td>C:\\path</td>", "C:\\path"),
+    ],
+)
+def test_html_pipe_in_table_cell_is_escaped(cell_html: str, expected_cell: str) -> None:
+    row = (
+        _convert_html(_TABLE_SHELL % (cell_html + "<td>rest</td>"))
+        .strip()
+        .splitlines()[2]
+    )
+
+    assert row == f"| {expected_cell} | rest |"
+
+
+def test_html_table_rows_keep_their_column_count() -> None:
+    html = (
+        "<table><thead><tr><th>Name</th><th>Note</th></tr></thead>"
+        "<tbody><tr><td>Alice</td><td>Has a | pipe</td></tr>"
+        "<tr><td>Bob</td><td>No pipe</td></tr></tbody></table>"
+    )
+    lines = _convert_html(html).strip().splitlines()
+
+    # Exactly two columns in every row: separator, header, and body cells.
+    assert lines == [
+        "| Name | Note |",
+        "| --- | --- |",
+        "| Alice | Has a \\| pipe |",
+        "| Bob | No pipe |",
+    ]
+
+
+def test_html_table_cell_without_pipes_is_unchanged() -> None:
+    row = (
+        _convert_html(_TABLE_SHELL % ("<td>plain</td><td>also plain</td>"))
+        .strip()
+        .splitlines()[2]
+    )
+
+    assert row == "| plain | also plain |"
+
+
+def test_html_table_cell_colspan_survives_escaping() -> None:
+    html = (
+        "<table><thead><tr><th>h1</th><th>h2</th></tr></thead>"
+        '<tbody><tr><td colspan="2">a|b</td></tr></tbody></table>'
+    )
+    row = _convert_html(html).strip().splitlines()[2]
+
+    assert row == "| a\\|b | |"
+
+
+def test_markdownify_td_and_th_escape_pipes_directly() -> None:
+    # DOCX tables render through this same layer (mammoth -> HTML ->
+    # markdownify), so the unit-level guarantee covers both sources.
+    td = BeautifulSoup("<td>Has a | pipe</td>", "html.parser").td
+    th = BeautifulSoup("<th>a|b</th>", "html.parser").th
+
+    assert (
+        _CustomMarkdownify().convert_td(td, "Has a | pipe", set())
+        == " Has a \\| pipe |"
+    )
+    assert _CustomMarkdownify().convert_th(th, "a|b", set()) == " a\\|b |"
+
+
 def test_preserves_non_utf8_percent_encoded_href_path() -> None:
     href = "https://abc.com/hist/" "%a5%c8%a5%c3%a5%d7%a5%da%a1%bc%a5%b8"
     html = f'<a href="{href}">example</a>'
