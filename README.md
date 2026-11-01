@@ -81,6 +81,9 @@ Or use `-o` to specify the output file:
 markitdown path-to-file.pdf -o document.md
 ```
 
+Redirected Markdown output uses UTF-8, matching the `-o` option, regardless of the
+console's encoding. Interactive output uses the terminal's encoding.
+
 You can also pipe content:
 
 ```bash
