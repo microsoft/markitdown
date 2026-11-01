@@ -297,6 +297,20 @@ result = md.convert("test.xlsx")
 print(result.markdown)
 ```
 
+For PDFs containing rotated text, the built-in PDF converter accepts
+`pdf_char_dir_rotated="btt"` (bottom-to-top) or `"ttb"` (top-to-bottom):
+
+```python
+result = md.convert("rotated.pdf", pdf_char_dir_rotated="btt")
+```
+
+An explicit direction uses pdfplumber output for both text and table pages.
+Omitting the option or passing `None` retains the default extraction behavior.
+Other values raise a conversion error. For tables with visible cell borders,
+the converter uses those borders to keep adjacent values in separate columns
+and preserves multi-line rotated headings within their cells. Merged cells
+retain empty placeholders, and text outside the tables stays in page order.
+
 Document Intelligence conversion in Python using an API key:
 
 ```python

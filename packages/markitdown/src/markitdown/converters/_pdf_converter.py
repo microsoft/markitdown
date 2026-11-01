@@ -1,6 +1,7 @@
 import sys
 import io
 import re
+from html import escape
 from typing import BinaryIO, Any
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
@@ -86,17 +87,21 @@ def _to_markdown_table(table: list[list[str]], include_separator: bool = True) -
     if not table:
         return ""
 
-    # Normalize None → ""
-    table = [[cell if cell is not None else "" for cell in row] for row in table]
-
-    # Filter out empty rows
-    table = [row for row in table if any(cell.strip() for cell in row)]
-
-    if not table:
+    # 保留单元格内的换行和空白行，并转义 Markdown 表格分隔符。
+    table = [
+        [
+            re.sub(r"([\\|`*_])", r"\\\1", escape(cell or "", quote=False)).replace(
+                "\n", "<br>"
+            )
+            for cell in row
+        ]
+        for row in table
+    ]
+    if not any(cell.strip() for row in table for cell in row):
         return ""
 
     # Column widths
-    col_widths = [max(len(str(cell)) for cell in col) for col in zip(*table)]
+    col_widths = [max(3, max(len(cell) for cell in col)) for col in zip(*table)]
 
     def fmt_row(row: list[str]) -> str:
         return (
@@ -117,7 +122,74 @@ def _to_markdown_table(table: list[list[str]], include_separator: bool = True) -
     return "\n".join(md)
 
 
-def _extract_form_content_from_words(page: Any) -> str | None:
+def _char_in_bbox(char: dict, bbox: tuple) -> bool:
+    x = (char["x0"] + char["x1"]) / 2
+    y = (char["top"] + char["bottom"]) / 2
+    return bbox[0] <= x < bbox[2] and bbox[1] <= y < bbox[3]
+
+
+def _extract_cell_text(chars: list[dict], char_dir_rotated: str) -> str:
+    parts = []
+    for upright in (True, False):
+        group = [char for char in chars if bool(char["upright"]) == upright]
+        if not group:
+            continue
+        line_dir = "ttb" if upright else ("ltr" if char_dir_rotated == "btt" else "rtl")
+        char_dir = "ltr" if upright else char_dir_rotated
+        text = pdfplumber.utils.extract_text(
+            group,
+            line_dir=line_dir,
+            char_dir=char_dir,
+            line_dir_rotated=line_dir,
+            char_dir_rotated=char_dir,
+            line_dir_render="ttb",
+            char_dir_render="ltr",
+        )
+        parts.append((min(c["top"] for c in group), min(c["x0"] for c in group), text))
+    return "\n".join(text for _, _, text in sorted(parts))
+
+
+def _extract_ruled_table_content(page: Any, char_dir_rotated: str) -> str | None:
+    tables = [
+        table
+        for table in page.find_tables()
+        if len(table.rows) >= 2 and len(table.columns) >= 2
+    ]
+    if not tables:
+        return None
+
+    blocks = []
+    for table in tables:
+        rows = []
+        for row in table.rows:
+            rows.append(
+                [
+                    (
+                        _extract_cell_text(
+                            [char for char in page.chars if _char_in_bbox(char, cell)],
+                            char_dir_rotated,
+                        )
+                        if cell is not None
+                        else ""
+                    )
+                    for cell in row.cells
+                ]
+            )
+        blocks.append((table.bbox[1], table.bbox[0], _to_markdown_table(rows)))
+
+    # 表格之外的正文按页面位置插入，避免重复提取表格内的文字。
+    outside = page.filter(
+        lambda obj: obj["object_type"] == "char"
+        and not any(_char_in_bbox(obj, table.bbox) for table in tables)
+    )
+    for line in outside.extract_text_lines(char_dir_rotated=char_dir_rotated):
+        blocks.append((line["top"], line["x0"], line["text"]))
+    return "\n\n".join(text for _, _, text in sorted(blocks) if text.strip())
+
+
+def _extract_form_content_from_words(
+    page: Any, *, char_dir_rotated: str | None = None
+) -> str | None:
     """
     Extract form-style content from a PDF page by analyzing word positions.
     This handles borderless forms/tables where words are aligned in columns.
@@ -129,7 +201,19 @@ def _extract_form_content_from_words(page: Any) -> str | None:
     Returns None if the page doesn't appear to be a form-style document,
     indicating that pdfminer should be used instead for better text spacing.
     """
-    words = page.extract_words(keep_blank_chars=True, x_tolerance=3, y_tolerance=3)
+    if char_dir_rotated is not None:
+        table_content = _extract_ruled_table_content(page, char_dir_rotated)
+        if table_content is not None:
+            return table_content
+
+    extract_words_kwargs: dict[str, Any] = {
+        "keep_blank_chars": True,
+        "x_tolerance": 3,
+        "y_tolerance": 3,
+    }
+    if char_dir_rotated is not None:
+        extract_words_kwargs["char_dir_rotated"] = char_dir_rotated
+    words = page.extract_words(**extract_words_kwargs)
     if not words:
         return None
 
@@ -536,6 +620,13 @@ class PdfConverter(DocumentConverter):
 
         assert isinstance(file_stream, io.IOBase)
 
+        char_dir_rotated = kwargs.get("pdf_char_dir_rotated")
+        if char_dir_rotated not in (None, "ttb", "btt"):
+            raise ValueError("pdf_char_dir_rotated must be 'ttb', 'btt', or None")
+        extract_text_kwargs: dict[str, Any] = {}
+        if char_dir_rotated is not None:
+            extract_text_kwargs["char_dir_rotated"] = char_dir_rotated
+
         # Read file stream into BytesIO for compatibility with pdfplumber
         pdf_bytes = io.BytesIO(file_stream.read())
 
@@ -551,7 +642,9 @@ class PdfConverter(DocumentConverter):
 
             with pdfplumber.open(pdf_bytes) as pdf:
                 for page_idx, page in enumerate(pdf.pages):
-                    page_content = _extract_form_content_from_words(page)
+                    page_content = _extract_form_content_from_words(
+                        page, **extract_text_kwargs
+                    )
 
                     if page_content is not None:
                         form_page_count += 1
@@ -559,27 +652,28 @@ class PdfConverter(DocumentConverter):
                             markdown_chunks.append(page_content)
                     else:
                         plain_page_indices.append(page_idx)
-                        text = page.extract_text()
+                        text = page.extract_text(**extract_text_kwargs)
                         if text and text.strip():
                             markdown_chunks.append(text.strip())
 
                     page.close()  # Free cached page data immediately
 
-            # If no pages had form-style content, use pdfminer for
-            # the whole document (better text spacing for prose).
-            if form_page_count == 0:
+            # 显式指定旋转方向时，保留 pdfplumber 的提取结果。
+            if form_page_count == 0 and char_dir_rotated is None:
                 pdf_bytes.seek(0)
                 markdown = pdfminer.high_level.extract_text(pdf_bytes)
             else:
                 markdown = "\n\n".join(markdown_chunks).strip()
 
         except Exception:
+            if char_dir_rotated is not None:
+                raise
             # Fallback if pdfplumber fails
             pdf_bytes.seek(0)
             markdown = pdfminer.high_level.extract_text(pdf_bytes)
 
         # Fallback if still empty
-        if not markdown:
+        if not markdown and char_dir_rotated is None:
             pdf_bytes.seek(0)
             markdown = pdfminer.high_level.extract_text(pdf_bytes)
 

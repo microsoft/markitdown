@@ -59,3 +59,15 @@ parsing, fallback, and cleanup without changing either source fixture. Rebuild
 them with `python tests/test_files/generate_pdf_cleanup_fixtures.py` in an
 environment with PyMuPDF installed; PyMuPDF is needed only to rebuild the files,
 not to run the core tests.
+
+The `rotated_plain_{btt,ttb}.pdf`, `rotated_mixed.pdf`, and `rotated_empty.pdf`
+fixtures exercise directional text extraction on plain, mixed, and empty pages.
+Rebuild them with
+`python tests/test_files/generate_rotated_pdf_fixtures.py` in an environment
+with ReportLab installed. ReportLab is needed only to rebuild the fixtures.
+
+The `rotated_ruled_{btt,ttb}.pdf` fixtures use the same generator and cover ruled
+tables with multi-line rotated headings, closely spaced numeric columns, merged
+cells, blank rows, mixed text orientations, and two tables surrounded by prose.
+The tests render their Markdown with markdown-it-py and inspect the resulting
+cells with BeautifulSoup.
