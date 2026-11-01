@@ -469,6 +469,54 @@ def test_missing_dependencies_and_legacy_xls_stay_separate(
 # Conversion regressions
 
 
+def test_xlsx_single_sheet_can_omit_sheet_header(tmp_path) -> None:
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = "Inventory"
+    sheet.append(["Product", "Quantity"])
+    sheet.append(["Apple", 10])
+    path = tmp_path / "inventory.xlsx"
+    workbook.save(path)
+    workbook.close()
+
+    converter = MarkItDown()
+    table = "| Product | Quantity |\n| --- | --- |\n| Apple | 10 |"
+    assert converter.convert(path).markdown == "## Inventory\n" + table
+    assert converter.convert(path, include_sheet_headers=False).markdown == table
+    assert converter.convert(path, include_sheet_headers=True).markdown == (
+        "## Inventory\n" + table
+    )
+
+
+@pytest.mark.parametrize("extension", [".xlsx", ".xls"])
+def test_spreadsheet_sheet_headers_preserve_tables(extension: str) -> None:
+    path = Path(__file__).parent / "test_files" / ("test" + extension)
+    converter = MarkItDown()
+    default = converter.convert(path).markdown
+    assert default.startswith("## ")
+    expected = "\n".join(
+        line for line in default.splitlines() if not line.startswith("## ")
+    )
+
+    result = converter.convert(path, include_sheet_headers=False).markdown
+
+    assert result == expected
+    assert converter.convert(path, include_sheet_headers=True).markdown == default
+
+
+def test_xlsx_sheet_headers_preserve_order_and_image_output() -> None:
+    data = _workbook()
+    converter = _ImageConverter(Mock(return_value="<p>recognized</p>"))
+    result = _convert(converter, data, include_sheet_headers=False)
+
+    assert "## Second" not in result
+    assert "## First" not in result
+    assert result.index("Header\\_one") < result.index("Other")
+    assert result.count("recognized") == 4
+    assert "### Images in this sheet:" in result
+    assert "recognized\n\n| Other |" in result
+
+
 def test_xlsx_legacy_show_zeroes_sheetview(tmp_path) -> None:
     from openpyxl import Workbook
 

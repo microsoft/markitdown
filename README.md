@@ -297,6 +297,16 @@ result = md.convert("test.xlsx")
 print(result.markdown)
 ```
 
+XLSX and XLS conversions include a `## SheetName` heading before each worksheet
+by default. To output only the worksheet contents, pass `include_sheet_headers=False`:
+
+```python
+result = md.convert("test.xlsx", include_sheet_headers=False)
+print(result.markdown)
+```
+
+Multiple worksheets remain in workbook order, with blank lines between their contents.
+
 Document Intelligence conversion in Python using an API key:
 
 ```python
