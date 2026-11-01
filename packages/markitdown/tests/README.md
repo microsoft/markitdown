@@ -65,3 +65,9 @@ fixtures exercise directional text extraction on plain, mixed, and empty pages.
 Rebuild them with
 `python tests/test_files/generate_rotated_pdf_fixtures.py` in an environment
 with ReportLab installed. ReportLab is needed only to rebuild the fixtures.
+
+The `rotated_ruled_{btt,ttb}.pdf` fixtures use the same generator and cover ruled
+tables with multi-line rotated headings, closely spaced numeric columns, merged
+cells, blank rows, mixed text orientations, and two tables surrounded by prose.
+The tests render their Markdown with markdown-it-py and inspect the resulting
+cells with BeautifulSoup.
