@@ -108,7 +108,12 @@ class PptxConverter(DocumentConverter):
                     text = shape.text or ""
                     if shape == title:
                         if text.strip():
-                            md_content += "# " + text.lstrip() + "\n"
+                            # An ATX heading is a single line, so a title with
+                            # multiple paragraphs (or soft line breaks) must be
+                            # flattened into one line instead of leaking the
+                            # extra lines into the slide body.
+                            title_line = re.sub(r"\s+", " ", text.strip())
+                            md_content += "# " + title_line + "\n"
                     else:
                         md_content += text + "\n"
 
