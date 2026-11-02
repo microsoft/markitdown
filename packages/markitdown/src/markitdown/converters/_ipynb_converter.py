@@ -12,6 +12,33 @@ CANDIDATE_MIME_TYPE_PREFIXES = [
 ACCEPTED_FILE_EXTENSIONS = [".ipynb"]
 
 
+def _is_notebook_json(text: str) -> bool:
+    """Recognize a notebook structurally, not by substring.
+
+    A notebook is a JSON object whose top level carries numeric ``nbformat``
+    and ``nbformat_minor`` versions and a ``cells`` list. Sniffing for the
+    marker names as substrings misrouted ordinary JSON that merely mentioned
+    them into an empty conversion (issue #2804).
+    """
+    try:
+        data = json.loads(text.lstrip("\ufeff"))
+    except (ValueError, RecursionError):
+        # Malformed or excessively nested JSON is not a notebook.
+        return False
+    if not isinstance(data, dict):
+        return False
+
+    def _is_version(value: Any) -> bool:
+        # JSON booleans are int subclasses; a version is a real number.
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+    return (
+        _is_version(data.get("nbformat"))
+        and _is_version(data.get("nbformat_minor"))
+        and isinstance(data.get("cells"), list)
+    )
+
+
 class IpynbConverter(DocumentConverter):
     """Converts Jupyter Notebook (.ipynb) files to Markdown."""
 
@@ -34,14 +61,11 @@ class IpynbConverter(DocumentConverter):
                 try:
                     encoding = stream_info.charset or "utf-8"
                     notebook_content = file_stream.read().decode(encoding)
-                    return (
-                        "nbformat" in notebook_content
-                        and "nbformat_minor" in notebook_content
-                    )
                 except (ValueError, LookupError):
                     return False
                 finally:
                     file_stream.seek(cur_pos)
+                return _is_notebook_json(notebook_content)
 
         return False
 
