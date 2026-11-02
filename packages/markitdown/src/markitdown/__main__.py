@@ -6,6 +6,7 @@ import os
 import sys
 import codecs
 import io
+import keyword
 from typing import Any, Dict
 from textwrap import dedent
 from importlib.metadata import entry_points
@@ -156,6 +157,14 @@ def main():
     )
 
     parser.add_argument(
+        "--plugin-option",
+        action="append",
+        default=[],
+        metavar="NAME=VALUE",
+        help="Pass a string option to plugin converters (repeatable; requires --use-plugins).",
+    )
+
+    parser.add_argument(
         "--list-plugins",
         action="store_true",
         help="List installed 3rd-party plugins. Plugins are loaded when using the -p or --use-plugins option.",
@@ -169,6 +178,44 @@ def main():
 
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
+
+    plugin_options: Dict[str, str] = {}
+    if args.plugin_option and not args.use_plugins:
+        parser.error("--plugin-option requires --use-plugins")
+    reserved_options = {
+        "self",
+        "source",
+        "path",
+        "stream",
+        "uri",
+        "response",
+        "file_stream",
+        "stream_info",
+        "stream_info_guesses",
+        "keep_data_uris",
+        "url",
+        "mock_url",
+        "file_extension",
+        "requests_session",
+        "enable_plugins",
+        "enable_builtins",
+        "llm_client",
+        "llm_model",
+        "llm_prompt",
+        "exiftool_path",
+        "style_map",
+    }
+    for option in args.plugin_option:
+        name, separator, value = option.partition("=")
+        if not separator:
+            parser.error("--plugin-option must be NAME=VALUE")
+        if not name.isidentifier() or keyword.iskeyword(name):
+            parser.error(f"Invalid plugin option name: {name!r}")
+        if name in reserved_options or name.startswith(("_", "docintel_", "cu_")):
+            parser.error(f"Plugin option name is reserved: {name!r}")
+        if name in plugin_options:
+            parser.error(f"Duplicate plugin option: {name!r}")
+        plugin_options[name] = value
 
     # Parse the extension hint
     extension_hint = args.extension
@@ -298,10 +345,14 @@ def main():
             io.BytesIO(sys.stdin.buffer.read()),
             stream_info=stream_info,
             keep_data_uris=args.keep_data_uris,
+            **plugin_options,
         )
     else:
         result = markitdown.convert(
-            args.filename, stream_info=stream_info, keep_data_uris=args.keep_data_uris
+            args.filename,
+            stream_info=stream_info,
+            keep_data_uris=args.keep_data_uris,
+            **plugin_options,
         )
 
     _handle_output(args, result)

@@ -414,6 +414,21 @@ markitdown --list-plugins
 markitdown --use-plugins path-to-file.pdf
 ```
 
+Plugins can read custom string options from the `**kwargs` of their converter's
+`accepts()` and `convert()` methods. Pass them from the CLI with repeatable
+`--plugin-option NAME=VALUE` arguments:
+
+```sh
+markitdown --use-plugins --plugin-option image_dir=./assets input.pptx > output.md
+```
+
+Option names must be Python identifiers. Internal names and built-in engine options
+(such as `stream_info` and `keep_data_uris`) are reserved; use the dedicated CLI
+flags for built-in settings. Duplicate names are rejected. Values are strings,
+including empty strings, with no automatic type conversion. These options are
+passed at conversion time, not during plugin registration. Plugins define which
+custom options they support; unsupported options may be ignored.
+
 See `packages/markitdown-sample-plugin` to get started, and tag your repository `#markitdown-plugin` so that others can find it.
 
 ### How to Contribute
