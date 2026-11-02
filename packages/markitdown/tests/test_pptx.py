@@ -90,6 +90,33 @@ def test_title_with_text_is_still_emitted() -> None:
     assert BODY_TEXT in markdown
 
 
+def _convert_multiline_title_slide() -> str:
+    """Convert a one-slide deck whose title placeholder has two paragraphs."""
+    prs = pptx.Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[1])
+    slide.shapes.title.text = "Line one"
+    slide.shapes.title.text_frame.add_paragraph().text = "Line two"
+    slide.placeholders[1].text = BODY_TEXT
+    buf = io.BytesIO()
+    prs.save(buf)
+    buf.seek(0)
+    return (
+        MarkItDown()
+        .convert_stream(buf, stream_info=StreamInfo(extension=".pptx"))
+        .markdown
+    )
+
+
+def test_multiline_title_is_flattened_into_the_heading() -> None:
+    markdown = _convert_multiline_title_slide()
+
+    # An ATX heading is a single line: both title paragraphs must stay inside
+    # it, and must not leak out as a plain-text paragraph.
+    assert _heading_lines(markdown) == ["# Line one Line two"]
+    assert "Line two" not in markdown.splitlines()
+    assert BODY_TEXT in markdown
+
+
 # Speaker notes
 
 
