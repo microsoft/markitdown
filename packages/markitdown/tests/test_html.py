@@ -169,9 +169,11 @@ def test_wikipedia_title(heading: str, expected: str) -> None:
     )
     assert (result.title, result.markdown) == (
         expected,
-        f"# {expected}\n\nBody text."
-        if sys.version_info >= (3, 11)
-        else f"# {expected}\n\n\n\nBody text.\n\n",
+        (
+            f"# {expected}\n\nBody text."
+            if sys.version_info >= (3, 11)
+            else f"# {expected}\n\n\n\nBody text.\n\n"
+        ),
     )
 
 
@@ -219,9 +221,11 @@ def test_wikipedia_empty_title(title: str) -> None:
         pytest.param("<p>Empty G<strike></strike>H.</p>", "Empty GH.", id="empty"),
         pytest.param(
             "<p>Newline I<strike>J\nK</strike>L.</p>",
-            "Newline I~~J K~~L."
-            if sys.version_info >= (3, 11)
-            else "Newline I~~J\nK~~L.",
+            (
+                "Newline I~~J K~~L."
+                if sys.version_info >= (3, 11)
+                else "Newline I~~J\nK~~L."
+            ),
             id="newline",
         ),
         pytest.param(
@@ -315,16 +319,20 @@ def test_html_table_cell_list_keeps_item_boundaries(
         ),
         pytest.param(
             "<pre><code><ul><li>one</li><li>two</li></ul></code></pre>",
-            "```\none\ntwo\n```"
-            if sys.version_info >= (3, 11)
-            else "```\n* one\n* two\n```",
+            (
+                "```\none\ntwo\n```"
+                if sys.version_info >= (3, 11)
+                else "```\n* one\n* two\n```"
+            ),
             id="pre",
         ),
         pytest.param(
             "<table><tr><td><code><p>one</p><p>two</p></code></td></tr></table>",
-            "|  |\n| --- |\n| `one two` |"
-            if sys.version_info >= (3, 11)
-            else "|  |\n| --- |\n| `one  two` |",
+            (
+                "|  |\n| --- |\n| `one two` |"
+                if sys.version_info >= (3, 11)
+                else "|  |\n| --- |\n| `one  two` |"
+            ),
             id="table-cell",
         ),
     ],
