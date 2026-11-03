@@ -19,6 +19,13 @@ def _is_notebook_json(text: str) -> bool:
     and ``nbformat_minor`` versions and a ``cells`` list. Sniffing for the
     marker names as substrings misrouted ordinary JSON that merely mentioned
     them into an empty conversion (issue #2804).
+
+    An empty ``cells`` list is only notebook-shaped when a dict ``metadata``
+    rides along: a real empty notebook carries notebook metadata, while an
+    ordinary JSON document that merely carries the numeric markers next to an
+    empty ``cells`` list and unrelated payload would otherwise be claimed as
+    ipynb and converted to empty markdown, dropping the payload (review of
+    PR #2810).
     """
     try:
         data = json.loads(text.lstrip("\ufeff"))
@@ -32,10 +39,15 @@ def _is_notebook_json(text: str) -> bool:
         # JSON booleans are int subclasses; a version is a real number.
         return isinstance(value, (int, float)) and not isinstance(value, bool)
 
-    return (
-        _is_version(data.get("nbformat"))
-        and _is_version(data.get("nbformat_minor"))
-        and isinstance(data.get("cells"), list)
+    cells = data.get("cells")
+    if not isinstance(cells, list):
+        return False
+    # Empty cells: only trust it when the object is notebook-shaped overall.
+    if not cells and not isinstance(data.get("metadata"), dict):
+        return False
+
+    return _is_version(data.get("nbformat")) and _is_version(
+        data.get("nbformat_minor")
     )
 
 

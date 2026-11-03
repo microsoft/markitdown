@@ -543,8 +543,10 @@ def test_ipynb_accepts_non_ascii() -> None:
     result = converter.accepts(io.BytesIO(french_bytes), stream_info_ascii)
     assert result is False
 
-    # Valid notebook content should still be accepted
-    notebook_bytes = b'{"nbformat": 4, "nbformat_minor": 5, "cells": []}'
+    # An empty notebook is still notebook-shaped when metadata is a dict
+    # (empty ``cells`` without metadata is ordinary JSON — see the empty-cells
+    # regression test below).
+    notebook_bytes = b'{"nbformat": 4, "nbformat_minor": 5, "metadata": {}, "cells": []}'
     stream_info_json = StreamInfo(mimetype="application/json", charset="utf-8")
 
     result = converter.accepts(io.BytesIO(notebook_bytes), stream_info_json)
@@ -608,6 +610,65 @@ def test_ipynb_marker_fields_without_cells_are_not_a_notebook() -> None:
         ),
     )
     assert "important content" in result.markdown
+
+
+def test_ipynb_empty_cells_with_sibling_data_is_not_a_notebook() -> None:
+    """Empty ``cells`` next to unrelated payload is not a notebook.
+
+    Regression for the review of #2810 (mangeshraut712, 2026-11-03): a JSON
+    object with numeric nbformat markers, an empty ``cells`` list and real
+    payload elsewhere must reach the fallback converters — claiming it as
+    ipynb yields empty markdown and drops the payload.
+    """
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    data = json.dumps(
+        {
+            "nbformat": 4,
+            "nbformat_minor": 5,
+            "cells": [],
+            "items": ["important content"],
+        }
+    ).encode("utf-8")
+
+    converter = IpynbConverter()
+    assert (
+        converter.accepts(
+            io.BytesIO(data),
+            StreamInfo(mimetype="application/json", charset="utf-8"),
+        )
+        is False
+    )
+
+    result = MarkItDown().convert_stream(
+        io.BytesIO(data),
+        stream_info=StreamInfo(
+            extension=".json", mimetype="application/json", charset="utf-8"
+        ),
+    )
+    assert "important content" in result.markdown
+
+
+def test_ipynb_empty_notebook_with_metadata_is_still_a_notebook() -> None:
+    """An empty notebook is notebook-shaped when ``metadata`` is a dict.
+
+    The reviewer's alternative accepted: empty ``cells`` plus notebook-shaped
+    ``metadata`` keeps the stream claimed as ipynb.
+    """
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    data = json.dumps(
+        {"nbformat": 4, "nbformat_minor": 5, "metadata": {}, "cells": []}
+    ).encode("utf-8")
+
+    converter = IpynbConverter()
+    assert (
+        converter.accepts(
+            io.BytesIO(data),
+            StreamInfo(mimetype="application/json", charset="utf-8"),
+        )
+        is True
+    )
 
 
 def test_ipynb_notebook_shaped_object_must_be_at_the_top_level() -> None:
