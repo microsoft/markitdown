@@ -18,6 +18,7 @@ import magika
 import charset_normalizer
 import codecs
 
+from .__about__ import __version__
 from ._stream_info import StreamInfo
 from ._uri_utils import parse_data_uri, file_uri_to_path
 
@@ -159,7 +160,10 @@ class MarkItDown:
             # e.g., https://blog.cloudflare.com/markdown-for-agents/
             self._requests_session.headers.update(
                 {
-                    "Accept": "text/markdown, text/html;q=0.9, text/plain;q=0.8, */*;q=0.1"
+                    "Accept": "text/markdown, text/html;q=0.9, text/plain;q=0.8, */*;q=0.1",
+                    # Identify the HTTP client and provide a contact URL instead of
+                    # the generic python-requests User-Agent blocked by some sites.
+                    "User-Agent": f"MarkItDown/{__version__} (https://github.com/microsoft/markitdown)",
                 }
             )
         else:
