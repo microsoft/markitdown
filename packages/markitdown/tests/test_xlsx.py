@@ -542,3 +542,22 @@ def test_xlsx_show_zeroes_rename_is_scoped_to_sheet_view_tags() -> None:
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
+
+
+def test_xlsx_blank_cells_and_na_like_text_are_preserved() -> None:
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.append(["country", "code", "score"])
+    sheet.append(["Namibia", "NA", 1])
+    sheet.append(["Unknown", "N/A", None])
+    sheet.append(["Other", "null", 2])
+    stream = io.BytesIO()
+    workbook.save(stream)
+    stream.seek(0)
+
+    markdown = MarkItDown().convert_stream(stream, file_extension=".xlsx").markdown
+
+    assert "NaN" not in markdown
+    assert "| Namibia | NA | 1 |" in markdown
+    assert "| Unknown | N/A |  |" in markdown
+    assert "| Other | null | 2 |" in markdown
