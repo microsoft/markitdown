@@ -9,6 +9,7 @@ from typing import BinaryIO, Any, Dict, List, Set
 
 from ._html_converter import HtmlConverter
 from .._base_converter import DocumentConverterResult
+from .._exceptions import FileConversionException
 from .._stream_info import StreamInfo
 
 ACCEPTED_MIME_TYPE_PREFIXES = [
@@ -63,9 +64,18 @@ class EpubConverter(HtmlConverter):
 
             # Locate content.opf
             container_dom = minidom.parse(z.open("META-INF/container.xml"))
-            opf_path = container_dom.getElementsByTagName("rootfile")[0].getAttribute(
-                "full-path"
-            )
+            rootfiles = container_dom.getElementsByTagName("rootfile")
+            if not rootfiles:
+                raise FileConversionException(
+                    "Error converting .epub file: no <rootfile> element found in "
+                    "META-INF/container.xml"
+                )
+            opf_path = rootfiles[0].getAttribute("full-path")
+            if opf_path not in z.namelist():
+                raise FileConversionException(
+                    f"Error converting .epub file: container.xml points to {opf_path!r}, "
+                    "which is not a member of the archive"
+                )
 
             # Parse content.opf
             opf_dom = minidom.parse(z.open(opf_path))
