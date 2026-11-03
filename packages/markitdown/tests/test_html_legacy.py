@@ -30,13 +30,15 @@ def test_python310_deep_content_fallback(extension: str, *, strict: bool) -> Non
     source: Final = (
         content
         if extension == ".html"
-        else "<rss><channel><item><description><![CDATA["
-        + content
-        + "]]></description></item></channel></rss>"
-        if extension == ".rss"
-        else '<feed xmlns="http://www.w3.org/2005/Atom"><entry><content type="html"><![CDATA['
-        + content
-        + "]]></content></entry></feed>"
+        else (
+            "<rss><channel><item><description><![CDATA["
+            + content
+            + "]]></description></item></channel></rss>"
+            if extension == ".rss"
+            else '<feed xmlns="http://www.w3.org/2005/Atom"><entry><content type="html"><![CDATA['
+            + content
+            + "]]></content></entry></feed>"
+        )
     )
     converter: Final = HtmlConverter() if extension == ".html" else RssConverter()
     recursion_limit: Final = sys.getrecursionlimit()

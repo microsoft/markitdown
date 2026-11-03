@@ -101,9 +101,7 @@ def convert_feed(content: str, base_url: str, options: _MarkdownOptions) -> str:
         attributes = (
             ("href",)
             if node.name == "a"
-            else ("src", "data-src")
-            if node.name == "img"
-            else ()
+            else ("src", "data-src") if node.name == "img" else ()
         )
         for attribute in attributes:
             reference = node.get(attribute)

@@ -29,9 +29,9 @@ class _CustomMarkdown:
     def __init__(self, **options: Unpack[_MarkdownOptions]) -> None:
         self._code_language: Final[str] = options.get("code_language", "")
         self._explicit_code_language: Final[str | None] = options.get("code_language")
-        self._code_language_callback: Final[
-            Callable[[Tag], str | None] | None
-        ] = options.get("code_language_callback")
+        self._code_language_callback: Final[Callable[[Tag], str | None] | None] = (
+            options.get("code_language_callback")
+        )
         self._strip_pre: Final[str | None] = options.get("strip_pre", "strip")
         self._pre_languages: Final[dict[Element, str]] = {}
         self._keep_data_uris: Final[bool] = options.get("keep_data_uris", False)

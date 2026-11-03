@@ -91,23 +91,29 @@ def test_html_code_invalid_trimming() -> None:
         ),
         pytest.param(
             "<pre><code><ul><li>one</li><li>two</li></ul></code></pre>",
-            "```\none\ntwo\n```"
-            if sys.version_info >= (3, 11)
-            else "```\n* one\n* two\n```",
+            (
+                "```\none\ntwo\n```"
+                if sys.version_info >= (3, 11)
+                else "```\n* one\n* two\n```"
+            ),
             id="malformed-blocks",
         ),
         pytest.param(
             "<table><tr><td><pre>one\ntwo</pre></td></tr></table>",
-            "|  |\n| --- |\n| `one two` |"
-            if sys.version_info >= (3, 11)
-            else "|  |\n| --- |\n| ``` one two ``` |",
+            (
+                "|  |\n| --- |\n| `one two` |"
+                if sys.version_info >= (3, 11)
+                else "|  |\n| --- |\n| ``` one two ``` |"
+            ),
             id="table-cell",
         ),
         pytest.param(
             "<ul><li><pre>one\ntwo</pre></li></ul>",
-            "* \n  ```\n  one\n  two\n  ```"
-            if sys.version_info >= (3, 11)
-            else "* ```\n  one\n  two\n  ```",
+            (
+                "* \n  ```\n  one\n  two\n  ```"
+                if sys.version_info >= (3, 11)
+                else "* ```\n  one\n  two\n  ```"
+            ),
             id="list-item",
         ),
         pytest.param(
