@@ -146,6 +146,46 @@ def test_notes_with_text_are_still_emitted() -> None:
     assert "### Notes:\nRemember to mention the budget." in markdown
 
 
+# Hidden slides
+
+
+def _convert_deck_with_second_slide_show(show: str | None) -> str:
+    """Convert a three-slide deck whose second slide has the given show value.
+
+    PowerPoint writes show="0" on <p:sld> for a hidden slide and omits the
+    attribute for a visible one.
+    """
+    prs = pptx.Presentation()
+    for title in ("First slide", "Second slide", "Third slide"):
+        prs.slides.add_slide(prs.slide_layouts[5]).shapes.title.text = title
+    if show is not None:
+        prs.slides[1]._element.set("show", show)
+    buf = io.BytesIO()
+    prs.save(buf)
+    buf.seek(0)
+    return (
+        MarkItDown()
+        .convert_stream(buf, stream_info=StreamInfo(extension=".pptx"))
+        .markdown
+    )
+
+
+@pytest.mark.parametrize("show", ["0", "false"])
+def test_hidden_slide_is_marked(show: str) -> None:
+    markdown = _convert_deck_with_second_slide_show(show)
+
+    assert "<!-- Slide number: 2 -->\n<!-- Hidden slide -->\n# Second slide" in markdown
+    assert markdown.count("<!-- Hidden slide -->") == 1
+
+
+@pytest.mark.parametrize("show", [None, "1", "true"])
+def test_visible_slides_are_not_marked(show: str | None) -> None:
+    markdown = _convert_deck_with_second_slide_show(show)
+
+    assert "# Second slide" in markdown
+    assert "<!-- Hidden slide -->" not in markdown
+
+
 # Missing text
 
 # Empty XML text nodes should not drop surrounding slide content. python-pptx

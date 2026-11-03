@@ -86,6 +86,8 @@ class PptxConverter(DocumentConverter):
             slide_num += 1
 
             md_content += f"\n\n<!-- Slide number: {slide_num} -->\n"
+            if self._is_hidden(slide):
+                md_content += "<!-- Hidden slide -->\n"
 
             title = slide.shapes.title
 
@@ -296,6 +298,11 @@ class PptxConverter(DocumentConverter):
                 if self._find_svg_blip_part(shape) is not None:
                     return True
         return False
+
+    def _is_hidden(self, slide):
+        # A hidden slide has show="0" (or "false") on <p:sld>. python-pptx
+        # has no property for it, and the attribute defaults to shown.
+        return slide._element.get("show") in ("0", "false")
 
     def _is_table(self, shape):
         if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.TABLE:
