@@ -1067,21 +1067,17 @@ def test_docx_comments() -> None:
     validate_strings(result, DOCX_COMMENT_TEST_STRINGS)
 
 
+DOCX_EXPECTED_OUTPUT = os.path.join(TEST_FILES_DIR, "expected_outputs", "test_docx.md")
+
+
 def test_docx_full_output() -> None:
     """Test complete output for the sample DOCX document."""
     docx_path = os.path.join(TEST_FILES_DIR, "test.docx")
-    expected_path = os.path.join(TEST_FILES_DIR, "expected_outputs", "test_docx.md")
-
-    if not os.path.exists(docx_path):
-        pytest.skip(f"Test file not found: {docx_path}")
-
-    if not os.path.exists(expected_path):
-        pytest.skip(f"Expected output not found: {expected_path}")
 
     result = MarkItDown().convert(docx_path)
     actual_output = result.text_content
 
-    with open(expected_path, "r", encoding="utf-8") as f:
+    with open(DOCX_EXPECTED_OUTPUT, "r", encoding="utf-8") as f:
         expected_output = f.read()
 
     assert actual_output == expected_output
@@ -1138,15 +1134,11 @@ def test_docx_full_output_truncates_data_uris_by_default() -> None:
 
 
 def test_docx_full_output_snapshot_has_no_trailing_whitespace_drift() -> None:
-    """The snapshot, when present, matches the conversion line by line."""
+    """The snapshot matches the conversion line by line."""
     docx_path = os.path.join(TEST_FILES_DIR, "test.docx")
-    expected_path = os.path.join(TEST_FILES_DIR, "expected_outputs", "test_docx.md")
-
-    if not os.path.exists(expected_path):
-        pytest.skip(f"Expected output not found: {expected_path}")
 
     actual_lines = MarkItDown().convert(docx_path).text_content.splitlines()
-    with open(expected_path, "r", encoding="utf-8", newline="") as f:
+    with open(DOCX_EXPECTED_OUTPUT, "r", encoding="utf-8", newline="") as f:
         expected_lines = f.read().splitlines()
 
     assert len(actual_lines) == len(expected_lines)
