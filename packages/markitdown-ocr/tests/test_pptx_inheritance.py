@@ -20,7 +20,6 @@ import markitdown._markitdown as markitdown_module
 from markitdown_ocr._ocr_service import LLMVisionOCRService, OCRResult
 from markitdown_ocr._pptx_converter_with_ocr import PptxConverterWithOCR
 
-
 _INFO = StreamInfo(extension=".pptx")
 _CORE_FILES = Path(__file__).parents[2] / "markitdown" / "tests" / "test_files"
 

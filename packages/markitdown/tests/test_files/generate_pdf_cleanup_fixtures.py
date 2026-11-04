@@ -8,7 +8,6 @@ from pathlib import Path
 
 import pymupdf
 
-
 FIXTURES = Path(__file__).resolve().parent
 
 

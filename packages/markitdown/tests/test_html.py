@@ -9,7 +9,6 @@ from markitdown import MarkItDown, StreamInfo
 from markitdown.converters import WikipediaConverter
 from markitdown.converters._markdownify import _CustomMarkdownify
 
-
 # HTML rendering
 
 
