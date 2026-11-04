@@ -134,7 +134,7 @@ def test_image_without_llm_is_unchanged(
         image_module, "exiftool_metadata", MagicMock(return_value=metadata)
     )
     description = MagicMock()
-    monkeypatch.setattr(ImageConverter, "_get_llm_description", description)
+    monkeypatch.setattr(image_module, "llm_caption", description)
 
     result = ImageConverter().convert(
         io.BytesIO(IMAGE_FILE.read_bytes()),
@@ -143,6 +143,140 @@ def test_image_without_llm_is_unchanged(
 
     assert result.markdown == ("Title: Image title\n" if metadata else "")
     description.assert_not_called()
+
+
+def test_image_converter_uses_shared_llm_caption() -> None:
+    from markitdown.converters import _llm_caption, _pptx_converter
+
+    assert image_module.llm_caption is _llm_caption.llm_caption
+    assert image_module.llm_caption is _pptx_converter.llm_caption
+    assert not hasattr(ImageConverter, "_get_llm_description")
+
+
+@pytest.mark.parametrize("prompt", [None, "Describe the chart."])
+def test_image_converter_delegates_to_llm_caption(
+    prompt: Optional[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(image_module, "exiftool_metadata", MagicMock(return_value={}))
+    caption = MagicMock(return_value="  Shared caption.  ")
+    monkeypatch.setattr(image_module, "llm_caption", caption)
+    client = MagicMock()
+    stream = io.BytesIO(IMAGE_FILE.read_bytes())
+    stream_info = StreamInfo(extension=".jpg", mimetype="image/jpeg")
+
+    kwargs: dict[str, Any] = {"llm_client": client, "llm_model": "test-model"}
+    if prompt is not None:
+        kwargs["llm_prompt"] = prompt
+    result = ImageConverter().convert(stream, stream_info, **kwargs)
+
+    assert result.markdown == "\n# Description:\nShared caption.\n"
+    caption.assert_called_once_with(
+        stream, stream_info, client=client, model="test-model", prompt=prompt
+    )
+    client.chat.completions.create.assert_not_called()
+
+
+def test_image_converter_skips_description_when_llm_caption_returns_none(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        image_module,
+        "exiftool_metadata",
+        MagicMock(return_value={"Title": "Image title"}),
+    )
+    caption = MagicMock(return_value=None)
+    monkeypatch.setattr(image_module, "llm_caption", caption)
+
+    result = ImageConverter().convert(
+        io.BytesIO(IMAGE_FILE.read_bytes()),
+        StreamInfo(extension=".jpg", mimetype="image/jpeg"),
+        llm_client=MagicMock(),
+        llm_model="test-model",
+    )
+
+    assert result.markdown == "Title: Image title\n"
+    caption.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "llm_kwargs",
+    [{"llm_client": MagicMock()}, {"llm_model": "test-model"}],
+)
+def test_image_converter_requires_client_and_model_for_caption(
+    llm_kwargs: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(image_module, "exiftool_metadata", MagicMock(return_value={}))
+    caption = MagicMock(return_value="unused")
+    monkeypatch.setattr(image_module, "llm_caption", caption)
+
+    result = ImageConverter().convert(
+        io.BytesIO(IMAGE_FILE.read_bytes()),
+        StreamInfo(extension=".jpg", mimetype="image/jpeg"),
+        **llm_kwargs,
+    )
+
+    assert result.markdown == ""
+    caption.assert_not_called()
+
+
+@pytest.mark.parametrize("prompt", [None, "", "   "])
+def test_image_converter_default_prompt_via_llm_caption(
+    prompt: Optional[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(image_module, "exiftool_metadata", MagicMock(return_value={}))
+    client = MagicMock()
+    client.chat.completions.create.return_value.choices[0].message.content = "ok"
+
+    ImageConverter().convert(
+        io.BytesIO(IMAGE_FILE.read_bytes()),
+        StreamInfo(extension=".jpg", mimetype="image/jpeg"),
+        llm_client=client,
+        llm_model="test-model",
+        llm_prompt=prompt,
+    )
+
+    messages = client.chat.completions.create.call_args.kwargs["messages"]
+    assert messages[0]["content"][0] == {
+        "type": "text",
+        "text": "Write a detailed caption for this image.",
+    }
+
+
+@pytest.mark.parametrize(
+    "stream_info, expected_type",
+    [
+        (StreamInfo(mimetype="image/png", extension=".jpg"), "image/png"),
+        (StreamInfo(extension=".jpg"), "image/jpeg"),
+        (StreamInfo(), "application/octet-stream"),
+    ],
+)
+def test_llm_caption_builds_data_uri_and_restores_stream(
+    stream_info: StreamInfo, expected_type: str
+) -> None:
+    import base64
+
+    from markitdown.converters._llm_caption import llm_caption
+
+    client = MagicMock()
+    client.chat.completions.create.return_value.choices[0].message.content = "cap"
+    prefix = b"prefix"
+    payload = b"image-bytes"
+    stream = io.BytesIO(prefix + payload)
+    stream.seek(len(prefix))
+
+    result = llm_caption(
+        stream, stream_info, client=client, model="m", prompt="Custom prompt"
+    )
+
+    assert result == "cap"
+    assert stream.tell() == len(prefix)
+    call = client.chat.completions.create.call_args
+    assert call.kwargs["model"] == "m"
+    content = call.kwargs["messages"][0]["content"]
+    assert content[0] == {"type": "text", "text": "Custom prompt"}
+    assert content[1]["image_url"]["url"] == (
+        f"data:{expected_type};base64," + base64.b64encode(payload).decode("utf-8")
+    )
 
 
 # Conversion regressions
