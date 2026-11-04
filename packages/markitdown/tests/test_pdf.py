@@ -1357,6 +1357,94 @@ class TestPdfMemoryOptimization:
             )
 
 
+class TestPdfminerFallbackNotRepeated:
+    """pdfminer runs at most once per conversion, even when it returns nothing."""
+
+    def test_scanned_pdf_runs_pdfminer_once(self, pdf_activity):
+        """A text-less PDF goes to pdfminer once; an empty result is not retried."""
+        pdf_path = os.path.join(
+            TEST_FILES_DIR, "MEDRPT-2024-PAT-3847_medical_report_scan.pdf"
+        )
+        markdown = MarkItDown().convert(pdf_path).markdown
+
+        assert markdown.strip() == ""
+        assert not any(kind == "form" for kind, _ in pdf_activity)
+        assert pdf_activity.count(("pdfminer", None)) == 1
+
+    def test_plain_pdf_with_empty_pdfminer_result_not_retried(self, monkeypatch):
+        """When the whole-document pdfminer pass yields empty text, keep it."""
+        from markitdown.converters import _pdf_converter
+
+        calls = []
+
+        def empty_extract_text(*args, **kwargs):
+            calls.append(args)
+            return ""
+
+        monkeypatch.setattr(
+            _pdf_converter.pdfminer.high_level, "extract_text", empty_extract_text
+        )
+
+        markdown = _convert_cleanup_fixture("plain")
+
+        assert markdown == ""
+        assert len(calls) == 1
+
+    def test_pdfplumber_failure_with_empty_pdfminer_result_not_retried(
+        self, monkeypatch
+    ):
+        """The exception fallback already used pdfminer, so it is not run again."""
+        from markitdown.converters import _pdf_converter
+
+        calls = []
+
+        def failing_open(*args, **kwargs):
+            raise RuntimeError("pdfplumber failure")
+
+        def empty_extract_text(*args, **kwargs):
+            calls.append(args)
+            return ""
+
+        monkeypatch.setattr(_pdf_converter.pdfplumber, "open", failing_open)
+        monkeypatch.setattr(
+            _pdf_converter.pdfminer.high_level, "extract_text", empty_extract_text
+        )
+
+        markdown = _convert_cleanup_fixture("form")
+
+        assert markdown == ""
+        assert len(calls) == 1
+
+    def test_pdfplumber_failure_uses_pdfminer_text(self, monkeypatch, pdf_activity):
+        """The exception fallback returns real pdfminer output from one call."""
+        from markitdown.converters import _pdf_converter
+
+        def failing_open(*args, **kwargs):
+            raise RuntimeError("pdfplumber failure")
+
+        monkeypatch.setattr(_pdf_converter.pdfplumber, "open", failing_open)
+
+        markdown = _convert_cleanup_fixture("plain")
+
+        assert "While there is contemporaneous exploration" in markdown
+        assert pdf_activity.count(("pdfminer", None)) == 1
+
+    def test_empty_form_content_still_falls_back_to_pdfminer(
+        self, monkeypatch, pdf_activity
+    ):
+        """Form pages with no content leave markdown empty; pdfminer is tried once."""
+        from markitdown.converters import _pdf_converter
+
+        monkeypatch.setattr(
+            _pdf_converter, "_extract_form_content_from_words", lambda page: ""
+        )
+
+        markdown = _convert_cleanup_fixture("plain")
+
+        assert pdf_activity.count(("pdfminer", None)) == 1
+        assert markdown.count("While there is contemporaneous exploration") == 3
+
+
 # Conversion regressions
 
 skip_remote = (
