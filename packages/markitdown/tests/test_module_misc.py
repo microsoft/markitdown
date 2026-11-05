@@ -73,9 +73,7 @@ def test_default_requests_session_has_identifiable_user_agent() -> None:
     assert request.headers["User-Agent"] == (
         f"MarkItDown/{__version__} (https://github.com/microsoft/markitdown)"
     )
-    assert markitdown._requests_session.headers["Accept"].startswith(
-        "text/markdown"
-    )
+    assert markitdown._requests_session.headers["Accept"].startswith("text/markdown")
 
 
 def test_caller_supplied_requests_session_keeps_custom_headers() -> None:
