@@ -12,7 +12,6 @@ from mammoth.docx.files import InvalidFileReferenceError
 from ..._stream_info import StreamInfo
 from .._image import _parse_image_html
 
-
 _BLOCK_ELEMENTS = HTMLTreeBuilder.DEFAULT_BLOCK_ELEMENTS | {
     "details",
     "dialog",

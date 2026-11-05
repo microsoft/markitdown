@@ -29,7 +29,6 @@ from markitdown._uri_utils import (
     parse_data_uri,
 )
 
-
 # Library behavior and remaining formats
 
 skip_remote = (

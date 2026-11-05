@@ -35,7 +35,6 @@ from markitdown.converter_utils.docx.math.omml import OMML_NS, load_string, oMat
 from markitdown.converter_utils.docx.pre_process import _pre_process_styles
 from markitdown.converters import DocxConverter, HtmlConverter, _docx_converter
 
-
 # Math functions
 
 
@@ -373,9 +372,7 @@ def styles_xml(request: pytest.FixtureRequest) -> bytes:
   <{prefix}:style {prefix}:type="paragraph" {prefix}:styleId="Normal">
     <{prefix}:name {prefix}:val="Normal"/>
   </{prefix}:style>
-</{prefix}:styles>""".encode(
-        "utf-8"
-    )
+</{prefix}:styles>""".encode("utf-8")
 
 
 def test_valid_styles_are_returned_unchanged(styles_xml: bytes) -> None:

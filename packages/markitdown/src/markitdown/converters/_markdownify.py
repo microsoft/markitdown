@@ -4,7 +4,6 @@ import markdownify
 from typing import Any, Optional
 from urllib.parse import quote, urlparse, urlunparse
 
-
 _PERCENT_ENCODED_OCTET = re.compile(r"%[0-9A-Fa-f]{2}")
 
 # Matches a pipe together with the (possibly empty) run of backslashes in front
