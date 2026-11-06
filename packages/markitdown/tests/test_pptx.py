@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 from typing import Any, BinaryIO, Callable, Optional
 from unittest.mock import MagicMock, Mock
+from zipfile import ZipFile
 
 import pptx
 import pytest
@@ -16,7 +17,9 @@ from pptx import Presentation
 from pptx.chart.data import CategoryChartData
 from pptx.enum.chart import XL_CHART_TYPE
 from pptx.enum.shapes import MSO_SHAPE_TYPE
+from pptx.oxml import parse_xml
 from pptx.util import Inches
+from xlsxwriter import Workbook
 
 from markitdown import (
     FileConversionException,
@@ -822,6 +825,89 @@ def test_pptx_chart_multi_series_conversion() -> None:
     assert f"| C{n_categories - 1} |" in md
     # A representative row carries the correct value for each series
     assert "| C10 | 10.0 | 20.0 |" in md
+
+
+def _build_combo_chart_presentation(line_categories: list[str]) -> io.BytesIO:
+    # python-pptx cannot create combo charts. Generate the chart and its data
+    # workbook with XlsxWriter, then insert them into the PowerPoint package.
+    workbook_stream = io.BytesIO()
+    with Workbook(workbook_stream) as workbook:
+        sheet = workbook.add_worksheet("Data")
+        sheet.write_column("A2", ["January", "February"])
+        sheet.write_column("B1", ["Orders", 10, 20])
+        sheet.write_column("C2", line_categories)
+        sheet.write_column(
+            "D1", ["Revenue", *(100 * i for i in range(1, len(line_categories) + 1))]
+        )
+
+        columns = workbook.add_chart({"type": "column"})
+        columns.add_series(
+            {
+                "name": "=Data!$B$1",
+                "categories": "=Data!$A$2:$A$3",
+                "values": "=Data!$B$2:$B$3",
+            }
+        )
+        line = workbook.add_chart({"type": "line"})
+        end_row = len(line_categories) + 1
+        line.add_series(
+            {
+                "name": "=Data!$D$1",
+                "categories": f"=Data!$C$2:$C${end_row}",
+                "values": f"=Data!$D$2:$D${end_row}",
+                "y2_axis": True,
+            }
+        )
+        columns.combine(line)
+        sheet.insert_chart("F1", columns)
+
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    placeholder = CategoryChartData()
+    placeholder.categories = ["Placeholder"]
+    placeholder.add_series("Placeholder", [0])
+    chart = slide.shapes.add_chart(
+        XL_CHART_TYPE.COLUMN_CLUSTERED, 0, 0, Inches(6), Inches(4), placeholder
+    ).chart
+    with ZipFile(workbook_stream) as archive:
+        combined = parse_xml(archive.read("xl/charts/chart1.xml"))
+    chart_xml = chart._element.chart
+    chart_xml.replace(chart_xml.plotArea, combined.chart.plotArea)
+    chart.part.chart_workbook.update_from_xlsx_blob(workbook_stream.getvalue())
+
+    stream = io.BytesIO()
+    presentation.save(stream)
+    stream.seek(0)
+    return stream
+
+
+def test_pptx_combo_chart_with_different_categories() -> None:
+    stream = _build_combo_chart_presentation(["February", "January", "March"])
+    markdown = (
+        MarkItDown()
+        .convert_stream(stream, stream_info=StreamInfo(extension=".pptx"))
+        .markdown
+    )
+
+    assert markdown.split("### Chart\n\n", 1)[1].split("\n\n") == [
+        "| Category | Orders |\n|---|---|\n| January | 10.0 |\n| February | 20.0 |",
+        "| Category | Revenue |\n|---|---|\n"
+        "| February | 100.0 |\n| January | 200.0 |\n| March | 300.0 |",
+    ]
+
+
+def test_pptx_combo_chart_with_shared_categories() -> None:
+    stream = _build_combo_chart_presentation(["January", "February"])
+    markdown = (
+        MarkItDown()
+        .convert_stream(stream, stream_info=StreamInfo(extension=".pptx"))
+        .markdown
+    )
+
+    assert markdown.split("### Chart\n\n", 1)[1] == (
+        "| Category | Orders | Revenue |\n|---|---|---|\n"
+        "| January | 10.0 | 100.0 |\n| February | 20.0 | 200.0 |"
+    )
 
 
 def test_pptx_converter_treats_none_llm_caption_as_empty(monkeypatch) -> None:
