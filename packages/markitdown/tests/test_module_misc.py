@@ -456,6 +456,30 @@ def test_ipynb_heading_title_preserves_leading_hash() -> None:
     assert result.title == "#hashtag campaign results"
 
 
+def test_ipynb_heading_title_from_string_source() -> None:
+    """Notebook cell sources can be a single string instead of a list of lines.
+
+    Regression for https://github.com/microsoft/markitdown/issues/2762
+    """
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    notebook = {
+        "nbformat": 4,
+        "nbformat_minor": 5,
+        "metadata": {},
+        "cells": [
+            {
+                "cell_type": "markdown",
+                "source": "# Notebook title\nBody text\n",
+                "metadata": {},
+            }
+        ],
+    }
+    result = IpynbConverter()._convert(notebook)
+    assert result.title == "Notebook title"
+    assert result.markdown == "# Notebook title\nBody text\n"
+
+
 _UTF8_BOM = b"\xef\xbb\xbf"
 
 _BOM_NOTEBOOK = {
