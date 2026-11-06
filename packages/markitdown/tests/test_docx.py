@@ -1067,6 +1067,85 @@ def test_docx_comments() -> None:
     validate_strings(result, DOCX_COMMENT_TEST_STRINGS)
 
 
+DOCX_EXPECTED_OUTPUT = os.path.join(TEST_FILES_DIR, "expected_outputs", "test_docx.md")
+
+
+def test_docx_full_output() -> None:
+    """Test complete output for the sample DOCX document."""
+    docx_path = os.path.join(TEST_FILES_DIR, "test.docx")
+
+    result = MarkItDown().convert(docx_path)
+    actual_output = result.text_content
+
+    with open(DOCX_EXPECTED_OUTPUT, "r", encoding="utf-8") as f:
+        expected_output = f.read()
+
+    assert actual_output == expected_output
+
+
+def test_docx_full_output_is_deterministic() -> None:
+    """Repeated conversions of the sample DOCX produce identical output."""
+    docx_path = os.path.join(TEST_FILES_DIR, "test.docx")
+
+    first = MarkItDown().convert(docx_path).text_content
+    second = MarkItDown().convert(docx_path).text_content
+
+    assert first
+    assert first == second
+
+
+def test_docx_full_output_matches_stream_conversion() -> None:
+    """Path and stream conversions of the sample DOCX agree exactly."""
+    docx_path = os.path.join(TEST_FILES_DIR, "test.docx")
+    markitdown = MarkItDown()
+
+    from_path = markitdown.convert(docx_path).text_content
+    with open(docx_path, "rb") as f:
+        from_stream = markitdown.convert_stream(
+            io.BytesIO(f.read()), file_extension=".docx"
+        ).text_content
+
+    assert from_path == from_stream
+
+
+def test_docx_full_output_preserves_document_order() -> None:
+    """Key sections of the sample DOCX appear in their document order."""
+    docx_path = os.path.join(TEST_FILES_DIR, "test.docx")
+    text = MarkItDown().convert(docx_path).text_content.replace("\\", "")
+
+    markers = [
+        "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation",
+        "# Abstract",
+        "# Introduction",
+    ]
+    positions = [text.find(marker) for marker in markers]
+
+    assert all(position >= 0 for position in positions)
+    assert positions == sorted(positions)
+
+
+def test_docx_full_output_truncates_data_uris_by_default() -> None:
+    """The default snapshot output elides embedded image payloads."""
+    docx_path = os.path.join(TEST_FILES_DIR, "test.docx")
+    text = MarkItDown().convert(docx_path).text_content
+
+    assert "data:image/png;base64..." in text
+    assert "data:image/png;base64,iVBORw0KGgoAAAANSU" not in text
+
+
+def test_docx_full_output_snapshot_has_no_trailing_whitespace_drift() -> None:
+    """The snapshot matches the conversion line by line."""
+    docx_path = os.path.join(TEST_FILES_DIR, "test.docx")
+
+    actual_lines = MarkItDown().convert(docx_path).text_content.splitlines()
+    with open(DOCX_EXPECTED_OUTPUT, "r", encoding="utf-8", newline="") as f:
+        expected_lines = f.read().splitlines()
+
+    assert len(actual_lines) == len(expected_lines)
+    for index, (actual, expected) in enumerate(zip(actual_lines, expected_lines)):
+        assert actual == expected, f"line {index + 1} differs"
+
+
 def _write_underlined_docx(
     path,
     embedded_style_map: Optional[str] = None,

@@ -59,3 +59,12 @@ parsing, fallback, and cleanup without changing either source fixture. Rebuild
 them with `python tests/test_files/generate_pdf_cleanup_fixtures.py` in an
 environment with PyMuPDF installed; PyMuPDF is needed only to rebuild the files,
 not to run the core tests.
+
+`test_files/expected_outputs/test_docx.md` is the exact default conversion of
+`test_files/test.docx`, compared byte for byte by `test_docx.py`. When a
+converter change intentionally alters that output, regenerate it from
+`packages/markitdown` and review the diff before committing:
+
+```sh
+python -c "from markitdown import MarkItDown; open('tests/test_files/expected_outputs/test_docx.md', 'w', encoding='utf-8', newline='').write(MarkItDown().convert('tests/test_files/test.docx').text_content)"
+```
