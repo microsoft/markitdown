@@ -317,9 +317,14 @@ class PptxConverter(DocumentConverter):
             first_row = False
         html_table += "</table></body></html>"
 
+        # End the table's block with a blank line. Shapes are concatenated as they are read,
+        # and a single "\n" is not a block separator in Markdown: the next shape's text (or
+        # another table) was parsed as part of this table -- a paragraph became cells, and two
+        # adjacent tables became one with a "| --- | --- |" row inside it. DOCX tables get the
+        # same separation from markdownify, which wraps its tables in "\n\n" on both sides.
         return (
             self._html_converter.convert_string(html_table, **kwargs).markdown.strip()
-            + "\n"
+            + "\n\n"
         )
 
     def _convert_chart_to_markdown(self, chart):
