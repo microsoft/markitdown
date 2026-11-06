@@ -126,9 +126,11 @@ class DocxConverter(HtmlConverter):
         if image_adapter is not None:
             html_result = image_adapter.replace_images(html_result)
 
-        html_result = self._convert_footnotes_to_gfm(html_result)
-
-        return self._html_converter.convert_string(html_result, **kwargs)
+        html_result, footnotes = self._extract_gfm_footnotes(html_result, **kwargs)
+        result = self._html_converter.convert_string(html_result, **kwargs)
+        if footnotes:
+            result.markdown += "\n\n" + "\n\n".join(footnotes)
+        return result
 
     def _image_to_html(
         self,
@@ -150,8 +152,8 @@ class DocxConverter(HtmlConverter):
         """
         return None
 
-    def _convert_footnotes_to_gfm(self, html: str) -> str:
-        """Rewrite mammoth's footnote HTML into GFM footnote syntax.
+    def _extract_gfm_footnotes(self, html: str, **kwargs: Any) -> tuple[str, list[str]]:
+        """Rewrite footnote references and return converted definitions separately.
 
         mammoth emits references as
         ``<sup><a href="#footnote-N" id="footnote-ref-N">[N]</a></sup>``
@@ -160,24 +162,24 @@ class DocxConverter(HtmlConverter):
         both ends with GFM footnotes, which need no anchors.
         """
         if "footnote-" not in html:
-            return html
+            return html, []
 
         soup = BeautifulSoup(html, "html.parser")
         definitions = soup.find_all("li", id=_FOOTNOTE_DEF_ID)
         if not definitions:
-            return html
+            return html, []
 
         for anchor in soup.find_all("a", href=_FOOTNOTE_REF_HREF):
-            number = _FOOTNOTE_REF_HREF.match(anchor["href"]).group(1)
+            number = str(anchor["href"]).removeprefix("#footnote-")
             (anchor.find_parent("sup") or anchor).replace_with("[^%s]" % number)
 
         blocks = []
         for item in definitions:
-            number = _FOOTNOTE_DEF_ID.match(item["id"]).group(1)
+            number = str(item["id"]).removeprefix("footnote-")
             for backlink in item.find_all("a", href="#footnote-ref-%s" % number):
                 backlink.extract()
             body = self._html_converter.convert_string(
-                item.decode_contents()
+                item.decode_contents(), **kwargs
             ).markdown.strip()
             lines = body.split("\n") if body else [""]
             content = "".join(
@@ -190,4 +192,4 @@ class DocxConverter(HtmlConverter):
             if list_holder is not None and list_holder.find("li") is None:
                 list_holder.decompose()
 
-        return str(soup) + "\n\n" + "\n".join(blocks)
+        return str(soup), blocks
