@@ -346,7 +346,9 @@ def test_speech_transcription_uses_https(monkeypatch: pytest.MonkeyPatch) -> Non
     assert "one two three four five" in result.text_content
     assert len(requests_sent) == 1
     request = requests_sent[0]
-    assert request.full_url.startswith("https://www.google.com/speech-api/v2/recognize?")
+    assert request.full_url.startswith(
+        "https://www.google.com/speech-api/v2/recognize?"
+    )
     assert request.get_method() == "POST"
     assert request.get_header("Content-type").startswith("audio/x-flac")
     assert request.data.startswith(b"fLaC")
