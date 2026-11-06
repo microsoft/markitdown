@@ -8,6 +8,7 @@ import sys
 from typing import Any, BinaryIO, Optional
 
 from markitdown import DocumentConverter, DocumentConverterResult, StreamInfo
+from markitdown.converters import PdfConverter
 from markitdown._exceptions import (
     MissingDependencyException,
     MISSING_DEPENDENCY_MESSAGE,
@@ -176,6 +177,10 @@ class PdfConverterWithOCR(DocumentConverter):
         ocr_service: LLMVisionOCRService | None = (
             kwargs.get("ocr_service") or self.ocr_service
         )
+
+        if ocr_service is None:
+            file_stream.seek(0)
+            return PdfConverter().convert(file_stream, stream_info, **kwargs)
 
         # Read PDF into BytesIO
         file_stream.seek(0)
