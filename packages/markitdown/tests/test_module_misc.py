@@ -28,6 +28,7 @@ from markitdown._uri_utils import (
     file_uri_to_path,
     parse_data_uri,
 )
+from markitdown.converter_utils._ooxml import _raise_if_encrypted
 
 # Library behavior and remaining formats
 
@@ -361,6 +362,32 @@ def test_exceptions() -> None:
         )
     assert len(exc_info.value.attempts) == 1
     assert type(exc_info.value.attempts[0].converter).__name__ == "PptxConverter"
+
+
+@pytest.mark.parametrize(
+    ("filename", "converter"),
+    [
+        ("encrypted.docx", "DocxConverter"),
+        ("encrypted.xlsx", "XlsxConverter"),
+        ("encrypted.pptx", "PptxConverter"),
+    ],
+)
+def test_encrypted_office_documents_are_reported(filename: str, converter: str) -> None:
+    # Encrypted Office documents are OLE compound files rather than ZIP packages,
+    # so they used to fail with "File is not a zip file".
+    with pytest.raises(FileConversionException) as exc_info:
+        MarkItDown().convert(os.path.join(TEST_FILES_DIR, filename))
+
+    assert len(exc_info.value.attempts) == 1
+    assert type(exc_info.value.attempts[0].converter).__name__ == converter
+    assert "is encrypted (password-protected or rights-managed)" in str(exc_info.value)
+
+
+def test_unencrypted_compound_file_is_not_reported_as_encrypted() -> None:
+    # test.xls is an OLE compound file too, but holds no EncryptedPackage stream.
+    with open(os.path.join(TEST_FILES_DIR, "test.xls"), "rb") as file_stream:
+        _raise_if_encrypted(file_stream, ".xlsx")
+        assert file_stream.tell() == 0
 
 
 def test_markitdown_llm_parameters() -> None:

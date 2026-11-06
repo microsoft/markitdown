@@ -5,6 +5,7 @@ from warnings import warn
 from typing import BinaryIO, Any, Optional
 
 from ._html_converter import HtmlConverter
+from ..converter_utils._ooxml import _raise_if_encrypted
 from ..converter_utils.docx.pre_process import pre_process_docx
 from .._base_converter import DocumentConverterResult
 from .._stream_info import StreamInfo
@@ -87,6 +88,7 @@ class DocxConverter(HtmlConverter):
                 _dependency_exc_info[2]
             )
 
+        _raise_if_encrypted(file_stream, ".docx")
         pre_process_stream = pre_process_docx(file_stream)
 
         caller_style_map = kwargs.get("style_map")

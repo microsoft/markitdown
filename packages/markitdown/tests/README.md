@@ -59,3 +59,10 @@ parsing, fallback, and cleanup without changing either source fixture. Rebuild
 them with `python tests/test_files/generate_pdf_cleanup_fixtures.py` in an
 environment with PyMuPDF installed; PyMuPDF is needed only to rebuild the files,
 not to run the core tests.
+
+The `test_files/encrypted.{docx,xlsx,pptx}` fixtures are copies of
+`test_with_comment.docx`, `test.xlsx`, and `test_svg_no_fallback.pptx`
+encrypted with the password `markitdown`. Rebuild them with
+`python tests/test_files/generate_encrypted_office_fixtures.py` in an
+environment with msoffcrypto-tool installed; it is needed only to rebuild the
+files.
