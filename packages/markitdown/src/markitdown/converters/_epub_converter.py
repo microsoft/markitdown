@@ -103,7 +103,7 @@ class EpubConverter(HtmlConverter):
             # Extract and convert the content
             markdown_content: List[str] = []
             for file in spine:
-                if file in z.namelist():
+                if file in zip_names:
                     with z.open(file) as f:
                         filename = os.path.basename(file)
                         extension = os.path.splitext(filename)[1].lower()
@@ -117,7 +117,9 @@ class EpubConverter(HtmlConverter):
                             ),
                             **kwargs,
                         )
-                        markdown_content.append(converted_content.markdown.strip())
+                        converted_text = converted_content.markdown.strip()
+                        if converted_text:
+                            markdown_content.append(converted_text)
 
             # Format and add the metadata
             metadata_markdown = []
@@ -127,10 +129,11 @@ class EpubConverter(HtmlConverter):
                 if value:
                     metadata_markdown.append(f"**{key.capitalize()}:** {value}")
 
-            markdown_content.insert(0, "\n".join(metadata_markdown))
+            if metadata_markdown:
+                markdown_content.insert(0, "\n".join(metadata_markdown))
 
             return DocumentConverterResult(
-                markdown="\n\n".join(markdown_content), title=metadata["title"]
+                markdown="\n\n".join(markdown_content), title=metadata.get("title")
             )
 
     def _resolve_manifest_href(
