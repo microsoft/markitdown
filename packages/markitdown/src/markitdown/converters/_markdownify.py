@@ -70,19 +70,23 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         href = el.get("href")
         title = el.get("title")
 
-        # Escape URIs and skip non-http or file schemes
+        # Escape URIs and skip schemes that are not safe to carry into Markdown.
+        # mailto: and tel: are not code-capable, so keep them like http/https/file.
         if href:
             try:
                 parsed_url = urlparse(href)  # type: ignore
-                if parsed_url.scheme and parsed_url.scheme.lower() not in ["http", "https", "file"]:  # type: ignore
+                scheme = parsed_url.scheme.lower()
+                if parsed_url.scheme and scheme not in ["http", "https", "file", "mailto", "tel"]:  # type: ignore
                     return "%s%s%s" % (prefix, text, suffix)
-                href = urlunparse(
-                    parsed_url._replace(
-                        path=_quote_path_preserving_percent_encoded_octets(
-                            parsed_url.path
+                if scheme in ["http", "https", "file"]:
+                    href = urlunparse(
+                        parsed_url._replace(
+                            path=_quote_path_preserving_percent_encoded_octets(
+                                parsed_url.path
+                            )
                         )
-                    )
-                )  # type: ignore
+                    )  # type: ignore
+                # mailto:/tel: carry an opaque part, not a path; leave them as-is.
             except ValueError:  # It's not clear if this ever gets thrown
                 return "%s%s%s" % (prefix, text, suffix)
 
