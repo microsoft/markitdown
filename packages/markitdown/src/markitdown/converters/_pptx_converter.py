@@ -4,6 +4,7 @@ import os
 import io
 import re
 import html
+from itertools import groupby
 
 from typing import BinaryIO, Any, Optional
 
@@ -332,29 +333,16 @@ class PptxConverter(DocumentConverter):
             if chart.has_title and chart.chart_title.has_text_frame:
                 md += f": {chart.chart_title.text_frame.text}"
             md += "\n\n"
-            data = []
-            category_names = [c.label for c in chart.plots[0].categories]
-            series_list = list(chart.series)
-            series_names = [s.name for s in series_list]
-            data.append(["Category"] + series_names)
+            # Each plot can have its own categories, for example on a
+            # secondary axis. Combine series only when the rows line up.
+            tables = []
+            for categories, plots in groupby(
+                chart.plots, key=lambda plot: [cat.label for cat in plot.categories]
+            ):
+                plot_series = [series for plot in plots for series in plot.series]
+                tables.append(self._chart_table(categories, plot_series))
 
-            # Materialize each series' values once. Accessing series.values[idx]
-            # inside the nested loop is O(n^2) in python-pptx (each lookup does an
-            # XPath scan of all points), which is extremely slow on large charts.
-            series_values = [list(s.values) for s in series_list]
-
-            for idx, category in enumerate(category_names):
-                row = [category]
-                for sv in series_values:
-                    row.append(sv[idx] if idx < len(sv) else None)
-                data.append(row)
-
-            markdown_table = []
-            for row in data:
-                markdown_table.append("| " + " | ".join(map(str, row)) + " |")
-            header = markdown_table[0]
-            separator = "|" + "|".join(["---"] * len(data[0])) + "|"
-            return md + "\n".join([header, separator] + markdown_table[1:])
+            return md + "\n\n".join(tables) if tables else "\n\n[unsupported chart]\n\n"
         except ValueError as e:
             # Handle the specific error for unsupported chart types
             if "unsupported plot type" in str(e):
@@ -362,3 +350,22 @@ class PptxConverter(DocumentConverter):
         except Exception:
             # Catch any other exceptions that might occur
             return "\n\n[unsupported chart]\n\n"
+
+    @staticmethod
+    def _chart_table(categories, series):
+        header = ["Category"] + [item.name for item in series]
+        rows = ["| " + " | ".join(header) + " |"]
+        rows.append("|" + "|".join(["---"] * len(header)) + "|")
+
+        # python-pptx scans the cached points on each access to series.values.
+        # Materialize each series once, outside the category loop.
+        series_values = [item.values for item in series]
+        for index, category in enumerate(categories):
+            row = [category]
+            row.extend(
+                values[index] if index < len(values) else None
+                for values in series_values
+            )
+            rows.append("| " + " | ".join(map(str, row)) + " |")
+
+        return "\n".join(rows)
