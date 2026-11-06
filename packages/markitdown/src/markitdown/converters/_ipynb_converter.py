@@ -12,6 +12,23 @@ CANDIDATE_MIME_TYPE_PREFIXES = [
 ACCEPTED_FILE_EXTENSIONS = [".ipynb"]
 
 
+def _iter_cells(notebook_content: dict):
+    """Yield a notebook's cells, whichever nbformat version it uses.
+
+    nbformat 4 keeps a flat ``cells`` list at the top level. nbformat 3 (IPython 3
+    and Jupyter 4.0, still common in archives) nests them under
+    ``worksheets[*].cells`` instead, so reading only the top level silently yielded
+    nothing and the whole notebook converted to an empty document.
+    """
+    cells = notebook_content.get("cells")
+    if cells is not None:
+        yield from cells
+        return
+
+    for worksheet in notebook_content.get("worksheets", []):
+        yield from worksheet.get("cells", [])
+
+
 class IpynbConverter(DocumentConverter):
     """Converts Jupyter Notebook (.ipynb) files to Markdown."""
 
@@ -67,25 +84,51 @@ class IpynbConverter(DocumentConverter):
             md_output = []
             title = None
 
-            for cell in notebook_content.get("cells", []):
+            for cell in _iter_cells(notebook_content):
                 cell_type = cell.get("cell_type", "")
-                source_lines = cell.get("source", [])
+                # nbformat 3 stores code cell text under "input"; nbformat 4 uses
+                # "source" for every cell type. Reading only "source" dropped the
+                # content of every code cell in an nbformat 3 notebook.
+                source = cell.get("source")
+                if source is None:
+                    source = cell.get("input", [])
+                # Both shapes are valid on disk, and the title match below
+                # iterates per-line, so a plain string would iterate characters.
+                if isinstance(source, str):
+                    line_source = source.splitlines(keepends=True)
+                else:
+                    line_source = source
+                cell_source = "".join(line_source)
 
                 if cell_type == "markdown":
-                    md_output.append("".join(source_lines))
+                    md_output.append(cell_source)
 
                     # Extract the first # heading as title if not already found
                     if title is None:
-                        for line in source_lines:
+                        for line in line_source:
                             if line.startswith("# "):
                                 title = line.removeprefix("# ").strip()
                                 break
 
+                elif cell_type == "heading":
+                    # nbformat 3 removed heading cells in 4.0 in favour of a
+                    # markdown '#' line; map them back so they are not dropped.
+                    level = cell.get("level", 1)
+                    try:
+                        level = int(level)
+                    except (TypeError, ValueError):
+                        level = 1
+                    level = max(level, 1)
+                    head_text = cell_source.strip()
+                    md_output.append(f"{'#' * level} {head_text}")
+                    if title is None and head_text:
+                        title = head_text
+
                 elif cell_type == "code":
                     # Code cells are wrapped in Markdown code blocks
-                    md_output.append(f"```python\n{''.join(source_lines)}\n```")
+                    md_output.append(f"```python\n{cell_source}\n```")
                 elif cell_type == "raw":
-                    md_output.append(f"```\n{''.join(source_lines)}\n```")
+                    md_output.append(f"```\n{cell_source}\n```")
 
             md_text = "\n\n".join(md_output)
 
