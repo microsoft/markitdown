@@ -95,6 +95,11 @@ def _to_markdown_table(table: list[list[str]], include_separator: bool = True) -
     if not table:
         return ""
 
+    # Pad ragged rows to the widest row; zip() below would otherwise
+    # truncate every row to the shortest one and drop the extra cells.
+    num_columns = max(len(row) for row in table)
+    table = [row + [""] * (num_columns - len(row)) for row in table]
+
     # Column widths
     col_widths = [max(len(str(cell)) for cell in col) for col in zip(*table)]
 
@@ -144,7 +149,11 @@ def _extract_form_content_from_words(page: Any) -> str | None:
 
     # Sort rows by Y position
     sorted_y_keys = sorted(rows_by_y.keys())
-    page_width = page.width if hasattr(page, "width") else 612
+    page_width = getattr(page, "width", 612)
+    if not page_width or page_width <= 0:
+        # A degenerate MediaBox can report a zero or negative width; fall
+        # back to US Letter so the paragraph-width comparison still works.
+        page_width = 612
 
     # First pass: analyze each row
     row_info: list[dict] = []

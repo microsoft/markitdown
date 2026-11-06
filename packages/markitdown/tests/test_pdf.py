@@ -1370,6 +1370,69 @@ PDF_TEST_STRINGS = [
 ]
 
 
+def test_to_markdown_table_keeps_cells_beyond_shortest_header() -> None:
+    """Ragged rows: cells past the shortest row's length must not be dropped."""
+    from markitdown.converters._pdf_converter import _to_markdown_table
+
+    out = _to_markdown_table([["H1", "H2"], ["r1c1", "r1c2", "r1c3"]])
+    assert "r1c3" in out
+    for line in out.split("\n"):
+        assert line.count("|") == 4  # 3 columns
+
+
+def test_to_markdown_table_keeps_header_cells_beyond_shortest_row() -> None:
+    """Ragged rows in the other direction: a long header must survive."""
+    from markitdown.converters._pdf_converter import _to_markdown_table
+
+    out = _to_markdown_table([["H1", "H2", "H3"], ["a", "b"]])
+    assert "H3" in out
+    for line in out.split("\n"):
+        assert line.count("|") == 4  # 3 columns
+
+
+class _FakeWordsPage:
+    """Minimal stand-in for a pdfplumber page with a degenerate width."""
+
+    def __init__(self, words, width):
+        self._words = words
+        self.width = width
+
+    def extract_words(self, **kwargs):
+        return self._words
+
+
+def _form_words():
+    def row(y, a, b, c):
+        return [
+            {"x0": 10, "x1": 60, "top": y, "text": a},
+            {"x0": 110, "x1": 160, "top": y, "text": b},
+            {"x0": 210, "x1": 260, "top": y, "text": c},
+        ]
+
+    return row(
+        10, "AlphaHeaderLongTextXX", "BravoHeaderLongTextXX", "CharlieHeaderLongTextX"
+    ) + row(
+        30, "DeltaRowValueLongTextX", "EchoRowValueLongTextXX", "FoxtrotRowValueLongTxt"
+    )
+
+
+@pytest.mark.parametrize("width", [0, -5])
+def test_extract_form_content_with_nonpositive_page_width(width) -> None:
+    """A zero/negative page width must fall back to the default width.
+
+    With width 0 every row counted as a paragraph (line width > 0), so the
+    form table was dropped entirely.
+    """
+    from markitdown.converters._pdf_converter import (
+        _extract_form_content_from_words,
+    )
+
+    out = _extract_form_content_from_words(_FakeWordsPage(_form_words(), width))
+    assert out is not None
+    assert "AlphaHeaderLongTextXX" in out
+    assert "FoxtrotRowValueLongTxt" in out
+
+
 @pytest.mark.skipif(
     skip_remote,
     reason="do not run tests that query external urls",

@@ -344,5 +344,19 @@ def test_deeply_nested_html_fallback() -> None:
     assert "<p>" not in result.markdown
 
 
+def test_link_title_newline_is_collapsed() -> None:
+    markdown = _convert_html(
+        '<a href="https://example.com" title="Line1\nLine2">Link</a>'
+    )
+    assert markdown.strip() == '[Link](https://example.com "Line1 Line2")'
+
+
+def test_image_title_newline_is_collapsed() -> None:
+    markdown = _convert_html(
+        '<img src="https://example.com/i.png" alt="pic" title="Line1\nLine2">'
+    )
+    assert markdown.strip() == '![pic](https://example.com/i.png "Line1 Line2")'
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
