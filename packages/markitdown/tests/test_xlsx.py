@@ -540,5 +540,103 @@ def test_xlsx_show_zeroes_rename_is_scoped_to_sheet_view_tags() -> None:
     assert b'<customSheetView showZeroes="0"/>' in repaired
 
 
+# Cell values
+
+
+def _convert_rows(rows: list[list[Any]]) -> str:
+    workbook = openpyxl.Workbook()
+    for row in rows:
+        workbook.active.append(row)
+    stream = io.BytesIO()
+    workbook.save(stream)
+    stream.seek(0)
+    return MarkItDown().convert_stream(stream, stream_info=_INFO).markdown
+
+
+def test_xlsx_text_cells_that_look_numeric_stay_text() -> None:
+    markdown = _convert_rows(
+        [
+            ["zip", "phone", "account"],
+            ["02134", "+15551234", "12345678901234567890"],
+            ["00501", "0612345678", "007"],
+        ]
+    )
+
+    assert markdown.splitlines()[-2:] == [
+        "| 02134 | +15551234 | 12345678901234567890 |",
+        "| 00501 | 0612345678 | 007 |",
+    ]
+
+
+def test_xlsx_missing_value_markers_are_unchanged() -> None:
+    # Keeping numeric-looking text does not change pandas' NA markers: these
+    # cells were missing before and still are, next to text that is kept.
+    markdown = _convert_rows(
+        [
+            ["zip", "marker"],
+            ["02134", "NA"],
+            ["00501", "N/A"],
+            ["00601", "NULL"],
+            ["00701", "nan"],
+            ["00801", "kept"],
+        ]
+    )
+
+    assert markdown.splitlines()[-5:] == [
+        "| 02134 | NaN |",
+        "| 00501 | NaN |",
+        "| 00601 | NaN |",
+        "| 00701 | NaN |",
+        "| 00801 | kept |",
+    ]
+
+
+def test_xlsx_numeric_cells_render_as_before() -> None:
+    markdown = _convert_rows(
+        [
+            ["int", "sparse", "float", "flag"],
+            [1, 2, 1.5, True],
+            [3, None, 0.25, False],
+        ]
+    )
+
+    assert markdown.splitlines()[-2:] == [
+        "| 1 | 2.0 | 1.50 | True |",
+        "| 3 | NaN | 0.25 | False |",
+    ]
+
+
+def test_xlsx_repeated_header_names_are_kept() -> None:
+    markdown = _convert_rows(
+        [
+            ["Item", "Total", "Total", "Item", "Total.1", "NA", None],
+            ["x", 1, 2, "y", 3, 4, 5],
+        ]
+    )
+
+    assert markdown.splitlines()[1] == (
+        "| Item | Total | Total | Item | Total.1 | NA | Unnamed: 6 |"
+    )
+    assert markdown.splitlines()[3] == "| x | 1 | 2 | y | 3 | 4 | 5 |"
+
+
+@pytest.mark.parametrize("label", ["NA", "N/A", "NULL", "nan", ""])
+def test_xlsx_repeated_na_like_header_names_are_kept(label: str) -> None:
+    markdown = _convert_rows([[label, label, "x"], [1, 2, 3]])
+
+    if label:
+        assert markdown.splitlines()[1] == f"| {label} | {label} | x |"
+    else:
+        # openpyxl writes "" as an empty cell, so pandas names both columns.
+        assert markdown.splitlines()[1] == "| Unnamed: 0 | Unnamed: 1 | x |"
+
+
+def test_xlsx_repeated_headers_with_a_narrow_first_row() -> None:
+    markdown = _convert_rows([["Total", "Total"], [1, 2, 3, 4]])
+
+    assert markdown.splitlines()[1] == "| Total | Total | Unnamed: 2 | Unnamed: 3 |"
+    assert markdown.splitlines()[3] == "| 1 | 2 | 3 | 4 |"
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
