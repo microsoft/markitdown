@@ -12,6 +12,29 @@ CANDIDATE_MIME_TYPE_PREFIXES = [
 ACCEPTED_FILE_EXTENSIONS = [".ipynb"]
 
 
+def _is_notebook_payload(content: str) -> bool:
+    """Return True only for JSON that is an actual notebook at the top level.
+
+    Substring matching on "nbformat"/"nbformat_minor" also matches ordinary
+    JSON documents that merely mention those words, and those documents were
+    then converted to empty Markdown. Parsing the candidate and requiring a
+    top-level ``cells`` list keeps the MIME detection honest.
+    """
+    try:
+        payload = json.loads(content.lstrip("\ufeff"))
+    except (json.JSONDecodeError, RecursionError):
+        return False
+
+    if not isinstance(payload, dict):
+        return False
+
+    return (
+        "nbformat" in payload
+        and "nbformat_minor" in payload
+        and isinstance(payload.get("cells"), list)
+    )
+
+
 class IpynbConverter(DocumentConverter):
     """Converts Jupyter Notebook (.ipynb) files to Markdown."""
 
@@ -34,10 +57,7 @@ class IpynbConverter(DocumentConverter):
                 try:
                     encoding = stream_info.charset or "utf-8"
                     notebook_content = file_stream.read().decode(encoding)
-                    return (
-                        "nbformat" in notebook_content
-                        and "nbformat_minor" in notebook_content
-                    )
+                    return _is_notebook_payload(notebook_content)
                 except (ValueError, LookupError):
                     return False
                 finally:

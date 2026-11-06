@@ -551,6 +551,91 @@ def test_ipynb_accepts_non_ascii() -> None:
     assert result is True
 
 
+# Ordinary JSON that only mentions notebook markers must not be claimed by the
+# IpynbConverter and converted to empty Markdown.
+_JSON_MENTIONING_NOTEBOOK_MARKERS = [
+    {
+        "description": "The format uses nbformat and nbformat_minor fields.",
+        "items": ["important content"],
+    },
+    {
+        "nbformat": 4,
+        "nbformat_minor": 5,
+        "data": ["important content"],
+    },
+    {
+        "example": {"nbformat": 4, "nbformat_minor": 5, "cells": []},
+        "items": ["important content"],
+    },
+    {
+        "nbformat": 4,
+        "nbformat_minor": 5,
+        "cells": "not a list",
+        "items": ["important content"],
+    },
+]
+
+
+@pytest.mark.parametrize("payload", _JSON_MENTIONING_NOTEBOOK_MARKERS)
+def test_ipynb_accepts_declines_json_that_only_mentions_markers(payload) -> None:
+    """Only a top-level notebook shape may be detected through the JSON MIME."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    data = json.dumps(payload).encode("utf-8")
+    stream_info = StreamInfo(mimetype="application/json", charset="utf-8")
+
+    assert IpynbConverter().accepts(io.BytesIO(data), stream_info) is False
+
+
+@pytest.mark.parametrize("payload", _JSON_MENTIONING_NOTEBOOK_MARKERS)
+def test_json_mentioning_notebook_markers_is_preserved(payload) -> None:
+    """End-to-end: the plain-text converter must keep the original JSON."""
+    data = json.dumps(payload).encode("utf-8")
+    stream_info = StreamInfo(
+        extension=".json", mimetype="application/json", charset="utf-8"
+    )
+
+    result = MarkItDown().convert_stream(io.BytesIO(data), stream_info=stream_info)
+
+    assert "important content" in result.markdown
+
+
+def test_ipynb_accepts_declines_malformed_json() -> None:
+    """Broken JSON must be declined instead of raising from detection."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    data = b'{"nbformat": 4, "nbformat_minor": 5, "cells": ['
+    stream_info = StreamInfo(mimetype="application/json", charset="utf-8")
+
+    assert IpynbConverter().accepts(io.BytesIO(data), stream_info) is False
+
+
+def test_ipynb_accepts_declines_deeply_nested_json() -> None:
+    """Pathologically nested JSON must not overflow detection."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    data = ("[" * 4000 + "]" * 4000).encode("utf-8")
+    stream_info = StreamInfo(mimetype="application/json", charset="utf-8")
+
+    assert IpynbConverter().accepts(io.BytesIO(data), stream_info) is False
+
+
+def test_ipynb_accepts_real_notebook_and_restores_stream_position() -> None:
+    """Detection must accept a genuine notebook and leave the stream untouched."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    data = json.dumps(_BOM_NOTEBOOK).encode("utf-8")
+    file_stream = io.BytesIO(data)
+    assert file_stream.tell() == 0
+
+    accepted = IpynbConverter().accepts(
+        file_stream, StreamInfo(mimetype="application/json", charset="utf-8")
+    )
+
+    assert accepted is True
+    assert file_stream.tell() == 0
+
+
 # File URI validation
 
 UNC_URI_PATHS = [
