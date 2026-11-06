@@ -354,7 +354,8 @@ class PptxConverter(DocumentConverter):
                 markdown_table.append("| " + " | ".join(map(str, row)) + " |")
             header = markdown_table[0]
             separator = "|" + "|".join(["---"] * len(data[0])) + "|"
-            return md + "\n".join([header, separator] + markdown_table[1:])
+            # End the table before the next shape's Markdown is appended.
+            return md + "\n".join([header, separator] + markdown_table[1:]) + "\n\n"
         except ValueError as e:
             # Handle the specific error for unsupported chart types
             if "unsupported plot type" in str(e):
