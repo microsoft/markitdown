@@ -824,6 +824,37 @@ def test_pptx_chart_multi_series_conversion() -> None:
     assert "| C10 | 10.0 | 20.0 |" in md
 
 
+def test_pptx_chart_missing_data_point_renders_empty() -> None:
+    """A missing chart value must render as an empty cell, not the string 'None'."""
+    pptx = pytest.importorskip("pptx")
+    from pptx.util import Inches
+    from pptx.chart.data import CategoryChartData
+    from pptx.enum.chart import XL_CHART_TYPE
+
+    presentation = pptx.Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[5])
+    chart_data = CategoryChartData()
+    chart_data.categories = ["Q1", "Q2", "Q3"]
+    chart_data.add_series("Sales", (1.0, None, 3.0))
+    slide.shapes.add_chart(
+        XL_CHART_TYPE.COLUMN_CLUSTERED,
+        Inches(1),
+        Inches(1),
+        Inches(8),
+        Inches(5),
+        chart_data,
+    )
+
+    buffer = io.BytesIO()
+    presentation.save(buffer)
+    buffer.seek(0)
+
+    md = MarkItDown().convert_stream(buffer, file_extension=".pptx").markdown
+
+    assert "| Q2 |  |" in md, "missing point must be an empty cell"
+    assert "None" not in md, "the literal 'None' must not appear"
+
+
 def test_pptx_converter_treats_none_llm_caption_as_empty(monkeypatch) -> None:
     from markitdown.converters import _pptx_converter
 
