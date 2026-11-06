@@ -1,29 +1,38 @@
+import importlib
 import io
 import re
-import sys
 import zipfile
 from contextlib import contextmanager
+from types import ModuleType
 from typing import BinaryIO, Any, Iterator, Optional
 from ._html_converter import HtmlConverter
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 from .._stream_info import StreamInfo
 
-# Try loading optional (but in this case, required) dependencies
-# Save reporting of any exceptions for later
-_xlsx_dependency_exc_info = None
-try:
-    import pandas as pd
-    import openpyxl  # noqa: F401
-except ImportError:
-    _xlsx_dependency_exc_info = sys.exc_info()
 
-_xls_dependency_exc_info = None
-try:
-    import pandas as pd  # noqa: F811
-    import xlrd  # noqa: F401
-except ImportError:
-    _xls_dependency_exc_info = sys.exc_info()
+def _import_pandas(
+    engine: str, *, converter: str, extension: str, feature: str
+) -> ModuleType:
+    """Import pandas and the given Excel engine for a spreadsheet conversion.
+
+    pandas is the slowest dependency to import, and only spreadsheets need it, so
+    it is imported on the first spreadsheet conversion instead of with this module.
+    """
+    try:
+        import pandas
+
+        importlib.import_module(engine)
+    except ImportError as exc:
+        raise MissingDependencyException(
+            MISSING_DEPENDENCY_MESSAGE.format(
+                converter=converter,
+                extension=extension,
+                feature=feature,
+            )
+        ) from exc
+    return pandas
+
 
 ACCEPTED_XLSX_MIME_TYPE_PREFIXES = [
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -46,6 +55,7 @@ _SHOW_ZEROES_ATTRIBUTE = re.compile(rb"(?<=[\s])showZeroes(\s*=)")
 
 @contextmanager
 def _read_xlsx_sheets(
+    pd: ModuleType,
     file_stream: BinaryIO,
 ) -> Iterator[tuple[dict[str, Any], BinaryIO]]:
     start_pos = file_stream.tell()
@@ -126,22 +136,15 @@ class XlsxConverter(DocumentConverter):
         stream_info: StreamInfo,
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
-        # Check the dependencies
-        if _xlsx_dependency_exc_info is not None:
-            raise MissingDependencyException(
-                MISSING_DEPENDENCY_MESSAGE.format(
-                    converter=type(self).__name__,
-                    extension=".xlsx",
-                    feature="xlsx",
-                )
-            ) from _xlsx_dependency_exc_info[
-                1
-            ].with_traceback(  # type: ignore[union-attr]
-                _xlsx_dependency_exc_info[2]
-            )
+        pd = _import_pandas(
+            "openpyxl",
+            converter=type(self).__name__,
+            extension=".xlsx",
+            feature="xlsx",
+        )
 
         md_content = ""
-        with _read_xlsx_sheets(file_stream) as (sheets, workbook_stream):
+        with _read_xlsx_sheets(pd, file_stream) as (sheets, workbook_stream):
             images = None
             if type(self)._image_to_html is not XlsxConverter._image_to_html:
                 from ..converter_utils._xlsx_images import _XlsxImages
@@ -223,19 +226,12 @@ class XlsConverter(DocumentConverter):
         stream_info: StreamInfo,
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
-        # Load the dependencies
-        if _xls_dependency_exc_info is not None:
-            raise MissingDependencyException(
-                MISSING_DEPENDENCY_MESSAGE.format(
-                    converter=type(self).__name__,
-                    extension=".xls",
-                    feature="xls",
-                )
-            ) from _xls_dependency_exc_info[
-                1
-            ].with_traceback(  # type: ignore[union-attr]
-                _xls_dependency_exc_info[2]
-            )
+        pd = _import_pandas(
+            "xlrd",
+            converter=type(self).__name__,
+            extension=".xls",
+            feature="xls",
+        )
 
         sheets = pd.read_excel(file_stream, sheet_name=None, engine="xlrd")
         md_content = ""
