@@ -1,6 +1,8 @@
+import io
 import os
 import posixpath
 import zipfile
+import zlib
 from urllib.parse import unquote
 from defusedxml import minidom
 from xml.dom.minidom import Document
@@ -103,21 +105,37 @@ class EpubConverter(HtmlConverter):
             # Extract and convert the content
             markdown_content: List[str] = []
             for file in spine:
-                if file in z.namelist():
-                    with z.open(file) as f:
-                        filename = os.path.basename(file)
-                        extension = os.path.splitext(filename)[1].lower()
-                        mimetype = MIME_TYPE_MAPPING.get(extension)
-                        converted_content = self._html_converter.convert(
-                            f,
-                            StreamInfo(
-                                mimetype=mimetype,
-                                extension=extension,
-                                filename=filename,
-                            ),
-                            **kwargs,
-                        )
-                        markdown_content.append(converted_content.markdown.strip())
+                if file not in zip_names:
+                    continue
+                try:
+                    payload = z.read(file)
+                except (
+                    RuntimeError,
+                    zipfile.BadZipFile,
+                    NotImplementedError,
+                    EOFError,
+                    zlib.error,
+                ) as exc:
+                    # One unreadable chapter -- encrypted, a bad CRC, a damaged deflate
+                    # stream, a truncated entry, or a compression method this build does not
+                    # carry -- must not cost the reader the rest of the book, so it is
+                    # reported in place and the spine continues.
+                    markdown_content.append(f"This part could not be read: {exc}")
+                    continue
+
+                filename = os.path.basename(file)
+                extension = os.path.splitext(filename)[1].lower()
+                mimetype = MIME_TYPE_MAPPING.get(extension)
+                converted_content = self._html_converter.convert(
+                    io.BytesIO(payload),
+                    StreamInfo(
+                        mimetype=mimetype,
+                        extension=extension,
+                        filename=filename,
+                    ),
+                    **kwargs,
+                )
+                markdown_content.append(converted_content.markdown.strip())
 
             # Format and add the metadata
             metadata_markdown = []
