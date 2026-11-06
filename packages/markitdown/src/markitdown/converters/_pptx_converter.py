@@ -322,6 +322,23 @@ class PptxConverter(DocumentConverter):
             + "\n"
         )
 
+    @staticmethod
+    def _escape_chart_table_cell(value):
+        """Escape literal table delimiters without changing inline Markdown."""
+        text = str(value)
+
+        # Preserve backslashes that precede a literal pipe while escaping the
+        # pipe itself. A run of n backslashes needs 2*n+1 backslashes before
+        # the pipe in the resulting Markdown: two preserve each original
+        # backslash and one escapes the delimiter.
+        def escape_pipe(match):
+            backslashes = match.group(0)[:-1]
+            return "\\" * (2 * len(backslashes) + 1) + "|"
+
+        text = re.sub(r"\\*\|", escape_pipe, text)
+        text = re.sub(r"\r\n|\r|\n", "<br>", text)
+        return text
+
     def _convert_chart_to_markdown(self, chart):
         try:
             md = "\n\n### Chart"
@@ -351,7 +368,11 @@ class PptxConverter(DocumentConverter):
 
             markdown_table = []
             for row in data:
-                markdown_table.append("| " + " | ".join(map(str, row)) + " |")
+                markdown_table.append(
+                    "| "
+                    + " | ".join(self._escape_chart_table_cell(cell) for cell in row)
+                    + " |"
+                )
             header = markdown_table[0]
             separator = "|" + "|".join(["---"] * len(data[0])) + "|"
             return md + "\n".join([header, separator] + markdown_table[1:])
