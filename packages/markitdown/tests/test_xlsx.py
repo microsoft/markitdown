@@ -540,5 +540,33 @@ def test_xlsx_show_zeroes_rename_is_scoped_to_sheet_view_tags() -> None:
     assert b'<customSheetView showZeroes="0"/>' in repaired
 
 
+def test_xlsx_preserves_saved_error_values() -> None:
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = "Results"
+    sheet.append(["Case", "Result"])
+    sheet.append(["Valid value", 42])
+    errors = ("#DIV/0!", "#REF!", "#VALUE!", "#N/A", "#NUM!", "#NAME?", "#NULL!")
+    for error in errors:
+        sheet.append(["Error " + str(sheet.max_row), error])
+    sheet.append(["Blank", None])
+    stream = io.BytesIO()
+    workbook.save(stream)
+    workbook.close()
+
+    saved = openpyxl.load_workbook(io.BytesIO(stream.getvalue()), data_only=True)
+    assert saved.active["B3"].value == "#DIV/0!"
+    assert saved.active["B3"].data_type == "e"
+    saved.close()
+
+    markdown = _convert(XlsxConverter(), stream.getvalue())
+
+    assert "| Valid value | 42.0 |" in markdown
+    assert "| Blank | NaN |" in markdown
+    for index, error in enumerate(errors, start=2):
+        assert f"| Error {index} | {error} |" in markdown
+    assert markdown.count("NaN") == 1
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))

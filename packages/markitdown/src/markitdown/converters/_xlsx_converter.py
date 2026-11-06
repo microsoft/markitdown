@@ -4,6 +4,7 @@ import sys
 import zipfile
 from contextlib import contextmanager
 from typing import BinaryIO, Any, Iterator, Optional
+from bs4 import BeautifulSoup
 from ._html_converter import HtmlConverter
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
@@ -44,20 +45,51 @@ _SHEET_VIEW_START_TAG = re.compile(rb"<sheetView(?=[\s/>])[^>]*>")
 _SHOW_ZEROES_ATTRIBUTE = re.compile(rb"(?<=[\s])showZeroes(\s*=)")
 
 
+def _html_preserving_excel_errors(file_stream: BinaryIO) -> dict[str, str]:
+    # pandas' openpyxl reader maps data_type "e" cells to NaN inside
+    # _convert_cell, before keep_default_na or dtype can see the token.
+    # Render first so numeric and datetime columns keep their formatting,
+    # then write the saved error text back into those HTML cells.
+    with pd.ExcelFile(file_stream, engine="openpyxl") as excel:
+        sheets = pd.read_excel(excel, sheet_name=None)
+        html_sheets: dict[str, str] = {}
+        for worksheet in excel.book.worksheets:
+            html = sheets[worksheet.title].to_html(index=False)
+            errors = [
+                cell
+                for row in worksheet.iter_rows()
+                for cell in row
+                if cell.data_type == "e" and cell.value is not None
+            ]
+            if errors:
+                soup = BeautifulSoup(html, "html.parser")
+                rows = [
+                    row.find_all(["th", "td"], recursive=False)
+                    for row in soup.find_all("tr")
+                ]
+                for cell in errors:
+                    # The reader uses the first row as the header and keeps
+                    # empty rows. index=False omits the row-index column.
+                    rows[cell.row - 1][cell.column - 1].string = str(cell.value)
+                html = str(soup)
+            html_sheets[worksheet.title] = html
+        return html_sheets
+
+
 @contextmanager
 def _read_xlsx_sheets(
     file_stream: BinaryIO,
-) -> Iterator[tuple[dict[str, Any], BinaryIO]]:
+) -> Iterator[tuple[dict[str, str], BinaryIO]]:
     start_pos = file_stream.tell()
     repaired_stream = None
     try:
         try:
-            sheets = pd.read_excel(file_stream, sheet_name=None, engine="openpyxl")
+            sheets = _html_preserving_excel_errors(file_stream)
         except TypeError as exc:
             if "showZeroes" not in str(exc):
                 raise
             repaired_stream = _repair_sheetview_show_zeroes(file_stream, start_pos)
-            sheets = pd.read_excel(repaired_stream, sheet_name=None, engine="openpyxl")
+            sheets = _html_preserving_excel_errors(repaired_stream)
         yield sheets, repaired_stream if repaired_stream is not None else file_stream
     finally:
         if repaired_stream is not None:
@@ -150,7 +182,7 @@ class XlsxConverter(DocumentConverter):
 
             for s in sheets:
                 md_content += f"## {s}\n"
-                html_content = sheets[s].to_html(index=False)
+                html_content = sheets[s]
                 md_content += (
                     self._html_converter.convert_string(
                         html_content, **kwargs
