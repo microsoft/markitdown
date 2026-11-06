@@ -8,14 +8,17 @@ the CU SDK's ``to_llm_input()`` helper.
 Install dependencies: ``pip install 'markitdown[az-content-understanding]'``
 """
 
-import sys
+import logging
 import os
-from typing import BinaryIO, Any, List, Optional, Dict
+import sys
 from enum import Enum
+from typing import Any, BinaryIO, Dict, List, Optional
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
-from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException
+from .._stream_info import StreamInfo
+
+logger = logging.getLogger(__name__)
 
 # Try loading optional dependencies — save error for later
 _dependency_exc_info = None
@@ -559,12 +562,22 @@ class ContentUnderstandingConverter(DocumentConverter):
             binary_input=file_bytes,
             content_type=content_type,
         )
+        operation_id = poller.operation_id
 
-        # 4. Block on result
-        result = poller.result()
+        try:
+            # 4. Block on result
+            result = poller.result()
 
-        # 5. Format output using to_llm_input()
-        text = to_llm_input(result)
+            # 5. Format output using to_llm_input()
+            text = to_llm_input(result)
 
-        # 6. Return
-        return DocumentConverterResult(markdown=text)
+            # 6. Return
+            return DocumentConverterResult(markdown=text)
+        finally:
+            try:
+                self._client.delete_result(operation_id)
+            except Exception:  # noqa: BLE001 - cleanup must not mask conversion results or errors
+                logger.warning(
+                    "Could not delete Content Understanding result; "
+                    "Azure will expire it automatically."
+                )
