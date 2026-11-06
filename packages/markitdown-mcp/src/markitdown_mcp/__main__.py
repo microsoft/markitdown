@@ -105,7 +105,7 @@ def main():
 
     use_http = args.http or args.sse
 
-    if not use_http and (args.host or args.port):
+    if not use_http and (args.host or args.port is not None):
         parser.error(
             "Host and port arguments are only valid when using streamable HTTP or SSE transport (see: --http)."
         )
@@ -129,7 +129,7 @@ def main():
         uvicorn.run(
             starlette_app,
             host=host,
-            port=args.port if args.port else 3001,
+            port=args.port if args.port is not None else 3001,
         )
     else:
         mcp.run()
