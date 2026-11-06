@@ -551,6 +551,68 @@ def test_ipynb_accepts_non_ascii() -> None:
     assert result is True
 
 
+def test_ipynb_with_string_source_extracts_the_title() -> None:
+    """nbformat allows `source` to be a single string, not just a list of lines.
+
+    Regression for https://github.com/microsoft/markitdown/issues/2762
+    """
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    notebook = {
+        "nbformat": 4,
+        "nbformat_minor": 5,
+        "metadata": {},
+        "cells": [
+            {"cell_type": "markdown", "source": "# My Title\nhello", "metadata": {}},
+        ],
+    }
+
+    result = IpynbConverter()._convert(notebook)
+
+    assert result.title == "My Title"
+    assert result.markdown == "# My Title\nhello"
+
+
+def test_ipynb_with_string_source_converts_the_same_as_the_list_form() -> None:
+    lines = [
+        "# My Title\n",
+        "Some text\n",
+        "more text\n",
+    ]
+    notebook_body = {
+        "nbformat": 4,
+        "nbformat_minor": 5,
+        "metadata": {},
+    }
+    from_list = {
+        **notebook_body,
+        "cells": [
+            {"cell_type": "markdown", "source": lines, "metadata": {}},
+            {"cell_type": "code", "source": ["x = 1\n", "print(x)\n"], "metadata": {}},
+        ],
+    }
+    from_string = {
+        **notebook_body,
+        "cells": [
+            {"cell_type": "markdown", "source": "".join(lines), "metadata": {}},
+            {"cell_type": "code", "source": "x = 1\nprint(x)\n", "metadata": {}},
+        ],
+    }
+
+    list_result = MarkItDown().convert_stream(
+        io.BytesIO(json.dumps(from_list).encode("utf-8")),
+        stream_info=StreamInfo(extension=".ipynb"),
+    )
+    string_result = MarkItDown().convert_stream(
+        io.BytesIO(json.dumps(from_string).encode("utf-8")),
+        stream_info=StreamInfo(extension=".ipynb"),
+    )
+
+    assert string_result.title == list_result.title == "My Title"
+    assert string_result.markdown == list_result.markdown
+    assert "```python\nx = 1\nprint(x)\n\n```" in string_result.markdown
+
+
 # File URI validation
 
 UNC_URI_PATHS = [
