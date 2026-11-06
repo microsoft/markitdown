@@ -16,7 +16,7 @@ MarkItDown currently supports the conversion from:
 - Excel
 - Images (EXIF metadata and captioning)
 - Audio (EXIF metadata and speech transcription)
-- HTML
+- HTML (and MHTML web archives)
 - Text-based formats (CSV, JSON, XML)
 - ZIP files (iterates over contents)
 - YouTube URLs
