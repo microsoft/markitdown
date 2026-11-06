@@ -2,7 +2,7 @@ import zipfile
 import io
 import os
 
-from typing import BinaryIO, Any, TYPE_CHECKING
+from typing import BinaryIO, Any, Optional, TYPE_CHECKING
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
@@ -17,6 +17,73 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 ]
 
 ACCEPTED_FILE_EXTENSIONS = [".zip"]
+
+
+def _decode_zip_filename(
+    entry: zipfile.ZipInfo,
+    metadata_encoding: Optional[str] = None,
+) -> str:
+    """Decode a ZIP member filename, handling non-ASCII names when flag bit 11 is not set."""
+    name = entry.filename
+    # If bit 11 is set, Python's zipfile already decoded the filename as UTF-8
+    if entry.flag_bits & 0x800:
+        return name
+
+    # When bit 11 is not set, zipfile decoded raw bytes as CP437.
+    # Re-encode to recover the original raw bytes.
+    try:
+        raw_bytes = name.encode("cp437")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return name
+
+    # 1. Use explicit user/caller provided metadata encoding if given
+    if metadata_encoding:
+        try:
+            return raw_bytes.decode(metadata_encoding)
+        except (UnicodeDecodeError, LookupError):
+            pass
+
+    # 2. Try UTF-8 first (many archivers write UTF-8 bytes without setting bit 11)
+    try:
+        return raw_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        pass
+
+    # 3. Use charset-normalizer to detect language/encoding
+    try:
+        from charset_normalizer import from_bytes
+
+        matches = from_bytes(raw_bytes)
+        best = matches.best()
+        if best is not None:
+            if best.encoding in ("cp932", "shift_jis"):
+                return str(best)
+
+            gb_match = next(
+                (m for m in matches if m.encoding in ("gb18030", "gbk", "cp936")),
+                None,
+            )
+            if gb_match is not None:
+                if (
+                    best.encoding in ("cp949", "johab")
+                    and "CJK Unified Ideographs" in best.alphabets
+                ):
+                    return str(gb_match)
+                if best.encoding in ("gb18030", "gbk", "cp936"):
+                    return str(gb_match)
+
+            return str(best)
+    except (ValueError, TypeError, LookupError):
+        pass
+
+    # 4. Fallback common CJK encodings
+    for enc in ("gb18030", "cp932", "big5"):
+        try:
+            return raw_bytes.decode(enc)
+        except (UnicodeDecodeError, LookupError):
+            pass
+
+    return name
 
 
 class ZipConverter(DocumentConverter):
@@ -107,7 +174,10 @@ class ZipConverter(DocumentConverter):
 
         with zipfile.ZipFile(file_stream, "r") as zipObj:
             for entry in zipObj.infolist():
-                name = entry.filename
+                name = _decode_zip_filename(
+                    entry,
+                    metadata_encoding=kwargs.get("metadata_encoding"),
+                )
                 try:
                     z_file_stream = io.BytesIO(zipObj.read(entry))
                     z_file_stream_info = StreamInfo(
