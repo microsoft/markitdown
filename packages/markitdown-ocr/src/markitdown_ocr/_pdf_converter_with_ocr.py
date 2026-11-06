@@ -5,6 +5,7 @@ Extracts images from PDFs and performs OCR while maintaining document context.
 
 import io
 import sys
+import warnings
 from typing import Any, BinaryIO, Optional
 
 from markitdown import DocumentConverter, DocumentConverterResult, StreamInfo
@@ -239,6 +240,8 @@ class PdfConverterWithOCR(DocumentConverter):
                                 ocr_result = ocr_service.extract_text(
                                     img_info["stream"]
                                 )
+                                if ocr_result.error:
+                                    warnings.warn(f"LLM OCR failed: {ocr_result.error}")
                                 if ocr_result.text.strip():
                                     image_data.append(
                                         {
@@ -369,6 +372,8 @@ class PdfConverterWithOCR(DocumentConverter):
                         # Run OCR
                         ocr_result = ocr_service.extract_text(img_stream)
 
+                        if ocr_result.error:
+                            warnings.warn(f"LLM OCR failed: {ocr_result.error}")
                         if ocr_result.text.strip():
                             text = ocr_result.text.strip()
                             markdown_parts.append(f"*[Image OCR]\n{text}\n[End OCR]*")
@@ -402,6 +407,8 @@ class PdfConverterWithOCR(DocumentConverter):
 
                         ocr_result = ocr_service.extract_text(img_stream)
 
+                        if ocr_result.error:
+                            warnings.warn(f"LLM OCR failed: {ocr_result.error}")
                         if ocr_result.text.strip():
                             text = ocr_result.text.strip()
                             markdown_parts.append(f"*[Image OCR]\n{text}\n[End OCR]*")
