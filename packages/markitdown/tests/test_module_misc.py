@@ -551,6 +551,74 @@ def test_ipynb_accepts_non_ascii() -> None:
     assert result is True
 
 
+# Plain JSON that only mentions the notebook keys must be left to the
+# plain-text converter. Regression for
+# https://github.com/microsoft/markitdown/issues/2804
+_NOT_NOTEBOOKS = {
+    "keys inside a string": {
+        "description": "The format uses nbformat and nbformat_minor fields.",
+        "items": ["important content"],
+    },
+    "top-level keys but no cells": {
+        "nbformat": 4,
+        "nbformat_minor": 5,
+        "data": ["important content"],
+    },
+    "notebook nested under a key": {
+        "example": {"nbformat": 4, "nbformat_minor": 5, "cells": []},
+        "real": "keep me",
+    },
+}
+
+
+@pytest.mark.parametrize("payload", _NOT_NOTEBOOKS.values(), ids=_NOT_NOTEBOOKS.keys())
+def test_json_that_only_mentions_notebook_keys_is_not_a_notebook(
+    payload: dict,
+) -> None:
+    text = json.dumps(payload)
+    result = MarkItDown(enable_plugins=False).convert_stream(
+        io.BytesIO(text.encode("utf-8")),
+        stream_info=StreamInfo(
+            extension=".json", mimetype="application/json", charset="utf-8"
+        ),
+    )
+
+    assert result.markdown == text
+
+
+def test_ipynb_detection_skips_json_nested_too_deep_to_parse() -> None:
+    """Detection must decline instead of raising when json gives up."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    deep = '{"nbformat": 4, "nbformat_minor": 5, "cells": ' + "[" * 5000 + "]" * 5000
+    stream_info = StreamInfo(mimetype="application/json", charset="utf-8")
+
+    assert IpynbConverter().accepts(io.BytesIO(deep.encode()), stream_info) is False
+
+
+def test_notebook_detected_by_mimetype_still_converts_with_a_bom() -> None:
+    """A genuine notebook without an extension is still picked up as one."""
+    data = _UTF8_BOM + json.dumps(_BOM_NOTEBOOK).encode("utf-8")
+
+    result = MarkItDown(enable_plugins=False).convert_stream(
+        io.BytesIO(data),
+        stream_info=StreamInfo(mimetype="application/json", charset="utf-8"),
+    )
+
+    assert result.markdown == "# Quarterly notes\n\n```python\nprint('hello')\n\n```"
+
+
+def test_ipynb_with_its_extension_still_converts_with_a_bom() -> None:
+    """Extension routing is untouched: the BOM is stripped in convert()."""
+    data = _UTF8_BOM + json.dumps(_BOM_NOTEBOOK).encode("utf-8")
+
+    result = MarkItDown(enable_plugins=False).convert_stream(
+        io.BytesIO(data), stream_info=StreamInfo(extension=".ipynb")
+    )
+
+    assert result.markdown == "# Quarterly notes\n\n```python\nprint('hello')\n\n```"
+
+
 # File URI validation
 
 UNC_URI_PATHS = [

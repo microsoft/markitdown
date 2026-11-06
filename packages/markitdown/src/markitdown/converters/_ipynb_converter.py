@@ -34,16 +34,38 @@ class IpynbConverter(DocumentConverter):
                 try:
                     encoding = stream_info.charset or "utf-8"
                     notebook_content = file_stream.read().decode(encoding)
-                    return (
-                        "nbformat" in notebook_content
-                        and "nbformat_minor" in notebook_content
-                    )
+                    return self._looks_like_notebook(notebook_content)
                 except (ValueError, LookupError):
                     return False
                 finally:
                     file_stream.seek(cur_pos)
 
         return False
+
+    def _looks_like_notebook(self, text: str) -> bool:
+        """Decide from the text itself whether it is a notebook.
+
+        A plain JSON file can mention ``nbformat``/``nbformat_minor`` anywhere
+        (a docs snippet, a config sample, ...), and latching onto that made us
+        return an empty conversion for it. So look at the actual top-level
+        keys instead of the raw text.
+        """
+        # Editors and Windows tooling prepend a BOM, which json rejects
+        text = text.lstrip("\ufeff")
+
+        try:
+            data = json.loads(text)
+        except (ValueError, RecursionError):
+            # Not JSON, or nested too deeply for the parser - not a notebook
+            return False
+
+        if not isinstance(data, dict):
+            return False
+        return (
+            "nbformat" in data
+            and "nbformat_minor" in data
+            and isinstance(data.get("cells"), list)
+        )
 
     def convert(
         self,
