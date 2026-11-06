@@ -1,4 +1,5 @@
 import io
+import re
 import warnings
 from typing import Any, BinaryIO, Optional
 from bs4 import BeautifulSoup
@@ -39,6 +40,50 @@ class HtmlConverter(DocumentConverter):
 
         return False
 
+    def _detect_html_encoding(self, file_stream: BinaryIO) -> Optional[str]:
+        """Peek at the HTML content to find charset declaration (<meta charset>).
+
+        Follows the HTML5 encoding sniffing algorithm: the <meta charset> tag
+        (or Content-Type http-equiv) is the authoritative source, taking
+        precedence over heuristic detection that is unreliable for non-Latin
+        scripts on some platforms.
+        """
+        cur_pos = file_stream.tell()
+        try:
+            # Read first 4 KB — enough to cover <head> and <meta> in any
+            # reasonable HTML document (HTML5 spec uses 1024 bytes minimum).
+            raw = file_stream.read(4096)
+            # Decode as ASCII-superset (Latin-1) so we can scan for meta tags
+            # without committing to the real encoding yet.
+            try:
+                head = raw.decode("ascii")
+            except UnicodeDecodeError:
+                head = raw.decode("latin-1")
+
+            # Pattern 1: <meta charset="utf-8">   (HTML5)
+            m = re.search(
+                r'<meta\b[^>]*\bcharset\s*=\s*["\']?\s*([\w\-\d]+)\s*["\']?',
+                head,
+                re.IGNORECASE,
+            )
+            if m:
+                return m.group(1)
+
+            # Pattern 2: <meta http-equiv="Content-Type"
+            #            content="text/html; charset=utf-8">
+            m = re.search(
+                r'<meta\b[^>]*\bhttp-equiv\s*=\s*["\']?Content-Type["\']?[^>]*\b'
+                r'content\s*=\s*["\'][^"\']*\bcharset\s*=\s*([\w\-\d]+)',
+                head,
+                re.IGNORECASE,
+            )
+            if m:
+                return m.group(1)
+
+            return None
+        finally:
+            file_stream.seek(cur_pos)
+
     def convert(
         self,
         file_stream: BinaryIO,
@@ -49,8 +94,21 @@ class HtmlConverter(DocumentConverter):
         # strict=True raises RecursionError instead of falling back to plain text.
         strict: bool = kwargs.pop("strict", False)
 
+        # Determine encoding — prefer the HTML <meta charset> declaration,
+        # then the stream_info hint, then UTF-8:
+        #   - <meta charset> is the HTML5-authoritative source.
+        #   - stream_info.charset comes from charset_normalizer which can
+        #     mis-detect non-Latin UTF-8 files (e.g. Chinese) on CJK-locale
+        #     Windows systems.
+        meta_encoding = self._detect_html_encoding(file_stream)
+        if meta_encoding:
+            encoding = meta_encoding
+        elif stream_info.charset is not None:
+            encoding = stream_info.charset
+        else:
+            encoding = "utf-8"
+
         # Parse the stream
-        encoding = "utf-8" if stream_info.charset is None else stream_info.charset
         soup = BeautifulSoup(file_stream, "html.parser", from_encoding=encoding)
 
         # Remove javascript and style blocks
