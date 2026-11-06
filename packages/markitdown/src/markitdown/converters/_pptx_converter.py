@@ -343,6 +343,14 @@ class PptxConverter(DocumentConverter):
             # XPath scan of all points), which is extremely slow on large charts.
             series_values = [list(s.values) for s in series_list]
 
+            # XY (scatter) and bubble charts have no category axis, so their
+            # data points only exist in the series themselves. Reuse the point
+            # position as the row label; otherwise every value below would be
+            # dropped along with the missing categories.
+            if not category_names:
+                point_count = max((len(sv) for sv in series_values), default=0)
+                category_names = [str(idx + 1) for idx in range(point_count)]
+
             for idx, category in enumerate(category_names):
                 row = [category]
                 for sv in series_values:
