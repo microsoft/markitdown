@@ -113,7 +113,10 @@ class PptxConverter(DocumentConverter):
                         md_content += text + "\n"
 
                 # Group Shapes
-                if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.GROUP:
+                if (
+                    self._shape_type_or_none(shape)
+                    == pptx.enum.shapes.MSO_SHAPE_TYPE.GROUP
+                ):
                     sorted_shapes = sorted(
                         shape.shapes,
                         key=lambda x: (
@@ -280,10 +283,25 @@ class PptxConverter(DocumentConverter):
 
         return None, None, None
 
+    @staticmethod
+    def _shape_type_or_none(shape):
+        """Return the shape's MSO type, or None if python-pptx can't identify it.
+
+        Some decks contain a shape whose type python-pptx does not recognize;
+        reading shape.shape_type then raises NotImplementedError. A single such
+        shape should not abort the whole presentation, so callers treat an
+        unrecognized shape as "none of the handled types" and fall through.
+        """
+        try:
+            return shape.shape_type
+        except NotImplementedError:
+            return None
+
     def _is_picture(self, shape):
-        if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.PICTURE:
+        shape_type = self._shape_type_or_none(shape)
+        if shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.PICTURE:
             return True
-        if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.PLACEHOLDER:
+        if shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.PLACEHOLDER:
             # ``shape.image`` can raise (e.g. ValueError "no embedded image")
             # for SVG placeholders without a raster fallback, so guard against
             # any exception rather than relying on hasattr (which only swallows
@@ -298,7 +316,7 @@ class PptxConverter(DocumentConverter):
         return False
 
     def _is_table(self, shape):
-        if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.TABLE:
+        if self._shape_type_or_none(shape) == pptx.enum.shapes.MSO_SHAPE_TYPE.TABLE:
             return True
         return False
 
