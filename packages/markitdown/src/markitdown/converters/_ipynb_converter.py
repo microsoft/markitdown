@@ -12,6 +12,24 @@ CANDIDATE_MIME_TYPE_PREFIXES = [
 ACCEPTED_FILE_EXTENSIONS = [".ipynb"]
 
 
+def _fence_for(text: str) -> str:
+    """Pick a backtick fence longer than any backtick run in text.
+
+    A fixed triple-backtick fence breaks when the content itself contains
+    a ``` run (a printed markdown example, say): it closes early and the
+    rest of the output leaks out as prose.
+    """
+    longest = 0
+    run = 0
+    for ch in text:
+        if ch == "`":
+            run += 1
+            longest = max(longest, run)
+        else:
+            run = 0
+    return "`" * max(3, longest + 1)
+
+
 class IpynbConverter(DocumentConverter):
     """Converts Jupyter Notebook (.ipynb) files to Markdown."""
 
@@ -61,6 +79,36 @@ class IpynbConverter(DocumentConverter):
 
         return self._convert(json.loads(notebook_content))
 
+
+
+    @staticmethod
+    def _render_outputs(outputs: list) -> str:
+        """Render a code cell's outputs as markdown, text-bearing ones only."""
+        parts: list[str] = []
+        for out in outputs:
+            if not isinstance(out, dict):
+                continue
+            out_type = out.get("output_type", "")
+            if out_type == "stream":
+                text = "".join(out.get("text", []) or [])
+                if text.strip():
+                    lang = "text" if out.get("name", "stdout") != "stderr" else ""
+                    fence = _fence_for(text)
+                    parts.append(f"{fence}{lang}\n{text.rstrip()}\n{fence}")
+            elif out_type == "error":
+                lines = out.get("traceback") or []
+                header = f"{out.get('ename', 'Error')}: {out.get('evalue', '')}".rstrip(": ")
+                body = "\n".join(lines) if lines else header
+                fence = _fence_for(body)
+                parts.append(f"{fence}\n{body}\n{fence}")
+            elif out_type in ("execute_result", "display_data"):
+                data = out.get("data", {}) or {}
+                text = "".join(data.get("text/plain", []) or [])
+                if text.strip():
+                    fence = _fence_for(text)
+                    parts.append(f"{fence}\n{text.rstrip()}\n{fence}")
+        return "\n\n".join(parts)
+
     def _convert(self, notebook_content: dict) -> DocumentConverterResult:
         """Helper function that converts notebook JSON content to Markdown."""
         try:
@@ -83,11 +131,19 @@ class IpynbConverter(DocumentConverter):
 
                 elif cell_type == "code":
                     # Code cells are wrapped in Markdown code blocks
-                    md_output.append(f"```python\n{''.join(source_lines)}\n```")
+                    src = ''.join(source_lines)
+                    fence = _fence_for(src)
+                    md_output.append(f"{fence}python\n{src}\n{fence}")
+                    # Text-bearing outputs (stdout/stderr streams, error
+                    # tracebacks, text results) follow their cell so the
+                    # notebook's recorded results survive conversion (#2285).
+                    md_output.append(self._render_outputs(cell.get("outputs", [])))
                 elif cell_type == "raw":
-                    md_output.append(f"```\n{''.join(source_lines)}\n```")
+                    src = ''.join(source_lines)
+                    fence = _fence_for(src)
+                    md_output.append(f"{fence}\n{src}\n{fence}")
 
-            md_text = "\n\n".join(md_output)
+            md_text = "\n\n".join(part for part in md_output if part.strip())
 
             # Check for title in notebook metadata
             title = notebook_content.get("metadata", {}).get("title", title)
