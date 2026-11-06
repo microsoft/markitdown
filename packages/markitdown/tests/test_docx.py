@@ -1482,5 +1482,91 @@ def test_convert_docx_with_style_missing_type(tmp_path):
     assert "# Abstract" in result.markdown
 
 
+def _write_footnote_docx(
+    path,
+    *,
+    with_reference: bool = True,
+    note_body: str = "<w:p><w:r><w:t>A note.</w:t></w:r></w:p>",
+) -> str:
+    """Write a minimal .docx with one footnote, and return its path."""
+    reference = '<w:r><w:footnoteReference w:id="1"/></w:r>' if with_reference else ""
+    document_xml = (
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        f"<w:body><w:p><w:r><w:t>Text</w:t></w:r>{reference}</w:p></w:body></w:document>"
+    )
+    footnotes_xml = (
+        '<w:footnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        f'<w:footnote w:id="1">{note_body}</w:footnote>'
+        "</w:footnotes>"
+    )
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr(
+            "[Content_Types].xml",
+            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+            '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+            '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+            '<Override PartName="/word/footnotes.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"/>'
+            "</Types>",
+        )
+        archive.writestr(
+            "_rels/.rels",
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>'
+            "</Relationships>",
+        )
+        archive.writestr(
+            "word/_rels/document.xml.rels",
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes" Target="footnotes.xml"/>'
+            "</Relationships>",
+        )
+        archive.writestr("word/document.xml", document_xml)
+        archive.writestr("word/footnotes.xml", footnotes_xml)
+    return str(path)
+
+
+def test_docx_footnotes_become_gfm_footnotes(tmp_path) -> None:
+    """Footnote links must not point at anchors the Markdown cannot carry."""
+    docx_file = _write_footnote_docx(tmp_path / "footnote.docx")
+
+    result = MarkItDown().convert(docx_file)
+
+    assert "[^1]" in result.markdown
+    assert "[^1]: A note." in result.markdown
+    assert "(#footnote-" not in result.markdown
+    assert "[↑]" not in result.markdown
+
+
+def test_docx_without_footnote_reference_is_untouched(tmp_path) -> None:
+    docx_file = _write_footnote_docx(tmp_path / "plain.docx", with_reference=False)
+
+    result = MarkItDown().convert(docx_file)
+
+    assert "Text" in result.markdown
+    assert "[^" not in result.markdown
+
+
+@pytest.mark.parametrize("emphasis_marker", ["*", "_"])
+def test_docx_footnote_keeps_paragraphs_and_inline_formatting(
+    tmp_path, emphasis_marker: str
+) -> None:
+    docx_file = _write_footnote_docx(
+        tmp_path / "footnote.docx",
+        note_body=(
+            "<w:p><w:r><w:t>First paragraph.</w:t></w:r></w:p>"
+            '<w:p><w:r><w:t xml:space="preserve">Second paragraph with </w:t></w:r>'
+            "<w:r><w:rPr><w:b/></w:rPr><w:t>bold text</w:t></w:r></w:p>"
+        ),
+    )
+    strong = emphasis_marker * 2
+
+    result = MarkItDown().convert(docx_file, strong_em_symbol=emphasis_marker)
+
+    assert result.markdown == (
+        "Text[^1]\n\n[^1]: First paragraph.\n\n"
+        f"    Second paragraph with {strong}bold text{strong}"
+    )
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
