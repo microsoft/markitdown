@@ -100,6 +100,16 @@ def test_html_href_does_not_quote_query_or_fragment() -> None:
     assert f"[example]({expected_href})" in markdown
 
 
+def test_html_href_preserves_mailto_and_tel_links() -> None:
+    html = (
+        '<p>Contact <a href="mailto:team@example.com">the team</a> or '
+        '<a href="tel:+1234567890">call us</a>.</p>'
+    )
+    markdown = _convert_html(html)
+    assert "[the team](mailto:team@example.com)" in markdown
+    assert "[call us](tel:+1234567890)" in markdown
+
+
 def test_img_prefers_data_src_over_placeholder_data_uri() -> None:
     placeholder = (
         "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBTAA7"
