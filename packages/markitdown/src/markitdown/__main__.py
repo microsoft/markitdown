@@ -2,298 +2,33 @@
 #
 # SPDX-License-Identifier: MIT
 import argparse
-import os
-import sys
-import codecs
 import io
-from typing import Any, Dict
-from textwrap import dedent
+import sys
 from importlib.metadata import entry_points
-from .__about__ import __version__
-from ._markitdown import MarkItDown, StreamInfo, DocumentConverterResult
+from typing import NoReturn
+
+from ._cli_args import parse_args
+from ._cli_options import converter_options, stream_info_from_args
+from ._markitdown import DocumentConverterResult, MarkItDown
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Convert various file formats to markdown.",
-        prog="markitdown",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        usage=dedent("""
-            SYNTAX:
-
-                markitdown <OPTIONAL: FILENAME>
-                If FILENAME is empty, markitdown reads from stdin.
-
-            EXAMPLE:
-
-                markitdown example.pdf
-
-                OR
-
-                cat example.pdf | markitdown
-
-                OR
-
-                markitdown < example.pdf
-
-                OR to save to a file use
-
-                markitdown example.pdf -o example.md
-
-                OR
-
-                markitdown example.pdf > example.md
-            """).strip(),
-    )
-
-    parser.add_argument(
-        "-v",
-        "--version",
-        action="version",
-        version=f"%(prog)s {__version__}",
-        help="show the version number and exit",
-    )
-
-    parser.add_argument(
-        "-o",
-        "--output",
-        help="Output file name. If not provided, output is written to stdout.",
-    )
-
-    parser.add_argument(
-        "-x",
-        "--extension",
-        help="Provide a hint about the file extension (e.g., when reading from stdin).",
-    )
-
-    parser.add_argument(
-        "-m",
-        "--mime-type",
-        help="Provide a hint about the file's MIME type.",
-    )
-
-    parser.add_argument(
-        "-c",
-        "--charset",
-        help="Provide a hint about the file's charset (e.g., UTF-8).",
-    )
-
-    cloud_group = parser.add_mutually_exclusive_group()
-    cloud_group.add_argument(
-        "-d",
-        "--use-docintel",
-        action="store_true",
-        help="Use Document Intelligence to extract text instead of offline conversion. Requires a valid Document Intelligence Endpoint.",
-    )
-
-    cloud_group.add_argument(
-        "--use-cu",
-        "--use-content-understanding",
-        action="store_true",
-        dest="use_cu",
-        help="Use Azure Content Understanding to extract text. Requires --cu-endpoint.",
-    )
-
-    parser.add_argument(
-        "-e",
-        "--endpoint",
-        type=str,
-        default=os.environ.get("MARKITDOWN_DOCINTEL_ENDPOINT") or None,
-        help="Document Intelligence Endpoint. Required if using Document Intelligence. Defaults to the MARKITDOWN_DOCINTEL_ENDPOINT environment variable.",
-    )
-
-    parser.add_argument(
-        "--cu-endpoint",
-        type=str,
-        default=os.environ.get("MARKITDOWN_CU_ENDPOINT") or None,
-        help="Content Understanding Endpoint. Required if using --use-cu. Defaults to the MARKITDOWN_CU_ENDPOINT environment variable.",
-    )
-
-    parser.add_argument(
-        "--cu-analyzer",
-        type=str,
-        help="Content Understanding analyzer ID. If not specified, auto-selects by file type.",
-    )
-
-    parser.add_argument(
-        "--cu-file-types",
-        type=str,
-        help="Comma-separated list of file types to route to Content Understanding (e.g., pdf,jpeg,mp4). If omitted, all supported types are routed.",
-    )
-
-    parser.add_argument(
-        "--docintel-model-id",
-        type=str,
-        default=None,
-        help="Document Intelligence model ID (e.g., 'prebuilt-layout', 'prebuilt-invoice', or a custom model ID). Defaults to 'prebuilt-layout'.",
-    )
-
-    parser.add_argument(
-        "--docintel-query-fields",
-        type=str,
-        default=None,
-        help="Comma-separated list of field names to extract via the billable Document Intelligence queryFields add-on (OCR file types only).",
-    )
-
-    parser.add_argument(
-        "--docintel-features",
-        type=str,
-        default=None,
-        help=(
-            "Comma-separated Document Intelligence analysis add-ons for OCR file types. "
-            "Available values: barcodes, formulas, keyValuePairs, languages, "
-            "ocrHighResolution, and styleFont. The formulas, ocrHighResolution, and "
-            "styleFont incur additional charges. No add-ons are enabled by default; "
-            "use 'none' to explicitly request none."
-        ),
-    )
-
-    parser.add_argument(
-        "-p",
-        "--use-plugins",
-        action="store_true",
-        help="Use 3rd-party plugins to convert files. Use --list-plugins to see installed plugins.",
-    )
-
-    parser.add_argument(
-        "--list-plugins",
-        action="store_true",
-        help="List installed 3rd-party plugins. Plugins are loaded when using the -p or --use-plugins option.",
-    )
-
-    parser.add_argument(
-        "--keep-data-uris",
-        action="store_true",
-        help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
-    )
-
-    parser.add_argument("filename", nargs="?")
-    args = parser.parse_args()
-
-    # Parse the extension hint
-    extension_hint = args.extension
-    if extension_hint is not None:
-        extension_hint = extension_hint.strip().lower()
-        if len(extension_hint) > 0:
-            if not extension_hint.startswith("."):
-                extension_hint = "." + extension_hint
-        else:
-            extension_hint = None
-
-    # Parse the mime type
-    mime_type_hint = args.mime_type
-    if mime_type_hint is not None:
-        mime_type_hint = mime_type_hint.strip()
-        if len(mime_type_hint) > 0:
-            if mime_type_hint.count("/") != 1:
-                _exit_with_error(f"Invalid MIME type: {mime_type_hint}")
-        else:
-            mime_type_hint = None
-
-    # Parse the charset
-    charset_hint = args.charset
-    if charset_hint is not None:
-        charset_hint = charset_hint.strip()
-        if len(charset_hint) > 0:
-            try:
-                charset_hint = codecs.lookup(charset_hint).name
-            except LookupError:
-                _exit_with_error(f"Invalid charset: {charset_hint}")
-        else:
-            charset_hint = None
-
-    stream_info = None
-    if (
-        extension_hint is not None
-        or mime_type_hint is not None
-        or charset_hint is not None
-    ):
-        stream_info = StreamInfo(
-            extension=extension_hint, mimetype=mime_type_hint, charset=charset_hint
-        )
+def main() -> None:
+    args = parse_args()
+    try:
+        stream_info = stream_info_from_args(args)
+    except ValueError as exc:
+        _exit_with_error(str(exc))
 
     if args.list_plugins:
-        # List installed plugins, then exit
-        print("Installed MarkItDown 3rd-party Plugins:\n")
-        plugin_entry_points = list(entry_points(group="markitdown.plugin"))
-        if len(plugin_entry_points) == 0:
-            print("  * No 3rd-party plugins installed.")
-            print(
-                "\nFind plugins by searching for the hashtag #markitdown-plugin on GitHub.\n"
-            )
-        else:
-            for entry_point in plugin_entry_points:
-                print(f"  * {entry_point.name:<16}\t(package: {entry_point.value})")
-            print(
-                "\nUse the -p (or --use-plugins) option to enable 3rd-party plugins.\n"
-            )
+        _list_plugins()
         sys.exit(0)
 
-    if args.use_docintel:
-        if args.endpoint is None:
-            _exit_with_error(
-                "Document Intelligence Endpoint is required when using Document Intelligence. "
-                "Pass -e/--endpoint or set MARKITDOWN_DOCINTEL_ENDPOINT."
-            )
-        elif args.filename is None:
-            _exit_with_error("Filename is required when using Document Intelligence.")
-
-        docintel_kwargs: Dict[str, Any] = {
-            "docintel_endpoint": args.endpoint,
-        }
-        if args.docintel_model_id:
-            docintel_kwargs["docintel_model_id"] = args.docintel_model_id
-        if args.docintel_features is not None:
-            if args.docintel_features.strip().lower() == "none":
-                docintel_kwargs["docintel_features"] = []
-            else:
-                docintel_kwargs["docintel_features"] = [
-                    feature.strip()
-                    for feature in args.docintel_features.split(",")
-                    if feature.strip()
-                ]
-        if args.docintel_query_fields:
-            fields = [
-                f.strip() for f in args.docintel_query_fields.split(",") if f.strip()
-            ]
-            if fields:
-                docintel_kwargs["docintel_query_fields"] = fields
-
-        markitdown = MarkItDown(enable_plugins=args.use_plugins, **docintel_kwargs)
-    elif args.use_cu:
-        if args.cu_endpoint is None:
-            _exit_with_error(
-                "Content Understanding Endpoint (--cu-endpoint) is required when using --use-cu. "
-                "Pass --cu-endpoint or set MARKITDOWN_CU_ENDPOINT."
-            )
-
-        cu_kwargs: Dict[str, Any] = {
-            "cu_endpoint": args.cu_endpoint,
-        }
-        if args.cu_analyzer is not None:
-            cu_kwargs["cu_analyzer_id"] = args.cu_analyzer
-        if args.cu_file_types is not None:
-            # Parse comma-separated file types into ContentUnderstandingFileType list
-            from .converters import ContentUnderstandingFileType
-
-            type_names = [
-                t.strip().lower() for t in args.cu_file_types.split(",") if t.strip()
-            ]
-            cu_types = []
-            for name in type_names:
-                # Try matching by value (e.g., "pdf", "jpeg", "mp4")
-                try:
-                    cu_types.append(ContentUnderstandingFileType(name))
-                except ValueError:
-                    _exit_with_error(f"Unknown file type: {name}")
-            cu_kwargs["cu_file_types"] = cu_types
-
-        markitdown = MarkItDown(enable_plugins=args.use_plugins, **cu_kwargs)
-    else:
-        markitdown = MarkItDown(enable_plugins=args.use_plugins)
-
+    try:
+        options = converter_options(args)
+    except ValueError as exc:
+        _exit_with_error(str(exc))
+    markitdown = MarkItDown(**options)
     if args.filename is None:
-        # Windows pipe-backed stdin can report seekable() even though it cannot rewind.
         result = markitdown.convert_stream(
             io.BytesIO(sys.stdin.buffer.read()),
             stream_info=stream_info,
@@ -303,23 +38,38 @@ def main():
         result = markitdown.convert(
             args.filename, stream_info=stream_info, keep_data_uris=args.keep_data_uris
         )
-
     _handle_output(args, result)
 
 
-def _handle_output(args, result: DocumentConverterResult):
-    """Handle output to stdout or file"""
-    if args.output:
-        with open(args.output, "w", encoding="utf-8") as f:
-            f.write(result.markdown)
+def _list_plugins() -> None:
+    print("Installed MarkItDown 3rd-party Plugins:\n")
+    plugin_entry_points = list(entry_points(group="markitdown.plugin"))
+    if not plugin_entry_points:
+        print("  * No 3rd-party plugins installed.")
+        print(
+            "\nFind plugins by searching for the hashtag #markitdown-plugin on GitHub.\n"
+        )
     else:
-        # Handle stdout encoding errors more gracefully, with fallback for
-        # cases where sys.stdout.encoding is None (e.g. redirected streams).
+        for entry_point in plugin_entry_points:
+            print(f"  * {entry_point.name:<16}\t(package: {entry_point.value})")
+        print("\nUse the -p (or --use-plugins) option to enable 3rd-party plugins.\n")
+
+
+def _handle_output(args: argparse.Namespace, result: DocumentConverterResult) -> None:
+    """Handle output to stdout or file."""
+    if args.output:
+        with open(args.output, "w", encoding="utf-8") as file:
+            file.write(result.markdown)
+    elif (
+        buffer := getattr(sys.stdout, "buffer", None)
+    ) is not None and not sys.stdout.isatty():
+        buffer.write((result.markdown + "\n").encode("utf-8"))
+    else:
         encoding = sys.stdout.encoding or "utf-8"
         print(result.markdown.encode(encoding, errors="replace").decode(encoding))
 
 
-def _exit_with_error(message: str):
+def _exit_with_error(message: str) -> NoReturn:
     print(message)
     sys.exit(1)
 
