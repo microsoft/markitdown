@@ -126,6 +126,31 @@ def test_image_successful_caption_response_is_unchanged(
     client.chat.completions.create.assert_called_once()
 
 
+@pytest.mark.parametrize(
+    ("llm_prompt", "expected"),
+    [
+        (None, "\n# Description:\nImage caption.\n"),
+        (" ", "\n# Description:\nImage caption.\n"),
+        # The caller's prompt controls the language and format, so no English
+        # heading is added in front of the description it asked for.
+        ("Beschreibe dieses Bild auf Deutsch.", "\nImage caption.\n"),
+    ],
+)
+def test_image_custom_prompt_omits_default_description_heading(
+    llm_prompt: Optional[str], expected: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(image_module, "exiftool_metadata", MagicMock(return_value={}))
+    client = MagicMock()
+    response = client.chat.completions.create.return_value
+    response.choices[0].message.content = "Image caption."
+
+    result = MarkItDown(
+        llm_client=client, llm_model="test-model", llm_prompt=llm_prompt
+    ).convert(IMAGE_FILE)
+
+    assert result.markdown == expected
+
+
 @pytest.mark.parametrize("metadata", [{}, {"Title": "Image title"}])
 def test_image_without_llm_is_unchanged(
     metadata: dict[str, str], monkeypatch: pytest.MonkeyPatch
