@@ -5,6 +5,7 @@ from typing import BinaryIO
 from xml.etree import ElementTree as ET
 
 from bs4 import BeautifulSoup, Tag
+from defusedxml import ElementTree as DefusedET
 
 from .math.omml import OMML_NS, oMath2Latex
 
@@ -28,6 +29,13 @@ MATH_ROOT_TEMPLATE = "".join(
         'xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" mc:Ignorable="w14 wp14">',
         "{0}</w:document>",
     )
+)
+
+RELATIONSHIP_TAG = (
+    "{http://schemas.openxmlformats.org/package/2006/relationships}Relationship"
+)
+OFFICE_DOCUMENT_TYPE = (
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
 )
 
 
@@ -247,6 +255,27 @@ def _pre_process_styles(content: bytes) -> bytes:
     return etree.tostring(root.getroottree(), encoding="utf-8", xml_declaration=True)
 
 
+def _find_main_document_part(files: dict[str, bytes]) -> str:
+    """
+    Return the name of the main document part, resolved as Mammoth does.
+
+    The main part is the target of the officeDocument relationship in
+    ``_rels/.rels``, so a valid package may name it something other than
+    ``word/document.xml`` (``word/document2.xml`` is seen in the wild).
+    Fall back to ``word/document.xml`` when no existing target is found.
+    """
+    try:
+        relationships = DefusedET.fromstring(files["_rels/.rels"])
+    except (KeyError, ValueError, ET.ParseError):
+        return "word/document.xml"
+    for relationship in relationships.iter(RELATIONSHIP_TAG):
+        if relationship.get("Type") == OFFICE_DOCUMENT_TYPE:
+            target = relationship.get("Target", "").lstrip("/")
+            if target in files:
+                return target
+    return "word/document.xml"
+
+
 def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
     """
     Pre-processes a DOCX file with provided steps.
@@ -265,15 +294,15 @@ def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
     input_docx = _fix_zip_filename_casing(input_docx)
 
     output_docx = BytesIO()
-    # The pre-processing steps to apply to each file in the .docx
-    pre_process_enable_files = {
-        "word/document.xml": (_pre_process_strike, _pre_process_math),
-        "word/footnotes.xml": (_pre_process_strike, _pre_process_math),
-        "word/endnotes.xml": (_pre_process_strike, _pre_process_math),
-        "word/styles.xml": (_pre_process_styles,),
-    }
     with zipfile.ZipFile(input_docx, mode="r") as zip_input:
         files = {name: zip_input.read(name) for name in zip_input.namelist()}
+        # The pre-processing steps to apply to each file in the .docx
+        pre_process_enable_files = {
+            _find_main_document_part(files): (_pre_process_strike, _pre_process_math),
+            "word/footnotes.xml": (_pre_process_strike, _pre_process_math),
+            "word/endnotes.xml": (_pre_process_strike, _pre_process_math),
+            "word/styles.xml": (_pre_process_styles,),
+        }
         with zipfile.ZipFile(output_docx, mode="w") as zip_output:
             zip_output.comment = zip_input.comment
             for name, content in files.items():

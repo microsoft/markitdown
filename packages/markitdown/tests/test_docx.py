@@ -32,7 +32,10 @@ from markitdown.converter_utils.docx.math.latex_dict import (
     T,
 )
 from markitdown.converter_utils.docx.math.omml import OMML_NS, load_string, oMath2Latex
-from markitdown.converter_utils.docx.pre_process import _pre_process_styles
+from markitdown.converter_utils.docx.pre_process import (
+    _find_main_document_part,
+    _pre_process_styles,
+)
 from markitdown.converters import DocxConverter, HtmlConverter, _docx_converter
 
 # Math functions
@@ -1184,6 +1187,78 @@ def test_docx_equations() -> None:
     # Find block equations wrapped with double $$ and check if they are present
     block_equations = re.findall(r"\$\$(.+?)\$\$", result.text_content)
     assert block_equations, "No block equations found in the document."
+
+
+@pytest.mark.parametrize("target", ["word/document2.xml", "/word/document2.xml"])
+def test_docx_equations_in_renamed_main_part(target: str) -> None:
+    # The main part is found through the officeDocument relationship, not by
+    # name, so a valid package may store it as word/document2.xml.
+    docx_file = os.path.join(TEST_FILES_DIR, "equations.docx")
+    markitdown = MarkItDown()
+    expected = markitdown.convert(docx_file).markdown
+    fixture = io.BytesIO()
+
+    with zipfile.ZipFile(docx_file) as source, zipfile.ZipFile(
+        fixture, "w"
+    ) as target_zip:
+        for item in source.infolist():
+            name, content = item.filename, source.read(item)
+            if name == "word/document.xml":
+                name = "word/document2.xml"
+            elif name == "word/_rels/document.xml.rels":
+                name = "word/_rels/document2.xml.rels"
+            elif name == "_rels/.rels":
+                assert content.count(b'Target="word/document.xml"') == 1
+                content = content.replace(
+                    b'Target="word/document.xml"', f'Target="{target}"'.encode()
+                )
+            elif name == "[Content_Types].xml":
+                content = content.replace(b"/word/document.xml", b"/word/document2.xml")
+            target_zip.writestr(name, content)
+
+    fixture.seek(0)
+    result = markitdown.convert_stream(fixture, file_extension=".docx")
+
+    assert "$m=1$" in expected
+    assert result.markdown == expected
+
+
+_PACKAGE_RELS = (
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+    '<Relationship Id="rId1" Type="{0}" Target="{1}"/>'
+    "</Relationships>"
+)
+_OFFICE_DOCUMENT = (
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+)
+
+
+@pytest.mark.parametrize(
+    "rels, expected",
+    [
+        (None, "word/document.xml"),
+        (b"<not-xml", "word/document.xml"),
+        (b'<!DOCTYPE r [<!ENTITY e "x">]><r>&e;</r>', "word/document.xml"),
+        (
+            _PACKAGE_RELS.format(_OFFICE_DOCUMENT, "word/document2.xml"),
+            "word/document2.xml",
+        ),
+        (
+            _PACKAGE_RELS.format(_OFFICE_DOCUMENT, "/word/document2.xml"),
+            "word/document2.xml",
+        ),
+        (
+            _PACKAGE_RELS.format(_OFFICE_DOCUMENT, "word/missing.xml"),
+            "word/document.xml",
+        ),
+        (_PACKAGE_RELS.format("urn:other", "word/document2.xml"), "word/document.xml"),
+    ],
+)
+def test_find_main_document_part(rels: Any, expected: str) -> None:
+    files = {"word/document.xml": b"", "word/document2.xml": b""}
+    if rels is not None:
+        files["_rels/.rels"] = rels.encode() if isinstance(rels, str) else rels
+    assert _find_main_document_part(files) == expected
 
 
 def test_docx_zip_filename_casing_mismatch() -> None:
