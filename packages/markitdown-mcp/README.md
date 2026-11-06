@@ -10,7 +10,14 @@
 
 The `markitdown-mcp` package provides a lightweight STDIO, Streamable HTTP, and SSE MCP server for calling MarkItDown.
 
-It exposes one tool: `convert_to_markdown(uri)`, where uri can be any `http:`, `https:`, `file:`, or `data:` URI.
+It exposes one tool: `convert_to_markdown(uri, output_file=None)`, where uri can be any `http:`, `https:`, `file:`, or `data:` URI.
+
+For conversions that are too large to return through an MCP client, set
+`output_file` to a path on the machine running the MCP server. The tool writes
+the complete markdown to a new file and returns its absolute path instead of
+returning the markdown content. Parent directories must already exist and
+existing files are not overwritten. The caller is responsible for removing the
+file when it is no longer needed.
 
 ## Installation
 
@@ -53,6 +60,15 @@ docker run -it --rm -v /home/user/data:/workdir markitdown-mcp:latest
 ```
 
 Once mounted, all files under data will be accessible under `/workdir` in the container. For example, if you have a file `example.txt` in `/home/user/data`, it will be accessible in the container at `/workdir/example.txt`.
+
+The same mount can receive large conversion results without returning them
+through MCP. For example, call `convert_to_markdown` with
+`uri="file:///workdir/example.pdf"` and `output_file="/workdir/example.md"`.
+The resulting `example.md` will be available in the mounted host directory.
+
+`output_file` is useful only when the MCP client and server share a filesystem
+or mounted directory. A path created on a separate HTTP or SSE server is local
+to that server.
 
 ## Accessing from Claude Desktop
 
@@ -131,7 +147,7 @@ Finally:
 
 ## Security Considerations
 
-The server does not support authentication, and runs with the privileges of the user running it. For this reason, when running in SSE or Streamable HTTP mode, the server binds by default to `localhost`. Even still, it is important to recognize that the server can be accessed by any process or users on the same local machine, and that the `convert_to_markdown` tool can be used to read any file that the server's user has access to, or any data from the network. If you require additional security, consider running the server in a sandboxed environment, such as a virtual machine or container, and ensure that the user permissions are properly configured to limit access to sensitive files and network segments. Above all, DO NOT bind the server to other interfaces (non-localhost) unless you understand the security implications of doing so.
+The server does not support authentication, and runs with the privileges of the user running it. For this reason, when running in SSE or Streamable HTTP mode, the server binds by default to `localhost`. Even still, it is important to recognize that the server can be accessed by any process or users on the same local machine, and that the `convert_to_markdown` tool can be used to read any file that the server's user has access to, fetch data from the network, or create a new file at a caller-supplied `output_file` path. Output files use mode `0600` on POSIX systems and platform-default permissions on Windows; existing files are not overwritten. If you require additional security, consider running the server in a sandboxed environment, such as a virtual machine or container, and ensure that the user permissions are properly configured to limit access to sensitive files and network segments. Above all, DO NOT bind the server to other interfaces (non-localhost) unless you understand the security implications of doing so.
 
 ## Trademarks
 
