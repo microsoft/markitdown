@@ -346,3 +346,23 @@ def test_deeply_nested_html_fallback() -> None:
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
+
+
+@pytest.mark.parametrize(
+    "cell, expected",
+    [
+        ("a|b", r"a\|b"),
+        (r"a\|b", r"a\\\|b"),
+        ("|", r"\|"),
+        ("no pipe", "no pipe"),
+    ],
+)
+def test_table_cell_pipes_are_escaped(cell: str, expected: str) -> None:
+    markdown = _convert_html(
+        f"<table><tr><th>{cell}</th><th>h2</th></tr>"
+        f"<tr><td>{cell}</td><td>x</td></tr></table>"
+    )
+
+    rows = markdown.strip().splitlines()
+    assert rows[0] == f"| {expected} | h2 |"
+    assert rows[2] == f"| {expected} | x |"

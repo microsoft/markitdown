@@ -542,3 +542,17 @@ def test_xlsx_show_zeroes_rename_is_scoped_to_sheet_view_tags() -> None:
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
+
+
+def test_xlsx_cell_pipes_do_not_add_columns() -> None:
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.append(["name", "value"])
+    sheet.append(["a|b", "c"])
+    stream = io.BytesIO()
+    workbook.save(stream)
+    stream.seek(0)
+
+    markdown = MarkItDown().convert_stream(stream, file_extension=".xlsx").markdown
+
+    assert r"| a\|b | c |" in markdown

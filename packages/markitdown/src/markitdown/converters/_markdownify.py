@@ -6,6 +6,16 @@ from urllib.parse import quote, urlparse, urlunparse
 
 _PERCENT_ENCODED_OCTET = re.compile(r"%[0-9A-Fa-f]{2}")
 
+# Matches a pipe together with the (possibly empty) run of backslashes in front
+# of it, so that run can be doubled before the pipe is escaped. Mirrors the
+# escaping the CSV converter applies to its table cells.
+_TABLE_PIPE_RE = re.compile(r"(?<!\\)(\\*)\|")
+
+
+def _escape_table_pipes(text: str) -> str:
+    """Escape pipes so cell text cannot split a Markdown table row."""
+    return _TABLE_PIPE_RE.sub(lambda m: m.group(1) * 2 + r"\|", text)
+
 
 def _quote_path_preserving_percent_encoded_octets(path: str) -> str:
     """Quote a URL path while preserving existing %HH byte encodings."""
@@ -173,6 +183,14 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
     def convert_strike(self, el: Any, text: str, *args, **kwargs) -> str:
         """Obsolete <strike> is still in the wild; treat it like <s>/<del>."""
         return self.convert_s(el, text, *args, **kwargs)  # type: ignore
+
+    def convert_td(self, el: Any, text: str, *args, **kwargs) -> str:
+        """Same as usual, but escape pipes so they do not add columns."""
+        return super().convert_td(el, _escape_table_pipes(text), *args, **kwargs)  # type: ignore
+
+    def convert_th(self, el: Any, text: str, *args, **kwargs) -> str:
+        """Same as usual, but escape pipes so they do not add columns."""
+        return super().convert_th(el, _escape_table_pipes(text), *args, **kwargs)  # type: ignore
 
     def convert_soup(self, soup: Any) -> str:
         return super().convert_soup(soup)  # type: ignore
