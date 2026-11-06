@@ -12,6 +12,25 @@ CANDIDATE_MIME_TYPE_PREFIXES = [
 ACCEPTED_FILE_EXTENSIONS = [".ipynb"]
 
 
+def _is_notebook_json(content: str) -> bool:
+    if "nbformat" not in content or "nbformat_minor" not in content:
+        return False
+    notebook = json.loads(content.lstrip("\ufeff"))
+    return (
+        isinstance(notebook, dict)
+        and "nbformat" in notebook
+        and "nbformat_minor" in notebook
+        and isinstance(notebook.get("cells"), list)
+    )
+
+
+def _first_heading_title(source_lines: list[str]) -> str | None:
+    for line in source_lines:
+        if line.startswith("# "):
+            return line.removeprefix("# ").strip()
+    return None
+
+
 class IpynbConverter(DocumentConverter):
     """Converts Jupyter Notebook (.ipynb) files to Markdown."""
 
@@ -34,11 +53,8 @@ class IpynbConverter(DocumentConverter):
                 try:
                     encoding = stream_info.charset or "utf-8"
                     notebook_content = file_stream.read().decode(encoding)
-                    return (
-                        "nbformat" in notebook_content
-                        and "nbformat_minor" in notebook_content
-                    )
-                except (ValueError, LookupError):
+                    return _is_notebook_json(notebook_content)
+                except (ValueError, LookupError, RecursionError):
                     return False
                 finally:
                     file_stream.seek(cur_pos)
@@ -75,11 +91,9 @@ class IpynbConverter(DocumentConverter):
                     md_output.append("".join(source_lines))
 
                     # Extract the first # heading as title if not already found
-                    if title is None:
-                        for line in source_lines:
-                            if line.startswith("# "):
-                                title = line.removeprefix("# ").strip()
-                                break
+                    title = (
+                        _first_heading_title(source_lines) if title is None else title
+                    )
 
                 elif cell_type == "code":
                     # Code cells are wrapped in Markdown code blocks

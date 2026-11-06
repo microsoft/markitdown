@@ -551,6 +551,57 @@ def test_ipynb_accepts_non_ascii() -> None:
     assert result is True
 
 
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"description": "The format uses nbformat and nbformat_minor fields."},
+        {"nbformat": 4, "nbformat_minor": 5, "data": ["important content"]},
+        {"example": {"nbformat": 4, "nbformat_minor": 5, "cells": []}},
+    ],
+)
+def test_ipynb_markers_in_ordinary_json_do_not_discard_content(payload) -> None:
+    content = json.dumps(payload)
+
+    result = MarkItDown().convert_stream(
+        io.BytesIO(content.encode("utf-8")),
+        stream_info=StreamInfo(
+            extension=".json", mimetype="application/json", charset="utf-8"
+        ),
+    )
+
+    assert result.markdown == content
+
+
+@pytest.mark.parametrize("prefix", [b"", _UTF8_BOM])
+def test_ipynb_json_detection_keeps_notebooks_and_stream_position(prefix) -> None:
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    stream = io.BytesIO(prefix + json.dumps(_BOM_NOTEBOOK).encode("utf-8"))
+    stream_info = StreamInfo(mimetype="application/json", charset="utf-8")
+
+    assert IpynbConverter().accepts(stream, stream_info) is True
+    assert stream.tell() == 0
+    assert (
+        "# Quarterly notes"
+        in MarkItDown().convert_stream(stream, stream_info=stream_info).markdown
+    )
+
+
+def test_ipynb_json_detection_rejects_deep_json_without_consuming_stream() -> None:
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    content = b"[" * 2000 + b'"nbformat nbformat_minor"' + b"]" * 2000
+    stream = io.BytesIO(content)
+
+    assert (
+        IpynbConverter().accepts(
+            stream, StreamInfo(mimetype="application/json", charset="utf-8")
+        )
+        is False
+    )
+    assert stream.tell() == 0
+
+
 # File URI validation
 
 UNC_URI_PATHS = [
