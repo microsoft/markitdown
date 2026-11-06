@@ -1,5 +1,6 @@
 from typing import BinaryIO, Any
 import json
+import re
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._exceptions import FileConversionException
@@ -69,23 +70,31 @@ class IpynbConverter(DocumentConverter):
 
             for cell in notebook_content.get("cells", []):
                 cell_type = cell.get("cell_type", "")
-                source_lines = cell.get("source", [])
+                # nbformat's `multiline_string` is a string *or* a list of lines, and
+                # both are valid. Joining the list and taking the string as-is give
+                # the same text.
+                source = cell.get("source", [])
+                source_text = source if isinstance(source, str) else "".join(source)
 
                 if cell_type == "markdown":
-                    md_output.append("".join(source_lines))
+                    md_output.append(source_text)
 
-                    # Extract the first # heading as title if not already found
+                    # Extract the first # heading as title if not already found.
+                    # Split the text rather than walking the raw value: a string
+                    # source would otherwise be iterated one character at a time,
+                    # and a list entry holding several lines would hide a heading
+                    # that is not on its first one.
                     if title is None:
-                        for line in source_lines:
+                        for line in re.split(r"\r\n|\r|\n", source_text):
                             if line.startswith("# "):
                                 title = line.removeprefix("# ").strip()
                                 break
 
                 elif cell_type == "code":
                     # Code cells are wrapped in Markdown code blocks
-                    md_output.append(f"```python\n{''.join(source_lines)}\n```")
+                    md_output.append(f"```python\n{source_text}\n```")
                 elif cell_type == "raw":
-                    md_output.append(f"```\n{''.join(source_lines)}\n```")
+                    md_output.append(f"```\n{source_text}\n```")
 
             md_text = "\n\n".join(md_output)
 
