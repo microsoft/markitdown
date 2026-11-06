@@ -235,8 +235,6 @@ def main():
                 "Document Intelligence Endpoint is required when using Document Intelligence. "
                 "Pass -e/--endpoint or set MARKITDOWN_DOCINTEL_ENDPOINT."
             )
-        elif args.filename is None:
-            _exit_with_error("Filename is required when using Document Intelligence.")
 
         docintel_kwargs: Dict[str, Any] = {
             "docintel_endpoint": args.endpoint,
