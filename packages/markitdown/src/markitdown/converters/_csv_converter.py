@@ -54,6 +54,29 @@ def _trim_outer_blank_rows(rows: list[list[str]]) -> None:
     del rows[:header_index]
 
 
+def _looks_like_delimited_csv(file_stream: BinaryIO) -> bool:
+    """Return true when extensionless text has a real CSV-style delimiter."""
+    cur_pos = file_stream.tell()
+    try:
+        data = file_stream.read(8192)
+    finally:
+        file_stream.seek(cur_pos)
+
+    if not data:
+        return False
+
+    detected = from_bytes(data).best()
+    content = str(detected) if detected is not None else data.decode("utf-8", "ignore")
+    sample = content.lstrip("\ufeff")
+
+    try:
+        dialect = csv.Sniffer().sniff(sample, delimiters=",;\t|")
+    except csv.Error:
+        return False
+
+    return dialect.delimiter in {",", ";", "\t", "|"}
+
+
 class CsvConverter(DocumentConverter):
     """
     Converts CSV files to Markdown tables.
@@ -74,7 +97,7 @@ class CsvConverter(DocumentConverter):
             return True
         for prefix in ACCEPTED_MIME_TYPE_PREFIXES:
             if mimetype.startswith(prefix):
-                return True
+                return _looks_like_delimited_csv(file_stream)
         return False
 
     def convert(
