@@ -1403,6 +1403,38 @@ def test_docx_malformed_equations() -> None:
     assert "After unnamespaced oMath" in result.markdown
 
 
+# An m:limLow whose base is not lim, max or min, as pandoc writes for \sup_{x},
+# \inf_{x} or \underset{x}{y}. oMath2Latex has no rendering for it and raises.
+_UNSUPPORTED_EQUATION = (
+    "<m:oMath><m:func><m:fName><m:limLow>"
+    "<m:e><m:r><m:t>sup</m:t></m:r></m:e>"
+    "<m:lim><m:r><m:t>x</m:t></m:r></m:lim>"
+    "</m:limLow></m:fName>"
+    "<m:e><m:r><m:t>f</m:t></m:r></m:e>"
+    "</m:func></m:oMath>"
+)
+
+
+def test_docx_unsupported_equation_keeps_the_other_equations() -> None:
+    """An equation that cannot be converted must not drop every other equation."""
+    body = (
+        "<m:oMathPara><m:oMath><m:r><m:t>E=mc</m:t></m:r></m:oMath></m:oMathPara>"
+        + _paragraph(_text("Inline ") + "<m:oMath><m:r><m:t>a+b</m:t></m:r></m:oMath>")
+        + _paragraph(_text("Supremum ") + _UNSUPPORTED_EQUATION)
+        # A block paragraph mixing a convertible and an unconvertible equation.
+        + "<m:oMathPara><m:oMath><m:r><m:t>y=2</m:t></m:r></m:oMath>"
+        + _UNSUPPORTED_EQUATION
+        + "</m:oMathPara>"
+    )
+
+    result = MarkItDown().convert_stream(_docx(body), stream_info=_INFO)
+
+    assert "$$E=mc$$" in result.markdown
+    assert "Inline $a+b$" in result.markdown
+    assert "Supremum" in result.markdown
+    assert "$$y=2$$" in result.markdown
+
+
 @pytest.mark.skipif(
     os.name == "nt",
     reason="The DOCX fixture embeds a POSIX file:///tmp/test_rlink.txt target.",

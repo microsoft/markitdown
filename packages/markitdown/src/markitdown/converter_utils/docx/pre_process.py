@@ -1,7 +1,7 @@
 import struct
 import zipfile
 from io import BytesIO
-from typing import BinaryIO
+from typing import BinaryIO, Optional
 from xml.etree import ElementTree as ET
 
 from bs4 import BeautifulSoup, Tag
@@ -52,7 +52,7 @@ def _convert_omath_to_latex(tag: Tag) -> str:
     return latex
 
 
-def _get_omath_tag_replacement(tag: Tag, block: bool = False) -> Tag:
+def _get_omath_tag_replacement(tag: Tag, block: bool = False) -> Optional[Tag]:
     """
     Creates a replacement tag for an OMML (Office Math Markup Language) element.
 
@@ -61,14 +61,18 @@ def _get_omath_tag_replacement(tag: Tag, block: bool = False) -> Tag:
         block (bool, optional): If True, the LaTeX will be wrapped in double dollar signs for block mode. Defaults to False.
 
     Returns:
-        Tag: A BeautifulSoup Tag object representing the replacement element.
+        Optional[Tag]: A BeautifulSoup Tag object representing the replacement element,
+        or None if the equation could not be converted.
     """
+    try:
+        latex = _convert_omath_to_latex(tag)
+    except Exception:
+        # An equation the converter cannot handle must only cost that equation.
+        # Letting the error escape aborts the math pre-processing of the whole
+        # part, and every other equation in it is then dropped as well.
+        return None
     t_tag = Tag(name="w:t")
-    t_tag.string = (
-        f"$${_convert_omath_to_latex(tag)}$$"
-        if block
-        else f"${_convert_omath_to_latex(tag)}$"
-    )
+    t_tag.string = f"$${latex}$$" if block else f"${latex}$"
     r_tag = Tag(name="w:r")
     r_tag.append(t_tag)
     return r_tag
@@ -89,12 +93,16 @@ def _replace_equations(tag: Tag):
         p_tag = Tag(name="w:p")
         # Replace each 'oMath' child tag with its LaTeX equivalent as block equations
         for child_tag in tag.find_all("oMath"):
-            p_tag.append(_get_omath_tag_replacement(child_tag, block=True))
+            replacement = _get_omath_tag_replacement(child_tag, block=True)
+            if replacement is not None:
+                p_tag.append(replacement)
         # Replace the original 'oMathPara' tag with the new paragraph tag
         tag.replace_with(p_tag)
     elif tag.name == "oMath":
         # Replace the 'oMath' tag with its LaTeX equivalent as inline equation
-        tag.replace_with(_get_omath_tag_replacement(tag, block=False))
+        replacement = _get_omath_tag_replacement(tag, block=False)
+        if replacement is not None:
+            tag.replace_with(replacement)
     else:
         raise ValueError(f"Not supported tag: {tag.name}")
 
