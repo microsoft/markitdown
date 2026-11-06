@@ -1083,5 +1083,26 @@ def test_deeply_nested_rss_item_fallback() -> None:
     assert "<p>" not in result.markdown
 
 
+def test_atom_feed_without_entries_is_supported() -> None:
+    feed = b"""<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Empty feed</title>
+  <id>urn:example:feed</id>
+  <updated>2026-01-01T00:00:00Z</updated>
+</feed>"""
+    converter = RssConverter()
+
+    for extension in (".atom", ".xml"):
+        stream_info = StreamInfo(extension=extension)
+        assert converter.accepts(io.BytesIO(feed), stream_info)
+        result = converter.convert(io.BytesIO(feed), stream_info)
+        assert result.title == "Empty feed"
+        assert "# Empty feed" in result.markdown
+
+
+def test_unnamespaced_feed_without_entries_is_not_accepted() -> None:
+    feed = b"<feed><title>Not Atom</title></feed>"
+    assert not RssConverter().accepts(io.BytesIO(feed), StreamInfo(extension=".xml"))
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
