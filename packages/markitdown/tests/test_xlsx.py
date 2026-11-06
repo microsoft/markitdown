@@ -540,5 +540,71 @@ def test_xlsx_show_zeroes_rename_is_scoped_to_sheet_view_tags() -> None:
     assert b'<customSheetView showZeroes="0"/>' in repaired
 
 
+# Cell values
+
+
+def _convert_rows(rows: list[list[Any]]) -> str:
+    workbook = openpyxl.Workbook()
+    for row in rows:
+        workbook.active.append(row)
+    stream = io.BytesIO()
+    workbook.save(stream)
+    stream.seek(0)
+    return MarkItDown().convert_stream(stream, stream_info=_INFO).markdown
+
+
+def test_xlsx_text_cells_that_look_numeric_stay_text() -> None:
+    markdown = _convert_rows(
+        [
+            ["zip", "phone", "account"],
+            ["02134", "+15551234", "12345678901234567890"],
+            ["00501", "0612345678", "007"],
+        ]
+    )
+
+    assert markdown.splitlines()[-2:] == [
+        "| 02134 | +15551234 | 12345678901234567890 |",
+        "| 00501 | 0612345678 | 007 |",
+    ]
+
+
+def test_xlsx_missing_value_markers_are_unchanged() -> None:
+    # Keeping numeric-looking text does not change pandas' NA markers: these
+    # cells were missing before and still are, next to text that is kept.
+    markdown = _convert_rows(
+        [
+            ["zip", "marker"],
+            ["02134", "NA"],
+            ["00501", "N/A"],
+            ["00601", "NULL"],
+            ["00701", "nan"],
+            ["00801", "kept"],
+        ]
+    )
+
+    assert markdown.splitlines()[-5:] == [
+        "| 02134 | NaN |",
+        "| 00501 | NaN |",
+        "| 00601 | NaN |",
+        "| 00701 | NaN |",
+        "| 00801 | kept |",
+    ]
+
+
+def test_xlsx_numeric_cells_render_as_before() -> None:
+    markdown = _convert_rows(
+        [
+            ["int", "sparse", "float", "flag"],
+            [1, 2, 1.5, True],
+            [3, None, 0.25, False],
+        ]
+    )
+
+    assert markdown.splitlines()[-2:] == [
+        "| 1 | 2.0 | 1.50 | True |",
+        "| 3 | NaN | 0.25 | False |",
+    ]
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
