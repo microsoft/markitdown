@@ -1131,7 +1131,8 @@ def test_docx_underlined_text_is_preserved(tmp_path) -> None:
         ('<w:t xml:space="preserve"> </w:t>', "First Last"),
         ("<w:tab/>", "First Last"),
         ("<w:t>&#160;</w:t>", "First\u00a0Last"),
-        ("<w:br/>", "First\nLast"),
+        # A Word line break is a hard line break, kept as trailing spaces
+        ("<w:br/>", "First  \nLast"),
     ],
 )
 def test_docx_underlined_whitespace_is_preserved(

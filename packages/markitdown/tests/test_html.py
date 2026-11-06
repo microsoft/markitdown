@@ -37,13 +37,29 @@ def test_underline_preserves_whitespace_verbatim(whitespace: str) -> None:
         (" ", "First Last"),
         ("\t", "First Last"),
         ("&#160;", "First\u00a0Last"),
-        ("<br>", "First\nLast"),
+        # <br> is a hard line break, kept as trailing spaces in Markdown
+        ("<br>", "First  \nLast"),
         ("word", "First<u>word</u>Last"),
         (" word ", "First <u>word</u> Last"),
     ],
 )
 def test_html_underlined_content_is_preserved(content: str, expected: str) -> None:
     assert _convert_html(f"<p>First<u>{content}</u>Last</p>") == expected
+
+
+def test_html_br_becomes_hard_line_break() -> None:
+    # A <br> is a hard line break and must survive the trailing-whitespace
+    # normalization (regression test for #2642).
+    markdown = _convert_html("<p>Line one<br>Line two</p>")
+
+    assert markdown == "Line one  \nLine two"
+
+
+def test_html_no_trailing_spaces_without_br() -> None:
+    # Lines without a hard break keep no trailing spaces.
+    markdown = _convert_html("<p>hello</p>")
+
+    assert markdown == "hello"
 
 
 def test_preserves_non_utf8_percent_encoded_href_path() -> None:
@@ -98,6 +114,25 @@ def test_html_href_does_not_quote_query_or_fragment() -> None:
     markdown = _convert_html(f'<a href="{href}">example</a>')
 
     assert f"[example]({expected_href})" in markdown
+
+
+def test_mailto_links_are_preserved() -> None:
+    markdown = _convert_html('<p>Contact <a href="mailto:team@example.com">the team</a>.</p>')
+
+    assert "mailto:team%40example.com" in markdown
+    assert "[the team](mailto:team%40example.com)" in markdown
+
+
+def test_tel_links_are_preserved() -> None:
+    markdown = _convert_html('<p>Call <a href="tel:+15551234567">support</a>.</p>')
+
+    assert "[support](tel:%2B15551234567)" in markdown
+
+
+def test_javascript_links_are_still_dropped() -> None:
+    markdown = _convert_html('<a href="javascript:alert(1)">x</a>')
+
+    assert markdown == "x"
 
 
 def test_img_prefers_data_src_over_placeholder_data_uri() -> None:
@@ -288,7 +323,8 @@ K</strike>L.</p>
             # A line break inside the element is kept, and the markup
             # survives it because strikethrough may span a single newline
             "Newline I~~J\nK~~L.",
-            "Break M~~N\nO~~P.",
+            # <br> is a hard line break, so the line keeps its trailing spaces
+            "Break M~~N  \nO~~P.",
         ]
     )
 

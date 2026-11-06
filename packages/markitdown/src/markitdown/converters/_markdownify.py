@@ -70,11 +70,17 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         href = el.get("href")
         title = el.get("title")
 
-        # Escape URIs and skip non-http or file schemes
+        # Escape URIs and skip non-http/file/mailto/tel schemes
         if href:
             try:
                 parsed_url = urlparse(href)  # type: ignore
-                if parsed_url.scheme and parsed_url.scheme.lower() not in ["http", "https", "file"]:  # type: ignore
+                if parsed_url.scheme and parsed_url.scheme.lower() not in [
+                    "http",
+                    "https",
+                    "file",
+                    "mailto",
+                    "tel",
+                ]:  # type: ignore
                     return "%s%s%s" % (prefix, text, suffix)
                 href = urlunparse(
                     parsed_url._replace(
