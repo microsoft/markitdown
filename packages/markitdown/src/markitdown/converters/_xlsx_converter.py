@@ -96,6 +96,8 @@ def _repair_sheetview_show_zeroes(
 class XlsxConverter(DocumentConverter):
     """
     Converts XLSX files to Markdown, with each sheet presented as a separate Markdown table.
+
+    Pass include_sheet_headers=False to convert() to omit the sheet-name headings.
     """
 
     def __init__(self):
@@ -149,7 +151,8 @@ class XlsxConverter(DocumentConverter):
                 images = _XlsxImages(workbook_stream)
 
             for s in sheets:
-                md_content += f"## {s}\n"
+                if kwargs.get("include_sheet_headers", True):
+                    md_content += f"## {s}\n"
                 html_content = sheets[s].to_html(index=False)
                 md_content += (
                     self._html_converter.convert_string(
@@ -193,6 +196,8 @@ class XlsxConverter(DocumentConverter):
 class XlsConverter(DocumentConverter):
     """
     Converts XLS files to Markdown, with each sheet presented as a separate Markdown table.
+
+    Pass include_sheet_headers=False to convert() to omit the sheet-name headings.
     """
 
     def __init__(self):
@@ -240,7 +245,8 @@ class XlsConverter(DocumentConverter):
         sheets = pd.read_excel(file_stream, sheet_name=None, engine="xlrd")
         md_content = ""
         for s in sheets:
-            md_content += f"## {s}\n"
+            if kwargs.get("include_sheet_headers", True):
+                md_content += f"## {s}\n"
             html_content = sheets[s].to_html(index=False)
             md_content += (
                 self._html_converter.convert_string(
