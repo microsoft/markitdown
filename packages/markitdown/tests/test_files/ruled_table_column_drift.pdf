@@ -1,0 +1,99 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 2674 >>
+stream
+0.5 w
+90 700 m 505 700 l S
+90 680 m 505 680 l S
+90 660 m 505 660 l S
+90 640 m 505 640 l S
+90 620 m 505 620 l S
+90 620 m 90 700 l S
+160 620 m 160 700 l S
+250 620 m 250 700 l S
+340 620 m 340 700 l S
+420 620 m 420 700 l S
+505 620 m 505 700 l S
+BT /F1 9 Tf 1 0 0 1 96 685 Tm (Address) Tj ET
+BT /F1 9 Tf 1 0 0 1 166 685 Tm (Name) Tj ET
+BT /F1 9 Tf 1 0 0 1 256 685 Tm (Type) Tj ET
+BT /F1 9 Tf 1 0 0 1 346 685 Tm (Default) Tj ET
+BT /F1 9 Tf 1 0 0 1 426 685 Tm (Notes) Tj ET
+BT /F1 9 Tf 1 0 0 1 96 665 Tm (0x00) Tj ET
+BT /F1 9 Tf 1 0 0 1 166 665 Tm (REG_CTRL) Tj ET
+BT /F1 9 Tf 1 0 0 1 256 665 Tm (RW) Tj ET
+BT /F1 9 Tf 1 0 0 1 346 665 Tm (0x00) Tj ET
+BT /F1 9 Tf 1 0 0 1 426 665 Tm (device control) Tj ET
+BT /F1 9 Tf 1 0 0 1 96 645 Tm (0x04) Tj ET
+BT /F1 9 Tf 1 0 0 1 166 645 Tm (REG_MODE) Tj ET
+BT /F1 9 Tf 1 0 0 1 256 645 Tm (RW) Tj ET
+BT /F1 9 Tf 1 0 0 1 346 645 Tm (0x00) Tj ET
+BT /F1 9 Tf 1 0 0 1 426 645 Tm (mode setting) Tj ET
+BT /F1 9 Tf 1 0 0 1 96 625 Tm (0x08) Tj ET
+BT /F1 9 Tf 1 0 0 1 166 625 Tm (REG_LIMIT) Tj ET
+BT /F1 9 Tf 1 0 0 1 256 625 Tm (RW) Tj ET
+BT /F1 9 Tf 1 0 0 1 346 625 Tm (0x00) Tj ET
+BT /F1 9 Tf 1 0 0 1 426 625 Tm (value threshold) Tj ET
+BT /F1 12 Tf 1 0 0 1 90 595 Tm (Device register map) Tj ET
+BT /F1 10 Tf 1 0 0 1 90 575 Tm (Table 2 Device Register Map) Tj ET
+90 555 m 505 555 l S
+90 535 m 505 535 l S
+90 515 m 505 515 l S
+90 495 m 505 495 l S
+90 475 m 505 475 l S
+90 455 m 505 455 l S
+90 435 m 505 435 l S
+90 415 m 505 415 l S
+90 415 m 90 555 l S
+240 415 m 240 555 l S
+420 415 m 420 555 l S
+505 415 m 505 555 l S
+BT /F1 9 Tf 1 0 0 1 120 540 Tm (Name) Tj ET
+BT /F1 9 Tf 1 0 0 1 293 540 Tm (Description) Tj ET
+BT /F1 9 Tf 1 0 0 1 440 540 Tm (Address) Tj ET
+BT /F1 9 Tf 1 0 0 1 122 520 Tm (REG_CTRL) Tj ET
+BT /F1 9 Tf 1 0 0 1 261 520 Tm (Primary device control) Tj ET
+BT /F1 9 Tf 1 0 0 1 454 520 Tm (0x00) Tj ET
+BT /F1 9 Tf 1 0 0 1 131 500 Tm (REG_MODE) Tj ET
+BT /F1 9 Tf 1 0 0 1 274 500 Tm (Operating mode setting) Tj ET
+BT /F1 9 Tf 1 0 0 1 454 500 Tm (0x04) Tj ET
+BT /F1 9 Tf 1 0 0 1 122 480 Tm (REG_LIMIT) Tj ET
+BT /F1 9 Tf 1 0 0 1 267 480 Tm (Maximum value threshold) Tj ET
+BT /F1 9 Tf 1 0 0 1 454 480 Tm (0x08) Tj ET
+BT /F1 9 Tf 1 0 0 1 131 460 Tm (REG_STATUS) Tj ET
+BT /F1 9 Tf 1 0 0 1 273 460 Tm (Current device status) Tj ET
+BT /F1 9 Tf 1 0 0 1 454 460 Tm (0x0C) Tj ET
+BT /F1 9 Tf 1 0 0 1 128 440 Tm (REG_CONFIG) Tj ET
+BT /F1 9 Tf 1 0 0 1 276 440 Tm (Configuration register) Tj ET
+BT /F1 9 Tf 1 0 0 1 454 440 Tm (0x10) Tj ET
+BT /F1 9 Tf 1 0 0 1 119 420 Tm (REG_EXT) Tj ET
+BT /F1 9 Tf 1 0 0 1 263 420 Tm (Extended option control) Tj ET
+BT /F1 9 Tf 1 0 0 1 454 420 Tm (0x14) Tj ET
+BT /F1 12 Tf 1 0 0 1 90 260 Tm (Additional notes follow.) Tj ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000311 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+3037
+%%EOF
