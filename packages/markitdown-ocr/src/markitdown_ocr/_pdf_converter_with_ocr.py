@@ -193,45 +193,16 @@ class PdfConverterWithOCR(DocumentConverter):
                         images_on_page = self._extract_page_images(pdf_bytes, page_num)
 
                         if images_on_page:
-                            # Extract text lines with Y positions
-                            chars = page.chars
-                            if chars:
-                                # Group chars into lines based on Y position
-                                lines_with_y = []
-                                current_line = []
-                                current_y = None
-
-                                for char in sorted(
-                                    chars, key=lambda c: (c["top"], c["x0"])
-                                ):
-                                    y = char["top"]
-                                    if current_y is None:
-                                        current_y = y
-                                    elif abs(y - current_y) > 2:  # New line threshold
-                                        if current_line:
-                                            text = "".join(
-                                                [c["text"] for c in current_line]
-                                            )
-                                            lines_with_y.append(
-                                                {"y": current_y, "text": text.strip()}
-                                            )
-                                        current_line = []
-                                        current_y = y
-                                    current_line.append(char)
-
-                                # Add last line
-                                if current_line:
-                                    text = "".join([c["text"] for c in current_line])
-                                    lines_with_y.append(
-                                        {"y": current_y, "text": text.strip()}
-                                    )
-                            else:
-                                # Fallback: use simple text extraction
-                                text_content = page.extract_text() or ""
-                                lines_with_y = [
-                                    {"y": i * 10, "text": line}
-                                    for i, line in enumerate(text_content.split("\n"))
-                                ]
+                            # Extract text lines with Y positions. Use pdfplumber's line
+                            # extraction rather than joining page.chars by hand: chars carry
+                            # no separator between adjacent columns, so a join glued them
+                            # together ("Customer NameVendor Name Ltd").
+                            lines_with_y = [
+                                {"y": line["top"], "text": line["text"].strip()}
+                                for line in page.extract_text_lines(
+                                    strip=True, return_chars=False
+                                )
+                            ]
 
                             # OCR all images
                             image_data = []
