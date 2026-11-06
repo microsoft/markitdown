@@ -1,8 +1,11 @@
+import re
 import sys
 import io
 from warnings import warn
 
 from typing import BinaryIO, Any, Optional
+
+from bs4 import BeautifulSoup
 
 from ._html_converter import HtmlConverter
 from ..converter_utils.docx.pre_process import pre_process_docx
@@ -28,6 +31,9 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 ACCEPTED_FILE_EXTENSIONS = [".docx"]
 
 _UNDERLINE_STYLE_MAP = "u => u"
+
+_FOOTNOTE_DEF_ID = re.compile(r"^footnote-(\d+)$")
+_FOOTNOTE_REF_HREF = re.compile(r"^#footnote-(\d+)$")
 
 
 def _read_embedded_style_map(file_stream: BinaryIO) -> Optional[str]:
@@ -120,6 +126,8 @@ class DocxConverter(HtmlConverter):
         if image_adapter is not None:
             html_result = image_adapter.replace_images(html_result)
 
+        html_result = self._convert_footnotes_to_gfm(html_result)
+
         return self._html_converter.convert_string(html_result, **kwargs)
 
     def _image_to_html(
@@ -141,3 +149,45 @@ class DocxConverter(HtmlConverter):
         normal conversion failure path.
         """
         return None
+
+    def _convert_footnotes_to_gfm(self, html: str) -> str:
+        """Rewrite mammoth's footnote HTML into GFM footnote syntax.
+
+        mammoth emits references as
+        ``<sup><a href="#footnote-N" id="footnote-ref-N">[N]</a></sup>``
+        and definitions as ``<li id="footnote-N">...``, anchored by ids that
+        the Markdown step cannot express, so the links arrive dead. Replace
+        both ends with GFM footnotes, which need no anchors.
+        """
+        if "footnote-" not in html:
+            return html
+
+        soup = BeautifulSoup(html, "html.parser")
+        definitions = soup.find_all("li", id=_FOOTNOTE_DEF_ID)
+        if not definitions:
+            return html
+
+        for anchor in soup.find_all("a", href=_FOOTNOTE_REF_HREF):
+            number = _FOOTNOTE_REF_HREF.match(anchor["href"]).group(1)
+            (anchor.find_parent("sup") or anchor).replace_with("[^%s]" % number)
+
+        blocks = []
+        for item in definitions:
+            number = _FOOTNOTE_DEF_ID.match(item["id"]).group(1)
+            for backlink in item.find_all("a", href="#footnote-ref-%s" % number):
+                backlink.extract()
+            body = self._html_converter.convert_string(
+                item.decode_contents()
+            ).markdown.strip()
+            lines = body.split("\n") if body else [""]
+            content = "".join(
+                line if index == 0 else ("\n" if not line else "\n    " + line)
+                for index, line in enumerate(lines)
+            )
+            blocks.append("[^%s]: %s" % (number, content))
+            list_holder = item.find_parent("ol")
+            item.decompose()
+            if list_holder is not None and list_holder.find("li") is None:
+                list_holder.decompose()
+
+        return str(soup) + "\n\n" + "\n".join(blocks)
