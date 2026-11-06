@@ -1,7 +1,7 @@
 import textwrap
 import warnings
 from html import escape
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit, uses_netloc, uses_relative
 
 from defusedxml import minidom
 from xml.dom.minidom import Document, Element, Node
@@ -43,10 +43,85 @@ _TEXT_BREAK_ELEMENTS = frozenset(
 )
 
 
+def _remove_dot_segments(path: str) -> str:
+    """RFC 3986 section 5.2.4, keeping empty segments ("a//b") intact."""
+    output: list[str] = []
+    while path:
+        if path.startswith("../"):
+            path = path[3:]
+        elif path.startswith("./"):
+            path = path[2:]
+        elif path.startswith("/./"):
+            path = path[2:]
+        elif path == "/.":
+            path = "/"
+        elif path.startswith("/../"):
+            path = path[3:]
+            if output:
+                output.pop()
+        elif path == "/..":
+            path = "/"
+            if output:
+                output.pop()
+        elif path in (".", ".."):
+            path = ""
+        else:
+            start = 1 if path.startswith("/") else 0
+            end = path.find("/", start)
+            if end == -1:
+                end = len(path)
+            output.append(path[:end])
+            path = path[end:]
+    return "".join(output)
+
+
+def _join_url(base_url: str, reference: str) -> str:
+    """Resolve ``reference`` against ``base_url`` per RFC 3986 section 5.2.
+
+    ``urllib.parse.urljoin`` drops empty path segments while merging relative
+    paths (python/cpython#84774), so ``exports//report.csv`` would name a
+    different resource. Cases that do not involve a hierarchical relative
+    merge are delegated to ``urljoin`` unchanged.
+    """
+    base = urlsplit(base_url)
+    ref = urlsplit(reference)
+    if (
+        not base.scheme
+        or not reference
+        or base.scheme not in uses_relative
+        or base.scheme not in uses_netloc
+        or (ref.scheme and (ref.scheme != base.scheme or ref.netloc))
+        or ref.netloc
+    ):
+        return urljoin(base_url, reference)
+
+    if not ref.path:
+        path = base.path
+        query = ref.query or base.query
+    elif ref.path.startswith("/"):
+        path, query = _remove_dot_segments(ref.path), ref.query
+    else:
+        if base.netloc and not base.path:
+            merged = "/" + ref.path
+        else:
+            merged = base.path[: base.path.rfind("/") + 1] + ref.path
+        path, query = _remove_dot_segments(merged), ref.query
+
+    result = f"{base.scheme}:"
+    if base.netloc or base_url.startswith(f"{base.scheme}://"):
+        result += f"//{base.netloc}"
+    result += path
+    if query:
+        result += f"?{query}"
+    if ref.fragment:
+        result += f"#{ref.fragment}"
+    return result
+
+
 def _resolve_url(base_url: str, reference: str) -> str:
     """Resolve a reference without letting a malformed URI drop the body."""
     try:
-        return urljoin(base_url, reference)
+        return _join_url(base_url, reference)
     except ValueError:
         # Leave malformed links to the Markdown converter's existing handling.
         return reference
