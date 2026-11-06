@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "markitdown": {
+      "command": "uvx",
+      "args": [
+        "--prerelease=allow",
+        "--from",
+        "markitdown-mcp==0.0.1a8",
+        "--with",
+        "markitdown-ocr==0.1.2",
+        "--with",
+        "markitdown-sample-plugin==0.1.0a1",
+        "markitdown-mcp"
+      ],
+      "env": {
+        "MARKITDOWN_ENABLE_PLUGINS": "true"
+      }
+    }
+  }
+}
