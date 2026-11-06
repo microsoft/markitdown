@@ -538,6 +538,7 @@ class PdfConverter(DocumentConverter):
 
         # Read file stream into BytesIO for compatibility with pdfplumber
         pdf_bytes = io.BytesIO(file_stream.read())
+        used_pdfminer = False
 
         try:
             # Single pass: check every page for form-style content.
@@ -569,6 +570,7 @@ class PdfConverter(DocumentConverter):
             # the whole document (better text spacing for prose).
             if form_page_count == 0:
                 pdf_bytes.seek(0)
+                used_pdfminer = True
                 markdown = pdfminer.high_level.extract_text(pdf_bytes)
             else:
                 markdown = "\n\n".join(markdown_chunks).strip()
@@ -576,10 +578,11 @@ class PdfConverter(DocumentConverter):
         except Exception:
             # Fallback if pdfplumber fails
             pdf_bytes.seek(0)
+            used_pdfminer = True
             markdown = pdfminer.high_level.extract_text(pdf_bytes)
 
-        # Fallback if still empty
-        if not markdown:
+        # Fallback if still empty and pdfminer has not already been tried
+        if not markdown and not used_pdfminer:
             pdf_bytes.seek(0)
             markdown = pdfminer.high_level.extract_text(pdf_bytes)
 
