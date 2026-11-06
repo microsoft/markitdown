@@ -232,11 +232,29 @@ class oMath2Latex(Tag2Method):
         null = D_DEFAULT.get("null")
         s_val = get_char(pr.begChr, default=D_DEFAULT.get("left"), store=T)
         e_val = get_char(pr.endChr, default=D_DEFAULT.get("right"), store=T)
+        # A delimiter may hold several <m:e> arguments (e.g. (a|b)). The dict
+        # keeps only the last one, so collect them in order and join with the
+        # separator: sepChr's val when present, the vertical bar when the
+        # element is omitted, and nothing when sepChr is present without a val.
+        args = [t for stag, t, e in self.process_children_list(elm, include=("e",))]
+        sep = self._delimiter_separator(elm)
+        text = sep.join(args)
         return pr.text + D.format(
             left=null if not s_val else escape_latex(s_val),
-            text=c_dict["e"],
+            text=text,
             right=null if not e_val else escape_latex(e_val),
         )
+
+    @staticmethod
+    def _delimiter_separator(elm):
+        # sepChr is an optional child of dPr. Absent -> "|"; present with a val
+        # -> that char; present without a val -> no separator.
+        dpr = elm.find(OMML_NS + "dPr")
+        if dpr is not None:
+            sep = dpr.find(OMML_NS + "sepChr")
+            if sep is not None:
+                return sep.get(OMML_NS + "val") or ""
+        return "|"
 
     def do_spre(self, elm):
         """
