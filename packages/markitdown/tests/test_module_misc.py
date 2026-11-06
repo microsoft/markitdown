@@ -456,6 +456,28 @@ def test_ipynb_heading_title_preserves_leading_hash() -> None:
     assert result.title == "#hashtag campaign results"
 
 
+def test_ipynb_title_from_markdown_cell_with_string_source() -> None:
+    """nbformat allows a cell's source to be a single string, not a list."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    notebook = {
+        "nbformat": 4,
+        "nbformat_minor": 5,
+        "metadata": {},
+        "cells": [
+            {
+                "cell_type": "markdown",
+                "source": "# My Title\nSome text\n",
+                "metadata": {},
+            },
+            {"cell_type": "code", "source": "print('hi')\n", "metadata": {}},
+        ],
+    }
+    result = IpynbConverter()._convert(notebook)
+    assert result.title == "My Title"
+    assert result.markdown == "# My Title\nSome text\n\n\n```python\nprint('hi')\n\n```"
+
+
 _UTF8_BOM = b"\xef\xbb\xbf"
 
 _BOM_NOTEBOOK = {
