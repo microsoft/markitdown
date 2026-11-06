@@ -232,6 +232,92 @@ def test_pdf_scanned_fallback_format() -> None:
     assert markdown == "## Page 1\n\n\n" + _OCR_BLOCK
 
 
+def test_scanned_page_uses_full_page_ocr(svc: MockOCRService) -> None:
+    """An empty-text page is rendered instead of OCRing embedded decorations."""
+    converter = PdfConverterWithOCR()
+    page = MagicMock()
+    page.extract_text.return_value = ""
+    page.to_image.return_value.original = MagicMock()
+
+    pdf = MagicMock()
+    pdf.pages = [page]
+    pdf.__enter__.return_value = pdf
+
+    with (
+        patch("pdfplumber.open", return_value=pdf) as open_pdf,
+        patch.object(converter, "_extract_page_images") as extract_images,
+    ):
+        result = converter.convert(
+            io.BytesIO(b"pdf"),
+            StreamInfo(extension=".pdf"),
+            ocr_service=svc,
+        )
+
+    assert _OCR_BLOCK in result.text_content
+    page.to_image.assert_called_once_with(resolution=300)
+    extract_images.assert_not_called()
+    open_pdf.assert_called_once()
+
+
+def test_scanned_page_falls_back_to_embedded_image_ocr_when_rendering_fails(
+    svc: MockOCRService,
+) -> None:
+    """A render failure must not discard a decodable embedded scan."""
+    converter = PdfConverterWithOCR()
+    page = MagicMock()
+    page.extract_text.return_value = ""
+    page.to_image.side_effect = RuntimeError("render failed")
+
+    pdf = MagicMock()
+    pdf.pages = [page]
+    pdf.__enter__.return_value = pdf
+    image_stream = io.BytesIO(b"embedded scan")
+
+    with (
+        patch("pdfplumber.open", return_value=pdf),
+        patch.object(
+            converter,
+            "_extract_page_images",
+            return_value=[{"stream": image_stream, "y_pos": 0, "name": "scan"}],
+        ) as extract_images,
+    ):
+        result = converter.convert(
+            io.BytesIO(b"pdf"),
+            StreamInfo(extension=".pdf"),
+            ocr_service=svc,
+        )
+
+    assert _OCR_BLOCK in result.text_content
+    extract_images.assert_called_once_with(page)
+
+
+def test_convert_reuses_open_page_for_image_extraction(svc: MockOCRService) -> None:
+    """Embedded-image extraction must not reopen and reparse the PDF."""
+    converter = PdfConverterWithOCR()
+    page = MagicMock()
+    page.extract_text.return_value = "body"
+    page.chars = []
+
+    pdf = MagicMock()
+    pdf.pages = [page]
+    pdf.__enter__.return_value = pdf
+
+    with (
+        patch("pdfplumber.open", return_value=pdf) as open_pdf,
+        patch.object(
+            converter, "_extract_page_images", return_value=[]
+        ) as extract_images,
+    ):
+        converter.convert(
+            io.BytesIO(b"pdf"),
+            StreamInfo(extension=".pdf"),
+            ocr_service=svc,
+        )
+
+    extract_images.assert_called_once_with(page)
+    open_pdf.assert_called_once()
+
+
 # ---------------------------------------------------------------------------
 # No OCR service — no OCR tags emitted
 # ---------------------------------------------------------------------------
@@ -246,3 +332,54 @@ def test_pdf_no_ocr_service_no_tags() -> None:
         md = converter.convert(f, StreamInfo(extension=".pdf")).text_content
     assert "*[Image OCR]" not in md
     assert "[End OCR]*" not in md
+
+
+@pytest.mark.parametrize("outcome", ["text", "empty", "ocr_error", "encode_error"])
+def test_ocr_page_closes_rendered_images(monkeypatch, outcome: str) -> None:
+    import pdfplumber
+
+    converter = PdfConverterWithOCR()
+    rendered = []
+
+    class OCR:
+        def extract_text(self, stream):
+            assert stream.read(8) == b"\x89PNG\r\n\x1a\n"
+            if outcome == "ocr_error":
+                raise RuntimeError("OCR failed")
+            return OCRResult(
+                text=_MOCK_TEXT if outcome == "text" else "", backend_used="mock"
+            )
+
+    with pdfplumber.open(TEST_DATA_DIR / "pdf_scanned_minimal.pdf") as pdf:
+        page = pdf.pages[0]
+        to_image = page.to_image
+
+        def capture_render(**kwargs):
+            image = to_image(**kwargs)
+            rendered.append(image)
+            if outcome == "encode_error":
+
+                def fail_save(*args, **kwargs):
+                    raise RuntimeError("encoding failed")
+
+                monkeypatch.setattr(image.original, "save", fail_save)
+            return image
+
+        monkeypatch.setattr(page, "to_image", capture_render)
+        if outcome.endswith("error"):
+            message = "OCR failed" if outcome == "ocr_error" else "encoding failed"
+            with pytest.raises(RuntimeError, match=message):
+                converter._ocr_page(page, OCR())
+        else:
+            result = converter._ocr_page(page, OCR())
+            assert result == (
+                _OCR_BLOCK
+                if outcome == "text"
+                else "*[No text could be extracted from this page]*"
+            )
+
+        assert len(rendered) == 1
+        assert rendered[0].original is not rendered[0].annotated
+        for image in (rendered[0].original, rendered[0].annotated):
+            with pytest.raises(ValueError, match="closed image"):
+                image.getpixel((0, 0))
