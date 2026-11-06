@@ -27,6 +27,7 @@ from ._cu_converter import (
 )
 from ._epub_converter import EpubConverter
 from ._csv_converter import CsvConverter
+from ._google_sheets_converter import GoogleSheetsConverter
 
 __all__ = [
     "PlainTextConverter",
@@ -51,4 +52,5 @@ __all__ = [
     "ContentUnderstandingFileType",
     "EpubConverter",
     "CsvConverter",
+    "GoogleSheetsConverter",
 ]
