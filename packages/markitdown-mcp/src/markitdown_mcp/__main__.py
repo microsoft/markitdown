@@ -17,11 +17,23 @@ mcp = MCPServer("markitdown")
 
 
 @mcp.tool()
-async def convert_to_markdown(uri: str) -> str:
-    """Convert a resource described by an http:, https:, file: or data: URI to markdown"""
+async def convert_to_markdown(
+    uri: str, *, sub_symbol: str | None = None, sup_symbol: str | None = None
+) -> str:
+    """Convert an http:, https:, file: or data: URI to markdown.
+
+    For HTML-based conversion (including DOCX), sub_symbol and sup_symbol
+    wrap subscripts and superscripts. Use '<sub>' and '<sup>' for HTML tags,
+    or markers such as '~' and '^'. Omit them to keep the default plain text.
+    """
     converter = MarkItDown(enable_plugins=check_plugins_enabled())
+    options = {}
+    if sub_symbol is not None:
+        options["sub_symbol"] = sub_symbol
+    if sup_symbol is not None:
+        options["sup_symbol"] = sup_symbol
     try:
-        return converter.convert_uri(uri).markdown
+        return converter.convert_uri(uri, **options).markdown
 
     # SDK 2.x only exposes ToolError messages.
     except UnsupportedFormatException as exc:
