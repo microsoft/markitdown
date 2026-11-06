@@ -24,16 +24,28 @@ PRECISE_FILE_EXTENSIONS = [".rss", ".atom"]
 CANDIDATE_MIME_TYPE_PREFIXES = [
     "text/xml",
     "application/xml",
+    "application/rdf+xml",  # RSS 1.0
 ]
 
 CANDIDATE_FILE_EXTENSIONS = [
     ".xml",
+    ".rdf",  # RSS 1.0
 ]
 
 ATOM_NAMESPACE = "http://www.w3.org/2005/Atom"
 XHTML_NAMESPACE = "http://www.w3.org/1999/xhtml"
 CONTENT_NAMESPACE = "http://purl.org/rss/1.0/modules/content/"
 XML_NAMESPACE = "http://www.w3.org/XML/1998/namespace"
+RDF_NAMESPACE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+RSS1_NAMESPACE = "http://purl.org/rss/1.0/"
+DC_NAMESPACE = "http://purl.org/dc/elements/1.1/"
+
+# Fields from RSS modules live in the module's namespace, whatever prefix the
+# feed binds it to.
+_MODULE_FIELDS = {
+    "content:encoded": (CONTENT_NAMESPACE, "encoded"),
+    "dc:date": (DC_NAMESPACE, "date"),
+}
 
 # Boundaries to retain when reducing markup to readable heading/plain text.
 # Inline elements must not introduce spaces (e.g. co<b>op</b>erate).
@@ -131,6 +143,13 @@ class RssConverter(DocumentConverter):
         if root is None:
             return None
         if root.tagName == "rss":
+            return "rss"
+        if (
+            root.localName == "RDF"
+            and root.namespaceURI == RDF_NAMESPACE
+            and self._get_children(root, "channel", namespace=RSS1_NAMESPACE)
+        ):
+            # RSS 1.0 (RDF Site Summary): an rdf:RDF root with an RSS 1.0 channel
             return "rss"
         if root.localName == "feed" and root.namespaceURI in (None, ATOM_NAMESPACE):
             if self._get_children(root, "entry"):
@@ -290,14 +309,20 @@ class RssConverter(DocumentConverter):
         """
         root = doc.documentElement
         assert root is not None
-        channel = self._get_child(root, "channel")
+        # RSS 1.0 puts its channel in the RSS 1.0 namespace under an rdf:RDF
+        # root, and lists the items beside the channel rather than inside it.
+        is_rss1 = root.namespaceURI == RDF_NAMESPACE
+        rss_namespace = RSS1_NAMESPACE if is_rss1 else None
+        channel = self._get_child(root, "channel", namespace=rss_namespace)
         if channel is None:
             raise ValueError("No channel found in RSS feed")
         channel_title = self._get_flattened_text(channel, "title")
         # A channel description is a text field; item descriptions carry HTML.
         # Preserve its existing whitespace while collecting the complete value.
         channel_description = self._get_data_by_tag_name(channel, "description")
-        items = self._get_children(channel, "item")
+        items = self._get_children(
+            root if is_rss1 else channel, "item", namespace=rss_namespace
+        )
         md_text = ""
         if channel_title:
             md_text += f"# {channel_title}\n"
@@ -307,6 +332,9 @@ class RssConverter(DocumentConverter):
             title = self._get_flattened_text(item, "title")
             description = self._get_data_by_tag_name(item, "description", kind="html")
             pubDate = self._get_flattened_text(item, "pubDate")
+            if pubDate is None and is_rss1:
+                # RSS 1.0 has no pubDate; items are dated with Dublin Core.
+                pubDate = self._get_flattened_text(item, "dc:date")
             content = self._get_data_by_tag_name(item, "content:encoded", kind="html")
 
             if title:
@@ -412,13 +440,20 @@ class RssConverter(DocumentConverter):
                 if isinstance(child, Tag)
             )
 
-    def _get_children(self, element: Element, tag_name: str) -> list[Element]:
-        """Select fields on their owner, without borrowing descendant metadata."""
-        namespace: str | None
-        if tag_name == "content:encoded":
-            namespace, local_name = CONTENT_NAMESPACE, "encoded"
+    def _get_children(
+        self, element: Element, tag_name: str, *, namespace: str | None = None
+    ) -> list[Element]:
+        """Select fields on their owner, without borrowing descendant metadata.
+
+        Fields are matched in the owner's namespace unless ``namespace`` names
+        another one, as RSS 1.0 needs for the channel and items under rdf:RDF.
+        """
+        if tag_name in _MODULE_FIELDS:
+            namespace, local_name = _MODULE_FIELDS[tag_name]
         else:
-            namespace, local_name = element.namespaceURI, tag_name
+            local_name = tag_name
+            if namespace is None:
+                namespace = element.namespaceURI
         return [
             child
             for child in element.childNodes
@@ -427,8 +462,11 @@ class RssConverter(DocumentConverter):
             and child.localName == local_name
         ]
 
-    def _get_child(self, element: Element, tag_name: str) -> Element | None:
-        return next(iter(self._get_children(element, tag_name)), None)
+    def _get_child(
+        self, element: Element, tag_name: str, *, namespace: str | None = None
+    ) -> Element | None:
+        children = self._get_children(element, tag_name, namespace=namespace)
+        return next(iter(children), None)
 
     def _get_data_by_tag_name(
         self, element: Element, tag_name: str, *, kind: str = "text"
