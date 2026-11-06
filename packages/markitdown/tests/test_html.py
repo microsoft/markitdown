@@ -21,6 +21,22 @@ def _convert_html(html: str, **kwargs) -> str:
     return result.markdown
 
 
+def test_table_caption_sections_preserve_empty_body_rows() -> None:
+    result = _convert_html(
+        "<table><caption>Caption</caption><colgroup><col></colgroup>"
+        "<tr><th>Value</th></tr>"
+        "<tbody><tr><td>one</td></tr><tr><td></td></tr></tbody>"
+        "<tfoot><tr><td>sum</td></tr></tfoot></table>"
+    )
+    rows = [
+        [cell.strip() for cell in line.strip().strip("|").split("|")]
+        for line in result.splitlines()
+        if line.lstrip().startswith("|")
+    ]
+    assert result.startswith("Caption\n\n")
+    assert rows == [["Value"], ["---"], ["one"], [""], ["sum"]]
+
+
 @pytest.mark.parametrize(
     "whitespace", ["", " ", "  ", "\t", "\n", "\r\n", "\u00a0", " \t\n\u00a0 "]
 )
