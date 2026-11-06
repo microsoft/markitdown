@@ -394,8 +394,6 @@ def test_markitdown_llm_parameters() -> None:
     # Reset the mock for the next test
     mock_client.chat.completions.create.reset_mock()
 
-    # TODO: may only use one test after the llm caption method duplicate has been removed:
-    # https://github.com/microsoft/markitdown/pull/1254
     # Test PPTX file
     markitdown.convert(os.path.join(TEST_FILES_DIR, "test.pptx"))
 
