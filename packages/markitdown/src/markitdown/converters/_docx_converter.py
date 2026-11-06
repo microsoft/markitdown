@@ -29,6 +29,16 @@ ACCEPTED_FILE_EXTENSIONS = [".docx"]
 
 _UNDERLINE_STYLE_MAP = "u => u"
 
+# Mammoth's default style map has no rules for Word's built-in Title and
+# Subtitle styles, so they would otherwise render as plain paragraphs. Match on
+# the style name because localized Word versions write their own style IDs.
+_TITLE_STYLE_MAP = "\n".join(
+    [
+        "p[style-name='Title'] => h1:fresh",
+        "p[style-name='Subtitle'] => h2:fresh",
+    ]
+)
+
 
 def _read_embedded_style_map(file_stream: BinaryIO) -> Optional[str]:
     """Read the style map embedded in a .docx, if it has one."""
@@ -97,6 +107,7 @@ class DocxConverter(HtmlConverter):
             for part in (
                 caller_style_map,
                 embedded_style_map,
+                _TITLE_STYLE_MAP,
                 _UNDERLINE_STYLE_MAP,
             )
             if part

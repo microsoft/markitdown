@@ -24,7 +24,7 @@ GENERAL_TEST_VECTORS = [
             "## d666f1f7-46cb-42bd-9a39-9a39cf2a509f",
             "# Abstract",
             "# Introduction",
-            "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation",
+            "# AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation",
             "data:image/png;base64...",
         ],
         must_not_include=[
