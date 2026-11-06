@@ -1,9 +1,11 @@
 """Image conversion, captions, and media metadata."""
 
 import io
+import json
 import os
 import re
 import shutil
+import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, BinaryIO, Optional
@@ -227,6 +229,73 @@ def test_exiftool_metadata_with_no_path():
     from markitdown.converters._exiftool import exiftool_metadata
 
     assert exiftool_metadata(io.BytesIO(b""), exiftool_path=None) == {}
+
+
+@pytest.mark.parametrize("version", ["11.99", "12.00", "12.23"])
+def test_exiftool_rejects_vulnerable_versions_before_reading_document(
+    version: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from markitdown.converters._exiftool import exiftool_metadata
+
+    run = MagicMock(return_value=SimpleNamespace(stdout=version))
+    monkeypatch.setattr("markitdown.converters._exiftool.subprocess.run", run)
+    stream = io.BytesIO(b"document bytes")
+    stream.seek(3)
+
+    with pytest.raises(RuntimeError, match="CVE-2021-22204"):
+        exiftool_metadata(stream, exiftool_path="exiftool")
+
+    assert run.call_count == 1
+    assert "input" not in run.call_args.kwargs
+    assert stream.tell() == 3
+
+
+@pytest.mark.parametrize("version", ["12.24", "13.00"])
+def test_exiftool_supported_versions_preserve_unicode_and_stream_position(
+    version: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from markitdown.converters._exiftool import exiftool_metadata
+
+    metadata = {"Title": "Café 東京"}
+    run = MagicMock(
+        side_effect=[
+            SimpleNamespace(stdout=version + "\n"),
+            SimpleNamespace(
+                stdout=json.dumps([metadata], ensure_ascii=False).encode("utf-8")
+            ),
+        ]
+    )
+    monkeypatch.setattr("markitdown.converters._exiftool.subprocess.run", run)
+    stream = io.BytesIO(b"prefix document bytes")
+    stream.seek(7)
+
+    assert exiftool_metadata(stream, exiftool_path="exiftool") == metadata
+    assert run.call_args.kwargs["input"] == b"document bytes"
+    assert stream.tell() == 7
+
+
+@pytest.mark.parametrize(
+    "version_result",
+    [
+        SimpleNamespace(stdout="not a version"),
+        subprocess.CalledProcessError(1, ["exiftool", "-ver"]),
+    ],
+)
+def test_exiftool_does_not_process_document_when_version_cannot_be_verified(
+    version_result: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from markitdown.converters._exiftool import exiftool_metadata
+
+    run = MagicMock(side_effect=[version_result])
+    monkeypatch.setattr("markitdown.converters._exiftool.subprocess.run", run)
+    stream = io.BytesIO(b"document bytes")
+
+    with pytest.raises(RuntimeError, match="Failed to verify ExifTool version"):
+        exiftool_metadata(stream, exiftool_path="exiftool")
+
+    assert run.call_count == 1
+    assert "input" not in run.call_args.kwargs
+    assert stream.tell() == 0
 
 
 def test_exiftool_metadata_invocation_oserror():
