@@ -19,6 +19,58 @@ ACCEPTED_FILE_EXTENSIONS = [".csv"]
 _PIPE_ESCAPE_RE = re.compile(r"(?<!\\)(\\*)\|")
 
 
+# The separators a spreadsheet actually writes into a file named ".csv".
+# Excel writes the list separator of the machine's locale, which is a semicolon
+# across most of Europe, and a tab-separated export is routinely saved as .csv.
+_CANDIDATE_DELIMITERS = (",", ";", "\t")
+
+# Some producers, Excel among them, write a "sep=" line ahead of the header to
+# declare the separator. Excel honours it and hides the line.
+_SEP_DIRECTIVE_RE = re.compile(r"^sep=(.)\r?\n", re.IGNORECASE)
+
+# How much of the file the detection looks at. A separator that holds for the
+# first rows holds for the file; reading all of a large export to decide would
+# not change the answer.
+_DETECTION_SAMPLE_CHARS = 64 * 1024
+_DETECTION_SAMPLE_ROWS = 20
+
+
+def _consistent_column_count(content: str, delimiter: str) -> int:
+    """Columns per row under `delimiter`, or 0 when the rows disagree.
+
+    A separator the file was not written with either does not occur at all (one
+    column) or occurs by accident, and then the rows do not line up. Requiring
+    the same count on every row is what keeps a comma inside a sentence from
+    being read as a separator.
+    """
+    count = 0
+    reader = csv.reader(io.StringIO(content, newline=""), delimiter=delimiter)
+    for index, row in enumerate(reader):
+        if index >= _DETECTION_SAMPLE_ROWS:
+            break
+        if not row:  # a blank line says nothing about the separator
+            continue
+        if count and len(row) != count:
+            return 0
+        count = len(row)
+    return count if count > 1 else 0
+
+
+def _detect_delimiter(content: str) -> str:
+    """The separator the file was written with, defaulting to a comma.
+
+    Parsing a semicolon-separated export with a comma does not fail -- it yields
+    one column holding the whole row, separators and all.
+    """
+    sample = content[:_DETECTION_SAMPLE_CHARS]
+    best_delimiter, best_columns = ",", 0
+    for delimiter in _CANDIDATE_DELIMITERS:
+        columns = _consistent_column_count(sample, delimiter)
+        if columns > best_columns:
+            best_delimiter, best_columns = delimiter, columns
+    return best_delimiter
+
+
 def _escape_table_cell(value: str) -> str:
     r"""Escape a CSV value so it is safe inside a Markdown table cell.
 
@@ -99,8 +151,16 @@ class CsvConverter(DocumentConverter):
         # it does not end up inside the first header cell.
         content = content.lstrip("\ufeff")
 
+        # A "sep=" line declares the separator and is not part of the table.
+        directive = _SEP_DIRECTIVE_RE.match(content)
+        if directive:
+            delimiter = directive.group(1)
+            content = content[directive.end() :]
+        else:
+            delimiter = _detect_delimiter(content)
+
         # Parse CSV content
-        reader = csv.reader(io.StringIO(content, newline=""))
+        reader = csv.reader(io.StringIO(content, newline=""), delimiter=delimiter)
         rows = list(reader)
         _trim_outer_blank_rows(rows)
 
