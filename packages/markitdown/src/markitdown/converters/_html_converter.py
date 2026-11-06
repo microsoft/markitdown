@@ -57,6 +57,12 @@ class HtmlConverter(DocumentConverter):
         for script in soup(["script", "style"]):
             script.extract()
 
+        # An ordinary <template> is inert: it does not render on the page.
+        # Declarative shadow roots, however, do render their contents.
+        for template in soup.find_all("template"):
+            if template.get("shadowrootmode", "").lower() not in ("open", "closed"):
+                template.extract()
+
         # Print only the main content
         body_elm = soup.find("body")
         webpage_text = ""
