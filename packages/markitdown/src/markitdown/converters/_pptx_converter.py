@@ -105,7 +105,7 @@ class PptxConverter(DocumentConverter):
 
                 # Text areas
                 elif shape.has_text_frame:
-                    text = shape.text or ""
+                    text = self._convert_text_frame(shape.text_frame, **kwargs)
                     if shape == title:
                         if text.strip():
                             md_content += "# " + text.lstrip() + "\n"
@@ -141,7 +141,11 @@ class PptxConverter(DocumentConverter):
                 # has merely been opened, so having one says nothing about there
                 # being notes to read. Only head a section that has content.
                 notes_frame = slide.notes_slide.notes_text_frame
-                notes_text = (notes_frame.text or "") if notes_frame is not None else ""
+                notes_text = (
+                    self._convert_text_frame(notes_frame, **kwargs)
+                    if notes_frame is not None
+                    else ""
+                )
                 if notes_text.strip():
                     md_content += "\n\n### Notes:\n" + notes_text
                     md_content = md_content.strip()
@@ -302,6 +306,54 @@ class PptxConverter(DocumentConverter):
             return True
         return False
 
+    def _convert_text_frame(self, text_frame, *, as_html=False, **kwargs):
+        paragraphs = []
+        for paragraph in text_frame.paragraphs:
+            runs = {run._r: run for run in paragraph.runs}
+            parts = []
+            # Use the same children as python-pptx's paragraph.text: runs alone
+            # omit soft line breaks and cached field text.
+            for child in paragraph._p.content_children:
+                text = html.escape(child.text) if as_html else child.text
+                run = runs.get(child)
+                if (
+                    run is not None
+                    and child.rPr is not None
+                    and child.rPr.hlinkClick is not None
+                    # Slide-jump actions need not have a URL relationship.
+                    and child.rPr.hlinkClick.rId
+                    and run.part.rels[child.rPr.hlinkClick.rId].is_external
+                ):
+                    address = run.hyperlink.address
+                    label = child.text.strip()
+                    if address and label:
+                        prefix = child.text[
+                            : len(child.text) - len(child.text.lstrip())
+                        ]
+                        suffix = child.text[len(child.text.rstrip()) :]
+                        anchor = (
+                            '<a href="'
+                            + html.escape(address, quote=True)
+                            + '">'
+                            + html.escape(label)
+                            + "</a>"
+                        )
+                        if as_html:
+                            text = html.escape(prefix) + anchor + html.escape(suffix)
+                        else:
+                            # HtmlConverter strips its result, so keep the run's
+                            # boundary whitespace outside the rendered fragment.
+                            text = (
+                                prefix
+                                + self._html_converter.convert_string(
+                                    anchor, **kwargs
+                                ).markdown
+                                + suffix
+                            )
+                parts.append(text)
+            paragraphs.append("".join(parts))
+        return "\n".join(paragraphs)
+
     def _convert_table_to_markdown(self, table, **kwargs):
         # Write the table as HTML, then convert it to Markdown
         html_table = "<html><body><table>"
@@ -310,9 +362,21 @@ class PptxConverter(DocumentConverter):
             html_table += "<tr>"
             for cell in row.cells:
                 if first_row:
-                    html_table += "<th>" + html.escape(cell.text) + "</th>"
+                    html_table += (
+                        "<th>"
+                        + self._convert_text_frame(
+                            cell.text_frame, as_html=True, **kwargs
+                        )
+                        + "</th>"
+                    )
                 else:
-                    html_table += "<td>" + html.escape(cell.text) + "</td>"
+                    html_table += (
+                        "<td>"
+                        + self._convert_text_frame(
+                            cell.text_frame, as_html=True, **kwargs
+                        )
+                        + "</td>"
+                    )
             html_table += "</tr>"
             first_row = False
         html_table += "</table></body></html>"

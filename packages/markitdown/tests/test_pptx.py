@@ -1,6 +1,7 @@
 """PowerPoint conversion, titles, notes, charts, and image hooks."""
 
 import base64
+import html
 import inspect
 import io
 import os
@@ -16,6 +17,7 @@ from pptx import Presentation
 from pptx.chart.data import CategoryChartData
 from pptx.enum.chart import XL_CHART_TYPE
 from pptx.enum.shapes import MSO_SHAPE_TYPE
+from pptx.opc.constants import RELATIONSHIP_TYPE as RT
 from pptx.util import Inches
 
 from markitdown import (
@@ -144,6 +146,197 @@ def test_notes_with_text_are_still_emitted() -> None:
     markdown = _convert_notes_slide("Remember to mention the budget.")
 
     assert "### Notes:\nRemember to mention the budget." in markdown
+
+
+# Hyperlinks
+
+
+def _hyperlink_presentation(
+    container: str,
+    linked: bool,
+    *,
+    label: str = "Docs",
+    address: str = "https://example.test/reference",
+) -> io.BytesIO:
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[1])
+    slide.shapes.title.text = "Slide title"
+    slide.placeholders[1].text = "Body text"
+    if container == "title":
+        frame = slide.shapes.title.text_frame
+    elif container == "body":
+        frame = slide.placeholders[1].text_frame
+    elif container == "notes":
+        frame = slide.notes_slide.notes_text_frame
+    else:
+        table = slide.shapes.add_table(2, 1, 0, Inches(3), Inches(5), Inches(1)).table
+        table.cell(0, 0).text = "References"
+        frame = table.cell(1, 0).text_frame
+    frame.clear()
+    paragraph = frame.paragraphs[0]
+    paragraph.add_run().text = "Before & <literal>_ "
+    run = paragraph.add_run()
+    run.text = label
+    if linked:
+        run.hyperlink.address = address
+    paragraph.add_run().text = " after"
+    paragraph.add_line_break()
+    paragraph.add_run().text = "After break "
+    # A real DrawingML field is separate from paragraph.runs, just like a:br.
+    field = etree.fromstring(
+        '<a:fld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" '
+        'id="{E0A3C9F2-8708-43C7-AEA9-787CF54AD2AA}" type="slidenum">'
+        "<a:t>7</a:t></a:fld>"
+    )
+    paragraph._p.append(field)
+    frame.add_paragraph().text = "Next paragraph"
+    stream = io.BytesIO()
+    presentation.save(stream)
+    stream.seek(0)
+    return stream
+
+
+@pytest.mark.parametrize("container", ["title", "body", "notes", "table"])
+def test_pptx_text_hyperlinks_preserve_target_and_surrounding_content(
+    container: str,
+) -> None:
+    source = _hyperlink_presentation(container, linked=True)
+    reloaded = Presentation(source)
+    slide = reloaded.slides[0]
+    if container == "title":
+        frame = slide.shapes.title.text_frame
+    elif container == "body":
+        frame = slide.placeholders[1].text_frame
+    elif container == "notes":
+        frame = slide.notes_slide.notes_text_frame
+    else:
+        frame = slide.shapes[-1].table.cell(1, 0).text_frame
+    assert frame.paragraphs[0].runs[1].hyperlink.address == (
+        "https://example.test/reference"
+    )
+    assert frame.text == "Before & <literal>_ Docs after\vAfter break 7\nNext paragraph"
+    source.seek(0)
+    converter = MarkItDown()
+    info = StreamInfo(extension=".pptx")
+    baseline = converter.convert_stream(
+        _hyperlink_presentation(container, linked=False), stream_info=info
+    ).markdown
+    markdown = converter.convert_stream(source, stream_info=info).markdown
+
+    plain_text = "Before & <literal>_ Docs after\vAfter break 7\nNext paragraph"
+    assert (
+        baseline
+        == "<!-- Slide number: 1 -->\n"
+        + {
+            "title": "# " + plain_text + "\nBody text",
+            "body": "# Slide title\n" + plain_text,
+            "notes": "# Slide title\nBody text\n\n### Notes:\n" + plain_text,
+            "table": (
+                "# Slide title\nBody text\n| References |\n| --- |\n"
+                "| Before & <literal>\\_ Docs after\vAfter break 7 Next paragraph |"
+            ),
+        }[container]
+    )
+    assert "Before" in markdown and "after" in markdown
+    assert "After break 7" in markdown and "Next paragraph" in markdown
+    assert "[Docs](https://example.test/reference)" in markdown
+    assert (
+        markdown.replace("[Docs](https://example.test/reference)", "Docs") == baseline
+    )
+
+
+@pytest.mark.parametrize("container", ["body", "table"])
+def test_pptx_hyperlinks_use_html_renderer_and_preserve_boundary_whitespace(
+    container: str,
+) -> None:
+    label = " \tDocs [v1]_ & <literal>\t "
+    address = "https://example.test/a b/(v1)?left=one&right=two#fragment"
+    converter = MarkItDown()
+    info = StreamInfo(extension=".pptx")
+    baseline = converter.convert_stream(
+        _hyperlink_presentation(container, linked=False, label=label), stream_info=info
+    ).markdown
+    markdown = converter.convert_stream(
+        _hyperlink_presentation(container, linked=True, label=label, address=address),
+        stream_info=info,
+    ).markdown
+    renderer = HtmlConverter()
+    rendered = renderer.convert_string(
+        '<a href="'
+        + html.escape(address, quote=True)
+        + '">'
+        + html.escape(label.strip())
+        + "</a>"
+    ).markdown
+    plain_label = (
+        renderer.convert_string(html.escape(label.strip())).markdown
+        if container == "table"
+        else label.strip()
+    )
+
+    assert rendered in markdown
+    assert markdown.replace(rendered, plain_label) == baseline
+
+
+@pytest.mark.parametrize("container", ["title", "body", "notes", "table"])
+def test_pptx_whitespace_only_link_text_retains_native_output(container: str) -> None:
+    converter = MarkItDown()
+    info = StreamInfo(extension=".pptx")
+    baseline = converter.convert_stream(
+        _hyperlink_presentation(container, linked=False, label=" \t "), stream_info=info
+    ).markdown
+    markdown = converter.convert_stream(
+        _hyperlink_presentation(container, linked=True, label=" \t "), stream_info=info
+    ).markdown
+
+    assert markdown == baseline
+
+
+@pytest.mark.parametrize("jump", ["nextslide", "empty-rid", "slide"])
+def test_pptx_run_slide_jump_keeps_text_without_an_external_url(jump: str) -> None:
+    presentation = Presentation(_hyperlink_presentation("body", linked=False))
+    if jump == "slide":
+        next_slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    baseline = io.BytesIO()
+    presentation.save(baseline)
+    baseline.seek(0)
+    run = presentation.slides[0].placeholders[1].text_frame.paragraphs[0].runs[1]
+    click = etree.SubElement(
+        run._r.get_or_add_rPr(),
+        "{http://schemas.openxmlformats.org/drawingml/2006/main}hlinkClick",
+        action="ppaction://hlinkshowjump?jump=nextslide",
+    )
+    if jump == "empty-rid":
+        click.set(
+            "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id",
+            "",
+        )
+    if jump == "slide":
+        relationship_id = run.part.relate_to(next_slide.part, RT.SLIDE)
+        click.set(
+            "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id",
+            relationship_id,
+        )
+        click.set("action", "ppaction://hlinksldjump")
+    stream = io.BytesIO()
+    presentation.save(stream)
+    stream.seek(0)
+    reloaded = Presentation(stream)
+    run = reloaded.slides[0].placeholders[1].text_frame.paragraphs[0].runs[1]
+    relationship_id = run._r.rPr.hlinkClick.rId
+    if jump == "slide":
+        assert not run.part.rels[relationship_id].is_external
+    elif jump == "empty-rid":
+        assert relationship_id == ""
+    else:
+        assert relationship_id is None
+    stream.seek(0)
+    converter = MarkItDown()
+    info = StreamInfo(extension=".pptx")
+
+    assert converter.convert_stream(stream, stream_info=info).markdown == (
+        converter.convert_stream(baseline, stream_info=info).markdown
+    )
 
 
 # Missing text
