@@ -551,6 +551,73 @@ def test_ipynb_accepts_non_ascii() -> None:
     assert result is True
 
 
+# UTF-8 BOM in plain text
+#
+# Editors and Windows tooling prepend a UTF-8 BOM to otherwise plain files. The
+# BOM is part of the encoding, not of the document, so it must not survive into
+# the Markdown output. In front of an ATX heading marker it is worse than
+# invisible: "\ufeff# Title" is a paragraph, because a heading starts with '#'.
+
+
+@pytest.mark.parametrize(
+    "extension", [".txt", ".text", ".md", ".markdown", ".json", ".jsonl"]
+)
+def test_plain_text_with_a_utf8_bom_is_not_emitted(extension: str) -> None:
+    """A declared charset must not let the BOM through to the Markdown."""
+    data = _UTF8_BOM + b"# Quarterly notes\n"
+
+    result = MarkItDown(enable_plugins=False).convert_stream(
+        io.BytesIO(data), stream_info=StreamInfo(extension=extension, charset="utf-8")
+    )
+
+    assert not result.markdown.startswith("\ufeff")
+    assert result.markdown.startswith("# Quarterly notes")
+
+
+def test_plain_text_bom_does_not_hide_the_heading_marker() -> None:
+    """The heading must remain a heading once the BOM is gone."""
+    data = _UTF8_BOM + b"# Quarterly notes\n\nbody"
+
+    result = MarkItDown(enable_plugins=False).convert_stream(
+        io.BytesIO(data), stream_info=StreamInfo(extension=".md", charset="utf-8")
+    )
+
+    assert result.markdown == "# Quarterly notes\n\nbody"
+
+
+def test_plain_text_bom_is_dropped_when_the_charset_is_detected() -> None:
+    """The whole stack must not leak the BOM when no charset is supplied."""
+    data = _UTF8_BOM + b"hello world"
+
+    result = MarkItDown(enable_plugins=False).convert_stream(
+        io.BytesIO(data), stream_info=StreamInfo(extension=".txt")
+    )
+
+    assert result.markdown == "hello world"
+
+
+def test_plain_text_without_a_bom_is_unchanged() -> None:
+    """The case that already worked must produce exactly the same markdown."""
+    result = MarkItDown(enable_plugins=False).convert_stream(
+        io.BytesIO(b"# Quarterly notes\n\nbody"),
+        stream_info=StreamInfo(extension=".md", charset="utf-8"),
+    )
+
+    assert result.markdown == "# Quarterly notes\n\nbody"
+
+
+def test_plain_text_utf8_sig_charset_still_works() -> None:
+    """A charset that already consumes the BOM must not be double-stripped."""
+    data = _UTF8_BOM + b"# Quarterly notes\n\nbody"
+
+    result = MarkItDown(enable_plugins=False).convert_stream(
+        io.BytesIO(data),
+        stream_info=StreamInfo(extension=".md", charset="utf-8-sig"),
+    )
+
+    assert result.markdown == "# Quarterly notes\n\nbody"
+
+
 # File URI validation
 
 UNC_URI_PATHS = [
