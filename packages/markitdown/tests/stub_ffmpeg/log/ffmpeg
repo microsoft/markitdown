@@ -1,0 +1,6 @@
+#!/bin/sh
+# Logging passthrough ffmpeg: records its argv, then execs the real ffmpeg.
+# The test sets FFMPEG_REAL to the real binary's path (resolved before this
+# stub was prepended to PATH); /usr/bin/ffmpeg is the fallback.
+echo "ffmpeg $*" >> "${FFMPEG_STUB_LOG:-/tmp/ffmpeg-stub.log}"
+exec "${FFMPEG_REAL:-/usr/bin/ffmpeg}" "$@"

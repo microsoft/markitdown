@@ -1,0 +1,4 @@
+#!/bin/sh
+# Stub ffmpeg that fails immediately with a recognizable stderr message.
+echo "stub ffmpeg: refusing to decode this input" >&2
+exit 1

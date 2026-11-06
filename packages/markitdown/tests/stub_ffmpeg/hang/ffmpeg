@@ -1,0 +1,6 @@
+#!/bin/sh
+# Stub ffmpeg for the hang test: records its argv, then sleeps.
+# Placed earlier on PATH so the code under test resolves it as "ffmpeg".
+echo "ffmpeg $*" >> "${FFMPEG_STUB_LOG:-/tmp/ffmpeg-stub.log}"
+# Self-terminates after 45 s so a leaked stub can never wedge the machine.
+exec sleep 45
