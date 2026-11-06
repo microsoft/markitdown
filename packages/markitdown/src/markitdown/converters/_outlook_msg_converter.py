@@ -334,6 +334,15 @@ class OutlookMsgConverter(DocumentConverter):
         try:
             if msg.exists(stream_path):
                 data = msg.openstream(stream_path).read()
+                # Some writers terminate a PT_UNICODE property with a NUL, just
+                # as they do the 8-bit streams. Drop the padding a code unit at
+                # a time: str.strip() keeps NULs, and shedding single bytes --
+                # or the whole tail at once -- would take the last character of
+                # the property with them.
+                if len(data) % 2:
+                    data = data[:-1]
+                while data.endswith(b"\x00\x00"):
+                    data = data[:-2]
                 # Try UTF-16 first (common for .msg files)
                 try:
                     return data.decode("utf-16-le").strip()
