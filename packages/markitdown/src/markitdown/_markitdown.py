@@ -98,6 +98,55 @@ def _read_charset_sample(file_stream: BinaryIO) -> bytes:
     return sample
 
 
+_FENCE_RE = re.compile(r"^[ \t]*(`{3,}|~{3,})(.*)$")
+_HARD_BREAK_RE = re.compile(r" {2,}$")
+
+
+def _normalize_markdown(text: str) -> str:
+    """Strip trailing whitespace and collapse excessive blank lines, but skip
+    content inside fenced code blocks (``` or ~~~) where whitespace is
+    significant. Preserve the markdown hard-line-break marker ("  \\n") so
+    that <br>/Word line breaks render as hard breaks."""
+    lines = re.split(r"\r?\n", text)
+    out: list[str] = []
+    in_fence = False
+    fence_marker = ""
+    pending_blank = False
+    for line in lines:
+        m = _FENCE_RE.match(line)
+        if in_fence:
+            if (
+                m
+                and m.group(1)[0] == fence_marker[0]
+                and len(m.group(1)) >= len(fence_marker)
+                and not m.group(2).strip()
+            ):
+                in_fence = False
+                fence_marker = ""
+            pending_blank = False
+            out.append(line)
+            continue
+        if m and (m.group(1)[0] == "~" or "`" not in m.group(2)):
+            in_fence = True
+            fence_marker = m.group(1)
+            pending_blank = False
+            out.append(line)
+            continue
+        stripped = line.rstrip()
+        if stripped == "":
+            if not pending_blank:
+                out.append("")
+                pending_blank = True
+        else:
+            pending_blank = False
+            # Preserve markdown hard-line-break marker (two trailing spaces).
+            if _HARD_BREAK_RE.search(line):
+                out.append(stripped + "  ")
+            else:
+                out.append(stripped)
+    return "\n".join(out)
+
+
 # Lower priority values are tried first.
 PRIORITY_SPECIFIC_FILE_FORMAT = (
     0.0  # e.g., .docx, .pdf, .xlsx, Or specific pages, e.g., wikipedia
@@ -690,11 +739,14 @@ class MarkItDown:
                         file_stream.seek(cur_pos)
 
                 if res is not None:
-                    # Normalize the content
-                    res.text_content = "\n".join(
-                        [line.rstrip() for line in re.split(r"\r?\n", res.text_content)]
-                    )
-                    res.text_content = re.sub(r"\n{3,}", "\n\n", res.text_content)
+                    # Normalize the content. Whitespace normalization (rstrip
+                    # trailing spaces, collapse runs of >=3 blank lines) is
+                    # applied only outside fenced code blocks, so that:
+                    #   1. Hard line breaks ("  \\n") survive -- the two
+                    #      trailing spaces markdown uses to mean <br>.
+                    #   2. Consecutive blank lines and trailing spaces inside
+                    #      ```/~~~ fences are preserved verbatim.
+                    res.text_content = _normalize_markdown(res.text_content)
                     return res
 
         # If we got this far without success, report any exceptions
