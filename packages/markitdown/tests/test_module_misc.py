@@ -18,6 +18,7 @@ from markitdown import (
     MarkItDown,
     StreamInfo,
     UnsupportedFormatException,
+    __version__,
 )
 from markitdown._markitdown import (
     _get_content_disposition_filename,
@@ -58,6 +59,33 @@ PPTX_TEST_STRINGS = [
     "a3f6004b-6f4f-4ea8-bee3-3741f4dc385f",  # chart title
     "2003",  # chart value
 ]
+
+
+# HTTP client identification
+
+
+def test_default_requests_session_has_identifiable_user_agent() -> None:
+    markitdown = MarkItDown(enable_builtins=False)
+    request = markitdown._requests_session.prepare_request(
+        requests.Request("GET", "https://en.wikipedia.org/wiki/Python")
+    )
+
+    assert request.headers["User-Agent"] == (
+        f"MarkItDown/{__version__} (https://github.com/microsoft/markitdown)"
+    )
+    assert markitdown._requests_session.headers["Accept"].startswith("text/markdown")
+
+
+def test_caller_supplied_requests_session_keeps_custom_headers() -> None:
+    session = requests.Session()
+    session.headers["User-Agent"] = "MyIndexer/2.0 (https://example.com/contact)"
+    session.headers["Accept"] = "application/json"
+    original_headers = dict(session.headers)
+
+    markitdown = MarkItDown(requests_session=session, enable_builtins=False)
+
+    assert markitdown._requests_session is session
+    assert dict(session.headers) == original_headers
 
 
 # --- Helper Functions ---
