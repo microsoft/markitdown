@@ -356,6 +356,200 @@ class TestCLIArgs:
 
 
 # ---------------------------------------------------------------------------
+# LLM client flags (issue #1897)
+# ---------------------------------------------------------------------------
+
+
+class TestLLMCLIArgs:
+    """Test CLI argument parsing for the --llm-* flags."""
+
+    def test_llm_options_are_forwarded_to_markitdown(self, capsys):
+        """--llm-client/--llm-model should reach MarkItDown as a live client object."""
+        import markitdown.__main__ as markitdown_cli
+
+        client = MagicMock()
+        markitdown_instance = MagicMock()
+        markitdown_instance.convert.return_value.markdown = "converted"
+        markitdown_cls = MagicMock(return_value=markitdown_instance)
+
+        with patch.object(
+            sys,
+            "argv",
+            [
+                "markitdown",
+                "--llm-client",
+                "openai",
+                "--llm-model",
+                "gpt-4o",
+                "fake.pdf",
+            ],
+        ), patch.object(markitdown_cli, "MarkItDown", markitdown_cls), patch.object(
+            markitdown_cli, "_create_llm_client", return_value=client
+        ) as create_client:
+            markitdown_cli.main()
+
+        create_client.assert_called_once_with("openai")
+        markitdown_cls.assert_called_once_with(
+            enable_plugins=False, llm_client=client, llm_model="gpt-4o"
+        )
+        assert capsys.readouterr().out == "converted\n"
+
+    def test_llm_prompt_is_forwarded_when_given(self, capsys):
+        """--llm-prompt is optional and forwarded only when provided."""
+        import markitdown.__main__ as markitdown_cli
+
+        client = MagicMock()
+        markitdown_instance = MagicMock()
+        markitdown_instance.convert.return_value.markdown = "converted"
+        markitdown_cls = MagicMock(return_value=markitdown_instance)
+
+        with patch.object(
+            sys,
+            "argv",
+            [
+                "markitdown",
+                "--llm-client",
+                "openai",
+                "--llm-model",
+                "gpt-4o",
+                "--llm-prompt",
+                "Describe this image.",
+                "fake.pdf",
+            ],
+        ), patch.object(markitdown_cli, "MarkItDown", markitdown_cls), patch.object(
+            markitdown_cli, "_create_llm_client", return_value=client
+        ):
+            markitdown_cli.main()
+
+        markitdown_cls.assert_called_once_with(
+            enable_plugins=False,
+            llm_client=client,
+            llm_model="gpt-4o",
+            llm_prompt="Describe this image.",
+        )
+
+    @pytest.mark.parametrize(
+        "mode_argv, mode_kwargs",
+        [
+            ([], {}),
+            (["-d", "-e", "https://fake-di"], {"docintel_endpoint": "https://fake-di"}),
+            (
+                ["--use-cu", "--cu-endpoint", "https://fake-cu"],
+                {"cu_endpoint": "https://fake-cu"},
+            ),
+        ],
+    )
+    def test_llm_options_are_forwarded_in_every_conversion_mode(
+        self, capsys, mode_argv, mode_kwargs
+    ):
+        """The LLM options apply to the default, DocIntel, and CU constructor paths."""
+        import markitdown.__main__ as markitdown_cli
+
+        client = MagicMock()
+        markitdown_instance = MagicMock()
+        markitdown_instance.convert.return_value.markdown = "converted"
+        markitdown_cls = MagicMock(return_value=markitdown_instance)
+
+        with patch.object(
+            sys,
+            "argv",
+            [
+                "markitdown",
+                *mode_argv,
+                "--llm-client",
+                "openai",
+                "--llm-model",
+                "gpt-4o",
+                "fake.pdf",
+            ],
+        ), patch.object(markitdown_cli, "MarkItDown", markitdown_cls), patch.object(
+            markitdown_cli, "_create_llm_client", return_value=client
+        ):
+            markitdown_cli.main()
+
+        markitdown_cls.assert_called_once_with(
+            enable_plugins=False,
+            llm_client=client,
+            llm_model="gpt-4o",
+            **mode_kwargs,
+        )
+        assert capsys.readouterr().out == "converted\n"
+
+    @pytest.mark.parametrize(
+        "argv",
+        [
+            ["markitdown", "--llm-model", "gpt-4o", "fake.pdf"],
+            ["markitdown", "--llm-prompt", "Describe this image.", "fake.pdf"],
+        ],
+    )
+    def test_llm_model_or_prompt_without_client_exits(self, monkeypatch, capsys, argv):
+        """--llm-model/--llm-prompt without --llm-client must not be silently ignored."""
+        import markitdown.__main__ as markitdown_cli
+
+        markitdown_cls = MagicMock()
+        monkeypatch.setattr(sys, "argv", argv)
+
+        with patch.object(markitdown_cli, "MarkItDown", markitdown_cls):
+            with pytest.raises(SystemExit) as exc:
+                markitdown_cli.main()
+
+        assert exc.value.code == 1
+        assert (
+            "--llm-client is required when using --llm-model or --llm-prompt."
+            in capsys.readouterr().out
+        )
+        markitdown_cls.assert_not_called()
+
+    def test_llm_client_without_model_exits(self, monkeypatch, capsys):
+        """--llm-client without --llm-model must exit with an actionable error."""
+        import markitdown.__main__ as markitdown_cli
+
+        markitdown_cls = MagicMock()
+        monkeypatch.setattr(
+            sys, "argv", ["markitdown", "--llm-client", "openai", "fake.pdf"]
+        )
+
+        with patch.object(markitdown_cli, "MarkItDown", markitdown_cls):
+            with pytest.raises(SystemExit) as exc:
+                markitdown_cli.main()
+
+        assert exc.value.code == 1
+        assert (
+            "--llm-model is required when using --llm-client."
+            in capsys.readouterr().out
+        )
+        markitdown_cls.assert_not_called()
+
+    def test_missing_openai_package_exits_with_install_hint(self, monkeypatch, capsys):
+        """A missing 'openai' dependency must produce an actionable error, not a traceback."""
+        import markitdown.__main__ as markitdown_cli
+
+        # None in sys.modules makes `import openai` raise ImportError deterministically,
+        # whether or not the package happens to be installed in this environment.
+        monkeypatch.setitem(sys.modules, "openai", None)
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            [
+                "markitdown",
+                "--llm-client",
+                "openai",
+                "--llm-model",
+                "gpt-4o",
+                "fake.pdf",
+            ],
+        )
+
+        with pytest.raises(SystemExit) as exc:
+            markitdown_cli.main()
+
+        assert exc.value.code == 1
+        output = capsys.readouterr().out
+        assert "requires the 'openai' package" in output
+        assert "pip install openai" in output
+
+
+# ---------------------------------------------------------------------------
 # Endpoint environment variables (issue #2326)
 # ---------------------------------------------------------------------------
 

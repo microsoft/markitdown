@@ -167,6 +167,25 @@ def main():
         help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
     )
 
+    parser.add_argument(
+        "--llm-client",
+        type=str,
+        choices=["openai"],
+        help="LLM client used to describe images and run LLM-based OCR (e.g., with -p/--use-plugins). Requires --llm-model. The API key is read from the OPENAI_API_KEY environment variable.",
+    )
+
+    parser.add_argument(
+        "--llm-model",
+        type=str,
+        help="LLM model name to use with --llm-client (e.g., gpt-4o).",
+    )
+
+    parser.add_argument(
+        "--llm-prompt",
+        type=str,
+        help="Custom prompt template to use for LLM descriptions. Requires --llm-client.",
+    )
+
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
 
@@ -229,6 +248,22 @@ def main():
             )
         sys.exit(0)
 
+    # Resolve the LLM options, which are shared by all conversion modes.
+    llm_kwargs: Dict[str, Any] = {}
+    if args.llm_client is not None:
+        if args.llm_model is None:
+            _exit_with_error("--llm-model is required when using --llm-client.")
+        llm_kwargs = {
+            "llm_client": _create_llm_client(args.llm_client),
+            "llm_model": args.llm_model,
+        }
+        if args.llm_prompt is not None:
+            llm_kwargs["llm_prompt"] = args.llm_prompt
+    elif args.llm_model is not None or args.llm_prompt is not None:
+        _exit_with_error(
+            "--llm-client is required when using --llm-model or --llm-prompt."
+        )
+
     if args.use_docintel:
         if args.endpoint is None:
             _exit_with_error(
@@ -259,7 +294,7 @@ def main():
             if fields:
                 docintel_kwargs["docintel_query_fields"] = fields
 
-        markitdown = MarkItDown(enable_plugins=args.use_plugins, **docintel_kwargs)
+        markitdown = MarkItDown(enable_plugins=args.use_plugins, **docintel_kwargs, **llm_kwargs)
     elif args.use_cu:
         if args.cu_endpoint is None:
             _exit_with_error(
@@ -288,9 +323,11 @@ def main():
                     _exit_with_error(f"Unknown file type: {name}")
             cu_kwargs["cu_file_types"] = cu_types
 
-        markitdown = MarkItDown(enable_plugins=args.use_plugins, **cu_kwargs)
+        markitdown = MarkItDown(
+            enable_plugins=args.use_plugins, **cu_kwargs, **llm_kwargs
+        )
     else:
-        markitdown = MarkItDown(enable_plugins=args.use_plugins)
+        markitdown = MarkItDown(enable_plugins=args.use_plugins, **llm_kwargs)
 
     if args.filename is None:
         # Windows pipe-backed stdin can report seekable() even though it cannot rewind.
@@ -305,6 +342,23 @@ def main():
         )
 
     _handle_output(args, result)
+
+
+def _create_llm_client(client_name: str) -> Any:
+    """Construct the LLM client object passed to MarkItDown."""
+    if client_name == "openai":
+        try:
+            import openai
+        except ImportError:
+            _exit_with_error(
+                "The --llm-client openai option requires the 'openai' package. "
+                "Install it with: pip install openai"
+            )
+        try:
+            return openai.OpenAI()
+        except openai.OpenAIError as e:
+            _exit_with_error(f"Failed to initialize the OpenAI client: {e}")
+    _exit_with_error(f"Unknown LLM client: {client_name}")
 
 
 def _handle_output(args, result: DocumentConverterResult):
