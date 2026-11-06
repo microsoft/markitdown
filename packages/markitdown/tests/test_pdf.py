@@ -1195,13 +1195,26 @@ class TestMasterFormatPartialNumbering:
         ), f"Found {isolated_count} isolated partial numberings that weren't merged"
 
 
+# Plain text reading order regression
+
+
+class TestPdfPlainTextOrdering:
+    def test_plain_text_preserves_reading_order(self):
+        pdf_path = os.path.join(TEST_FILES_DIR, "pdf_text_order_repro.pdf")
+        markdown = MarkItDown().convert(pdf_path).markdown or ""
+        normalized = "".join(markdown.split())
+        # The fixture draws characters in stream order A-C-B-D at x positions
+        # whose reading order is A-B-C-D.
+        assert "ABCD" in normalized
+
+
 # Page cleanup and extraction fallback
 
 # Tests for PDF converter memory optimization.
 #
 # Verifies that:
 # - page.close() is called after processing each page (frees cached data)
-# - Plain-text PDFs fall back to pdfminer when no form pages are found
+# - Plain-text PDFs use pdfminer when it preserves pdfplumber character order
 # - Mixed PDFs use form extraction only on form-style pages
 
 
@@ -1266,7 +1279,7 @@ class TestPdfMemoryOptimization:
             if page < 3:
                 assert closed < pdf_activity.index(("form", page + 1))
 
-    def test_plain_text_pdf_falls_back_to_pdfminer(self, pdf_activity):
+    def test_plain_text_pdf_uses_pdfminer_when_order_matches(self, pdf_activity):
         markdown = _convert_cleanup_fixture("plain")
         assert pdf_activity.count(("pdfminer", None)) == 1
         assert [(kind, page) for kind, page in pdf_activity if kind == "plain"] == [

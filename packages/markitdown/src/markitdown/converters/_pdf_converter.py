@@ -11,6 +11,11 @@ from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 PARTIAL_NUMBERING_PATTERN = re.compile(r"^\.\d+$")
 
 
+def _compact_pdf_text(text: str) -> str:
+    """Remove whitespace before comparing PDF text extraction order."""
+    return re.sub(r"\s+", "", text)
+
+
 def _merge_partial_numbering_lines(text: str) -> str:
     """
     Post-process extracted text to merge MasterFormat-style partial numbering
@@ -547,10 +552,8 @@ class PdfConverter(DocumentConverter):
             # keep memory usage constant regardless of page count.
             markdown_chunks: list[str] = []
             form_page_count = 0
-            plain_page_indices: list[int] = []
-
             with pdfplumber.open(pdf_bytes) as pdf:
-                for page_idx, page in enumerate(pdf.pages):
+                for page in pdf.pages:
                     page_content = _extract_form_content_from_words(page)
 
                     if page_content is not None:
@@ -558,20 +561,20 @@ class PdfConverter(DocumentConverter):
                         if page_content.strip():
                             markdown_chunks.append(page_content)
                     else:
-                        plain_page_indices.append(page_idx)
                         text = page.extract_text()
                         if text and text.strip():
                             markdown_chunks.append(text.strip())
 
                     page.close()  # Free cached page data immediately
 
-            # If no pages had form-style content, use pdfminer for
-            # the whole document (better text spacing for prose).
+            markdown = "\n\n".join(markdown_chunks).strip()
+
+            # Keep pdfminer's spacing when both extractors preserve character order.
             if form_page_count == 0:
                 pdf_bytes.seek(0)
-                markdown = pdfminer.high_level.extract_text(pdf_bytes)
-            else:
-                markdown = "\n\n".join(markdown_chunks).strip()
+                pdfminer_markdown = pdfminer.high_level.extract_text(pdf_bytes)
+                if _compact_pdf_text(pdfminer_markdown) == _compact_pdf_text(markdown):
+                    markdown = pdfminer_markdown
 
         except Exception:
             # Fallback if pdfplumber fails
