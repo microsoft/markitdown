@@ -77,6 +77,20 @@ def get_char(key, default=None, store=CHR):
     return store.get(key, key) if store else key
 
 
+def is_on(elm):
+    """Return whether an OOXML on/off property element is enabled.
+
+    A property element with no ``m:val`` attribute is enabled; otherwise
+    ``1``/``true``/``on`` mean enabled and anything else means disabled.
+    """
+    if elm is None:
+        return False
+    val = elm.get(OMML_NS + "val")
+    if val is None:
+        return True
+    return val.strip().lower() in ("1", "true", "on")
+
+
 class Tag2Method(object):
     def call_method(self, elm, stag=None):
         getmethod = self.tag2meth.get
@@ -311,7 +325,9 @@ class oMath2Latex(Tag2Method):
         c_dict = self.process_children_dict(elm)
         text = c_dict.get("e")
         deg_text = c_dict.get("deg")
-        if deg_text:
+        rad_pr = elm.find(OMML_NS + "radPr")
+        deg_hide = None if rad_pr is None else rad_pr.find(OMML_NS + "degHide")
+        if deg_text and not is_on(deg_hide):
             return RAD.format(deg=deg_text, text=text)
         else:
             return RAD_DEFAULT.format(text=text)

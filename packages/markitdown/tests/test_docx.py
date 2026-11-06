@@ -32,7 +32,10 @@ from markitdown.converter_utils.docx.math.latex_dict import (
     T,
 )
 from markitdown.converter_utils.docx.math.omml import OMML_NS, load_string, oMath2Latex
-from markitdown.converter_utils.docx.pre_process import _pre_process_styles
+from markitdown.converter_utils.docx.pre_process import (
+    _pre_process_math,
+    _pre_process_styles,
+)
 from markitdown.converters import DocxConverter, HtmlConverter, _docx_converter
 
 # Math functions
@@ -169,6 +172,79 @@ def test_caron_and_ring_accents() -> None:
 def test_unmodified_accent_still_converts() -> None:
     """Control: a neighbouring accent that was never broken."""
     assert _latex_for_accent(CIRCUMFLEX) == "\\hat{x}"
+
+
+# Math radicals
+
+# ``m:degHide`` hides the degree of a radical. A hidden degree is still stored
+# in ``m:deg`` by Word, so reading ``m:deg`` without consulting ``m:radPr``
+# emitted the degree anyway and changed the meaning of the equation.
+
+_RADICAL_DOC = (
+    "<m:oMathPara "
+    'xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">'
+    "<m:oMath><m:rad>{props}"
+    "<m:deg><m:r><m:t>3</m:t></m:r></m:deg>"
+    "<m:e><m:r><m:t>x</m:t></m:r></m:e>"
+    "</m:rad></m:oMath></m:oMathPara>"
+)
+
+
+def _latex_for_radical(props: str) -> str:
+    """Convert a cube root of x with the given radical properties to LaTeX."""
+    results = list(load_string(_RADICAL_DOC.format(props=props)))
+    assert len(results) == 1
+    return str(results[0])
+
+
+@pytest.mark.parametrize(
+    "deg_hide",
+    [
+        '<m:degHide m:val="1"/>',
+        '<m:degHide m:val="true"/>',
+        '<m:degHide m:val="on"/>',
+        "<m:degHide/>",
+    ],
+)
+def test_hidden_radical_degree_is_not_emitted(deg_hide: str) -> None:
+    """A degree marked hidden must produce \\sqrt{x}, not \\sqrt[3]{x}."""
+    assert _latex_for_radical(f"<m:radPr>{deg_hide}</m:radPr>") == r"\sqrt{x}"
+
+
+@pytest.mark.parametrize(
+    "deg_hide",
+    [
+        '<m:degHide m:val="0"/>',
+        '<m:degHide m:val="false"/>',
+        '<m:degHide m:val="off"/>',
+        "<m:radPr/>",
+        "",
+    ],
+)
+def test_visible_radical_degree_is_still_emitted(deg_hide: str) -> None:
+    """Controls: an absent or disabled degHide keeps the stored degree."""
+    props = f"<m:radPr>{deg_hide}</m:radPr>" if deg_hide else ""
+    assert _latex_for_radical(props) == r"\sqrt[3]{x}"
+
+
+def test_hidden_radical_degree_through_docx_preprocessing() -> None:
+    """The same fix must apply on the path used by DOCX conversion."""
+    document_xml = (
+        "<w:document "
+        'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
+        'xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">'
+        "<m:oMath>"
+        '<m:rad><m:radPr><m:degHide m:val="1"/></m:radPr>'
+        "<m:deg><m:r><m:t>3</m:t></m:r></m:deg>"
+        "<m:e><m:r><m:t>x</m:t></m:r></m:e>"
+        "</m:rad>"
+        "</m:oMath></w:document>"
+    )
+
+    processed = _pre_process_math(document_xml.encode("utf-8"))
+
+    assert b"$\\sqrt{x}$" in processed
+    assert b"\\sqrt[3]{x}" not in processed
 
 
 # Math symbols
