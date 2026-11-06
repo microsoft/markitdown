@@ -83,6 +83,7 @@ features = ["all"]
 extra-dependencies = [
   "openai",
   "pyyaml",
+  "markdown-it-py",
 ]
 
 [tool.hatch.envs.types]

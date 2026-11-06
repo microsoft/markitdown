@@ -5,10 +5,13 @@ import re
 from unittest.mock import patch
 
 import pytest
+from bs4 import BeautifulSoup
+from markdown_it import MarkdownIt
 
-from markitdown import MarkItDown
+from markitdown import FileConversionException, MarkItDown, StreamInfo
 from markitdown.converters._pdf_converter import (
     PARTIAL_NUMBERING_PATTERN,
+    PdfConverter,
     _merge_partial_numbering_lines,
 )
 
@@ -1041,6 +1044,139 @@ class TestPdfTableStructureConsistency:
         table_text = str(second_table)
         assert "Electronics" in table_text, "Second table should contain Electronics"
         assert "Hardware" in table_text, "Second table should contain Hardware"
+
+    def test_rotated_text_direction_can_be_configured(self, markitdown):
+        """Test that bottom-to-top rotated text can use pdfplumber's direction option."""
+        pdf_path = os.path.join(TEST_FILES_DIR, "rotated_table.pdf")
+
+        default_result = markitdown.convert(pdf_path)
+        assert "noitalupoP" in default_result.text_content
+
+        result = markitdown.convert(pdf_path, pdf_char_dir_rotated="btt")
+        assert "Projected Population" in result.text_content
+        assert "noitalupoP" not in result.text_content
+        table = (
+            "| Column A | Column B | Column C |\n"
+            "| -------- | -------- | -------- |\n"
+            "| Alpha    | 100      | kg       |\n"
+            "| Beta     | 200      | lb       |"
+        )
+        assert table in default_result.text_content
+        assert table in result.text_content
+
+    @pytest.mark.parametrize("direction", ["btt", "ttb"])
+    def test_rotated_plain_text_direction(self, markitdown, direction):
+        pdf_path = os.path.join(TEST_FILES_DIR, f"rotated_plain_{direction}.pdf")
+        with open(pdf_path, "rb") as stream:
+            result = markitdown.convert_stream(
+                stream,
+                stream_info=StreamInfo(extension=".pdf"),
+                pdf_char_dir_rotated=direction,
+            )
+        assert result.text_content == (
+            "Rotation example\nProjected\nPopulation\nKharif\nRice"
+        )
+
+    def test_rotated_mixed_pages_preserve_order(self, markitdown):
+        pdf_path = os.path.join(TEST_FILES_DIR, "rotated_mixed.pdf")
+        result = markitdown.convert(pdf_path, pdf_char_dir_rotated="btt")
+        plain_page = "Rotation example\nProjected\nPopulation\nKharif\nRice"
+        table_page = (
+            "Inventory\n"
+            "| Column A | Column B | Column C |\n"
+            "| -------- | -------- | -------- |\n"
+            "| Alpha    | 100      | kg       |\n"
+            "| Beta     | 200      | lb       |"
+        )
+        assert result.text_content == "\n\n".join((plain_page, table_page, plain_page))
+
+    @pytest.mark.parametrize("direction", ["", "foo", "ltr", "rtl", True, 1, [], {}])
+    def test_invalid_rotated_direction_raises(self, markitdown, direction):
+        pdf_path = os.path.join(TEST_FILES_DIR, "rotated_table.pdf")
+        with open(pdf_path, "rb") as stream:
+            with pytest.raises(ValueError, match="pdf_char_dir_rotated"):
+                PdfConverter().convert(
+                    stream,
+                    StreamInfo(extension=".pdf"),
+                    pdf_char_dir_rotated=direction,
+                )
+            assert stream.tell() == 0
+        with pytest.raises(FileConversionException, match="pdf_char_dir_rotated"):
+            markitdown.convert(pdf_path, pdf_char_dir_rotated=direction)
+
+    @pytest.mark.parametrize("kind", ["plain", "form", "mixed"])
+    def test_unset_rotated_direction_preserves_default(self, markitdown, kind):
+        pdf_path = os.path.join(TEST_FILES_DIR, f"pdf_cleanup_{kind}.pdf")
+        default = markitdown.convert(pdf_path).text_content
+        assert default.strip()
+        assert (
+            markitdown.convert(pdf_path, pdf_char_dir_rotated=None).text_content
+            == default
+        )
+
+    @pytest.mark.parametrize("direction", ["btt", "ttb"])
+    def test_rotated_direction_with_empty_page(self, markitdown, direction):
+        pdf_path = os.path.join(TEST_FILES_DIR, "rotated_empty.pdf")
+        result = markitdown.convert(pdf_path, pdf_char_dir_rotated=direction)
+        assert result.text_content == ""
+
+    @pytest.mark.parametrize("direction", ["btt", "ttb"])
+    @pytest.mark.parametrize("entrypoint", ["file", "stream"])
+    def test_rotated_ruled_tables_preserve_cells(
+        self, markitdown, direction, entrypoint
+    ):
+        pdf_path = os.path.join(TEST_FILES_DIR, f"rotated_ruled_{direction}.pdf")
+        if entrypoint == "file":
+            result = markitdown.convert(pdf_path, pdf_char_dir_rotated=direction)
+        else:
+            with open(pdf_path, "rb") as stream:
+                result = markitdown.convert_stream(
+                    stream,
+                    stream_info=StreamInfo(extension=".pdf"),
+                    pdf_char_dir_rotated=direction,
+                )
+        rendered = MarkdownIt("commonmark").enable("table").render(result.text_content)
+        document = BeautifulSoup(rendered, "html.parser")
+        tables = document.find_all("table")
+        assert len(tables) == 2
+        rows = [
+            [cell.get_text("\n", strip=True) for cell in row.find_all(["th", "td"])]
+            for row in tables[0].find_all("tr")
+        ]
+        assert rows == [
+            [
+                "No.\nIndex",
+                "District",
+                "Projected Population\nfor 2012-13\n(In lakhs)",
+                "Adult\nEquivalent to 88%\n(In lakhs)",
+                "Total Consumption\nrequirement\n(In Lakh tonnes)",
+                "Total Requirement\nIncluding seeds\nand feeds",
+                "Production (Rice)",
+                "",
+                "",
+                "Surplus/Deficit",
+                "",
+            ],
+            ["", "", "", "", "", "", "Kharif", "Rabi", "Total", "Rice", "Paddy"],
+            "1 Alpha 23.65 20.81 3.04 3.47 2.78 0.86 3.64 0.17 0.25".split(),
+            [""] * 11,
+            "2 Beta 15.34 13.50 1.97 2.25 3.50 0.05 3.55 1.30 1.94".split(),
+            ["TOTAL", ""] + "38.99 34.31 5.01 5.72 6.28 0.91 7.19 1.47 2.19".split(),
+        ]
+        assert [
+            [cell.get_text(strip=True) for cell in row.find_all(["th", "td"])]
+            for row in tables[1].find_all("tr")
+        ] == [["Name | code", "Amount"], ["<total>", "3.47"]]
+        fragments = [
+            "Before the first table",
+            "Projected Population",
+            "Between the tables",
+            "Name",
+            "After the second table",
+        ]
+        positions = [result.text_content.index(fragment) for fragment in fragments]
+        assert positions == sorted(positions)
+        assert all(result.text_content.count(fragment) == 1 for fragment in fragments)
 
 
 # MasterFormat numbering
