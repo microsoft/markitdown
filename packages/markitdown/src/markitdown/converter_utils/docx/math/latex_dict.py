@@ -269,6 +269,7 @@ D = "\\left{left}{text}\\right{right}"
 D_DEFAULT = {
     "left": "(",
     "right": ")",
+    "sep": "|",
     "null": ".",
 }
 
