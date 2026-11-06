@@ -57,6 +57,16 @@ class HtmlConverter(DocumentConverter):
         for script in soup(["script", "style"]):
             script.extract()
 
+        # <head> content (title, meta, noscript fallback text, ...) is already
+        # returned separately as DocumentConverterResult.title. html.parser
+        # does not synthesize a <body>, so a document that omits <body> tags
+        # would otherwise leak head text into the markdown body. Capture the
+        # title first, then drop <head> so only rendered content is converted.
+        title = None if soup.title is None else soup.title.string
+        head_elm = soup.find("head")
+        if head_elm is not None:
+            head_elm.extract()
+
         # Print only the main content
         body_elm = soup.find("body")
         webpage_text = ""
@@ -87,7 +97,7 @@ class HtmlConverter(DocumentConverter):
 
         return DocumentConverterResult(
             markdown=webpage_text,
-            title=None if soup.title is None else soup.title.string,
+            title=title,
         )
 
     def convert_string(
