@@ -156,6 +156,39 @@ def test_empty_ansi_properties_are_omitted(codepage: int, value: bytes) -> None:
     assert result.markdown == "# Email Message\n\n\n## Content"
 
 
+@pytest.mark.parametrize("terminator", [b"\x00\x00", b"\x00\x00\x00\x00"])
+def test_unicode_terminators_are_removed(terminator: bytes) -> None:
+    """A Unicode stream terminates the same way, one character wide.
+
+    The terminator has to be removed from the decoded text: dropping trailing
+    NUL bytes instead would also take the high byte of the last character.
+    """
+    streams = _unicode_streams()
+    for path in streams:
+        streams[path] += terminator
+
+    result = _convert_result(streams)
+
+    assert result.title == SUBJECT
+    assert result.markdown == (
+        f"# Email Message\n\n**From:** {SENDER}\n**To:** {RECIPIENT}\n"
+        f"**Subject:** {SUBJECT}\n\n## Content\n\n{BODY}"
+    )
+
+
+@pytest.mark.parametrize("value", [b"\x00\x00", b"\x00\x00\x00\x00"])
+def test_empty_unicode_properties_are_omitted(value: bytes) -> None:
+    """A Unicode property holding only its terminator is empty, not a NUL."""
+    streams = _unicode_streams()
+    for path in streams:
+        streams[path] = value
+
+    result = _convert_result(streams)
+
+    assert not result.title
+    assert result.markdown == "# Email Message\n\n\n## Content"
+
+
 def test_ansi_terminators_are_removed_without_a_detected_charset() -> None:
     streams = _ansi_streams(encoding="utf-8", codepage=0)
     for path in streams:
