@@ -208,8 +208,12 @@ class XlsConverter(DocumentConverter):
         mimetype = (stream_info.mimetype or "").lower()
         extension = (stream_info.extension or "").lower()
 
-        if extension in ACCEPTED_XLS_FILE_EXTENSIONS:
-            return True
+        # Some upstream systems label every legacy Office Compound File as
+        # application/vnd.ms-excel, including Word .doc files. When the
+        # extension is known, use it as the discriminator so a .doc is not
+        # handed to xlrd. MIME type remains a fallback for extensionless input.
+        if extension:
+            return extension in ACCEPTED_XLS_FILE_EXTENSIONS
 
         for prefix in ACCEPTED_XLS_MIME_TYPE_PREFIXES:
             if mimetype.startswith(prefix):
