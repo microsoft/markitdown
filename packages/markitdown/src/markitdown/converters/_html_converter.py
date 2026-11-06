@@ -1,6 +1,7 @@
 import io
 import warnings
 from typing import Any, BinaryIO, Optional
+from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
@@ -56,6 +57,33 @@ class HtmlConverter(DocumentConverter):
         # Remove javascript and style blocks
         for script in soup(["script", "style"]):
             script.extract()
+
+        # Determine effective base URL per WHATWG HTML spec:
+        # First <base href="..."> resolved against stream_info.url if present.
+        effective_base_url: Optional[str] = stream_info.url
+        base_tag = soup.find("base", href=True)
+        if base_tag and isinstance(base_tag, dict) and "href" in base_tag.attrs:
+            pass  # handled below
+        if base_tag and base_tag.get("href"):
+            base_href = str(base_tag.get("href")).strip()
+            if effective_base_url:
+                effective_base_url = urljoin(effective_base_url, base_href)
+            else:
+                effective_base_url = base_href
+
+        if effective_base_url:
+            for a_tag in soup.find_all("a", href=True):
+                href_val = a_tag.get("href")
+                if href_val:
+                    a_tag["href"] = urljoin(effective_base_url, str(href_val))
+
+            for img_tag in soup.find_all("img"):
+                src_val = img_tag.get("src")
+                if src_val and not str(src_val).lower().startswith("data:"):
+                    img_tag["src"] = urljoin(effective_base_url, str(src_val))
+                data_src_val = img_tag.get("data-src")
+                if data_src_val and not str(data_src_val).lower().startswith("data:"):
+                    img_tag["data-src"] = urljoin(effective_base_url, str(data_src_val))
 
         # Print only the main content
         body_elm = soup.find("body")
