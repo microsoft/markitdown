@@ -6,6 +6,7 @@ from typing import BinaryIO, Any
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
+from ._pdf_layout import extract_ordered_content
 
 # Pattern for MasterFormat-style partial numbering (e.g., ".1", ".2", ".10")
 PARTIAL_NUMBERING_PATTERN = re.compile(r"^\.\d+$")
@@ -547,27 +548,36 @@ class PdfConverter(DocumentConverter):
             # keep memory usage constant regardless of page count.
             markdown_chunks: list[str] = []
             form_page_count = 0
+            ordered_page_count = 0
             plain_page_indices: list[int] = []
 
             with pdfplumber.open(pdf_bytes) as pdf:
                 for page_idx, page in enumerate(pdf.pages):
-                    page_content = _extract_form_content_from_words(page)
+                    try:
+                        ordered_content = extract_ordered_content(page)
+                        if ordered_content is not None:
+                            ordered_page_count += 1
+                            if ordered_content.strip():
+                                markdown_chunks.append(ordered_content)
+                            continue
+                        page_content = _extract_form_content_from_words(page)
 
-                    if page_content is not None:
-                        form_page_count += 1
-                        if page_content.strip():
-                            markdown_chunks.append(page_content)
-                    else:
-                        plain_page_indices.append(page_idx)
-                        text = page.extract_text()
-                        if text and text.strip():
-                            markdown_chunks.append(text.strip())
+                        if page_content is not None:
+                            form_page_count += 1
+                            if page_content.strip():
+                                markdown_chunks.append(page_content)
+                        else:
+                            plain_page_indices.append(page_idx)
+                            text = page.extract_text()
+                            if text and text.strip():
+                                markdown_chunks.append(text.strip())
 
-                    page.close()  # Free cached page data immediately
+                    finally:
+                        page.close()  # Release cached glyph/layout objects per page.
 
-            # If no pages had form-style content, use pdfminer for
-            # the whole document (better text spacing for prose).
-            if form_page_count == 0:
+            # Preserve pdfminer's prose spacing when no page needed form or
+            # directional/layout reconstruction.
+            if form_page_count == 0 and ordered_page_count == 0:
                 pdf_bytes.seek(0)
                 markdown = pdfminer.high_level.extract_text(pdf_bytes)
             else:

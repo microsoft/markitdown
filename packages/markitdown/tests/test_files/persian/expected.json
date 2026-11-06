@@ -1,0 +1,40 @@
+{
+  "arabic_digits": "٠١٢٣٤٥٦٧٨٩",
+  "ascii_digits": "0123456789",
+  "basic_sentence": "این یک سند آزمایشی برای بررسی استخراج متن فارسی است.",
+  "contract_date": "شماره قرارداد ABC-123 در تاریخ ۱۴۰۵/۰۷/۳۰ ثبت شد.",
+  "decimal_unit": "مقدار آزمایش برابر با 3.75 mg/L است.",
+  "diacritics": "سَلام",
+  "email": "نشانی test@example.com است.",
+  "file_identifier": "شناسه فایل DOC-2026-A15 است.",
+  "heading": "گزارش آزمایش\n\nاین متن گزارش است.",
+  "letter_variants": "ی ي ک ك",
+  "ltr_sentence": "The identifier DOC-2026-A15 uses Python 3.12.",
+  "model_identifier": "مدل GPT-4o برای پردازش متن استفاده شد.",
+  "paragraphs": "این بند اول است.\n\nاین بند دوم است.",
+  "parentheses_math": "رابطه (x + 2 = 5) درست است.",
+  "persian_digits": "۰۱۲۳۴۵۶۷۸۹",
+  "python_version": "این پروژه از Python 3.12 استفاده می‌کند.",
+  "rtl_table": [
+    [
+      "نام محصول",
+      "کد محصول",
+      "مقدار"
+    ],
+    [
+      "پلی‌اتیلن",
+      "PE-101",
+      "۲۵"
+    ],
+    [
+      "پلی‌پروپیلن",
+      "PP-202",
+      "۴۰"
+    ]
+  ],
+  "sentences": "این جمله اول است. این جمله دوم است.",
+  "two_column_ltr": "Left top\n\nLeft bottom\n\nRight top\n\nRight bottom",
+  "two_column_rtl": "ستون راست بالا\n\nستون راست پایین\n\nستون چپ بالا\n\nستون چپ پایین",
+  "url": "برای اطلاعات بیشتر به https://example.com مراجعه کنید.",
+  "zwnj": "می‌روم کتاب‌ها برنامه‌نویسی"
+}

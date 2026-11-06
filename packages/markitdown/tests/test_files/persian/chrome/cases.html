@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>Persian Chrome PDF regression cases</title>
+<style>
+@font-face { font-family: NA; src: url("../fonts/NotoSansArabic-Regular.ttf"); }
+@font-face { font-family: NL; src: url("../fonts/NotoSans-Regular.ttf"); }
+@page { size: A4; margin: 20mm; }
+body { font-family: NA, NL; font-size: 13pt; line-height: 1.9; margin: 0; }
+section { page-break-after: always; }
+section:last-child { page-break-after: auto; }
+h1 { font-size: 22pt; margin: 0 0 14pt; font-weight: normal; }
+h2 { font-size: 17pt; margin: 14pt 0 8pt; font-weight: normal; }
+p { margin: 0 0 12pt; text-align: justify; }
+table { border-collapse: collapse; width: 100%; }
+td, th { border: 1px solid #000; padding: 6pt; font-weight: normal; text-align: right; }
+.cols { column-count: 2; column-gap: 40pt; }
+.narrow { column-count: 2; column-gap: 14pt; }
+.foot { margin-top: 560pt; text-align: center; }
+ul.none { list-style: none; padding: 0; }
+.en { direction: ltr; font-family: NL; }
+.ltr { direction: ltr; unicode-bidi: isolate; }
+</style>
+</head>
+<body>
+
+<section id="prose_wrapped">
+<p>گزارش فنی این پروژه نشان می‌دهد که استخراج متن از پرونده‌های دارای نوشتار راست‌به‌چپ نیازمند توجه ویژه‌ای است. هنگامی که یک بند طولانی در چند سطر شکسته می‌شود، ترتیب سطرها و واژه‌ها باید دقیقاً مطابق با متن منطقی نویسنده بازسازی شود تا خواننده بتواند مطلب را بدون ابهام دنبال کند.</p>
+<p>بند دوم کوتاه‌تر است؛ اما همچنان شامل نشانه‌های نگارشی مانند ویرگول، نقطه‌ویرگول و پرسش است. آیا همه‌ی این نشانه‌ها در جای درست خود باقی می‌مانند؟</p>
+</section>
+
+<section id="heading_sections">
+<h1>گزارش سالانه فعالیت‌ها</h1>
+<h2>۱. مقدمه</h2>
+<p>در سال گذشته چندین پروژه پژوهشی با موفقیت به پایان رسید و نتایج آن‌ها در نشریات معتبر منتشر شد.</p>
+<h2>۲. روش‌ها</h2>
+<p>داده‌ها از طریق پرسش‌نامه گردآوری و سپس با نرم‌افزار آماری تحلیل شدند.</p>
+</section>
+
+<section id="numbered_list">
+<h2>فهرست کارهای هفته</h2>
+<ol>
+<li>تهیه‌ی پیش‌نویس گزارش</li>
+<li>بازبینی جدول‌ها و نمودارها</li>
+<li>ارسال نسخه‌ی نهایی به کمیته</li>
+</ol>
+</section>
+
+<section id="ruled_table">
+<table>
+<tr><th>نام</th><th>شهر</th><th>تعداد</th></tr>
+<tr><td>علی</td><td>تهران</td><td>۱۲</td></tr>
+<tr><td>مریم</td><td>شیراز</td><td>۳۴</td></tr>
+<tr><td>رضا</td><td>تبریز</td><td>۵۶</td></tr>
+</table>
+</section>
+
+<section id="mixed_wrapped">
+<p>برای نصب بسته کافی است دستور <span class="ltr">pip install markitdown</span> را اجرا کنید و سپس نسخه‌ی <span class="ltr">Python 3.12</span> را بررسی نمایید. نشانی مخزن کد <span class="ltr">https://github.com/microsoft/markitdown</span> است و گزارش خطا را می‌توانید به <span class="ltr">bugs@example.com</span> ارسال کنید.</p>
+</section>
+
+<section id="two_columns">
+<div class="cols">
+<p>ستون نخست شامل چند جمله‌ی نسبتاً بلند است تا متن در همین ستون ادامه یابد و به ستون دوم نرسد. این جمله برای پر کردن فضا نوشته شده است.</p>
+<p>ستون دوم با بند دیگری آغاز می‌شود که باید پس از پایان ستون نخست خوانده شود، نه همزمان با آن.</p>
+</div>
+</section>
+
+<section id="narrow_columns">
+<div class="narrow">
+<p>در روزنامه‌ها و مجله‌ها معمولاً فاصله‌ی میان ستون‌ها کم است و خواننده تنها با یک شکاف باریک متن را از هم جدا می‌بیند. بازسازی ترتیب خواندن در چنین صفحه‌هایی باید ابتدا ستون راست را کامل بخواند.</p>
+<p>سپس نوبت به ستون چپ می‌رسد که همان بند بعدی را ادامه می‌دهد و نباید با سطرهای ستون نخست درهم بیامیزد.</p>
+</div>
+</section>
+
+<section id="page_footer">
+<h1>عنوان صفحه</h1>
+<p>متن اصلی صفحه در اینجا قرار دارد و پایین صفحه شماره‌ی آن آمده است.</p>
+<p class="foot">۱۲</p>
+</section>
+
+<section id="quotes_percent">
+<p>او گفت: «این روش ۲۵٪ سریع‌تر است (طبق آزمایش‌ها)». سپس افزود: «نتیجه در جدول ۳ آمده است؛ لطفاً بررسی کنید.»</p>
+</section>
+
+<section id="math_in_text">
+<p>رابطه (x + 3 = 9) برقرار است و مقدار <span class="ltr">(a + b)</span> نیز درست است. هر دو در فایل <span class="ltr">report_v2.pdf</span> آمده‌اند.</p>
+</section>
+
+<section id="long_pages">
+<h1>ارزیابی عملکرد سامانه</h1>
+<p>سامانه‌ی جدید در سه مرحله ارزیابی شد. در مرحله‌ی نخست، نمونه‌هایی از متن فارسی با طول‌های گوناگون تهیه شد و خروجی هر نمونه با متن مرجع مقایسه گردید. در این مرحله ۹۸٫۵ درصد واژه‌ها بدون خطا بازسازی شدند.</p>
+<p>در مرحله‌ی دوم، پرونده‌هایی با جدول و ستون‌های متعدد بررسی شد و نتایج نشان داد که ترتیب خواندن در بیشتر موارد درست است. با این حال، چند مورد استثنا باقی ماند که در بخش بعد توضیح داده می‌شود.</p>
+<p>در مرحله‌ی سوم، سرعت پردازش اندازه‌گیری شد؛ میانگین زمان برای هر صفحه حدود ۰٫۱۲ ثانیه بود و حافظه‌ی مصرفی تغییر چشمگیری نکرد.</p>
+</section>
+
+</body>
+</html>
