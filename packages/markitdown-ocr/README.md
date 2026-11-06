@@ -49,7 +49,7 @@ md = MarkItDown(
 )
 
 result = md.convert("document_with_images.pdf")
-print(result.text_content)
+print(result.markdown)
 ```
 
 If no `llm_client` is provided the plugin still loads, but OCR is silently skipped — falling back to the standard built-in converter.
