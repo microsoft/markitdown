@@ -374,9 +374,21 @@ class oMath2Latex(Tag2Method):
         """
         the n-ary object
         """
+        include = {"naryPr", "sub", "sup", "e"}
+        properties = elm.find(OMML_NS + "naryPr")
+        if properties is not None:
+            for bound in ("sub", "sup"):
+                hide = properties.find(OMML_NS + bound + "Hide")
+                # A present on/off property with no value means enabled.
+                if hide is not None and hide.get(OMML_NS + "val", "1") in (
+                    "1",
+                    "true",
+                    "on",
+                ):
+                    include.remove(bound)
         res = []
         bo = ""
-        for stag, t, e in self.process_children_list(elm):
+        for stag, t, e in self.process_children_list(elm, include=include):
             if stag == "naryPr":
                 bo = get_char(t.chr, store=CHR_BO)
             else:
