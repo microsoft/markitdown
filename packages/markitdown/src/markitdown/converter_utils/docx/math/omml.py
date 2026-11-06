@@ -332,10 +332,14 @@ class oMath2Latex(Tag2Method):
         """
         t_dict = self.process_children_dict(elm, include=("e", "lim"))
         latex_s = LIM_FUNC.get(t_dict["e"])
-        if not latex_s:
-            raise NotImplementedError("Not support lim %s" % t_dict["e"])
-        else:
+        if latex_s:
             return latex_s.format(lim=t_dict.get("lim"))
+        # Unknown limit functions fall back to \operatorname, following the
+        # fallback do_fname already uses for unknown function names.
+        lim = t_dict.get("lim")
+        if lim:
+            return r"\operatorname{%s}_{%s}" % (t_dict["e"], lim)
+        return r"\operatorname{%s}" % t_dict["e"]
 
     def do_limupp(self, elm):
         """

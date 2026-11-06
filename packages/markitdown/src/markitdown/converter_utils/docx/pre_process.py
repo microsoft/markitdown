@@ -87,14 +87,23 @@ def _replace_equations(tag: Tag):
     if tag.name == "oMathPara":
         # Create a new paragraph tag
         p_tag = Tag(name="w:p")
-        # Replace each 'oMath' child tag with its LaTeX equivalent as block equations
+        # Replace each 'oMath' child tag with its LaTeX equivalent as block equations.
+        # An equation that fails to convert keeps its original OMML tag, so one
+        # bad equation does not discard the others in the same paragraph.
         for child_tag in tag.find_all("oMath"):
-            p_tag.append(_get_omath_tag_replacement(child_tag, block=True))
+            try:
+                p_tag.append(_get_omath_tag_replacement(child_tag, block=True))
+            except Exception:
+                p_tag.append(child_tag)
         # Replace the original 'oMathPara' tag with the new paragraph tag
         tag.replace_with(p_tag)
     elif tag.name == "oMath":
-        # Replace the 'oMath' tag with its LaTeX equivalent as inline equation
-        tag.replace_with(_get_omath_tag_replacement(tag, block=False))
+        # Replace the 'oMath' tag with its LaTeX equivalent as inline equation.
+        # On failure the original tag is left in place.
+        try:
+            tag.replace_with(_get_omath_tag_replacement(tag, block=False))
+        except Exception:
+            pass
     else:
         raise ValueError(f"Not supported tag: {tag.name}")
 
@@ -137,10 +146,18 @@ def _pre_process_math(content: bytes) -> bytes:
         bytes: The processed content with OMML elements replaced by their LaTeX equivalents, encoded as bytes.
     """
     soup = BeautifulSoup(content.decode(), features="xml")
+    # Each equation is replaced independently: a failure on one leaves that
+    # equation's original OMML in place and does not abort the remaining ones.
     for tag in soup.find_all("oMathPara"):
-        _replace_equations(tag)
+        try:
+            _replace_equations(tag)
+        except Exception:
+            pass
     for tag in soup.find_all("oMath"):
-        _replace_equations(tag)
+        try:
+            _replace_equations(tag)
+        except Exception:
+            pass
     return str(soup).encode()
 
 
