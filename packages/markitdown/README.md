@@ -42,6 +42,29 @@ result = md.convert("test.xlsx")
 print(result.markdown)
 ```
 
+### Optional conversion diagnostics
+
+```python
+from markitdown import MarkItDown
+
+result = MarkItDown().convert("document.html", include_diagnostics=True)
+print(result.diagnostics.converter)
+print(result.diagnostics.warnings)
+```
+
+Diagnostics are `None` by default. When requested, an immutable
+`ConversionDiagnostics` reports the successful outer converter's class name and
+a tuple of stable warning codes. The initial code,
+`html_recursion_plain_text_fallback`, reports when the HTML converter falls back
+to plain text after a recursion error. Existing Python warnings and strict-mode
+exceptions are preserved. An empty tuple does not guarantee lossless conversion.
+
+Converter-provided diagnostics are preserved. Nested diagnostics are not
+aggregated. Charset confidence, failed attempts, cloud involvement, CLI JSON,
+and configurable thresholds are outside this initial API. Diagnostic values do
+not include input content, filenames, URLs, or exception text. Custom converters
+are responsible for following the same convention for their warning codes.
+
 ### More Information
 
 For more information, and full documentation, see the project [README.md](https://github.com/microsoft/markitdown) on GitHub.

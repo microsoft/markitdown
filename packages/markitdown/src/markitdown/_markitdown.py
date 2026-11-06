@@ -44,7 +44,11 @@ from .converters import (
     CsvConverter,
 )
 
-from ._base_converter import DocumentConverter, DocumentConverterResult
+from ._base_converter import (
+    ConversionDiagnostics,
+    DocumentConverter,
+    DocumentConverterResult,
+)
 
 from ._exceptions import (
     FileConversionException,
@@ -343,6 +347,11 @@ class MarkItDown:
             - source: can be a path (str or Path), url, or a requests.response object
             - stream_info: optional stream info to use for the conversion. If None, infer from source
             - kwargs: additional arguments to pass to the converter
+
+        Set include_diagnostics=True to attach the successful converter name
+        and supported structured warning codes to the result. An empty warning
+        tuple does not guarantee lossless conversion. Nested results are not
+        aggregated.
         """
 
         # Local path or url
@@ -690,6 +699,13 @@ class MarkItDown:
                         file_stream.seek(cur_pos)
 
                 if res is not None:
+                    if (
+                        kwargs.get("include_diagnostics", False)
+                        and res.diagnostics is None
+                    ):
+                        res.diagnostics = ConversionDiagnostics(
+                            converter=type(converter).__name__,
+                        )
                     # Normalize the content
                     res.text_content = "\n".join(
                         [line.rstrip() for line in re.split(r"\r?\n", res.text_content)]

@@ -1,5 +1,14 @@
-from typing import Any, BinaryIO, Optional
+from dataclasses import dataclass
+from typing import Any, BinaryIO, Optional, Tuple
 from ._stream_info import StreamInfo
+
+
+@dataclass(frozen=True)
+class ConversionDiagnostics:
+    """Optional conversion metadata. Warning codes never contain input content."""
+
+    converter: str
+    warnings: Tuple[str, ...] = ()
 
 
 class DocumentConverterResult:
@@ -10,6 +19,7 @@ class DocumentConverterResult:
         markdown: str,
         *,
         title: Optional[str] = None,
+        diagnostics: Optional[ConversionDiagnostics] = None,
     ):
         """
         Initialize the DocumentConverterResult.
@@ -20,9 +30,23 @@ class DocumentConverterResult:
         Parameters:
         - markdown: The converted Markdown text.
         - title: Optional title of the document.
+        - diagnostics: Optional converter identity and structured warning codes.
         """
         self.markdown = markdown
         self.title = title
+        if diagnostics is not None:
+            self.diagnostics = diagnostics
+
+    @property
+    def diagnostics(self) -> Optional[ConversionDiagnostics]:
+        return self.__dict__.get("_diagnostics")
+
+    @diagnostics.setter
+    def diagnostics(self, value: Optional[ConversionDiagnostics]) -> None:
+        if value is None:
+            self.__dict__.pop("_diagnostics", None)
+        else:
+            self._diagnostics = value
 
     @property
     def text_content(self) -> str:
