@@ -1,7 +1,7 @@
 from typing import BinaryIO, Any
-from charset_normalizer import from_bytes
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
+from ..converter_utils._text import decode_text
 
 ACCEPTED_MIME_TYPE_PREFIXES = [
     "text/",
@@ -55,12 +55,6 @@ class PlainTextConverter(DocumentConverter):
         if stream_info.charset:
             text_content = file_stream.read().decode(stream_info.charset)
         else:
-            data = file_stream.read()
-            detected = from_bytes(data).best()
-            text_content = (
-                str(detected)
-                if detected is not None
-                else data.decode("utf-8", errors="ignore")
-            )
+            text_content = decode_text(file_stream.read())
 
         return DocumentConverterResult(markdown=text_content)
