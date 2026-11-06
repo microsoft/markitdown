@@ -125,6 +125,66 @@ def _pre_process_strike(content: bytes) -> bytes:
     return str(soup).encode()
 
 
+def _pre_process_text_boxes(content: bytes) -> bytes:
+    """
+    Rewrites DrawingML text boxes into the VML form Mammoth already reads.
+
+    A text box keeps its own paragraphs in a ``w:txbxContent``. Mammoth reads that
+    element, but only reaches it through the legacy VML path
+    (``w:pict`` -> ``v:shape`` -> ``v:textbox``). A modern text box is a DrawingML
+    shape instead — ``w:drawing`` -> ``wp:inline`` -> ``wps:wsp`` -> ``wps:txbx`` —
+    and ``wp:inline`` is read as a picture, so the shape's text is dropped with no
+    warning. Callouts, pull quotes, sidebars and diagram labels vanish.
+
+    A copy of the ``w:txbxContent`` is therefore inserted after the ``w:drawing``
+    that holds it, wrapped in ``w:pict``/``v:shape``/``v:textbox``, and the
+    original is removed so the text cannot be read twice. Mammoth treats a
+    ``w:pict`` as extra content that follows the paragraph containing it, which is
+    where a reader of the page sees the text box anyway.
+
+    Text boxes inside ``mc:AlternateContent`` are left alone: Mammoth reads the
+    ``mc:Fallback`` branch there, which Word fills with the same text as a VML
+    shape, so promoting the ``mc:Choice`` branch as well would duplicate it.
+
+    Args:
+        content (bytes): The XML content of the DOCX file as bytes.
+
+    Returns:
+        bytes: The processed content, encoded as bytes.
+    """
+    # Parsing and reserializing is expensive on large documents, so skip the
+    # round-trip when there is no text box to promote.
+    if b"txbxContent" not in content:
+        return content
+
+    soup = BeautifulSoup(content.decode(), features="xml")
+    changed = False
+
+    for text_box in soup.find_all("txbxContent"):
+        ancestors = {parent.name for parent in text_box.parents}
+        # Already reachable, or handled through the fallback branch.
+        if "pict" in ancestors or "AlternateContent" in ancestors:
+            continue
+
+        drawing = text_box.find_parent("drawing")
+        if drawing is None:
+            continue
+
+        pict = soup.new_tag("pict", nsprefix="w")
+        shape = soup.new_tag("shape", nsprefix="v")
+        textbox = soup.new_tag("textbox", nsprefix="v")
+        pict.append(shape)
+        shape.append(textbox)
+        textbox.append(text_box.extract())
+        drawing.insert_after(pict)
+        changed = True
+
+    if not changed:
+        return content
+
+    return str(soup).encode()
+
+
 def _pre_process_math(content: bytes) -> bytes:
     """
     Pre-processes the math content in a DOCX -> XML file by converting OMML (Office Math Markup Language) elements to LaTeX.
@@ -267,7 +327,11 @@ def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
     output_docx = BytesIO()
     # The pre-processing steps to apply to each file in the .docx
     pre_process_enable_files = {
-        "word/document.xml": (_pre_process_strike, _pre_process_math),
+        "word/document.xml": (
+            _pre_process_strike,
+            _pre_process_text_boxes,
+            _pre_process_math,
+        ),
         "word/footnotes.xml": (_pre_process_strike, _pre_process_math),
         "word/endnotes.xml": (_pre_process_strike, _pre_process_math),
         "word/styles.xml": (_pre_process_styles,),
