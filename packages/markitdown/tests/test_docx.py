@@ -531,6 +531,18 @@ def _docx(body: str = _BODY, *, embedded_style_map: Optional[str] = None) -> io.
     return stream
 
 
+@pytest.mark.parametrize(
+    "breaks,expected", [(1, "First\nSecond"), (2, "First\n\nSecond")]
+)
+def test_docx_keeps_upstream_break_normalization(breaks, expected) -> None:
+    body = _paragraph(_text("First") + "<w:r><w:br/></w:r>" * breaks + _text("Second"))
+    result = MarkItDown(enable_plugins=False).convert_stream(
+        _docx(body), stream_info=StreamInfo(extension=".docx")
+    )
+
+    assert result.markdown == expected
+
+
 class _ImageConverter(DocxConverter):
     def __init__(self, render: Callable[..., Optional[str]]):
         super().__init__()

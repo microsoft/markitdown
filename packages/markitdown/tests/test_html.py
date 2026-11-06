@@ -22,6 +22,28 @@ def _convert_html(html: str, **kwargs) -> str:
 
 
 @pytest.mark.parametrize(
+    "html,expected",
+    [
+        ("<p>First<br>Second</p>", "First\nSecond"),
+        ("<p>First<br><br>Second</p>", "First\n\nSecond"),
+        ("<p>First<u><br></u>Second</p>", "First\nSecond"),
+        ("<pre>First<br>Second</pre>", "```\nFirst\nSecond\n```"),
+    ],
+)
+def test_html_keeps_upstream_break_normalization(html, expected) -> None:
+    assert _convert_html(html) == expected
+
+
+def test_html_with_markdown_extension_keeps_upstream_normalization() -> None:
+    result = MarkItDown(enable_plugins=False).convert_stream(
+        io.BytesIO(b"<p>First<br>Second</p>"),
+        stream_info=StreamInfo(extension=".md", mimetype="text/html", charset="utf-8"),
+    )
+
+    assert result.markdown == "First\nSecond"
+
+
+@pytest.mark.parametrize(
     "whitespace", ["", " ", "  ", "\t", "\n", "\r\n", "\u00a0", " \t\n\u00a0 "]
 )
 def test_underline_preserves_whitespace_verbatim(whitespace: str) -> None:

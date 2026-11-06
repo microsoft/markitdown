@@ -14,6 +14,7 @@ from charset_normalizer import from_bytes
 
 import markitdown._uri_utils as uri_utils
 from markitdown import (
+    DocumentConverterResult,
     FileConversionException,
     MarkItDown,
     StreamInfo,
@@ -69,6 +70,100 @@ def validate_strings(result, expected_strings, exclude_strings=None):
     if exclude_strings:
         for string in exclude_strings:
             assert string not in text_content
+
+
+@pytest.mark.parametrize(
+    "stream_info",
+    [
+        StreamInfo(extension=".md"),
+        StreamInfo(extension=".markdown"),
+        StreamInfo(extension=".MD"),
+        StreamInfo(mimetype="text/markdown"),
+        StreamInfo(mimetype="application/markdown"),
+        StreamInfo(mimetype="Text/Markdown; charset=utf-8"),
+        StreamInfo(extension=".md", mimetype="text/plain"),
+    ],
+)
+def test_markdown_input_keeps_hard_breaks(stream_info: StreamInfo) -> None:
+    source = "First  \nSecond   \r\nThird\n"
+    result = MarkItDown(enable_plugins=False).convert_stream(
+        io.BytesIO(source.encode()),
+        stream_info=stream_info.copy_and_update(charset="utf-8"),
+    )
+
+    assert result.markdown == "First  \nSecond   \nThird\n"
+
+
+@pytest.mark.parametrize(
+    "extension,mimetype",
+    [(".txt", "text/plain"), (".text", "text/plain"), (None, "text/plain")],
+)
+def test_non_markdown_text_keeps_upstream_normalization(extension, mimetype) -> None:
+    result = MarkItDown(enable_plugins=False).convert_stream(
+        io.BytesIO(b"First  \nSecond   \r\nThird \t\n\n\nLast\n"),
+        stream_info=StreamInfo(extension=extension, mimetype=mimetype, charset="utf-8"),
+    )
+
+    assert result.markdown == "First\nSecond\nThird\n\nLast\n"
+
+
+@pytest.mark.parametrize(
+    "source,expected",
+    [
+        ("First\\\nSecond\n", "First\\\nSecond\n"),
+        ("First \nSecond\n", "First\nSecond\n"),
+        ("First\t\nSecond\n", "First\nSecond\n"),
+        ("First  \t\nSecond\n", "First\nSecond\n"),
+        ("First\n   \n\n\nSecond\n", "First\n\nSecond\n"),
+        ("", ""),
+    ],
+)
+def test_markdown_other_normalization_is_unchanged(source, expected) -> None:
+    result = MarkItDown(enable_plugins=False).convert_stream(
+        io.BytesIO(source.encode()),
+        stream_info=StreamInfo(extension=".md", charset="utf-8"),
+    )
+
+    assert result.markdown == expected
+
+
+@pytest.mark.parametrize("entry_point", ["local", "file_uri", "data_uri", "response"])
+def test_markdown_hard_breaks_across_entry_points(tmp_path, entry_point) -> None:
+    source = b"First  \nSecond\n"
+    markitdown = MarkItDown(enable_plugins=False)
+    path = tmp_path / "notes.md"
+    path.write_bytes(source)
+
+    if entry_point == "local":
+        result = markitdown.convert(path)
+    elif entry_point == "file_uri":
+        result = markitdown.convert_uri(path.as_uri())
+    elif entry_point == "data_uri":
+        result = markitdown.convert_uri("data:text/markdown,First%20%20%0ASecond%0A")
+    else:
+        response = requests.Response()
+        response.status_code = 200
+        response.url = "https://example.com/notes"
+        response.headers["Content-Type"] = "text/markdown; charset=utf-8"
+        response.raw = io.BytesIO(source)
+        result = markitdown.convert_response(response)
+
+    assert result.markdown == source.decode()
+
+
+def test_custom_converter_keeps_upstream_normalization_for_markdown_input() -> None:
+    converter = MagicMock()
+    converter.accepts.return_value = True
+    converter.convert.return_value = DocumentConverterResult(markdown="First  \nSecond")
+    markitdown = MarkItDown(enable_builtins=False, enable_plugins=False)
+    markitdown.register_converter(converter)
+
+    result = markitdown.convert_stream(
+        io.BytesIO(b"First  \nSecond"),
+        stream_info=StreamInfo(extension=".md", charset="utf-8"),
+    )
+
+    assert result.markdown == "First\nSecond"
 
 
 def test_stream_info_operations() -> None:
