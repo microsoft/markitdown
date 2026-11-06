@@ -1482,5 +1482,25 @@ def test_convert_docx_with_style_missing_type(tmp_path):
     assert "# Abstract" in result.markdown
 
 
+def test_equation_latex_is_not_markdown_escaped() -> None:
+    sum_xi = (
+        '<m:nary><m:naryPr><m:chr m:val="\u2211"/></m:naryPr>'
+        "<m:sub><m:r><m:t>i=1</m:t></m:r></m:sub><m:sup><m:r><m:t>n</m:t></m:r></m:sup>"
+        "<m:e><m:sSub><m:e><m:r><m:t>a*b</m:t></m:r></m:e>"
+        "<m:sub><m:r><m:t>i</m:t></m:r></m:sub></m:sSub></m:e></m:nary>"
+    )
+    body = (
+        '<w:p><w:r><w:t xml:space="preserve">Inline: </w:t></w:r>'
+        f"<m:oMath>{sum_xi}</m:oMath></w:p>"
+        f"<w:p><m:oMathPara><m:oMath>{sum_xi}</m:oMath></m:oMathPara></w:p>"
+        "<w:p><w:r><w:t>snake_case</w:t></w:r></w:p>"
+    )
+    markdown = MarkItDown().convert_stream(_docx(body), file_extension=".docx").markdown
+    assert "$\\sum_{i=1}^{n}a*b_{i}$" in markdown
+    assert "$$\\sum_{i=1}^{n}a*b_{i}$$" in markdown
+    assert "\\_" not in markdown.replace("snake\\_case", "")
+    assert "snake\\_case" in markdown
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))

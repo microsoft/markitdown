@@ -5,7 +5,7 @@ from warnings import warn
 from typing import BinaryIO, Any, Optional
 
 from ._html_converter import HtmlConverter
-from ..converter_utils.docx.pre_process import pre_process_docx
+from ..converter_utils.docx.pre_process import pre_process_docx, restore_equations
 from .._base_converter import DocumentConverterResult
 from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
@@ -120,7 +120,9 @@ class DocxConverter(HtmlConverter):
         if image_adapter is not None:
             html_result = image_adapter.replace_images(html_result)
 
-        return self._html_converter.convert_string(html_result, **kwargs)
+        result = self._html_converter.convert_string(html_result, **kwargs)
+        result.markdown = restore_equations(result.markdown)
+        return result
 
     def _image_to_html(
         self,

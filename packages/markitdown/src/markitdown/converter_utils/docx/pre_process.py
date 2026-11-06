@@ -1,3 +1,4 @@
+import re
 import struct
 import zipfile
 from io import BytesIO
@@ -52,6 +53,25 @@ def _convert_omath_to_latex(tag: Tag) -> str:
     return latex
 
 
+# Equations are passed through mammoth and markdownify as opaque placeholders
+# (private-use delimiters around the hex-encoded text), so that markdownify does
+# not escape characters such as "_" and "*" inside the LaTeX. They are swapped
+# back for the real text by ``restore_equations`` once conversion is done.
+_EQUATION_PLACEHOLDER = re.compile("\ue000([0-9a-f]*)\ue001")
+
+
+def restore_equations(markdown: str) -> str:
+    """Replace equation placeholders in converted Markdown with their LaTeX."""
+
+    def _restore(match: "re.Match[str]") -> str:
+        try:
+            return bytes.fromhex(match.group(1)).decode("utf-8")
+        except ValueError:  # Not one of ours (e.g. literal text in the document)
+            return match.group(0)
+
+    return _EQUATION_PLACEHOLDER.sub(_restore, markdown)
+
+
 def _get_omath_tag_replacement(tag: Tag, block: bool = False) -> Tag:
     """
     Creates a replacement tag for an OMML (Office Math Markup Language) element.
@@ -64,11 +84,9 @@ def _get_omath_tag_replacement(tag: Tag, block: bool = False) -> Tag:
         Tag: A BeautifulSoup Tag object representing the replacement element.
     """
     t_tag = Tag(name="w:t")
-    t_tag.string = (
-        f"$${_convert_omath_to_latex(tag)}$$"
-        if block
-        else f"${_convert_omath_to_latex(tag)}$"
-    )
+    latex = _convert_omath_to_latex(tag)
+    text = f"$${latex}$$" if block else f"${latex}$"
+    t_tag.string = "\ue000" + text.encode("utf-8").hex() + "\ue001"
     r_tag = Tag(name="w:r")
     r_tag.append(t_tag)
     return r_tag
