@@ -34,7 +34,9 @@ class WikipediaConverter(DocumentConverter):
         mimetype = (stream_info.mimetype or "").lower()
         extension = (stream_info.extension or "").lower()
 
-        if not re.search(r"^https?:\/\/[a-zA-Z]{2,3}(\.m)?\.wikipedia.org\/", url):
+        # Language codes are not limited to two or three letters: "simple",
+        # "zh-min-nan" and "be-x-old" are all valid Wikipedia subdomains.
+        if not re.search(r"^https?:\/\/[a-zA-Z][a-zA-Z0-9\-]+(\.m)?\.wikipedia\.org\/", url):
             # Not a Wikipedia URL
             return False
 
