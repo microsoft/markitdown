@@ -12,7 +12,13 @@ from markitdown._exceptions import (
     MissingDependencyException,
     MISSING_DEPENDENCY_MESSAGE,
 )
-from ._ocr_service import LLMVisionOCRService
+from ._ocr_service import (
+    DEFAULT_OCR_PROMPT,
+    LLMVisionOCRService,
+    _extract_text_with_options,
+)
+
+PDF_OCR_PROMPT = DEFAULT_OCR_PROMPT
 
 # Import dependencies
 _dependency_exc_info = None
@@ -236,8 +242,12 @@ class PdfConverterWithOCR(DocumentConverter):
                             # OCR all images
                             image_data = []
                             for img_info in images_on_page:
-                                ocr_result = ocr_service.extract_text(
-                                    img_info["stream"]
+                                ocr_result = _extract_text_with_options(
+                                    ocr_service,
+                                    img_info["stream"],
+                                    prompt=getattr(
+                                        ocr_service, "default_prompt", PDF_OCR_PROMPT
+                                    ),
                                 )
                                 if ocr_result.text.strip():
                                     image_data.append(
@@ -367,7 +377,13 @@ class PdfConverterWithOCR(DocumentConverter):
                         img_stream.seek(0)
 
                         # Run OCR
-                        ocr_result = ocr_service.extract_text(img_stream)
+                        ocr_result = _extract_text_with_options(
+                            ocr_service,
+                            img_stream,
+                            prompt=getattr(
+                                ocr_service, "default_prompt", PDF_OCR_PROMPT
+                            ),
+                        )
 
                         if ocr_result.text.strip():
                             text = ocr_result.text.strip()
@@ -400,7 +416,13 @@ class PdfConverterWithOCR(DocumentConverter):
                         img_stream = io.BytesIO(pix.tobytes("png"))
                         img_stream.seek(0)
 
-                        ocr_result = ocr_service.extract_text(img_stream)
+                        ocr_result = _extract_text_with_options(
+                            ocr_service,
+                            img_stream,
+                            prompt=getattr(
+                                ocr_service, "default_prompt", PDF_OCR_PROMPT
+                            ),
+                        )
 
                         if ocr_result.text.strip():
                             text = ocr_result.text.strip()

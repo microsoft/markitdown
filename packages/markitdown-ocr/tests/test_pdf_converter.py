@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from markitdown_ocr._ocr_service import OCRResult  # noqa: E402
 from markitdown_ocr._pdf_converter_with_ocr import (  # noqa: E402
+    PDF_OCR_PROMPT,
     PdfConverterWithOCR,
 )
 from markitdown import StreamInfo  # noqa: E402
@@ -39,6 +40,24 @@ class MockOCRService:
         **kwargs: Any,
     ) -> OCRResult:
         return OCRResult(text=_MOCK_TEXT, backend_used="mock")
+
+
+def test_pdf_ocr_uses_math_aware_prompt() -> None:
+    seen_prompts: list[str] = []
+
+    class PromptRecordingOCRService:
+        def extract_text(self, image_stream: Any, prompt: str | None = None) -> OCRResult:
+            assert prompt is not None
+            seen_prompts.append(prompt)
+            return OCRResult(text=_MOCK_TEXT, backend_used="mock")
+
+    markdown = _convert("pdf_image_middle.pdf", PromptRecordingOCRService())
+
+    assert _OCR_BLOCK in markdown
+    assert seen_prompts
+    assert seen_prompts[0] == PDF_OCR_PROMPT
+    assert "valid LaTeX" in seen_prompts[0]
+    assert "$$...$$" in seen_prompts[0]
 
 
 @pytest.fixture(scope="module")

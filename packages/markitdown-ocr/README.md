@@ -67,6 +67,11 @@ md = MarkItDown(
 )
 ```
 
+PDF OCR uses a math-aware prompt by default. Mathematical notation is
+transcribed as LaTeX with `$...$` for inline expressions and `$$...$$` for
+display equations. Supply `llm_prompt` when a document needs a different OCR
+format or domain-specific instructions.
+
 ### Any OpenAI-Compatible Client
 
 Works with any client that follows the OpenAI API:
