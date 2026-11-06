@@ -1,0 +1,6 @@
+name,<field>,&copy;
+placeholder,<redacted>,&#65;
+markup,<em>keep me</em>,&amp;
+comment,<!--keep me-->,&#x41;
+autolink,<https://example.test>,&unknown;
+code,`<tag>`,``&copy;``
