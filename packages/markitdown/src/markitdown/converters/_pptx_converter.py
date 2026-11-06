@@ -341,7 +341,7 @@ class PptxConverter(DocumentConverter):
             # Materialize each series' values once. Accessing series.values[idx]
             # inside the nested loop is O(n^2) in python-pptx (each lookup does an
             # XPath scan of all points), which is extremely slow on large charts.
-            series_values = [list(s.values) for s in series_list]
+            series_values = [self._series_values(s) for s in series_list]
 
             for idx, category in enumerate(category_names):
                 row = [category]
@@ -355,10 +355,21 @@ class PptxConverter(DocumentConverter):
             header = markdown_table[0]
             separator = "|" + "|".join(["---"] * len(data[0])) + "|"
             return md + "\n".join([header, separator] + markdown_table[1:])
-        except ValueError as e:
-            # Handle the specific error for unsupported chart types
-            if "unsupported plot type" in str(e):
-                return "\n\n[unsupported chart]\n\n"
         except Exception:
-            # Catch any other exceptions that might occur
+            # Any chart we cannot read becomes a placeholder. Returning nothing
+            # would be concatenated into the document and end the conversion.
             return "\n\n[unsupported chart]\n\n"
+
+    @staticmethod
+    def _series_values(series):
+        """The series' values, or an empty tuple when they cannot be read.
+
+        python-pptx parses a numeric cache eagerly, so one non-numeric point
+        raises for the whole series -- an ``#N/A`` carried over from the linked
+        worksheet is the common one. The categories and the series names are
+        still readable, so keep the table rather than discarding the chart.
+        """
+        try:
+            return list(series.values)
+        except Exception:
+            return []
