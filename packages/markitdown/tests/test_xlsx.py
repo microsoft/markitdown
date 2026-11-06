@@ -540,5 +540,33 @@ def test_xlsx_show_zeroes_rename_is_scoped_to_sheet_view_tags() -> None:
     assert b'<customSheetView showZeroes="0"/>' in repaired
 
 
+def test_float_precision_preserved(tmp_path) -> None:
+    """Regression test: floats like 123456.789 should not become 1.234568e+05."""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Data"
+    # Values that pandas would render in scientific notation without float_format
+    ws["A1"] = "Label"
+    ws["B1"] = "Value"
+    ws["A2"] = "Large int"
+    ws["B2"] = 123456789.123
+    ws["A3"] = "Fractional"
+    ws["B3"] = 0.123456789
+    ws["A4"] = "Small float"
+    ws["B4"] = 42.0
+
+    xlsx_path = tmp_path / "floats.xlsx"
+    wb.save(xlsx_path)
+
+    result = MarkItDown().convert(str(xlsx_path))
+
+    # Full values must appear verbatim in the markdown, not in scientific notation
+    assert "123456789.123" in result.markdown
+    assert "0.123456789" in result.markdown
+    assert "42.0" in result.markdown
+    # Sanity check: scientific notation should not appear
+    assert "e+" not in result.markdown.lower()
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
