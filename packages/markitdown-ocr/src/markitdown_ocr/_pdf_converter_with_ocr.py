@@ -276,10 +276,18 @@ class PdfConverterWithOCR(DocumentConverter):
                                     )
                                     markdown_content.append(img_marker)
                         else:
-                            # No images detected - just extract regular text
+                            # No embedded images detected. If the page also has
+                            # no text layer, OCR just this page instead of
+                            # waiting for the whole-document fallback.
                             text_content = page.extract_text() or ""
                             if text_content.strip():
                                 markdown_content.append(text_content.strip())
+                            else:
+                                ocr_block = self._ocr_single_page(
+                                    page, ocr_service
+                                )
+                                if ocr_block:
+                                    markdown_content.append(ocr_block)
                     else:
                         # No OCR, just extract text
                         text_content = page.extract_text() or ""
@@ -336,6 +344,24 @@ class PdfConverterWithOCR(DocumentConverter):
         images.sort(key=lambda x: x["y_pos"])
 
         return images
+
+    def _ocr_single_page(
+        self, page: Any, ocr_service: LLMVisionOCRService
+    ) -> str:
+        """Render one PDF page and OCR it."""
+        try:
+            page_img = page.to_image(resolution=300)
+            img_stream = io.BytesIO()
+            page_img.original.save(img_stream, format="PNG")
+            img_stream.seek(0)
+
+            ocr_result = ocr_service.extract_text(img_stream)
+            text = (ocr_result.text or "").strip()
+            if not text:
+                return ""
+            return f"*[Image OCR]\n{text}\n[End OCR]*"
+        except Exception:
+            return ""
 
     def _ocr_full_pages(
         self, pdf_bytes: io.BytesIO, ocr_service: LLMVisionOCRService
