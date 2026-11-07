@@ -1,0 +1,157 @@
+<mxfile host="65bd71144e">
+    <diagram id="9Ay7t5IaKKnwAftK50mF" name="Page-1">
+        <mxGraphModel dx="1239" dy="313" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" background="#ffffff" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="2" value="" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="-20" y="70" width="1480" height="700" as="geometry"/>
+                </mxCell>
+                <mxCell id="3" value="&lt;span style=&quot;color: rgb(63, 63, 63);&quot;&gt;&lt;font style=&quot;font-size: 18px;&quot;&gt;&lt;b style=&quot;&quot;&gt;Conversion Orchestrator (&lt;/b&gt;_markitdown.py&lt;b style=&quot;&quot;&gt;)&lt;/b&gt;&lt;/font&gt;&lt;/span&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="30" y="100" width="390" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="5" value="&lt;div style=&quot;text-align: left;&quot;&gt;&lt;b style=&quot;background-color: transparent;&quot;&gt;Import Types:&lt;/b&gt;&lt;/div&gt;&lt;div style=&quot;text-align: left;&quot;&gt;&lt;b style=&quot;background-color: transparent;&quot;&gt;&lt;br&gt;&lt;/b&gt;&lt;/div&gt;&lt;span data-end=&quot;1524&quot; data-start=&quot;1504&quot;&gt;&lt;div style=&quot;font-weight: bold; text-align: left;&quot;&gt;&lt;strong style=&quot;background-color: transparent;&quot; data-end=&quot;1524&quot; data-start=&quot;1504&quot;&gt;Standard Library&lt;/strong&gt;&lt;/div&gt;&lt;ul style=&quot;line-height: 90%;&quot;&gt;&lt;li style=&quot;text-align: left;&quot;&gt;&lt;span style=&quot;&quot; data-end=&quot;1524&quot; data-start=&quot;1504&quot;&gt;copy&lt;/span&gt;&lt;/li&gt;&lt;li style=&quot;text-align: left;&quot;&gt;&lt;span data-end=&quot;1524&quot; data-start=&quot;1504&quot;&gt;mimetypes&lt;/span&gt;&lt;/li&gt;&lt;li style=&quot;text-align: left;&quot;&gt;&lt;span data-end=&quot;1524&quot; data-start=&quot;1504&quot;&gt;os&lt;/span&gt;&lt;/li&gt;&lt;li style=&quot;text-align: left;&quot;&gt;&lt;span data-end=&quot;1524&quot; data-start=&quot;1504&quot;&gt;re&lt;/span&gt;&lt;/li&gt;&lt;li style=&quot;text-align: left;&quot;&gt;&lt;span data-end=&quot;1524&quot; data-start=&quot;1504&quot;&gt;sys&lt;/span&gt;&lt;/li&gt;&lt;li style=&quot;text-align: left;&quot;&gt;&lt;span data-end=&quot;1524&quot; data-start=&quot;1504&quot;&gt;shutil&lt;/span&gt;&lt;/li&gt;&lt;li style=&quot;text-align: left;&quot;&gt;&lt;span data-end=&quot;1524&quot; data-start=&quot;1504&quot;&gt;tempfile&lt;/span&gt;&lt;/li&gt;&lt;li style=&quot;text-align: left;&quot;&gt;&lt;span data-end=&quot;1524&quot; data-start=&quot;1504&quot;&gt;warnings&lt;/span&gt;&lt;/li&gt;&lt;li style=&quot;text-align: left;&quot;&gt;&lt;span data-end=&quot;1524&quot; data-start=&quot;1504&quot;&gt;traceback&lt;/span&gt;&lt;/li&gt;&lt;li style=&quot;text-align: left;&quot;&gt;&lt;span data-end=&quot;1524&quot; data-start=&quot;1504&quot;&gt;dataclasses&lt;/span&gt;&lt;/li&gt;&lt;li style=&quot;text-align: left;&quot;&gt;&lt;span data-end=&quot;1524&quot; data-start=&quot;1504&quot;&gt;io&lt;/span&gt;&lt;/li&gt;&lt;li style=&quot;text-align: left;&quot;&gt;&lt;span data-end=&quot;1524&quot; data-start=&quot;1504&quot;&gt;importlib.metadata&lt;/span&gt;&lt;/li&gt;&lt;li style=&quot;text-align: left;&quot;&gt;&lt;span data-end=&quot;1524&quot; data-start=&quot;1504&quot;&gt;typing&lt;/span&gt;&lt;/li&gt;&lt;li style=&quot;text-align: left;&quot;&gt;&lt;span data-end=&quot;1524&quot; data-start=&quot;1504&quot;&gt;pathlib&lt;/span&gt;&lt;/li&gt;&lt;li style=&quot;text-align: left;&quot;&gt;&lt;span data-end=&quot;1524&quot; data-start=&quot;1504&quot;&gt;urllib.parse&lt;/span&gt;&lt;/li&gt;&lt;li style=&quot;text-align: left;&quot;&gt;&lt;span style=&quot;&quot; data-end=&quot;1524&quot; data-start=&quot;1504&quot;&gt;warnings&amp;nbsp;&lt;/span&gt;&lt;strong style=&quot;font-weight: bold;&quot; data-end=&quot;1524&quot; data-start=&quot;1504&quot;&gt;&amp;nbsp;&lt;/strong&gt;&lt;/li&gt;&lt;/ul&gt;&lt;/span&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="-30" y="160" width="220" height="360" as="geometry"/>
+                </mxCell>
+                <mxCell id="7" value="&lt;b&gt;Third-Party Libraries&lt;/b&gt;&lt;div&gt;&lt;ul style=&quot;line-height: 90%;&quot;&gt;&lt;li style=&quot;text-align: left;&quot;&gt;requests&lt;/li&gt;&lt;li style=&quot;text-align: left;&quot;&gt;magika&lt;/li&gt;&lt;li style=&quot;text-align: left;&quot;&gt;charset_normalizer&lt;/li&gt;&lt;li style=&quot;text-align: left;&quot;&gt;codecs&lt;/li&gt;&lt;/ul&gt;&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="140" y="350" width="150" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="8" value="&lt;span style=&quot;font-family: monospace; font-size: 0px; text-align: start; text-wrap-mode: nowrap;&quot;&gt;%3CmxGraphModel%3E%3Croot%3E%3CmxCell%20id%3D%220%22%2F%3E%3CmxCell%20id%3D%221%22%20parent%3D%220%22%2F%3E%3CmxCell%20id%3D%222%22%20value%3D%22%26lt%3Bb%26gt%3BThird-Party%20Libraries%26lt%3B%2Fb%26gt%3B%26lt%3Bdiv%26gt%3B%26lt%3Bul%20style%3D%26quot%3Bline-height%3A%2090%25%3B%26quot%3B%26gt%3B%26lt%3Bli%20style%3D%26quot%3Btext-align%3A%20left%3B%26quot%3B%26gt%3Brequests%26lt%3B%2Fli%26gt%3B%26lt%3Bli%20style%3D%26quot%3Btext-align%3A%20left%3B%26quot%3B%26gt%3Bmagika%26lt%3B%2Fli%26gt%3B%26lt%3Bli%20style%3D%26quot%3Btext-align%3A%20left%3B%26quot%3B%26gt%3Bcharset_normalizer%26lt%3B%2Fli%26gt%3B%26lt%3Bli%20style%3D%26quot%3Btext-align%3A%20left%3B%26quot%3B%26gt%3Bcodecs%26lt%3B%2Fli%26gt%3B%26lt%3B%2Ful%26gt%3B%26lt%3B%2Fdiv%26gt%3B%22%20style%3D%22text%3Bhtml%3D1%3Balign%3Dcenter%3BverticalAlign%3Dmiddle%3BwhiteSpace%3Dwrap%3Brounded%3D0%3B%22%20vertex%3D%221%22%20parent%3D%221%22%3E%3CmxGeometry%20x%3D%22150%22%20y%3D%22190%22%20width%3D%22150%22%20height%3D%22130%22%20as%3D%22geometry%22%2F%3E%3C%2FmxCell%3E%3C%2Froot%3E%3C%2FmxGraphModel%3E&lt;/span&gt;&lt;b&gt;&amp;nbsp;Custom (Internal)&amp;nbsp;Libraries&lt;/b&gt;&lt;div&gt;&lt;ul style=&quot;line-height: 90%;&quot;&gt;&lt;li style=&quot;text-align: left;&quot;&gt;_stream_info&lt;/li&gt;&lt;li style=&quot;text-align: left;&quot;&gt;_uri_utils&lt;/li&gt;&lt;li style=&quot;text-align: left;&quot;&gt;converters&amp;nbsp;&lt;/li&gt;&lt;li style=&quot;text-align: left;&quot;&gt;_base_converter&lt;/li&gt;&lt;li style=&quot;text-align: left;&quot;&gt;_exceptions&amp;nbsp;&lt;/li&gt;&lt;/ul&gt;&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="140" y="190" width="170" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="9" value="" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;dashPattern=8 8;" parent="1" vertex="1">
+                    <mxGeometry x="30" y="510" width="360" height="220" as="geometry"/>
+                </mxCell>
+                <mxCell id="10" value="&lt;span style=&quot;color: rgb(0, 0, 0);&quot;&gt;&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;initialization phase&lt;/font&gt;&lt;/b&gt;&lt;/span&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="130" y="530" width="140" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="11" value="Register Converters for Built-ins" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="77.25" y="570" width="270" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="12" value="Register Converters for Plugins" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="77.25" y="650" width="272.75" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="18" value="" style="rounded=1;whiteSpace=wrap;html=1;arcSize=15;dashed=1;dashPattern=8 8;" parent="1" vertex="1">
+                    <mxGeometry x="440" y="130" width="980" height="600" as="geometry"/>
+                </mxCell>
+                <mxCell id="28" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;Conversion Phase&lt;/font&gt;&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="480" y="170" width="140" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="51" value="&lt;b&gt;def convert_local ()&lt;br&gt;&lt;/b&gt;Converts a local file to a document format by inferring metadata (like extension or URL) and applying conversion logic with optional stream information." style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="490" y="380" width="265" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="52" value="&lt;b&gt;def convert()&lt;/b&gt;&lt;div&gt;Handles different input types (path, URL, HTTP response, or binary stream) and routes them to the appropriate conversion method based on the source format.&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="490" y="240" width="265" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="53" value="&lt;b&gt;def convert_stream()&lt;/b&gt;&lt;div&gt;Converts a binary stream by optionally enriching it with metadata, ensuring it&#39;s seekable, inferring content type, and passing it to the core conversion engine&lt;b&gt;&lt;/b&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="807" y="240" width="265" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="54" value="&lt;div&gt;&lt;b&gt;&amp;nbsp; &amp;nbsp; def convert_uri ()&lt;/b&gt;&lt;/div&gt;&lt;div&gt;Converts content from a URI by detecting its scheme (file, data, or HTTP/HTTPS) and routing it to the appropriate conversion method, optionally with metadata&lt;b&gt;&lt;/b&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="812" y="380" width="265" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="55" value="&lt;div&gt;&lt;b&gt;&amp;nbsp; &amp;nbsp; def&amp;nbsp;&lt;/b&gt;&lt;span style=&quot;background-color: transparent;&quot;&gt;&lt;b&gt;convert_url&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;A wrapper alias for convert_uri() that converts a URL into a document, maintaining compatibility with legacy calls.&lt;b&gt;&lt;/b&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="496" y="520" width="265" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="56" value="&lt;div&gt;&lt;b&gt;&amp;nbsp; &amp;nbsp; def&amp;nbsp;&lt;/b&gt;&lt;span style=&quot;background-color: transparent;&quot;&gt;&lt;b&gt;convert_response&lt;/b&gt;&lt;/span&gt;&lt;b style=&quot;background-color: transparent;&quot;&gt;&amp;nbsp;()&lt;/b&gt;&lt;/div&gt;&lt;div&gt;Converts an HTTP response by extracting metadata from headers, building stream info, buffering the content, and passing it to the core conversion logic&lt;b&gt;&lt;/b&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="812" y="520" width="265" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="57" value="&lt;b&gt;def&amp;nbsp;_convert()&lt;/b&gt;&lt;div&gt;Attempts to convert a file stream to a document by iterating over registered converters and stream metadata guesses, falling back and raising exceptions if no successful conversion occurs.&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="1120" y="240" width="265" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="58" value="&lt;b&gt;def register_converter()&lt;br&gt;&lt;/b&gt;&lt;div&gt;&lt;span style=&quot;background-color: transparent;&quot;&gt;Registers a new DocumentConverter with a specified priority, inserting it at the front of the converter list to ensure recent registrations are tried first when priorities are equal.&lt;/span&gt;.&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="1120" y="380" width="265" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="59" value="&lt;b&gt;def&amp;nbsp;&lt;/b&gt;&lt;span style=&quot;text-align: start;&quot;&gt;&lt;b&gt;_get_stream_info_guesses&lt;/b&gt;&lt;font face=&quot;monospace&quot;&gt;&lt;span style=&quot;font-size: 0px; text-wrap-mode: nowrap;&quot;&gt;%3CmxGraphModel%3E%3Croot%3E%3CmxCell%20id%3D%220%22%2F%3E%3CmxCell%20id%3D%221%22%20parent%3D%220%22%2F%3E%3CmxCell%20id%3D%222%22%20value%3D%22%26lt%3Bb%26gt%3Bdef%20register_converter()%26lt%3Bbr%26gt%3B%26lt%3B%2Fb%26gt%3B%26lt%3Bdiv%26gt%3B%26lt%3Bspan%20style%3D%26quot%3Bbackground-color%3A%20transparent%3B%26quot%3B%26gt%3BRegisters%20a%20new%20DocumentConverter%20with%20a%20specified%20priority%2C%20inserting%20it%20at%20the%20front%20of%20the%20converter%20list%20to%20ensure%20recent%20registrations%20are%20tried%20first%20when%20priorities%20are%20equal.%26lt%3B%2Fspan%26gt%3B.%26lt%3B%2Fdiv%26gt%3B%22%20style%3D%22rounded%3D1%3BwhiteSpace%3Dwrap%3Bhtml%3D1%3B%22%20vertex%3D%221%22%20parent%3D%221%22%3E%3CmxGeometry%20x%3D%221120%22%20y%3D%22395%22%20width%3D%22265%22%20height%3D%22100%22%20as%3D%22geometry%22%2F%3E%3C%2FmxCell%3E%3C%2Froot%3E%3C%2FmxGraphModel%3E&lt;/span&gt;&lt;/font&gt;&lt;/span&gt;&lt;b&gt;()&lt;br&gt;&lt;/b&gt;&lt;div&gt;Attempts to refine or expand the initial stream information using file extension/MIME type heuristics and Magika content analysis, returning a list of likely candidates for conversion&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="1120" y="520" width="265" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="92" value="" style="group" parent="1" vertex="1" connectable="0">
+                    <mxGeometry x="1590" y="80" width="960" height="470" as="geometry"/>
+                </mxCell>
+                <mxCell id="75" value="" style="rounded=1;whiteSpace=wrap;html=1;" parent="92" vertex="1">
+                    <mxGeometry width="960" height="470" as="geometry"/>
+                </mxCell>
+                <mxCell id="76" value="&lt;font style=&quot;font-size: 18px;&quot;&gt;&lt;strong style=&quot;color: rgb(63, 63, 63);&quot; data-end=&quot;843&quot; data-start=&quot;822&quot;&gt;Base Converter Interface&amp;nbsp;&lt;/strong&gt;&lt;span style=&quot;color: rgb(63, 63, 63);&quot;&gt;(_base_converter.py)&lt;/span&gt;&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="92" vertex="1">
+                    <mxGeometry x="50" y="40" width="430" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="78" value="&lt;div style=&quot;text-align: left;&quot;&gt;&lt;b style=&quot;background-color: transparent;&quot;&gt;Import Types:&lt;/b&gt;&lt;/div&gt;&lt;div style=&quot;text-align: left;&quot;&gt;&lt;b style=&quot;background-color: transparent;&quot;&gt;&lt;br&gt;&lt;/b&gt;&lt;/div&gt;&lt;span data-end=&quot;1524&quot; data-start=&quot;1504&quot;&gt;&lt;div style=&quot;font-weight: bold; text-align: left;&quot;&gt;&lt;span style=&quot;font-weight: 400; text-wrap-mode: nowrap; font-family: monospace; font-size: 0px;&quot;&gt;%3CmxGraphModel%3E%3Croot%3E%3CmxCell%20id%3D%220%22%2F%3E%3CmxCell%20id%3D%221%22%20parent%3D%220%22%2F%3E%3CmxCell%20id%3D%222%22%20value%3D%22%26lt%3Bb%26gt%3BThird-Party%20Libraries%26lt%3B%2Fb%26gt%3B%26lt%3Bdiv%26gt%3B%26lt%3Bul%20style%3D%26quot%3Bline-height%3A%2090%25%3B%26quot%3B%26gt%3B%26lt%3Bli%20style%3D%26quot%3Btext-align%3A%20left%3B%26quot%3B%26gt%3Brequests%26lt%3B%2Fli%26gt%3B%26lt%3Bli%20style%3D%26quot%3Btext-align%3A%20left%3B%26quot%3B%26gt%3Bmagika%26lt%3B%2Fli%26gt%3B%26lt%3Bli%20style%3D%26quot%3Btext-align%3A%20left%3B%26quot%3B%26gt%3Bcharset_normalizer%26lt%3B%2Fli%26gt%3B%26lt%3Bli%20style%3D%26quot%3Btext-align%3A%20left%3B%26quot%3B%26gt%3Bcodecs%26lt%3B%2Fli%26gt%3B%26lt%3B%2Ful%26gt%3B%26lt%3B%2Fdiv%26gt%3B%22%20style%3D%22text%3Bhtml%3D1%3Balign%3Dcenter%3BverticalAlign%3Dmiddle%3BwhiteSpace%3Dwrap%3Brounded%3D0%3B%22%20vertex%3D%221%22%20parent%3D%221%22%3E%3CmxGeometry%20x%3D%22150%22%20y%3D%22190%22%20width%3D%22150%22%20height%3D%22130%22%20as%3D%22geometry%22%2F%3E%3C%2FmxCell%3E%3C%2Froot%3E%3C%2FmxGraphModel%3E&lt;/span&gt;&lt;b style=&quot;text-align: center;&quot;&gt;&amp;nbsp;Custom (Internal)&amp;nbsp;Libraries&lt;/b&gt;&lt;div style=&quot;font-weight: 400; text-align: center;&quot;&gt;&lt;ul style=&quot;line-height: 10.8px;&quot;&gt;&lt;li style=&quot;text-align: left;&quot;&gt;_stream_info&lt;/li&gt;&lt;/ul&gt;&lt;/div&gt;&lt;/div&gt;&lt;/span&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="92" vertex="1">
+                    <mxGeometry x="40" y="40" width="230" height="161" as="geometry"/>
+                </mxCell>
+                <mxCell id="88" value="" style="group" parent="92" vertex="1" connectable="0">
+                    <mxGeometry x="510" y="170" width="410" height="260" as="geometry"/>
+                </mxCell>
+                <mxCell id="79" value="" style="rounded=1;whiteSpace=wrap;html=1;" parent="88" vertex="1">
+                    <mxGeometry width="410" height="260" as="geometry"/>
+                </mxCell>
+                <mxCell id="83" value="&lt;b&gt;&amp;nbsp;DocumentConverter&lt;/b&gt;&lt;br&gt;&lt;div&gt;Provides a blueprint for all document converter classes. It defines two key methods that subclasses must implement: accepts() and convert().&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="88" vertex="1">
+                    <mxGeometry x="20" y="20" width="360" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="84" value="accepts(...)&lt;br&gt;&lt;div&gt;Determines whether the converter is suitable for processing the given document based on metadata like MIME type, file extension, and URL.&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="88" vertex="1">
+                    <mxGeometry x="35" y="100" width="330" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="85" value="convert(...)&lt;div&gt;&lt;span style=&quot;background-color: transparent;&quot;&gt;Performs the actual document conversion, returning the output in Markdown format, possibly with a title.&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;div&gt;&lt;p data-end=&quot;1160&quot; data-start=&quot;1139&quot;&gt;&lt;/p&gt;&lt;/div&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="88" vertex="1">
+                    <mxGeometry x="35" y="180" width="330" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="90" value="" style="group" parent="92" vertex="1" connectable="0">
+                    <mxGeometry x="50" y="170" width="410" height="260" as="geometry"/>
+                </mxCell>
+                <mxCell id="77" value="" style="rounded=1;whiteSpace=wrap;html=1;" parent="90" vertex="1">
+                    <mxGeometry width="410" height="260" as="geometry"/>
+                </mxCell>
+                <mxCell id="80" value="&lt;b&gt;DocumentConverterResult&amp;nbsp;&lt;/b&gt;&lt;div&gt;(DocumentConverterResult is a container for Markdown-converted document content, optionally including a title.)&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="90" vertex="1">
+                    <mxGeometry x="25" y="15.5" width="360" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="81" value="&lt;b&gt;text_content (getter)&lt;/b&gt;&lt;div&gt;Provides a read-only alias for markdown to maintain compatibility with older code.&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="90" vertex="1">
+                    <mxGeometry x="40" y="90" width="330" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="82" value="&lt;b&gt;text_content (setter)&lt;/b&gt;&lt;br&gt;&lt;div&gt;allows setting the markdown content via the text_content alias&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="90" vertex="1">
+                    <mxGeometry x="40" y="160" width="330" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="93" value="" style="group" parent="1" vertex="1" connectable="0">
+                    <mxGeometry x="1610" y="610" width="820" height="380" as="geometry"/>
+                </mxCell>
+                <mxCell id="67" value="" style="rounded=1;whiteSpace=wrap;html=1;" parent="93" vertex="1">
+                    <mxGeometry width="820" height="380" as="geometry"/>
+                </mxCell>
+                <mxCell id="68" value="&lt;div style=&quot;text-align: center;&quot;&gt;&lt;strong style=&quot;background-color: transparent; color: rgb(63, 63, 63);&quot; data-end=&quot;843&quot; data-start=&quot;822&quot;&gt;&lt;font style=&quot;font-size: 18px;&quot;&gt;Format Converters({file}_converter.py)&amp;nbsp;&lt;/font&gt;&lt;/strong&gt;&lt;span style=&quot;background-color: transparent; text-align: center;&quot;&gt;&lt;b&gt;&lt;font style=&quot;font-size: 18px;&quot;&gt;inheriting from the DocumentConverter class&lt;/font&gt;&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="93" vertex="1">
+                    <mxGeometry x="27.25" y="40" width="772.75" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="69" value="&lt;div style=&quot;text-align: left;&quot;&gt;&lt;b style=&quot;background-color: transparent;&quot;&gt;Import Types:&lt;/b&gt;&lt;/div&gt;&lt;div style=&quot;text-align: left;&quot;&gt;&lt;b style=&quot;background-color: transparent;&quot;&gt;&lt;br&gt;&lt;/b&gt;&lt;/div&gt;&lt;span data-end=&quot;1524&quot; data-start=&quot;1504&quot;&gt;&lt;div style=&quot;font-weight: bold; text-align: left;&quot;&gt;&lt;span style=&quot;font-weight: 400; text-wrap-mode: nowrap; font-family: monospace; font-size: 0px;&quot;&gt;%3CmxGraphModel%3E%3Croot%3E%3CmxCell%20id%3D%220%22%2F%3E%3CmxCell%20id%3D%221%22%20parent%3D%220%22%2F%3E%3CmxCell%20id%3D%222%22%20value%3D%22%26lt%3Bb%26gt%3BThird-Party%20Libraries%26lt%3B%2Fb%26gt%3B%26lt%3Bdiv%26gt%3B%26lt%3Bul%20style%3D%26quot%3Bline-height%3A%2090%25%3B%26quot%3B%26gt%3B%26lt%3Bli%20style%3D%26quot%3Btext-align%3A%20left%3B%26quot%3B%26gt%3Brequests%26lt%3B%2Fli%26gt%3B%26lt%3Bli%20style%3D%26quot%3Btext-align%3A%20left%3B%26quot%3B%26gt%3Bmagika%26lt%3B%2Fli%26gt%3B%26lt%3Bli%20style%3D%26quot%3Btext-align%3A%20left%3B%26quot%3B%26gt%3Bcharset_normalizer%26lt%3B%2Fli%26gt%3B%26lt%3Bli%20style%3D%26quot%3Btext-align%3A%20left%3B%26quot%3B%26gt%3Bcodecs%26lt%3B%2Fli%26gt%3B%26lt%3B%2Ful%26gt%3B%26lt%3B%2Fdiv%26gt%3B%22%20style%3D%22text%3Bhtml%3D1%3Balign%3Dcenter%3BverticalAlign%3Dmiddle%3BwhiteSpace%3Dwrap%3Brounded%3D0%3B%22%20vertex%3D%221%22%20parent%3D%221%22%3E%3CmxGeometry%20x%3D%22150%22%20y%3D%22190%22%20width%3D%22150%22%20height%3D%22130%22%20as%3D%22geometry%22%2F%3E%3C%2FmxCell%3E%3C%2Froot%3E%3C%2FmxGraphModel%3E&lt;/span&gt;&lt;b style=&quot;text-align: center;&quot;&gt;&amp;nbsp;Custom (Internal)&amp;nbsp;Libraries&lt;/b&gt;&lt;div style=&quot;font-weight: 400; text-align: center;&quot;&gt;&lt;ul style=&quot;line-height: 10.8px;&quot;&gt;&lt;li style=&quot;text-align: left;&quot;&gt;_stream_info&lt;/li&gt;&lt;li style=&quot;text-align: left;&quot;&gt;_uri_utils&lt;/li&gt;&lt;li style=&quot;text-align: left;&quot;&gt;_exiftool&amp;nbsp;&lt;/li&gt;&lt;li style=&quot;text-align: left;&quot;&gt;_base_converter&lt;/li&gt;&lt;li style=&quot;text-align: left;&quot;&gt;_exceptions&amp;nbsp;&lt;/li&gt;&lt;/ul&gt;&lt;/div&gt;&lt;/div&gt;&lt;/span&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="93" vertex="1">
+                    <mxGeometry x="13" y="79.5" width="230" height="161" as="geometry"/>
+                </mxCell>
+                <mxCell id="72" value="&lt;div&gt;&lt;b&gt;&amp;nbsp; &amp;nbsp; Array of ACCEPTED_MIME_TYPE_PREFIXES [ ]&amp;nbsp;&amp;nbsp;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;and&amp;nbsp;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;ACCEPTED_FILE_EXTENSIONS [ ]&lt;/b&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="93" vertex="1">
+                    <mxGeometry x="243" y="110" width="265" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="73" value="&lt;div&gt;&lt;b&gt;&amp;nbsp; &amp;nbsp;&amp;nbsp;&amp;nbsp; def accepts ()&lt;/b&gt;&lt;/div&gt;&lt;div&gt;This function checks if the input file stream is a Bing search results page and has an accepted MIME type or file extension.&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="93" vertex="1">
+                    <mxGeometry x="530" y="110" width="265" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="74" value="&lt;div&gt;&lt;b&gt;&amp;nbsp; &amp;nbsp;&amp;nbsp;&amp;nbsp; def convert()&lt;/b&gt;&lt;/div&gt;&lt;div&gt;It reads a file stream, converts its contents into a normalized format (usually Markdown), and returns a DocumentConverterResult object containing the converted content.&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="93" vertex="1">
+                    <mxGeometry x="380" y="230" width="265" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="96" value="" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="780" y="820" width="650" height="280" as="geometry"/>
+                </mxCell>
+                <mxCell id="97" value="&lt;div style=&quot;text-align: center;&quot;&gt;&lt;strong data-end=&quot;1203&quot; data-start=&quot;1178&quot;&gt;&lt;font style=&quot;font-size: 18px;&quot;&gt;Stream&amp;nbsp;&lt;/font&gt;&lt;/strong&gt;&lt;/div&gt;&lt;div style=&quot;text-align: center;&quot;&gt;(&lt;span style=&quot;background-color: transparent;&quot;&gt;Stores metadata about a file stream, such as MIME type, extension, filename, URL, and character encoding.&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;text-align: center;&quot;&gt;Provides metadata that document converters use to handle different file types and sources.)&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="707.25" y="840" width="782.75" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="100" value="&lt;div&gt;&lt;b&gt;&amp;nbsp; &amp;nbsp; def&amp;nbsp;&lt;/b&gt;&lt;span style=&quot;background-color: transparent;&quot;&gt;&lt;b&gt;copy_and_update()&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;background-color: transparent;&quot;&gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;background-color: transparent;&quot;&gt;&lt;div style=&quot;&quot;&gt;Creates a new StreamInfo object by copying the current one and updating its fields with:&lt;/div&gt;&lt;div style=&quot;&quot;&gt;&lt;ul style=&quot;&quot;&gt;&lt;li style=&quot;text-align: left;&quot;&gt;Another StreamInfo instance (*args)&lt;/li&gt;&lt;li style=&quot;text-align: left;&quot;&gt;Additional fields via keyword arguments (**kwargs)&lt;/li&gt;&lt;/ul&gt;&lt;/div&gt;&lt;/span&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="850" y="930" width="472.5" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="109" value="" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="90" y="820" width="650" height="210" as="geometry"/>
+                </mxCell>
+                <mxCell id="110" value="&lt;b&gt;pre_process_docx&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="112.5" y="940" width="177.5" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="111" value="&lt;div style=&quot;text-align: center;&quot;&gt;&lt;strong data-end=&quot;1203&quot; data-start=&quot;1178&quot;&gt;&lt;font style=&quot;font-size: 18px;&quot;&gt;converter_utils&lt;/font&gt;&lt;/strong&gt;&lt;/div&gt;&lt;div style=&quot;text-align: center;&quot;&gt;Handles DOCX math conversion by transforming OMML equations into LaTeX. Ensures accurate preservation of mathematical expressions during DOCX-to-Markdown conversion through preprocessing and symbol mapping&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+                    <mxGeometry x="185" y="850" width="480" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="114" value="&lt;b&gt;oMath2Latex&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="326.25" y="940" width="177.5" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="115" value="&lt;b&gt;latex_dict&amp;nbsp;&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="539.75" y="940" width="177.5" height="55" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
