@@ -11,7 +11,6 @@ import pytest
 from markitdown import DocumentConverterResult, MarkItDown, StreamInfo
 from markitdown.converters._outlook_msg_converter import OutlookMsgConverter
 
-
 # Message encodings
 
 TEST_FILES_DIR = os.path.join(os.path.dirname(__file__), "test_files")

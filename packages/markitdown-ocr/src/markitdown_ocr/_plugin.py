@@ -12,7 +12,6 @@ from ._docx_converter_with_ocr import DocxConverterWithOCR
 from ._pptx_converter_with_ocr import PptxConverterWithOCR
 from ._xlsx_converter_with_ocr import XlsxConverterWithOCR
 
-
 __plugin_interface_version__ = 1
 
 

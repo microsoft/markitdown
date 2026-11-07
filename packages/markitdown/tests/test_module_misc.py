@@ -30,7 +30,6 @@ from markitdown._uri_utils import (
     parse_data_uri,
 )
 
-
 # Library behavior and remaining formats
 
 skip_remote = (
@@ -392,6 +391,32 @@ def test_get_content_disposition_filename_decodes_rfc5987() -> None:
 #    assert test_string in result.text_content
 
 
+def test_speech_transcription_uses_https(monkeypatch: pytest.MonkeyPatch) -> None:
+    from speech_recognition.recognizers import google
+
+    requests_sent = []
+
+    def fake_urlopen(request, timeout=None):
+        requests_sent.append(request)
+        return io.BytesIO(
+            b'{"result":[{"alternative":[{"transcript":"one two three four five"}]}]}'
+        )
+
+    monkeypatch.setattr(google, "urlopen", fake_urlopen)
+
+    result = MarkItDown().convert(os.path.join(TEST_FILES_DIR, "test.wav"))
+
+    assert "one two three four five" in result.text_content
+    assert len(requests_sent) == 1
+    request = requests_sent[0]
+    assert request.full_url.startswith(
+        "https://www.google.com/speech-api/v2/recognize?"
+    )
+    assert request.get_method() == "POST"
+    assert request.get_header("Content-type").startswith("audio/x-flac")
+    assert request.data.startswith(b"fLaC")
+
+
 @pytest.mark.skipif(
     skip_remote,
     reason="do not run remotely run speech transcription tests",
@@ -743,6 +768,58 @@ def test_windows_local_drive_uri(authority: str, uri_path: str, expected: str) -
 
     assert netloc == (authority or None)
     assert path == expected
+
+
+# ExifTool discovery
+
+
+def _discovered_exiftool(monkeypatch: pytest.MonkeyPatch, found: str):
+    monkeypatch.delenv("EXIFTOOL_PATH", raising=False)
+    monkeypatch.setattr(
+        "markitdown._markitdown.shutil.which",
+        lambda name: found if name == "exiftool" else None,
+    )
+    return MarkItDown()._exiftool_path
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows paths are case-insensitive")
+@pytest.mark.parametrize(
+    "found",
+    [
+        r"C:\Windows\System32\exiftool.exe",
+        # The default Windows PATH spells System32 like this.
+        r"C:\WINDOWS\system32\exiftool.exe",
+        r"c:\program files\exiftool.exe",
+        "C:/Program Files (x86)/exiftool.exe",
+    ],
+)
+def test_exiftool_found_in_windows_directory_of_any_case(
+    monkeypatch: pytest.MonkeyPatch, found: str
+) -> None:
+    assert _discovered_exiftool(monkeypatch, found) == os.path.abspath(found)
+
+
+@pytest.mark.parametrize(
+    "found",
+    [
+        r"C:\Windows\Temp\exiftool.exe",
+        r"C:\WINDOWS\system32\tools\exiftool.exe",
+        "/home/user/bin/exiftool",
+        "/usr/bin/tools/exiftool",
+    ],
+)
+def test_exiftool_outside_trusted_directories_is_ignored(
+    monkeypatch: pytest.MonkeyPatch, found: str
+) -> None:
+    assert _discovered_exiftool(monkeypatch, found) is None
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX paths are case-sensitive")
+def test_exiftool_posix_directory_match_is_exact(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert _discovered_exiftool(monkeypatch, "/usr/bin/exiftool") == "/usr/bin/exiftool"
+    assert _discovered_exiftool(monkeypatch, "/USR/BIN/exiftool") is None
 
 
 # Charset sampling
