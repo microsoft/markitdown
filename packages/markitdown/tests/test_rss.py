@@ -8,7 +8,6 @@ import pytest
 from markitdown import MarkItDown, StreamInfo
 from markitdown.converters import RssConverter
 
-
 # Feed bodies and links
 
 
@@ -42,9 +41,7 @@ def test_atom_namespace_prefixes(root_prefix: str, child_prefix: str) -> None:
     </{child_prefix}content>
   </{child_prefix}entry>
 </{root_prefix}feed>
-""".encode(
-        "utf-8"
-    )
+""".encode("utf-8")
     stream_info = StreamInfo(mimetype="application/xml", extension=".xml")
     converter = RssConverter()
     stream = io.BytesIO(feed)

@@ -9,7 +9,6 @@ import httpx2 as httpx
 
 from markitdown_mcp.__main__ import create_starlette_app, mcp
 
-
 BASE_URL = "http://127.0.0.1:3001"
 INITIALIZE = {
     "jsonrpc": "2.0",

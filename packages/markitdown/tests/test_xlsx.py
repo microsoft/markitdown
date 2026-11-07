@@ -25,7 +25,6 @@ from markitdown import MarkItDown, MissingDependencyException, StreamInfo
 from markitdown.converter_utils import _xlsx_images
 from markitdown.converters import XlsConverter, XlsxConverter, _xlsx_converter
 
-
 # Image hooks
 
 _INFO = StreamInfo(extension=".xlsx")

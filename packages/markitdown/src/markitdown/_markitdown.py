@@ -208,8 +208,10 @@ class MarkItDown:
                 candidate = shutil.which("exiftool")
                 if candidate:
                     candidate = os.path.abspath(candidate)
+                    # normcase: Windows directories match in any letter case
+                    candidate_dir = os.path.normcase(os.path.dirname(candidate))
                     if any(
-                        d == os.path.dirname(candidate)
+                        os.path.normcase(d) == candidate_dir
                         for d in [
                             "/usr/bin",
                             "/usr/local/bin",
@@ -270,6 +272,18 @@ class MarkItDown:
                 docintel_version = kwargs.get("docintel_api_version")
                 if docintel_version is not None:
                     docintel_args["api_version"] = docintel_version
+
+                docintel_model_id = kwargs.get("docintel_model_id")
+                if docintel_model_id is not None:
+                    docintel_args["model_id"] = docintel_model_id
+
+                docintel_features = kwargs.get("docintel_features")
+                if docintel_features is not None:
+                    docintel_args["features"] = docintel_features
+
+                docintel_query_fields = kwargs.get("docintel_query_fields")
+                if docintel_query_fields is not None:
+                    docintel_args["query_fields"] = docintel_query_fields
 
                 self.register_converter(
                     DocumentIntelligenceConverter(**docintel_args),

@@ -27,8 +27,9 @@ classifiers = [
 dependencies = [
   "beautifulsoup4",
   "requests",
+  "certifi>=2026.10.19",
   "markdownify",
-  "magika~=0.6.1",
+  "magika>=0.6.1,<2",
   "charset-normalizer",
   "defusedxml",
 ]
@@ -36,7 +37,7 @@ dependencies = [
 [project.optional-dependencies]
 all = [
   "python-pptx",
-  "mammoth~=1.11.0",
+  "mammoth>=1.12.2,<2",
   "pandas",
   "openpyxl",
   "xlrd",
@@ -45,7 +46,7 @@ all = [
   "pdfplumber>=0.11.9",
   "olefile",
   "pydub",
-  "SpeechRecognition",
+  "SpeechRecognition>=3.10.4",
   "youtube-transcript-api~=1.2.3",
   "azure-ai-documentintelligence",
   "azure-ai-contentunderstanding>=1.2.0b1",
@@ -53,13 +54,13 @@ all = [
   "rhwp-python>=0.8.1",
 ]
 pptx = ["python-pptx"]
-docx = ["mammoth~=1.11.0", "lxml"]
+docx = ["mammoth>=1.12.2,<2", "lxml"]
 xlsx = ["pandas", "openpyxl"]
 xls = ["pandas", "xlrd"]
 pdf = ["pdfminer.six>=20251230", "pdfplumber>=0.11.9"]
 outlook = ["olefile"]
 hwp = ["rhwp-python>=0.8.1"]
-audio-transcription = ["pydub", "SpeechRecognition"]
+audio-transcription = ["pydub", "SpeechRecognition>=3.10.4"]
 youtube-transcription = ["youtube-transcript-api~=1.2.3"]
 az-doc-intel = ["azure-ai-documentintelligence", "azure-identity"]
 # >=1.2.0b1 required for to_llm_input() helper used by ContentUnderstandingConverter
@@ -83,6 +84,7 @@ features = ["all"]
 features = ["all"]
 extra-dependencies = [
   "openai",
+  "pyyaml",
 ]
 
 [tool.hatch.envs.types]
