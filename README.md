@@ -21,6 +21,7 @@ MarkItDown currently supports the conversion from:
 - ZIP files (iterates over contents)
 - YouTube URLs
 - EPubs
+- UYAP UDF documents
 - ... and more!
 
 NOTE: Image captioning and speech transcription rely on web-hosted services.
