@@ -569,12 +569,207 @@ def test_ipynb_accepts_non_ascii() -> None:
     result = converter.accepts(io.BytesIO(french_bytes), stream_info_ascii)
     assert result is False
 
-    # Valid notebook content should still be accepted
-    notebook_bytes = b'{"nbformat": 4, "nbformat_minor": 5, "cells": []}'
+    # An empty notebook is still notebook-shaped when metadata is a dict
+    # (empty ``cells`` without metadata is ordinary JSON — see the empty-cells
+    # regression test below).
+    notebook_bytes = b'{"nbformat": 4, "nbformat_minor": 5, "metadata": {}, "cells": []}'
     stream_info_json = StreamInfo(mimetype="application/json", charset="utf-8")
 
     result = converter.accepts(io.BytesIO(notebook_bytes), stream_info_json)
     assert result is True
+
+
+def test_ipynb_plain_json_mentioning_markers_is_not_discarded() -> None:
+    """Regression for https://github.com/microsoft/markitdown/issues/2804
+
+    Ordinary JSON that merely mentions the marker names inside a string value
+    must not be routed into IpynbConverter, whose empty ``cells`` iteration
+    silently discards the document.
+    """
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    payload = {
+        "description": "The format uses nbformat and nbformat_minor fields.",
+        "items": ["important content"],
+    }
+    data = json.dumps(payload).encode("utf-8")
+
+    converter = IpynbConverter()
+    assert (
+        converter.accepts(
+            io.BytesIO(data),
+            StreamInfo(mimetype="application/json", charset="utf-8"),
+        )
+        is False
+    )
+
+    result = MarkItDown().convert_stream(
+        io.BytesIO(data),
+        stream_info=StreamInfo(
+            extension=".json", mimetype="application/json", charset="utf-8"
+        ),
+    )
+    assert "important content" in result.markdown
+
+
+def test_ipynb_marker_fields_without_cells_are_not_a_notebook() -> None:
+    """Numeric markers alone do not make a notebook; ``cells`` is required."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    data = json.dumps(
+        {"nbformat": 4, "nbformat_minor": 5, "data": ["important content"]}
+    ).encode("utf-8")
+
+    converter = IpynbConverter()
+    assert (
+        converter.accepts(
+            io.BytesIO(data),
+            StreamInfo(mimetype="application/json", charset="utf-8"),
+        )
+        is False
+    )
+
+    result = MarkItDown().convert_stream(
+        io.BytesIO(data),
+        stream_info=StreamInfo(
+            extension=".json", mimetype="application/json", charset="utf-8"
+        ),
+    )
+    assert "important content" in result.markdown
+
+
+def test_ipynb_empty_cells_with_sibling_data_is_not_a_notebook() -> None:
+    """Empty ``cells`` next to unrelated payload is not a notebook.
+
+    Regression for the review of #2810 (mangeshraut712, 2026-11-03): a JSON
+    object with numeric nbformat markers, an empty ``cells`` list and real
+    payload elsewhere must reach the fallback converters — claiming it as
+    ipynb yields empty markdown and drops the payload.
+    """
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    data = json.dumps(
+        {
+            "nbformat": 4,
+            "nbformat_minor": 5,
+            "cells": [],
+            "items": ["important content"],
+        }
+    ).encode("utf-8")
+
+    converter = IpynbConverter()
+    assert (
+        converter.accepts(
+            io.BytesIO(data),
+            StreamInfo(mimetype="application/json", charset="utf-8"),
+        )
+        is False
+    )
+
+    result = MarkItDown().convert_stream(
+        io.BytesIO(data),
+        stream_info=StreamInfo(
+            extension=".json", mimetype="application/json", charset="utf-8"
+        ),
+    )
+    assert "important content" in result.markdown
+
+
+def test_ipynb_empty_notebook_with_metadata_is_still_a_notebook() -> None:
+    """An empty notebook is notebook-shaped when ``metadata`` is a dict.
+
+    The reviewer's alternative accepted: empty ``cells`` plus notebook-shaped
+    ``metadata`` keeps the stream claimed as ipynb.
+    """
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    data = json.dumps(
+        {"nbformat": 4, "nbformat_minor": 5, "metadata": {}, "cells": []}
+    ).encode("utf-8")
+
+    converter = IpynbConverter()
+    assert (
+        converter.accepts(
+            io.BytesIO(data),
+            StreamInfo(mimetype="application/json", charset="utf-8"),
+        )
+        is True
+    )
+
+
+def test_ipynb_notebook_shaped_object_must_be_at_the_top_level() -> None:
+    """A notebook-shaped object nested under another key is ordinary JSON."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    payload = {
+        "example": {"nbformat": 4, "nbformat_minor": 5, "cells": []},
+        "docs": "The nbformat fields are documented here.",
+    }
+    data = json.dumps(payload).encode("utf-8")
+
+    converter = IpynbConverter()
+    assert (
+        converter.accepts(
+            io.BytesIO(data),
+            StreamInfo(mimetype="application/json", charset="utf-8"),
+        )
+        is False
+    )
+
+
+def test_ipynb_deeply_nested_json_is_declined_without_crashing() -> None:
+    """Excessively nested JSON must be declined, not raise RecursionError."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    text = '{"note": "mentions nbformat and nbformat_minor"}'
+    for _ in range(2000):
+        text = '{"nested": ' + text + "}"
+    payload = text.encode("utf-8")
+
+    converter = IpynbConverter()
+    assert (
+        converter.accepts(
+            io.BytesIO(payload),
+            StreamInfo(mimetype="application/json", charset="utf-8"),
+        )
+        is False
+    )
+
+
+def test_ipynb_mimetype_routed_notebook_with_bom_still_accepted() -> None:
+    """Genuine notebooks routed by MIME type keep working, BOM included."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    data = _UTF8_BOM + json.dumps(_BOM_NOTEBOOK).encode("utf-8")
+
+    converter = IpynbConverter()
+    assert (
+        converter.accepts(
+            io.BytesIO(data),
+            StreamInfo(mimetype="application/json", charset="utf-8"),
+        )
+        is True
+    )
+
+    result = MarkItDown().convert_stream(
+        io.BytesIO(data),
+        stream_info=StreamInfo(mimetype="application/json", charset="utf-8"),
+    )
+    assert result.markdown.startswith("# Quarterly notes")
+
+
+def test_ipynb_ipynb_extension_routing_is_unchanged() -> None:
+    """The .ipynb extension keeps routing without content sniffing."""
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    converter = IpynbConverter()
+    assert (
+        converter.accepts(
+            io.BytesIO(b"not json at all"),
+            StreamInfo(extension=".ipynb", charset="utf-8"),
+        )
+        is True
+    )
 
 
 # File URI validation

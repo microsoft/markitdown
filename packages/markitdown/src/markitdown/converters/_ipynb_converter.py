@@ -12,6 +12,45 @@ CANDIDATE_MIME_TYPE_PREFIXES = [
 ACCEPTED_FILE_EXTENSIONS = [".ipynb"]
 
 
+def _is_notebook_json(text: str) -> bool:
+    """Recognize a notebook structurally, not by substring.
+
+    A notebook is a JSON object whose top level carries numeric ``nbformat``
+    and ``nbformat_minor`` versions and a ``cells`` list. Sniffing for the
+    marker names as substrings misrouted ordinary JSON that merely mentioned
+    them into an empty conversion (issue #2804).
+
+    An empty ``cells`` list is only notebook-shaped when a dict ``metadata``
+    rides along: a real empty notebook carries notebook metadata, while an
+    ordinary JSON document that merely carries the numeric markers next to an
+    empty ``cells`` list and unrelated payload would otherwise be claimed as
+    ipynb and converted to empty markdown, dropping the payload (review of
+    PR #2810).
+    """
+    try:
+        data = json.loads(text.lstrip("\ufeff"))
+    except (ValueError, RecursionError):
+        # Malformed or excessively nested JSON is not a notebook.
+        return False
+    if not isinstance(data, dict):
+        return False
+
+    def _is_version(value: Any) -> bool:
+        # JSON booleans are int subclasses; a version is a real number.
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+    cells = data.get("cells")
+    if not isinstance(cells, list):
+        return False
+    # Empty cells: only trust it when the object is notebook-shaped overall.
+    if not cells and not isinstance(data.get("metadata"), dict):
+        return False
+
+    return _is_version(data.get("nbformat")) and _is_version(
+        data.get("nbformat_minor")
+    )
+
+
 class IpynbConverter(DocumentConverter):
     """Converts Jupyter Notebook (.ipynb) files to Markdown."""
 
@@ -34,14 +73,11 @@ class IpynbConverter(DocumentConverter):
                 try:
                     encoding = stream_info.charset or "utf-8"
                     notebook_content = file_stream.read().decode(encoding)
-                    return (
-                        "nbformat" in notebook_content
-                        and "nbformat_minor" in notebook_content
-                    )
                 except (ValueError, LookupError):
                     return False
                 finally:
                     file_stream.seek(cur_pos)
+                return _is_notebook_json(notebook_content)
 
         return False
 
