@@ -7,6 +7,7 @@ from urllib.parse import parse_qs, urlparse, unquote
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
+from ._html_converter import HtmlConverter
 
 # Optional YouTube transcription support
 try:
@@ -35,7 +36,25 @@ ACCEPTED_FILE_EXTENSIONS = [
 
 
 class YouTubeConverter(DocumentConverter):
-    """Handle YouTube specially, focusing on the video title, description, and transcript."""
+    """Extract YouTube metadata and transcripts, or fall back to HTML."""
+
+    def _get_video_id(self, url: str) -> Union[str, None]:
+        """Extract a YouTube video ID from supported URL formats."""
+        parsed_url = urlparse(url)
+        hostname = parsed_url.netloc.lower()
+        path_parts = [part for part in parsed_url.path.split("/") if part]
+
+        if hostname in {"youtu.be", "www.youtu.be"}:
+            return path_parts[0] if path_parts else None
+
+        if hostname in {"youtube.com", "www.youtube.com", "m.youtube.com"}:
+            if path_parts[:1] == ["watch"]:
+                params = parse_qs(parsed_url.query)
+                return params.get("v", [None])[0]
+            if path_parts[:1] in (["shorts"], ["embed"]):
+                return path_parts[1] if len(path_parts) > 1 else None
+
+        return None
 
     def accepts(
         self,
@@ -53,7 +72,7 @@ class YouTubeConverter(DocumentConverter):
         url = unquote(url)
         url = url.replace(r"\?", "?").replace(r"\=", "=")
 
-        if not url.startswith("https://www.youtube.com/watch?"):
+        if not self._get_video_id(url):
             # Not a YouTube URL
             return False
 
@@ -74,6 +93,7 @@ class YouTubeConverter(DocumentConverter):
         **kwargs: Any,  # Options to pass to the converter
     ) -> DocumentConverterResult:
         # Parse the stream
+        start_position = file_stream.tell()
         encoding = "utf-8" if stream_info.charset is None else stream_info.charset
         soup = bs4.BeautifulSoup(file_stream, "html.parser", from_encoding=encoding)
 
@@ -116,10 +136,9 @@ class YouTubeConverter(DocumentConverter):
             pass
 
         # Start preparing the page
-        webpage_text = "# YouTube\n"
+        webpage_text = ""
 
-        title = self._get(metadata, ["title", "og:title", "name"])  # type: ignore
-        assert isinstance(title, str)
+        title = self._get(metadata, ["title", "og:title", "name"]) or ""
 
         if title:
             webpage_text += f"\n## {title}\n"
@@ -147,10 +166,8 @@ class YouTubeConverter(DocumentConverter):
         if IS_YOUTUBE_TRANSCRIPT_CAPABLE:
             ytt_api = YouTubeTranscriptApi()
             transcript_text = ""
-            parsed_url = urlparse(stream_info.url)  # type: ignore
-            params = parse_qs(parsed_url.query)  # type: ignore
-            if "v" in params and params["v"][0]:
-                video_id = str(params["v"][0])
+            video_id = self._get_video_id(stream_info.url or "")
+            if video_id:
                 transcript_list = ytt_api.list(video_id)
                 languages = ["en"]
                 for transcript in transcript_list:
@@ -188,11 +205,12 @@ class YouTubeConverter(DocumentConverter):
             if transcript_text:
                 webpage_text += f"\n### Transcript\n{transcript_text}\n"
 
-        title = title if title else (soup.title.string if soup.title else "")
-        assert isinstance(title, str)
+        if not webpage_text:
+            file_stream.seek(start_position)
+            return HtmlConverter().convert(file_stream, stream_info, **kwargs)
 
         return DocumentConverterResult(
-            markdown=webpage_text,
+            markdown="# YouTube\n" + webpage_text,
             title=title,
         )
 

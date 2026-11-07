@@ -21,6 +21,10 @@ from ._doc_intel_converter import (
     DocumentIntelligenceConverter,
     DocumentIntelligenceFileType,
 )
+from ._cu_converter import (
+    ContentUnderstandingConverter,
+    ContentUnderstandingFileType,
+)
 from ._epub_converter import EpubConverter
 from ._csv_converter import CsvConverter
 from ._udf_converter import UdfConverter
@@ -44,6 +48,8 @@ __all__ = [
     "ZipConverter",
     "DocumentIntelligenceConverter",
     "DocumentIntelligenceFileType",
+    "ContentUnderstandingConverter",
+    "ContentUnderstandingFileType",
     "EpubConverter",
     "CsvConverter",
     "UdfConverter",

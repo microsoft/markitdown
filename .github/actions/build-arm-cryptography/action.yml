@@ -1,0 +1,30 @@
+name: Build Windows ARM64 Cryptography
+description: Provide a current native wheel to pip and Hatch until PyPI publishes one.
+runs:
+  using: composite
+  steps:
+    - name: Build OpenSSL and Cryptography
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = 'Stop'
+        $vcpkgRoot = $env:VCPKG_INSTALLATION_ROOT
+        & "$vcpkgRoot/vcpkg.exe" install openssl:arm64-windows-static-md
+        if ($LASTEXITCODE -ne 0) { throw 'OpenSSL build failed' }
+
+        $env:OPENSSL_DIR = "$vcpkgRoot/installed/arm64-windows-static-md"
+        $env:OPENSSL_STATIC = '1'
+        $env:CARGO_BUILD_TARGET = 'aarch64-pc-windows-msvc'
+        rustup target add aarch64-pc-windows-msvc
+        if ($LASTEXITCODE -ne 0) { throw 'Rust target installation failed' }
+
+        $wheelhouse = Join-Path $env:RUNNER_TEMP 'cryptography-wheels'
+        New-Item -ItemType Directory -Force -Path $wheelhouse | Out-Null
+        python -m pip wheel --no-deps --no-binary cryptography --wheel-dir $wheelhouse -c "$env:GITHUB_WORKSPACE/.github/constraints.txt" cryptography
+        if ($LASTEXITCODE -ne 0) { throw 'Cryptography wheel build failed' }
+        if (-not (Get-ChildItem "$wheelhouse/cryptography-*-win_arm64.whl")) {
+          throw 'Expected a native Windows ARM64 wheel'
+        }
+
+        # Hatch creates its own environment; make the wheel available to both installers.
+        "PIP_FIND_LINKS=$wheelhouse" >> $env:GITHUB_ENV
+        "UV_FIND_LINKS=$wheelhouse" >> $env:GITHUB_ENV
