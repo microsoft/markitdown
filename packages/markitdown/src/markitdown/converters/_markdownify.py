@@ -6,6 +6,50 @@ from urllib.parse import quote, urlparse, urlunparse
 
 _PERCENT_ENCODED_OCTET = re.compile(r"%[0-9A-Fa-f]{2}")
 
+# Matches a pipe together with the (possibly empty) run of backslashes in front
+# of it, so that run can be doubled before the pipe is escaped. Same rule as
+# _csv_converter._escape_table_cell (issues #2438/#2266).
+_PIPE_ESCAPE_RE = re.compile(r"(?<!\\)(\\*)\|")
+
+# Matches the segments of a rendered cell where a pipe is literal by GFM rules
+# and escaping it would corrupt the content (review of PR #2808):
+# - code spans (backtick context): GFM renders the pipe as-is, no escaping;
+# - inline link/image destinations "](...)": a backslash-escaped pipe would
+#   change the URL.
+_LEAVE_PIPES_ALONE_RE = re.compile(
+    r"(?P<code>(?P<btick>`+)(?:(?!(?P=btick)).)*(?P=btick))"
+    r"|(?P<dest>\]\([^)\n]*\))",
+    re.DOTALL,
+)
+
+
+def _escape_pipe_match(match: "re.Match[str]") -> str:
+    return match.group(1) * 2 + r"\|"
+
+
+def _escape_cell_pipes(value: str) -> str:
+    r"""Escape raw pipes so a table cell keeps a single Markdown column.
+
+    A pipe is a column separator, so it must be escaped. Any backslashes
+    directly in front of a pipe are doubled first, so a sequence that was
+    already escaped in the source stays literal (``\|`` -> ``\\|``) instead
+    of changing meaning.
+
+    Segments where a pipe is literal by GFM rules are skipped: pipes inside
+    code spans need no escaping, and the pipe of an inline link or image
+    destination is part of the URL, so escaping it would change the URL
+    (review of PR #2808).
+    """
+    parts: list[str] = []
+    pos = 0
+    for segment in _LEAVE_PIPES_ALONE_RE.finditer(value):
+        parts.append(
+            _PIPE_ESCAPE_RE.sub(_escape_pipe_match, value[pos : segment.start()])
+        )
+        parts.append(segment.group(0))
+        pos = segment.end()
+    parts.append(_PIPE_ESCAPE_RE.sub(_escape_pipe_match, value[pos:]))
+    return "".join(parts)
 
 def _quote_path_preserving_percent_encoded_octets(path: str) -> str:
     """Quote a URL path while preserving existing %HH byte encodings."""
@@ -29,6 +73,7 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
     - Removing javascript hyperlinks.
     - Truncating images with large data:uri sources.
     - Ensuring URIs are properly escaped, and do not conflict with Markdown syntax
+    - Escaping pipes inside table cells so tables stay well-formed
     """
 
     def __init__(self, **options: Any):
@@ -173,6 +218,22 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
     def convert_strike(self, el: Any, text: str, *args, **kwargs) -> str:
         """Obsolete <strike> is still in the wild; treat it like <s>/<del>."""
         return self.convert_s(el, text, *args, **kwargs)  # type: ignore
+
+    def convert_td(self, el: Any, text: str, *args, **kwargs) -> str:
+        """Same as usual converter, but pipes are escaped (issue #2438).
+
+        A table cell is rendered inside a Markdown table row, so an
+        unescaped pipe in the cell text adds a fake column and corrupts
+        the table. Pipes that are literal by GFM rules (inside code
+        spans, inside inline link/image destinations) are left alone.
+        DOCX tables render through this same layer
+        (mammoth -> HTML -> markdownify), so they are covered too.
+        """
+        return super().convert_td(el, _escape_cell_pipes(text), *args, **kwargs)  # type: ignore
+
+    def convert_th(self, el: Any, text: str, *args, **kwargs) -> str:
+        """Same as usual converter, but pipes are escaped (issue #2438)."""
+        return super().convert_th(el, _escape_cell_pipes(text), *args, **kwargs)  # type: ignore
 
     def convert_soup(self, soup: Any) -> str:
         return super().convert_soup(soup)  # type: ignore
