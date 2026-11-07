@@ -328,6 +328,32 @@ def test_get_content_disposition_filename_decodes_rfc5987() -> None:
 #    assert test_string in result.text_content
 
 
+def test_speech_transcription_uses_https(monkeypatch: pytest.MonkeyPatch) -> None:
+    from speech_recognition.recognizers import google
+
+    requests_sent = []
+
+    def fake_urlopen(request, timeout=None):
+        requests_sent.append(request)
+        return io.BytesIO(
+            b'{"result":[{"alternative":[{"transcript":"one two three four five"}]}]}'
+        )
+
+    monkeypatch.setattr(google, "urlopen", fake_urlopen)
+
+    result = MarkItDown().convert(os.path.join(TEST_FILES_DIR, "test.wav"))
+
+    assert "one two three four five" in result.text_content
+    assert len(requests_sent) == 1
+    request = requests_sent[0]
+    assert request.full_url.startswith(
+        "https://www.google.com/speech-api/v2/recognize?"
+    )
+    assert request.get_method() == "POST"
+    assert request.get_header("Content-type").startswith("audio/x-flac")
+    assert request.data.startswith(b"fLaC")
+
+
 @pytest.mark.skipif(
     skip_remote,
     reason="do not run remotely run speech transcription tests",
