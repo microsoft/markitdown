@@ -18,6 +18,38 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 
 ACCEPTED_FILE_EXTENSIONS = [".zip"]
 
+# Limits that protect against zip bombs (tiny archives that expand to gigabytes)
+# and deeply nested archives. They can be overridden per call via kwargs:
+# zip_max_entry_bytes, zip_max_total_bytes, zip_max_entries, zip_max_depth.
+DEFAULT_MAX_ENTRY_BYTES = 100 * 1024 * 1024  # 100 MB per member
+DEFAULT_MAX_TOTAL_BYTES = 500 * 1024 * 1024  # 500 MB for the whole archive
+DEFAULT_MAX_ENTRIES = 10_000
+DEFAULT_MAX_DEPTH = 3  # zip inside zip inside zip
+
+_CHUNK = 1024 * 1024
+
+
+class _LimitExceeded(Exception):
+    pass
+
+
+def _read_capped(zip_obj: zipfile.ZipFile, entry: zipfile.ZipInfo, cap: int) -> bytes:
+    """Read a member, stopping as soon as it exceeds `cap` bytes.
+
+    The size in the zip header can lie, so the real decompressed size is
+    counted while reading instead of trusting entry.file_size.
+    """
+    buf = io.BytesIO()
+    with zip_obj.open(entry) as fh:
+        while True:
+            chunk = fh.read(_CHUNK)
+            if not chunk:
+                break
+            if buf.tell() + len(chunk) > cap:
+                raise _LimitExceeded()
+            buf.write(chunk)
+    return buf.getvalue()
+
 
 class ZipConverter(DocumentConverter):
     """Converts ZIP files to markdown by extracting and converting all contained files.
@@ -98,25 +130,59 @@ class ZipConverter(DocumentConverter):
         )
         md_content = f"Content from the zip file `{file_path}`:\n\n"
 
-        # Drop the metadata describing the outer *archive*
+        max_entry = int(kwargs.get("zip_max_entry_bytes", DEFAULT_MAX_ENTRY_BYTES))
+        max_total = int(kwargs.get("zip_max_total_bytes", DEFAULT_MAX_TOTAL_BYTES))
+        max_entries = int(kwargs.get("zip_max_entries", DEFAULT_MAX_ENTRIES))
+        max_depth = int(kwargs.get("zip_max_depth", DEFAULT_MAX_DEPTH))
+        depth = int(kwargs.get("_zip_depth", 0)) + 1
+
+        if depth > max_depth:
+            return DocumentConverterResult(
+                markdown=f"Skipped zip file `{file_path}`: nested deeper than {max_depth} levels."
+            )
+
+        # Drop the metadata describing the outer *archive*, and pass the
+        # current nesting depth down so nested zips are counted.
         member_kwargs = {
             key: value
             for key, value in kwargs.items()
-            if key not in ("file_extension", "url")
+            if key not in ("file_extension", "url", "_zip_depth")
         }
+        member_kwargs["_zip_depth"] = depth
 
+        skipped = []
+        total = 0
         with zipfile.ZipFile(file_stream, "r") as zipObj:
-            for entry in zipObj.infolist():
+            entries = [e for e in zipObj.infolist() if not e.is_dir()]
+            if len(entries) > max_entries:
+                skipped.append(
+                    f"{len(entries) - max_entries} files beyond the limit of {max_entries}"
+                )
+                entries = entries[:max_entries]
+
+            for entry in entries:
                 name = entry.filename
+                remaining = max_total - total
+                if remaining <= 0:
+                    skipped.append(f"`{name}` (archive total limit reached)")
+                    continue
                 try:
-                    z_file_stream = io.BytesIO(zipObj.read(entry))
-                    z_file_stream_info = StreamInfo(
-                        extension=os.path.splitext(name)[1],
-                        filename=os.path.basename(name),
-                    )
+                    data = _read_capped(zipObj, entry, min(max_entry, remaining))
+                except _LimitExceeded:
+                    skipped.append(f"`{name}` (too large once decompressed)")
+                    continue
+                except (zipfile.BadZipFile, RuntimeError, NotImplementedError):
+                    # Corrupt, encrypted or unsupported compression
+                    skipped.append(f"`{name}` (could not be read)")
+                    continue
+                total += len(data)
+                try:
                     result = self._markitdown.convert_stream(
-                        stream=z_file_stream,
-                        stream_info=z_file_stream_info,
+                        stream=io.BytesIO(data),
+                        stream_info=StreamInfo(
+                            extension=os.path.splitext(name)[1],
+                            filename=os.path.basename(name),
+                        ),
                         **member_kwargs,
                     )
                     if result is not None:
@@ -126,5 +192,8 @@ class ZipConverter(DocumentConverter):
                     pass
                 except FileConversionException:
                     pass
+
+        if skipped:
+            md_content += "## Skipped\n\n" + "".join(f"- {s}\n" for s in skipped)
 
         return DocumentConverterResult(markdown=md_content.strip())
