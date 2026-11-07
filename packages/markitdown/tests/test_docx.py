@@ -96,6 +96,37 @@ def test_omml_known_function_split_across_runs():
     assert str(results[0]) == r"\sin(x)"
 
 
+# Math radicals
+
+
+@pytest.mark.parametrize(
+    ("rad_pr_xml", "expected"),
+    [
+        ('<m:radPr><m:degHide m:val="1"/></m:radPr>', "\\sqrt{x}"),
+        ('<m:radPr><m:degHide m:val="true"/></m:radPr>', "\\sqrt{x}"),
+        ("<m:radPr><m:degHide/></m:radPr>", "\\sqrt{x}"),
+        ('<m:radPr><m:degHide m:val="0"/></m:radPr>', "\\sqrt[3]{x}"),
+        ('<m:radPr><m:degHide m:val="false"/></m:radPr>', "\\sqrt[3]{x}"),
+        ("<m:radPr/>", "\\sqrt[3]{x}"),
+        ("", "\\sqrt[3]{x}"),
+    ],
+)
+def test_omml_radical_honours_deg_hide(rad_pr_xml: str, expected: str) -> None:
+    """A hidden radical degree (m:degHide) must be omitted from the LaTeX root."""
+    omml_xml = f"""<m:oMathPara xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">
+        <m:oMath>
+            <m:rad>
+                {rad_pr_xml}
+                <m:deg><m:r><m:t>3</m:t></m:r></m:deg>
+                <m:e><m:r><m:t>x</m:t></m:r></m:e>
+            </m:rad>
+        </m:oMath>
+    </m:oMathPara>"""
+    results = list(load_string(omml_xml))
+    assert len(results) == 1
+    assert str(results[0]) == expected
+
+
 # Math accents
 
 # Tests for DOCX math accent templates.

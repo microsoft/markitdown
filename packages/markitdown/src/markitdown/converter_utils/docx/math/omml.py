@@ -133,6 +133,8 @@ class Pr(Tag2Method):
     text = ""
 
     __val_tags = ("chr", "pos", "begChr", "endChr", "type")
+    # OMML on/off properties: a present element without m:val means "on".
+    __bool_tags = ("degHide",)
 
     __innerdict = None  # can't use the __dict__
 
@@ -157,9 +159,11 @@ class Pr(Tag2Method):
 
     def do_common(self, elm):
         stag = elm.tag.replace(OMML_NS, "")
+        raw = elm.get("{0}val".format(OMML_NS))
         if stag in self.__val_tags:
-            t = elm.get("{0}val".format(OMML_NS))
-            self.__innerdict[stag] = t
+            self.__innerdict[stag] = raw
+        elif stag in self.__bool_tags:
+            self.__innerdict[stag] = raw is None or raw.lower() in ("1", "true", "on")
         return None
 
     tag2meth = {
@@ -169,6 +173,7 @@ class Pr(Tag2Method):
         "begChr": do_common,
         "endChr": do_common,
         "type": do_common,
+        "degHide": do_common,
     }
 
 
@@ -311,7 +316,9 @@ class oMath2Latex(Tag2Method):
         c_dict = self.process_children_dict(elm)
         text = c_dict.get("e")
         deg_text = c_dict.get("deg")
-        if deg_text:
+        rad_pr = c_dict.get("radPr")
+        deg_hidden = rad_pr is not None and rad_pr.degHide
+        if deg_text and not deg_hidden:
             return RAD.format(deg=deg_text, text=text)
         else:
             return RAD_DEFAULT.format(text=text)
