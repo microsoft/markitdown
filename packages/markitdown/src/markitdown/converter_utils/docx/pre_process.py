@@ -136,6 +136,12 @@ def _pre_process_math(content: bytes) -> bytes:
     Returns:
         bytes: The processed content with OMML elements replaced by their LaTeX equivalents, encoded as bytes.
     """
+    # Same idea as in _pre_process_strike: the OMML prefix can only appear in a
+    # document that has equations, so most .docx files can skip the round-trip.
+    # On a 12 MB document.xml that is ~9s of BeautifulSoup time for nothing.
+    if b"oMath" not in content:
+        return content
+
     soup = BeautifulSoup(content.decode(), features="xml")
     for tag in soup.find_all("oMathPara"):
         _replace_equations(tag)

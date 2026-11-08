@@ -1403,6 +1403,86 @@ def test_docx_malformed_equations() -> None:
     assert "After unnamespaced oMath" in result.markdown
 
 
+# Math pre-processing on documents without equations
+
+
+def test_math_pre_process_skips_documents_without_equations() -> None:
+    """No oMath means nothing to convert, so the XML must come back untouched."""
+    from markitdown.converter_utils.docx.pre_process import _pre_process_math
+
+    content = (
+        b'<?xml version="1.0" encoding="UTF-8"?>\n'
+        b"<!DOCTYPE REMOTE [\n"
+        b'<!ENTITY testent SYSTEM "http://poi.apache.org/">\n'
+        b"]>\n"
+        b'<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        b'<w:body><w:p><w:r><w:t>plain</w:t></w:r></w:p></w:body></w:document>'
+    )
+
+    # The round-trip drops the internal subset, which leaves mammoth with a
+    # dangling entity reference and an ExpatError; returning the original
+    # bytes keeps the document readable.
+    assert _pre_process_math(content) == content
+
+
+def test_math_pre_process_still_converts_equations() -> None:
+    """The early return must not swallow documents that do have equations."""
+    from markitdown.converter_utils.docx.pre_process import _pre_process_math
+
+    content = (
+        b'<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
+        b'xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">'
+        b"<w:body><w:p><w:r><w:t>before</w:t></w:r></w:p>"
+        b"<m:oMath><m:r><m:t>a+b</m:t></m:r></m:oMath>"
+        b'<w:p><w:r><w:t>after</w:t></w:r></w:p></w:body></w:document>'
+    )
+
+    processed = _pre_process_math(content).decode()
+
+    assert "$a+b$" in processed
+    assert "before" in processed and "after" in processed
+    assert "<m:oMath" not in processed
+
+
+def test_docx_with_doctype_and_no_equations_converts(tmp_path) -> None:
+    """A document whose DOCTYPE carries an internal subset used to break.
+
+    BeautifulSoup re-serializes the declaration as a bare <!DOCTYPE REMOTE>,
+    so the entity reference in the body no longer resolves. Nothing in the
+    document is math, so it should not be touched at all.
+    """
+    source_path = os.path.join(TEST_FILES_DIR, "test.docx")
+    doctype_path = tmp_path / "doctype.docx"
+
+    with zipfile.ZipFile(source_path, mode="r") as zip_input:
+        with zipfile.ZipFile(doctype_path, mode="w") as zip_output:
+            for item in zip_input.infolist():
+                content = zip_input.read(item.filename)
+                if item.filename == "word/document.xml":
+                    assert b"oMath" not in content, "fixture changed, pick another one"
+                    content = content.replace(
+                        b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+                        b'<?xml version="1.0" encoding="UTF-8"?>\r\n'
+                        b'<!DOCTYPE REMOTE [\r\n'
+                        b'<!ENTITY testent SYSTEM "http://poi.apache.org/">\r\n'
+                        b"]>",
+                        1,
+                    )
+                    content = content.replace(
+                        b"</w:body>",
+                        b'<w:p><w:r><w:t>see &amp;testent; for the site</w:t></w:r></w:p>'
+                        b"</w:body>",
+                        1,
+                    )
+                zip_output.writestr(item, content)
+
+    result = MarkItDown().convert(str(doctype_path))
+
+    assert "see" in result.markdown
+    # Nothing is fetched: the entity is declared but never resolved.
+    assert "poi.apache.org" not in result.markdown
+
+
 @pytest.mark.skipif(
     os.name == "nt",
     reason="The DOCX fixture embeds a POSIX file:///tmp/test_rlink.txt target.",
