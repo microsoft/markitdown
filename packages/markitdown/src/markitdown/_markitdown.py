@@ -208,8 +208,10 @@ class MarkItDown:
                 candidate = shutil.which("exiftool")
                 if candidate:
                     candidate = os.path.abspath(candidate)
+                    # normcase: Windows directories match in any letter case
+                    candidate_dir = os.path.normcase(os.path.dirname(candidate))
                     if any(
-                        d == os.path.dirname(candidate)
+                        os.path.normcase(d) == candidate_dir
                         for d in [
                             "/usr/bin",
                             "/usr/local/bin",
