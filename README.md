@@ -14,7 +14,7 @@ MarkItDown currently supports the conversion from:
 - PowerPoint
 - Word
 - Excel
-- Images (EXIF metadata and OCR)
+- Images (EXIF metadata and captioning)
 - Audio (EXIF metadata and speech transcription)
 - HTML (and MHTML web archives)
 - Text-based formats (CSV, JSON, XML)
@@ -22,6 +22,8 @@ MarkItDown currently supports the conversion from:
 - YouTube URLs
 - EPubs
 - ... and more!
+
+NOTE: Image captioning and speech transcription rely on web-hosted services.
 
 ## Why Markdown?
 
@@ -461,6 +463,8 @@ MarkItDown performs I/O with the privileges of the current process. Like `open()
 **Sanitize your inputs:** Do not pass untrusted input directly to MarkItDown. If any part of the input may be controlled by an untrusted user or system, such as in hosted or server-side applications, it must be validated and restricted before calling MarkItDown. Depending on your environment, this may include restricting file paths, limiting URI schemes and network destinations, and blocking access to private, loopback, link-local, or metadata-service addresses.
 
 **Call only the conversion method you need:** Prefer the narrowest conversion API that fits your use case. MarkItDown's `convert()` method is intentionally permissive and can handle local files, remote URIs, and byte streams. If your application only needs to read local files, call `convert_local()` instead. If you need more control over URI fetching, call `requests.get()` yourself and pass the response object to `convert_response()`. For maximum control, open a stream to the input you want converted and call `convert_stream()`.
+
+Additionally, image captioning, speech transcription, Azure Document Intelligence, and Azure Content Understanding rely on web-hosted services to function. For local-only operations, install only the optional dependencies that you need and want to use.
 
 ## Trademarks
 
