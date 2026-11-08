@@ -1,3 +1,5 @@
+import datetime
+
 """Spreadsheet conversion, compatibility repairs, and image hooks."""
 
 import inspect
@@ -540,10 +542,6 @@ def test_xlsx_show_zeroes_rename_is_scoped_to_sheet_view_tags() -> None:
     assert b'<customSheetView showZeroes="0"/>' in repaired
 
 
-if __name__ == "__main__":
-    raise SystemExit(pytest.main([__file__]))
-
-
 def test_xlsx_blank_cells_and_na_like_text_are_preserved() -> None:
     workbook = openpyxl.Workbook()
     sheet = workbook.active
@@ -561,3 +559,27 @@ def test_xlsx_blank_cells_and_na_like_text_are_preserved() -> None:
     assert "| Namibia | NA | 1 |" in markdown
     assert "| Unknown | N/A |  |" in markdown
     assert "| Other | null | 2 |" in markdown
+
+
+def test_xlsx_date_column_with_blank_cell_keeps_date_format() -> None:
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.append(["day", "at"])
+    sheet.append([datetime.datetime(2026, 1, 2), datetime.datetime(2026, 1, 2, 14, 30)])
+    sheet.append([None, None])
+    sheet.append([datetime.datetime(2026, 1, 3), datetime.datetime(2026, 1, 3)])
+    stream = io.BytesIO()
+    workbook.save(stream)
+    stream.seek(0)
+
+    markdown = MarkItDown().convert_stream(stream, file_extension=".xlsx").markdown
+
+    # A column of plain dates prints dates only, even with a blank cell in it,
+    # while a column that has a time of day keeps full timestamps.
+    assert "| 2026-01-02 | 2026-01-02 14:30:00 |" in markdown
+    assert "| 2026-01-03 | 2026-01-03 00:00:00 |" in markdown
+    assert "NaN" not in markdown and "NaT" not in markdown
+
+
+if __name__ == "__main__":
+    raise SystemExit(pytest.main([__file__]))
