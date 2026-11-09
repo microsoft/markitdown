@@ -40,7 +40,8 @@ ACCEPTED_XLS_FILE_EXTENSIONS = [".xls"]
 # Some producers write the legacy attribute "showZeroes" on <sheetView>, where the
 # schema calls it "showZeros". openpyxl rejects the unknown attribute outright, so the
 # workbook is repaired by renaming it. The rename is confined to <sheetView> start tags.
-_SHEET_VIEW_START_TAG = re.compile(rb"<sheetView(?=[\s/>])[^>]*>")
+# Worksheet XML can use a namespace prefix (for example, <x:sheetView>).
+_SHEET_VIEW_START_TAG = re.compile(rb"<(?:[^\s<>/:]+:)?sheetView(?=[\s/>])[^>]*>")
 _SHOW_ZEROES_ATTRIBUTE = re.compile(rb"(?<=[\s])showZeroes(\s*=)")
 
 
