@@ -20,6 +20,7 @@ from openpyxl.drawing.spreadsheet_drawing import (
     OneCellAnchor,
     TwoCellAnchor,
 )
+from openpyxl.xml.constants import SHEET_MAIN_NS
 
 from markitdown import MarkItDown, MissingDependencyException, StreamInfo
 from markitdown.converter_utils import _xlsx_images
@@ -469,7 +470,8 @@ def test_missing_dependencies_and_legacy_xls_stay_separate(
 # Conversion regressions
 
 
-def test_xlsx_legacy_show_zeroes_sheetview(tmp_path) -> None:
+@pytest.mark.parametrize("prefix", ["", "x"])
+def test_xlsx_legacy_show_zeroes_sheetview(tmp_path, prefix: str) -> None:
     from openpyxl import Workbook
 
     base_path = tmp_path / "base.xlsx"
@@ -490,8 +492,17 @@ def test_xlsx_legacy_show_zeroes_sheetview(tmp_path) -> None:
             for item in source.infolist():
                 data = source.read(item.filename)
                 if item.filename == "xl/worksheets/sheet1.xml":
+                    tag = (
+                        f'<{prefix}:sheetView xmlns:{prefix}="{SHEET_MAIN_NS}"'
+                        if prefix
+                        else "<sheetView"
+                    )
+                    if prefix:
+                        data = data.replace(
+                            b"</sheetView>", f"</{prefix}:sheetView>".encode(), 1
+                        )
                     data = data.replace(
-                        b"<sheetView ", b'<sheetView showZeroes="0" ', 1
+                        b"<sheetView ", f'{tag} showZeroes="0" '.encode(), 1
                     )
                     # Guard the fixture: the sheet view attribute and the cell text must
                     # both live here, or this test stops exercising the repair.
