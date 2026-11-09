@@ -525,7 +525,7 @@ def test_replacements_keep_native_table_chart_notes_and_slide_placement() -> Non
         "| Item | Details |",
         "| A | B & <literal> |",
         "### Chart: Sales",
-        "| Q1 | 10.0 |",
+        "| Q1 | 10 |",
         "### Notes:\nSpeaker notes",
         "<!-- Slide number: 2 -->",
         "Closing",
@@ -819,9 +819,118 @@ def test_pptx_chart_multi_series_conversion() -> None:
     assert "Series B" in md
     # First and last categories are present (nothing truncated)
     assert "| C0 |" in md
-    assert f"| C{n_categories - 1} |" in md
-    # A representative row carries the correct value for each series
-    assert "| C10 | 10.0 | 20.0 |" in md
+    assert f"| C{n_categories - 1}' |" in md
+    # Series A's values come out once each, with Series B's on its own rows
+    assert "| C10 | 10.0 |  |" in md
+    assert "| C10' |  | 20.0 |" in md
+
+
+def _combo_chart_presentation() -> io.BytesIO:
+    """One slide with a bar chart that also carries an overlaid line.
+
+    PowerPoint writes such a chart as two plot groups in <c:plotArea> (a
+    <c:barChart> and a <c:lineChart>), like a combo chart on a secondary axis.
+    python-pptx can only build a single-group chart, so the second group is
+    moved out of the bar group by hand.
+    """
+    from pptx.chart.data import CategoryChartData
+    from pptx.enum.chart import XL_CHART_TYPE
+    from pptx.oxml.ns import qn
+    from pptx.util import Inches
+
+    presentation = pptx.Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[5])
+    data = CategoryChartData()
+    data.categories = ["Q1", "Q2", "Q3"]
+    data.add_series("Revenue", (10, 20, 30))
+    data.add_series("Cost", (4, 8, 12))
+    chart_frame = slide.shapes.add_chart(
+        XL_CHART_TYPE.COLUMN_CLUSTERED,
+        Inches(1),
+        Inches(1),
+        Inches(8),
+        Inches(5),
+        data,
+    )
+    plot_area = chart_frame.chart._chartSpace.chart.plotArea
+    bar_chart = plot_area.find(qn("c:barChart"))
+    line_series = bar_chart.findall(qn("c:ser"))[1]
+
+    line_chart = etree.SubElement(plot_area, qn("c:lineChart"))
+    etree.SubElement(line_chart, qn("c:grouping")).set("val", "standard")
+    etree.SubElement(line_chart, qn("c:varyColors")).set("val", "0")
+    line_chart.append(line_series)
+    etree.SubElement(line_chart, qn("c:marker")).set("val", "1")
+    for ax_id in ("-2068027336", "333333"):
+        etree.SubElement(line_chart, qn("c:axId")).set("val", ax_id)
+    # plot groups precede the axes they share
+    plot_area.remove(line_chart)
+    plot_area.find(qn("c:catAx")).addprevious(line_chart)
+
+    second_value_axis = etree.fromstring(etree.tostring(plot_area.find(qn("c:valAx"))))
+    second_value_axis.find(qn("c:axId")).set("val", "333333")
+    second_value_axis.find(qn("c:crossAx")).set("val", "-2068027336")
+    plot_area.find(qn("c:valAx")).addnext(second_value_axis)
+
+    stream = io.BytesIO()
+    presentation.save(stream)
+    stream.seek(0)
+    return stream
+
+
+def test_pptx_combo_chart_keeps_the_series_of_every_plot_group() -> None:
+    """A bar chart with an overlaid line must not lose the line series.
+
+    ``chart.series`` and ``chart.plots[0].categories`` both stop at the first
+    plot group, so a chart that kept its series in two groups used to be
+    rendered without the second group's data.
+    """
+    pytest.importorskip("pptx")
+
+    stream = _combo_chart_presentation()
+    chart = Presentation(stream).slides[0].shapes[-1].chart
+    assert [type(plot).__name__ for plot in chart.plots] == ["BarPlot", "LinePlot"]
+
+    markdown = MarkItDown().convert_stream(stream, file_extension=".pptx").markdown
+
+    # Both columns are there, and the line series' own values are under it.
+    assert "| Category | Revenue | Cost |" in markdown
+    assert "| Q1 | 10 |  |" in markdown
+    assert "| Q2 | 20 |  |" in markdown
+    assert "| Q1' |  | 4 |" in markdown
+    assert "| Q2' |  | 8 |" in markdown
+    assert "| Q3' |  | 12 |" in markdown
+
+
+def test_pptx_combo_chart_keeps_a_line_series_category_range_of_its_own() -> None:
+    """Each plot group brings its own labels, which may not match the others."""
+    pytest.importorskip("pptx")
+    from pptx.oxml.ns import qn
+
+    stream = _combo_chart_presentation()
+    presentation = Presentation(stream)
+    plot_area = presentation.slides[0].shapes[-1].chart._chartSpace.chart.plotArea
+    line_series = plot_area.find(qn("c:lineChart")).find(qn("c:ser"))
+    categories = line_series.find(qn("c:cat"))
+    for child in list(categories):
+        categories.remove(child)
+    literal = etree.SubElement(categories, qn("c:strLit"))
+    etree.SubElement(literal, qn("c:ptCount")).set("val", "3")
+    for index, label in enumerate(["Actual", "Budget", "Forecast"]):
+        point = etree.SubElement(literal, qn("c:pt"))
+        point.set("idx", str(index))
+        etree.SubElement(point, qn("c:v")).text = label
+    rewritten = io.BytesIO()
+    presentation.save(rewritten)
+    rewritten.seek(0)
+
+    markdown = MarkItDown().convert_stream(rewritten, file_extension=".pptx").markdown
+
+    # The bar rows come first, then the line's own labels as extra rows.
+    assert "| Q1 | 10 |  |" in markdown
+    assert "| Actual |  | 4 |" in markdown
+    assert "| Budget |  | 8 |" in markdown
+    assert "| Forecast |  | 12 |" in markdown
 
 
 def test_pptx_converter_treats_none_llm_caption_as_empty(monkeypatch) -> None:

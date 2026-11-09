@@ -9,6 +9,7 @@ from typing import BinaryIO, Any, Optional
 
 from ._html_converter import HtmlConverter
 from ._llm_caption import llm_caption
+from ._chart_series import read_series as read_chart_series
 from ..converter_utils._image import _parse_image_html
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
@@ -332,29 +333,11 @@ class PptxConverter(DocumentConverter):
             if chart.has_title and chart.chart_title.has_text_frame:
                 md += f": {chart.chart_title.text_frame.text}"
             md += "\n\n"
-            data = []
-            category_names = [c.label for c in chart.plots[0].categories]
-            series_list = list(chart.series)
-            series_names = [s.name for s in series_list]
-            data.append(["Category"] + series_names)
 
-            # Materialize each series' values once. Accessing series.values[idx]
-            # inside the nested loop is O(n^2) in python-pptx (each lookup does an
-            # XPath scan of all points), which is extremely slow on large charts.
-            series_values = [list(s.values) for s in series_list]
-
-            for idx, category in enumerate(category_names):
-                row = [category]
-                for sv in series_values:
-                    row.append(sv[idx] if idx < len(sv) else None)
-                data.append(row)
-
-            markdown_table = []
-            for row in data:
-                markdown_table.append("| " + " | ".join(map(str, row)) + " |")
-            header = markdown_table[0]
-            separator = "|" + "|".join(["---"] * len(data[0])) + "|"
-            return md + "\n".join([header, separator] + markdown_table[1:])
+            table = self._chart_table(chart)
+            if table is None:
+                return "\n\n[unsupported chart]\n\n"
+            return md + table
         except ValueError as e:
             # Handle the specific error for unsupported chart types
             if "unsupported plot type" in str(e):
@@ -362,3 +345,70 @@ class PptxConverter(DocumentConverter):
         except Exception:
             # Catch any other exceptions that might occur
             return "\n\n[unsupported chart]\n\n"
+
+    @classmethod
+    def _chart_table(cls, chart) -> Optional[str]:
+        """Render every series of the chart as a single Markdown table.
+
+        The series come from the chart XML (see ``_chart_series``) rather than
+        from ``chart.plots[0].categories`` plus ``chart.series``, which between
+        them only reach the first plot group. A chart that keeps its series in
+        more than one group -- bars with an overlaid line, a second value axis
+        -- then keeps all of them.
+        """
+        names = []
+        labels_by_series = []
+        values_by_series = []
+        for name, labels, values in read_chart_series(chart):
+            if values is None:
+                continue
+            if labels is None:
+                labels = {index: str(index + 1) for index in values}
+            names.append(name)
+            labels_by_series.append(
+                [
+                    labels[index] if index in labels else str(index + 1)
+                    for index in values
+                ]
+            )
+            values_by_series.append(dict(zip(labels_by_series[-1], values.values())))
+
+        if not names:
+            return None
+
+        # Rows follow the categories of the first series, then whatever later
+        # series add. Every plot group can number its points from zero, so a
+        # label has to be unique across the whole table: a repeated one gets a
+        # suffix and the values are filed under that suffixed label.
+        rows = []
+        taken = set()
+        for position, labels in enumerate(labels_by_series):
+            unique_labels = []
+            for label in labels:
+                if label in taken:
+                    label = cls._unique_label(label, taken)
+                taken.add(label)
+                unique_labels.append(label)
+            labels_by_series[position] = unique_labels
+            values_by_series[position] = dict(
+                zip(unique_labels, values_by_series[position].values())
+            )
+            for label in unique_labels:
+                if label not in rows:
+                    rows.append(label)
+
+        lines = [
+            "| Category | " + " | ".join(names) + " |",
+            "|" + "|".join(["---"] * (len(names) + 1)) + "|",
+        ]
+        for row in rows:
+            cells = [values.get(row, "") for values in values_by_series]
+            lines.append("| " + row + " | " + " | ".join(cells) + " |")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _unique_label(label: str, taken: set) -> str:
+        while label in taken:
+            label += "'"
+        taken.add(label)
+        return label
