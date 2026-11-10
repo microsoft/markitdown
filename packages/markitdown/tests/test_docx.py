@@ -13,7 +13,7 @@ from xml.etree import ElementTree as ET
 
 import mammoth
 import pytest
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 from lxml import etree
 from mammoth.docx.files import InvalidFileReferenceError
 
@@ -1480,6 +1480,281 @@ def test_convert_docx_with_style_missing_type(tmp_path):
         in result.markdown
     )
     assert "# Abstract" in result.markdown
+
+
+# DOCX namespace prefixes are aliases for namespace URIs; they do not change
+# the meaning of an equation or of the containing WordprocessingML document.
+_MATH_URI = "http://schemas.openxmlformats.org/officeDocument/2006/math"
+_WORD_URI = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+
+
+def _rewrite_document_namespaces(
+    stream: io.BytesIO, math_style: str = "standard", word_style: str = "standard"
+) -> io.BytesIO:
+    output = io.BytesIO()
+    with zipfile.ZipFile(stream) as source, zipfile.ZipFile(output, "w") as target:
+        for item in source.infolist():
+            data = source.read(item)
+            if item.filename == "word/document.xml":
+                original = etree.fromstring(data)
+                if math_style == "alias":
+                    data = (
+                        data.replace(b"xmlns:m=", b"xmlns:mathx=")
+                        .replace(b"<m:", b"<mathx:")
+                        .replace(b"</m:", b"</mathx:")
+                        .replace(b" m:", b" mathx:")
+                    )
+                elif math_style == "default":
+                    data = (
+                        data.replace(b"xmlns:m=", b"xmlns=")
+                        .replace(b"<m:", b"<")
+                        .replace(b"</m:", b"</")
+                        .replace(b" m:", b" mathx:")
+                    )
+                    data = data.replace(
+                        b"<w:document",
+                        f'<w:document xmlns:mathx="{_MATH_URI}"'.encode(),
+                        1,
+                    )
+                elif math_style == "nested":
+                    data = data.replace(
+                        b"<w:document",
+                        f'<w:document xmlns:nestedmath="{_MATH_URI}"'.encode(),
+                        1,
+                    )
+                    for name in (b"num", b"den", b"r", b"t"):
+                        data = data.replace(
+                            b"<m:" + name + b">", b"<nestedmath:" + name + b">"
+                        ).replace(b"</m:" + name + b">", b"</nestedmath:" + name + b">")
+                elif math_style == "rebound":
+                    data = data.replace(
+                        f'xmlns:m="{_MATH_URI}"'.encode(),
+                        f'xmlns:m="urn:shadow" xmlns:mathx="{_MATH_URI}"'.encode(),
+                        1,
+                    )
+                    data = data.replace(b"<m:oMathPara>", b"<mathx:oMathPara>").replace(
+                        b"</m:oMathPara>", b"</mathx:oMathPara>"
+                    )
+                    data = data.replace(
+                        b"<m:oMath>", f'<mathx:oMath xmlns:m="{_MATH_URI}">'.encode()
+                    ).replace(b"</m:oMath>", b"</mathx:oMath>")
+                if word_style == "alias":
+                    data = (
+                        data.replace(b"xmlns:w=", b"xmlns:wordx=")
+                        .replace(b"<w:", b"<wordx:")
+                        .replace(b"</w:", b"</wordx:")
+                        .replace(b" w:", b" wordx:")
+                    )
+                elif word_style == "default":
+                    data = (
+                        data.replace(b"xmlns:w=", b"xmlns=")
+                        .replace(b"<w:", b"<")
+                        .replace(b"</w:", b"</")
+                        .replace(b" w:", b" wordattr:")
+                    )
+                    data = data.replace(
+                        b"<document",
+                        f'<document xmlns:wordattr="{_WORD_URI}"'.encode(),
+                        1,
+                    )
+                rewritten = etree.fromstring(data)
+
+                def signature(element):
+                    return (
+                        element.tag,
+                        sorted(element.attrib.items()),
+                        element.text,
+                        element.tail,
+                        [signature(child) for child in element],
+                    )
+
+                assert signature(rewritten) == signature(original)
+            target.writestr(item, data)
+    output.seek(0)
+    return output
+
+
+_NAMESPACE_EQUATIONS = [
+    ("<m:oMath><m:r><m:t>x</m:t></m:r></m:oMath>", "$x$"),
+    ("<m:oMathPara><m:oMath><m:r><m:t>z</m:t></m:r></m:oMath></m:oMathPara>", "$$z$$"),
+    (
+        '<m:oMath><m:f><m:fPr><m:type m:val="lin"/></m:fPr><m:num><m:r><m:t>a</m:t></m:r></m:num><m:den><m:r><m:t>b</m:t></m:r></m:den></m:f></m:oMath>',
+        r"${a}/{b}$",
+    ),
+]
+
+
+@pytest.mark.parametrize("equation, expected", _NAMESPACE_EQUATIONS)
+@pytest.mark.parametrize(
+    "math_style", ["standard", "alias", "default", "nested", "rebound"]
+)
+def test_docx_math_namespace_prefix_does_not_change_conversion(
+    equation: str, expected: str, math_style: str
+) -> None:
+    body = _paragraph(_text("Before ") + equation + _text(" After"))
+    result = MarkItDown().convert_stream(
+        _rewrite_document_namespaces(_docx(body), math_style=math_style),
+        stream_info=_INFO,
+    )
+    assert expected in result.markdown
+    assert "Before" in result.markdown and "After" in result.markdown
+
+
+@pytest.mark.parametrize("equation, expected", _NAMESPACE_EQUATIONS[:2])
+@pytest.mark.parametrize("word_style", ["standard", "alias", "default"])
+def test_docx_word_namespace_prefix_does_not_break_math(
+    equation: str, expected: str, word_style: str
+) -> None:
+    bold_before = '<w:r><w:rPr><w:b w:val="1"/></w:rPr><w:t xml:space="preserve">Before </w:t></w:r>'
+    body = _paragraph(bold_before + equation + _text(" After"))
+    result = MarkItDown().convert_stream(
+        _rewrite_document_namespaces(_docx(body), word_style=word_style),
+        stream_info=_INFO,
+    )
+    assert expected in result.markdown
+    assert "Before" in result.markdown and "After" in result.markdown
+
+
+def test_docx_math_foreign_same_local_names_do_not_drop_valid_equations() -> None:
+    from markitdown.converter_utils.docx.pre_process import _pre_process_math
+
+    source = f"""<w:document xmlns:w="{_WORD_URI}" xmlns:m="{_MATH_URI}" xmlns:foreign="urn:example:vendor">
+      <w:p><foreign:oMath><foreign:t>extension</foreign:t></foreign:oMath>
+        <m:oMath><m:r><m:t>x</m:t></m:r></m:oMath></w:p></w:document>""".encode()
+    output = etree.fromstring(_pre_process_math(source))
+    assert (
+        output.xpath(
+            "count(//*[local-name()='oMath' and namespace-uri()='urn:example:vendor'])"
+        )
+        == 1
+    )
+    assert "$x$" in "".join(output.itertext())
+
+
+def test_docx_math_namespace_prefix_preserves_unicode_and_escaped_text() -> None:
+    equation = "<m:oMath><m:r><m:t>α &amp; β</m:t></m:r></m:oMath>"
+    body = _paragraph(_text("Before ") + equation + _text(" After"))
+    plain = MarkItDown().convert_stream(_docx(body), stream_info=_INFO).markdown
+    alias = (
+        MarkItDown()
+        .convert_stream(
+            _rewrite_document_namespaces(_docx(body), math_style="alias"),
+            stream_info=_INFO,
+        )
+        .markdown
+    )
+    assert "α" in plain and "β" in plain
+    assert alias == plain
+
+
+def test_docx_math_processing_instructions_are_not_rendered_as_text() -> None:
+    equation = "<m:oMath><m:r><m:t>x<?probe hidden?>y</m:t></m:r></m:oMath>"
+    body = _paragraph(_text("Before ") + equation + _text(" After"))
+    result = MarkItDown().convert_stream(_docx(body), stream_info=_INFO)
+    assert "$xy$" in result.markdown
+    assert "probe hidden" not in result.markdown
+
+
+def test_docx_math_xml_copy_preserves_expanded_names_and_mixed_text() -> None:
+    from markitdown.converter_utils.docx.pre_process import _to_element
+
+    xml = (
+        f'<m:oMath xmlns:m="{_MATH_URI}" xmlns:x="urn:outer">'
+        '<m:r><m:t xml:space="preserve"> α &amp; β </m:t><x:part x:id="outer">before'
+        '<x:part xmlns:x="urn:inner" x:id="inner">inside</x:part>after</x:part></m:r></m:oMath>'
+    )
+    expected = ET.fromstring(xml)
+    tag = BeautifulSoup(xml, features="xml").find("oMath")
+    assert isinstance(tag, Tag)
+    actual = _to_element(tag)
+
+    def signature(element: ET.Element):
+        return (
+            element.tag,
+            sorted(element.attrib.items()),
+            element.text,
+            element.tail,
+            [signature(child) for child in element],
+        )
+
+    assert signature(actual) == signature(expected)
+
+
+@pytest.mark.parametrize("kind", ["footnote", "endnote"])
+@pytest.mark.parametrize("word_style", ["standard", "alias"])
+def test_docx_notes_convert_alternate_prefix_equations(
+    kind: str, word_style: str
+) -> None:
+    reference = f'<w:r><w:{kind}Reference w:id="1"/></w:r>'
+    source = _docx(_paragraph(_text("Reference ") + reference))
+    notes = f"""<w:{kind}s xmlns:w="{_WORD_URI}" xmlns:mathx="{_MATH_URI}">
+      <w:{kind} w:id="1"><w:p><w:r><w:t>Note </w:t></w:r>
+      <mathx:oMath><mathx:r><mathx:t>x</mathx:t></mathx:r></mathx:oMath>
+      </w:p></w:{kind}></w:{kind}s>""".encode()
+    if word_style == "alias":
+        notes = (
+            notes.replace(b"xmlns:w=", b"xmlns:wordx=")
+            .replace(b"<w:", b"<wordx:")
+            .replace(b"</w:", b"</wordx:")
+            .replace(b" w:", b" wordx:")
+        )
+    etree.fromstring(notes)
+    target_stream = io.BytesIO()
+    with zipfile.ZipFile(source) as archive, zipfile.ZipFile(
+        target_stream, "w"
+    ) as target:
+        for item in archive.infolist():
+            data = archive.read(item)
+            if item.filename == "[Content_Types].xml":
+                override = (
+                    f'<Override PartName="/word/{kind}s.xml" '
+                    f'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.{kind}s+xml"/>'
+                )
+                data = data.replace(b"</Types>", override.encode() + b"</Types>")
+            elif item.filename == "word/_rels/document.xml.rels":
+                relation = (
+                    f'<Relationship Id="rIdNotes" '
+                    f'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/{kind}s" '
+                    f'Target="{kind}s.xml"/>'
+                )
+                data = data.replace(
+                    b"</Relationships>", relation.encode() + b"</Relationships>"
+                )
+            target.writestr(item, data)
+        target.writestr(f"word/{kind}s.xml", notes)
+    target_stream.seek(0)
+    result = MarkItDown().convert_stream(target_stream, stream_info=_INFO)
+    assert "Note" in result.markdown
+    assert "$x$" in result.markdown
+
+
+def test_docx_existing_equations_file_with_alternate_math_prefix() -> None:
+    original = (_FILES / "equations.docx").read_bytes()
+    baseline = (
+        MarkItDown().convert_stream(io.BytesIO(original), stream_info=_INFO).markdown
+    )
+    alias = (
+        MarkItDown()
+        .convert_stream(
+            _rewrite_document_namespaces(io.BytesIO(original), math_style="alias"),
+            stream_info=_INFO,
+        )
+        .markdown
+    )
+    assert "$" in baseline
+    assert alias == baseline
+
+
+def test_docx_scoped_default_math_inside_default_word_namespace() -> None:
+    equation = (
+        f'<oMath xmlns="{_MATH_URI}"><f><fPr><type m:val="lin"/></fPr>'
+        "<num><r><t>a</t></r></num><den><r><t>b</t></r></den></f></oMath>"
+    )
+    body = _paragraph(_text("Before ") + equation + _text(" After"))
+    stream = _rewrite_document_namespaces(_docx(body), word_style="default")
+    result = MarkItDown().convert_stream(stream, stream_info=_INFO)
+    assert "Before" in result.markdown and "After" in result.markdown
+    assert "${a}/{b}$" in result.markdown
 
 
 if __name__ == "__main__":
