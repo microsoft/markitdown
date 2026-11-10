@@ -14,7 +14,6 @@ import io
 import sys
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -144,17 +143,30 @@ def test_pdf_complex_layout(svc: MockOCRService) -> None:
 
 
 # ---------------------------------------------------------------------------
-# pdf_multipage.pdf — pdfplumber/pdfminer fail (EOF); PyMuPDF fallback used
+# pdf_multipage.pdf
 # ---------------------------------------------------------------------------
 
 
 def test_pdf_multipage(svc: MockOCRService) -> None:
-    # pdfplumber cannot open this file (Unexpected EOF), so _ocr_full_pages
-    # falls back to PyMuPDF for page rendering.  Each page becomes one OCR block.
     expected = (
-        f"## Page 1\n\n\n{_OCR_BLOCK}\n\n\n"
-        f"## Page 2\n\n\n{_OCR_BLOCK}\n\n\n"
-        f"## Page 3\n\n\n{_OCR_BLOCK}"
+        "## Page 1\n\n\n"
+        "Page 1 - Content before image\n\n"
+        "This is important text that appears BEFORE the image.\n\n\n\n"
+        "*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*\n\n\n"
+        "This text appears AFTER the image on page 1.\n\n"
+        "More content follows here.\n\n\n"
+        "## Page 2\n\n\n"
+        "Page 2 - Content with image at end\n\n"
+        "Main content of page 2 starts here.\n\n"
+        "This is paragraph 1.\n\n"
+        "This is paragraph 2.\n\n"
+        "Final paragraph before image.\n\n\n\n"
+        "*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*\n\n\n\n"
+        "## Page 3\n\n\n"
+        "Page 3 - Image at top\n\n\n\n"
+        "*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*\n\n\n"
+        "Content that follows the image.\n\n"
+        "This text is AFTER the image."
     )
     assert _convert("pdf_multipage.pdf", svc) == expected
 
@@ -194,28 +206,30 @@ def test_pdf_scanned_report(svc: MockOCRService) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_pdf_scanned_fallback_format(svc: MockOCRService) -> None:
-    """_ocr_full_pages emits *[Image OCR]...[End OCR]* for each page."""
+def test_pdf_scanned_fallback_format() -> None:
+    """Render a real PDF, replacing only the remote OCR service."""
+    from PIL import Image
+
     path = TEST_DATA_DIR / "pdf_image_start.pdf"
-    if not path.exists():
-        pytest.skip(f"Test file not found: {path}")
+    seen = []
+
+    class RecordingOCRService:
+        def extract_text(self, image_stream: Any) -> OCRResult:
+            assert image_stream.tell() == 0
+            with Image.open(image_stream) as image:
+                assert image.format == "PNG"
+                assert image.width > 0 and image.height > 0
+                image.load()
+                seen.append(image.size)
+            return OCRResult(text=_MOCK_TEXT, backend_used="mock")
 
     converter = PdfConverterWithOCR()
-    with patch("pdfplumber.open") as mock_plumber:
-        mock_pdf = MagicMock()
-        mock_page = MagicMock()
-        mock_page.page_number = 1
-        mock_pdf.pages = [mock_page]
-        mock_pdf.__enter__.return_value = mock_pdf
-        mock_plumber.return_value = mock_pdf
+    markdown = converter._ocr_full_pages(
+        io.BytesIO(path.read_bytes()), RecordingOCRService()
+    )
 
-        with open(path, "rb") as f:
-            md = converter._ocr_full_pages(io.BytesIO(f.read()), svc)
-
-    expected = "## Page 1\n\n\n" "*[Image OCR]\nMOCK_OCR_TEXT_12345\n[End OCR]*"
-    assert (
-        md == expected
-    ), f"_ocr_full_pages must produce:\n{expected!r}\nActual:\n{md!r}"
+    assert len(seen) == 1
+    assert markdown == "## Page 1\n\n\n" + _OCR_BLOCK
 
 
 # ---------------------------------------------------------------------------
