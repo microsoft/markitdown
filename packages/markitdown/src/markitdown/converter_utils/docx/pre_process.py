@@ -4,31 +4,39 @@ from io import BytesIO
 from typing import BinaryIO
 from xml.etree import ElementTree as ET
 
-from bs4 import BeautifulSoup, Tag
+from bs4 import BeautifulSoup, Comment, NavigableString, Tag
+from bs4.element import ProcessingInstruction
 
 from .math.omml import OMML_NS, oMath2Latex
 
-MATH_ROOT_TEMPLATE = "".join(
-    (
-        "<w:document ",
-        'xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas" ',
-        'xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" ',
-        'xmlns:o="urn:schemas-microsoft-com:office:office" ',
-        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ',
-        'xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" ',
-        'xmlns:v="urn:schemas-microsoft-com:vml" ',
-        'xmlns:wp14="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing" ',
-        'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" ',
-        'xmlns:w10="urn:schemas-microsoft-com:office:word" ',
-        'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" ',
-        'xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" ',
-        'xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup" ',
-        'xmlns:wpi="http://schemas.microsoft.com/office/word/2010/wordprocessingInk" ',
-        'xmlns:wne="http://schemas.microsoft.com/office/word/2006/wordml" ',
-        'xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" mc:Ignorable="w14 wp14">',
-        "{0}</w:document>",
-    )
-)
+WORD_NAMESPACE = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+
+
+def _to_element(tag: Tag) -> ET.Element:
+    """Copy an XML tag using namespace URIs rather than inherited prefixes."""
+    name = f"{{{tag.namespace}}}{tag.name}" if tag.namespace else tag.name
+    element = ET.Element(name)
+    for attr, value in tag.attrs.items():
+        if str(attr) == "xmlns" or getattr(attr, "prefix", None) == "xmlns":
+            continue
+        namespace = getattr(attr, "namespace", None)
+        local_name = getattr(attr, "name", str(attr))
+        key = f"{{{namespace}}}{local_name}" if namespace else str(attr)
+        element.set(key, value)
+
+    previous = None
+    for child in tag.children:
+        if isinstance(child, Tag):
+            previous = _to_element(child)
+            element.append(previous)
+        elif isinstance(child, NavigableString) and not isinstance(
+            child, (Comment, ProcessingInstruction)
+        ):
+            if previous is None:
+                element.text = (element.text or "") + str(child)
+            else:
+                previous.tail = (previous.tail or "") + str(child)
+    return element
 
 
 def _convert_omath_to_latex(tag: Tag) -> str:
@@ -41,11 +49,8 @@ def _convert_omath_to_latex(tag: Tag) -> str:
     Returns:
         str: The LaTeX representation of the OMML element.
     """
-    # Format the tag into a complete XML document string
-    math_root = ET.fromstring(MATH_ROOT_TEMPLATE.format(str(tag)))
-    # Find the 'oMath' element within the XML document
-    math_element = math_root.find(OMML_NS + "oMath")
-    if math_element is None:
+    math_element = _to_element(tag)
+    if math_element.tag != OMML_NS + "oMath":
         return ""
     # Convert the 'oMath' element to LaTeX using the oMath2Latex function
     latex = oMath2Latex(math_element).latex
@@ -69,7 +74,7 @@ def _get_omath_tag_replacement(tag: Tag, block: bool = False) -> Tag:
         if block
         else f"${_convert_omath_to_latex(tag)}$"
     )
-    r_tag = Tag(name="w:r")
+    r_tag = Tag(name="w:r", attrs={"xmlns:w": WORD_NAMESPACE})
     r_tag.append(t_tag)
     return r_tag
 
@@ -86,9 +91,11 @@ def _replace_equations(tag: Tag):
     """
     if tag.name == "oMathPara":
         # Create a new paragraph tag
-        p_tag = Tag(name="w:p")
+        p_tag = Tag(name="w:p", attrs={"xmlns:w": WORD_NAMESPACE})
         # Replace each 'oMath' child tag with its LaTeX equivalent as block equations
         for child_tag in tag.find_all("oMath"):
+            if child_tag.namespace != OMML_NS[1:-1]:
+                continue
             p_tag.append(_get_omath_tag_replacement(child_tag, block=True))
         # Replace the original 'oMathPara' tag with the new paragraph tag
         tag.replace_with(p_tag)
@@ -138,9 +145,11 @@ def _pre_process_math(content: bytes) -> bytes:
     """
     soup = BeautifulSoup(content.decode(), features="xml")
     for tag in soup.find_all("oMathPara"):
-        _replace_equations(tag)
+        if tag.namespace == OMML_NS[1:-1]:
+            _replace_equations(tag)
     for tag in soup.find_all("oMath"):
-        _replace_equations(tag)
+        if tag.namespace == OMML_NS[1:-1]:
+            _replace_equations(tag)
     return str(soup).encode()
 
 
