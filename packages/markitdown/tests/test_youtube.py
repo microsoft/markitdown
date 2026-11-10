@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+import requests
 
 import markitdown.converters._youtube_converter as youtube_module
 from markitdown import MarkItDown, StreamInfo
@@ -173,6 +174,63 @@ def test_youtube_preserves_library_transcript(
 
 
 # Conversion regressions
+
+
+@pytest.mark.parametrize("list_raises", [False, True])
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://www.youtube.com/watch?v=12345",
+        "https://youtu.be/12345",
+        "https://www.youtube.com/shorts/12345",
+        "https://www.youtube.com/embed/12345",
+    ],
+)
+def test_youtube_transcript_list_failure_preserves_metadata(
+    url: str,
+    list_raises: bool,
+    transcript_api: MagicMock,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Transcript listing failures must not send video metadata to HTML fallback."""
+    monkeypatch.setattr(youtube_module, "IS_YOUTUBE_TRANSCRIPT_CAPABLE", True)
+    api = transcript_api.return_value
+    if list_raises:
+        api.list.side_effect = RuntimeError("Transcript listing unavailable")
+
+    response = requests.Response()
+    response.status_code = 200
+    response.url = url
+    response.headers["Content-Type"] = "text/html; charset=utf-8"
+    response.raw = io.BytesIO(
+        b"<html><head><title>Regression video</title>"
+        b'<meta itemprop="interactionCount" content="42">'
+        b'<meta name="keywords" content="regression, metadata">'
+        b'<meta itemprop="duration" content="PT1M">'
+        b'<script>var ytInitialData = {"attributedDescriptionBodyText": '
+        b'{"content": "Description only available in video data"}};</script>'
+        b"</head><body><p>Generic HTML fallback content</p></body></html>"
+    )
+
+    result = MarkItDown().convert(response)
+
+    assert result.title == "Regression video"
+    assert "# YouTube\n" in result.markdown
+    assert "## Regression video" in result.markdown
+    assert (
+        "### Description\nDescription only available in video data" in result.markdown
+    )
+    assert "- **Views:** 42" in result.markdown
+    assert "- **Keywords:** regression, metadata" in result.markdown
+    assert "- **Runtime:** PT1M" in result.markdown
+    assert "Generic HTML fallback content" not in result.markdown
+    api.list.assert_called_once_with("12345")
+    if list_raises:
+        assert "### Transcript\n*(Transcript unavailable)*" in result.markdown
+        api.fetch.assert_not_called()
+    else:
+        assert "### Transcript" not in result.markdown
+        api.fetch.assert_called_once_with("12345", languages=["en"])
 
 
 @pytest.mark.parametrize(
