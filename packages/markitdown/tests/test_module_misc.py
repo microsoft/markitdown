@@ -312,6 +312,23 @@ def test_convert_response_prefers_extended_content_disposition_filename() -> Non
     )
 
 
+@pytest.mark.parametrize(
+    ("attachment_name", "expected"),
+    [
+        ("download", "| name | value |\n| --- | --- |\n| alpha | beta |"),
+        ("download.txt", "name,value\nalpha,beta\n"),
+    ],
+)
+def test_convert_response_uses_url_extension_as_fallback(
+    attachment_name: str, expected: str
+) -> None:
+    response = _response(f'attachment; filename="{attachment_name}"')
+    response.url = "https://example.com/export.csv"
+    response.headers["content-type"] = "text/plain"
+
+    assert MarkItDown().convert_response(response).markdown == expected
+
+
 def test_get_content_disposition_filename_decodes_rfc5987() -> None:
     assert (
         _get_content_disposition_filename(
