@@ -133,9 +133,7 @@ class RssConverter(DocumentConverter):
         if root.tagName == "rss":
             return "rss"
         if root.localName == "feed" and root.namespaceURI in (None, ATOM_NAMESPACE):
-            if self._get_children(root, "entry"):
-                # An Atom feed must have a root element of <feed> and at least one <entry>
-                return "atom"
+            return "atom"
         return None
 
     def convert(
