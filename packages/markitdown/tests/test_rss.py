@@ -78,6 +78,25 @@ def test_atom_without_namespace_is_still_supported() -> None:
     assert "Entry content." in result.markdown
 
 
+def test_atom_feed_with_zero_entries_is_valid() -> None:
+    """RFC 4287 permits zero or more entries; empty feeds must not be rejected."""
+    feed = b"""<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Empty feed</title>
+  <id>urn:example:feed</id>
+  <updated>2026-01-01T00:00:00Z</updated>
+  <author><name>Example</name></author>
+</feed>"""
+    converter = RssConverter()
+
+    assert converter.accepts(io.BytesIO(feed), StreamInfo(extension=".atom"))
+    assert converter.accepts(io.BytesIO(feed), StreamInfo(extension=".xml"))
+
+    result = converter.convert(io.BytesIO(feed), StreamInfo(extension=".atom"))
+    assert result.title == "Empty feed"
+    assert result.markdown == "# Empty feed\n"
+
+
 def test_atom_ignores_elements_from_other_namespaces() -> None:
     feed = b"""<a:feed xmlns:a="http://www.w3.org/2005/Atom" xmlns="urn:example:other">
   <title>Unrelated title</title>
