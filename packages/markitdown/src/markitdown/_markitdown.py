@@ -574,13 +574,14 @@ class MarkItDown:
                 if len(_extension) > 0:
                     extension = _extension
 
-        # If there is still no filename, try to read it from the url
-        if filename is None:
+        # Use the URL as a format hint when the attachment has no extension.
+        if extension is None:
             parsed_url = urlparse(response.url)
             _, _extension = os.path.splitext(parsed_url.path)
-            if len(_extension) > 0:  # Looks like this might be a file!
-                filename = os.path.basename(parsed_url.path)
+            if _extension:
                 extension = _extension
+                if filename is None:
+                    filename = os.path.basename(parsed_url.path)
 
         # Create an initial guess from all this information
         base_guess = StreamInfo(
