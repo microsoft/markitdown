@@ -9,8 +9,6 @@ from typing import Any, BinaryIO, Callable, Optional
 from unittest.mock import MagicMock, Mock
 
 import pptx
-import pptx.shapes.autoshape
-import pptx.slide
 import pytest
 from bs4 import BeautifulSoup
 from lxml import etree
@@ -27,7 +25,6 @@ from markitdown import (
     StreamInfo,
 )
 from markitdown.converters import HtmlConverter, PptxConverter, _pptx_converter
-
 
 # Slide titles
 
@@ -151,63 +148,43 @@ def test_notes_with_text_are_still_emitted() -> None:
 
 # Missing text
 
-# Regression test for #1808: PptxConverter must not crash when ``shape.text``
-# or ``notes_text_frame.text`` returns ``None`` (e.g. an ``<a:r>`` run with no
-# ``<a:t>`` child, or certain third-party-generated decks).
+# Empty XML text nodes should not drop surrounding slide content. python-pptx
+# normalizes <a:t/> to ""; it does not return None for shape/text-frame text.
 
 TEST_FILES_DIR = os.path.join(os.path.dirname(__file__), "test_files")
 
 PPTX_FIXTURE = os.path.join(TEST_FILES_DIR, "test.pptx")
 
 
-def _build_pptx_with_notes() -> io.BytesIO:
-    """Build a minimal pptx with a notes slide attached, in memory."""
-    prs = pptx.Presentation()
-    blank = prs.slide_layouts[6]
-    slide = prs.slides.add_slide(blank)
-    slide.notes_slide.notes_text_frame.text = "some notes"
-    buf = io.BytesIO()
-    prs.save(buf)
-    buf.seek(0)
-    return buf
-
-
-def test_pptx_converter_handles_none_shape_text(monkeypatch):
-    """``shape.text`` returning None must not blow up the title / body paths."""
-    monkeypatch.setattr(
-        pptx.shapes.autoshape.Shape,
-        "text",
-        property(lambda self: None),
-        raising=True,
+@pytest.mark.parametrize("empty_shape", ["title", "body"])
+def test_pptx_fixture_contains_empty_text_run(empty_shape: str) -> None:
+    path = Path(TEST_FILES_DIR) / f"pptx_empty_{empty_shape}_run.pptx"
+    # Confirm the fixture contains an empty text node, not just no runs.
+    reloaded = Presentation(path).slides[-1]
+    shape = (
+        reloaded.shapes.title if empty_shape == "title" else reloaded.placeholders[1]
     )
+    assert shape.text_frame.paragraphs[0].runs[0]._r.t.text is None
+    assert shape.text == ""
 
-    result = MarkItDown().convert(PPTX_FIXTURE)
-    assert result.markdown is not None
 
+@pytest.mark.parametrize("notes_state", ["empty-run", "missing-body-frame"])
+def test_pptx_empty_notes_have_no_heading(notes_state: str) -> None:
+    suffix = notes_state.replace("-", "_")
+    path = Path(TEST_FILES_DIR) / f"pptx_notes_{suffix}.pptx"
+    reloaded = Presentation(path).slides[-1]
+    assert reloaded.has_notes_slide
+    frame = reloaded.notes_slide.notes_text_frame
+    if notes_state == "empty-run":
+        assert frame.paragraphs[0].runs[0]._r.t.text is None
+        assert frame.text == ""
+    else:
+        assert frame is None
+    markdown = MarkItDown().convert(path).markdown
 
-def test_pptx_converter_handles_none_notes_text(monkeypatch):
-    """``notes_text_frame.text`` returning None must not blow up the notes path."""
-    real_notes = pptx.slide.NotesSlide.notes_text_frame
-
-    class _NoneText:
-        text = None
-
-    def fake_notes(self):
-        frame = real_notes.fget(self)
-        if frame is None:
-            return None
-        return _NoneText()
-
-    monkeypatch.setattr(
-        pptx.slide.NotesSlide,
-        "notes_text_frame",
-        property(fake_notes),
-        raising=True,
-    )
-
-    buf = _build_pptx_with_notes()
-    result = MarkItDown().convert_stream(buf, file_extension=".pptx")
-    assert result.markdown is not None
+    # Earlier slides retain their notes; only the appended slide has empty notes.
+    last_slide = markdown.rsplit("<!-- Slide number:", 1)[1]
+    assert "### Notes:" not in last_slide
 
 
 # SVG pictures
@@ -917,57 +894,48 @@ def test_pptx_converter_treats_none_llm_caption_as_empty(monkeypatch) -> None:
     )
 
 
-def test_pptx_chart_no_title_text_frame() -> None:
-    from markitdown.converters._pptx_converter import PptxConverter
+def _chart_presentation(title: str | None) -> io.BytesIO:
+    # Modify an in-memory copy of an existing deck; keep its fixture intact.
+    presentation = Presentation(Path(PPTX_FIXTURE))
+    slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    data = CategoryChartData()
+    data.categories = ["Cat 1"]
+    data.add_series("Series 1", [10.0])
+    chart = slide.shapes.add_chart(
+        XL_CHART_TYPE.COLUMN_CLUSTERED,
+        Inches(1),
+        Inches(1),
+        Inches(5),
+        Inches(3),
+        data,
+    ).chart
+    chart.has_title = True
+    if title is not None:
+        chart.chart_title.text_frame.text = title
+    assert chart.chart_title.has_text_frame is (title is not None)
+    stream = io.BytesIO()
+    presentation.save(stream)
+    stream.seek(0)
+    return stream
 
-    # python-pptx's ChartTitle.text_frame is destructive -- it creates a text
-    # frame if one isn't already present, so it never returns None.
-    # has_text_frame is the property that actually reflects presence/absence,
-    # which is what the has_title=True-but-no-text-frame case looks like
-    # against the real library.
-    mock_chart = MagicMock()
-    mock_chart.has_title = True
-    mock_chart.chart_title.has_text_frame = False
 
-    mock_category = MagicMock()
-    mock_category.label = "Cat 1"
-    mock_chart.plots = [MagicMock(categories=[mock_category])]
-
-    mock_series = MagicMock()
-    mock_series.name = "Series 1"
-    mock_series.values = [10.0]
-    mock_chart.series = [mock_series]
-
+@pytest.mark.parametrize("title", [None, "Revenue"])
+def test_pptx_chart_title_text_frame(title: str | None) -> None:
+    stream = _chart_presentation(title)
+    # Reload the serialized package so the real parser reads title XML.
+    chart = Presentation(stream).slides[-1].shapes[-1].chart
     converter = PptxConverter()
-    result = converter._convert_chart_to_markdown(mock_chart)
-
-    assert "### Chart" in result
+    result = converter._convert_chart_to_markdown(chart)
+    heading = "### Chart" if title is None else "### Chart: Revenue"
+    assert result.strip().splitlines()[0] == heading
     assert "Cat 1" in result
     assert "Series 1" in result
-    assert ":" not in result
-
-
-def test_pptx_chart_with_title_text_frame() -> None:
-    from markitdown.converters._pptx_converter import PptxConverter
-
-    mock_chart = MagicMock()
-    mock_chart.has_title = True
-    mock_chart.chart_title.has_text_frame = True
-    mock_chart.chart_title.text_frame.text = "Revenue"
-
-    mock_category = MagicMock()
-    mock_category.label = "Cat 1"
-    mock_chart.plots = [MagicMock(categories=[mock_category])]
-
-    mock_series = MagicMock()
-    mock_series.name = "Series 1"
-    mock_series.values = [10.0]
-    mock_chart.series = [mock_series]
-
-    converter = PptxConverter()
-    result = converter._convert_chart_to_markdown(mock_chart)
-
-    assert "### Chart: Revenue" in result
+    assert "10.0" in result
+    # Accessing a title without a text frame must not create one.
+    assert chart.chart_title.has_text_frame is (title is not None)
+    stream.seek(0)
+    markdown = converter.convert(stream, StreamInfo(extension=".pptx")).markdown
+    assert result.strip() in markdown
 
 
 if __name__ == "__main__":

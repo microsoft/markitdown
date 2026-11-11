@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+import requests
 from charset_normalizer import from_bytes
 
 import markitdown._uri_utils as uri_utils
@@ -27,7 +28,6 @@ from markitdown._uri_utils import (
     file_uri_to_path,
     parse_data_uri,
 )
-
 
 # Library behavior and remaining formats
 
@@ -273,19 +273,19 @@ def test_input_as_strings() -> None:
     assert "# Test" in result.text_content
 
 
-def _mock_response(content_disposition: str) -> MagicMock:
-    response = MagicMock()
-    response.headers = {"content-disposition": content_disposition}
+def _response(content_disposition: str) -> requests.Response:
+    response = requests.Response()
+    response.status_code = 200
+    response.headers["content-disposition"] = content_disposition
     response.url = "https://example.com/download"
-    response.iter_content.return_value = [b"name,value\nalpha,beta\n"]
-    response.raise_for_status.return_value = None
+    response.raw = io.BytesIO(b"name,value\nalpha,beta\n")
     return response
 
 
 def test_convert_response_uses_rfc5987_content_disposition_filename() -> None:
     markitdown = MarkItDown()
     result = markitdown.convert_response(
-        _mock_response("attachment; filename*=UTF-8''data.csv")
+        _response("attachment; filename*=UTF-8''data.csv")
     )
 
     assert result.markdown == "\n".join(
@@ -300,7 +300,7 @@ def test_convert_response_uses_rfc5987_content_disposition_filename() -> None:
 def test_convert_response_prefers_extended_content_disposition_filename() -> None:
     markitdown = MarkItDown()
     result = markitdown.convert_response(
-        _mock_response("attachment; filename=fallback.txt; filename*=UTF-8''data.csv")
+        _response("attachment; filename=fallback.txt; filename*=UTF-8''data.csv")
     )
 
     assert result.markdown == "\n".join(
@@ -326,6 +326,32 @@ def test_get_content_disposition_filename_decodes_rfc5987() -> None:
 # result = markitdown.convert(YOUTUBE_TEST_URL)
 # for test_string in YOUTUBE_TEST_STRINGS:
 #    assert test_string in result.text_content
+
+
+def test_speech_transcription_uses_https(monkeypatch: pytest.MonkeyPatch) -> None:
+    from speech_recognition.recognizers import google
+
+    requests_sent = []
+
+    def fake_urlopen(request, timeout=None):
+        requests_sent.append(request)
+        return io.BytesIO(
+            b'{"result":[{"alternative":[{"transcript":"one two three four five"}]}]}'
+        )
+
+    monkeypatch.setattr(google, "urlopen", fake_urlopen)
+
+    result = MarkItDown().convert(os.path.join(TEST_FILES_DIR, "test.wav"))
+
+    assert "one two three four five" in result.text_content
+    assert len(requests_sent) == 1
+    request = requests_sent[0]
+    assert request.full_url.startswith(
+        "https://www.google.com/speech-api/v2/recognize?"
+    )
+    assert request.get_method() == "POST"
+    assert request.get_header("Content-type").startswith("audio/x-flac")
+    assert request.data.startswith(b"fLaC")
 
 
 @pytest.mark.skipif(
@@ -681,7 +707,68 @@ def test_windows_local_drive_uri(authority: str, uri_path: str, expected: str) -
     assert path == expected
 
 
+# ExifTool discovery
+
+
+def _discovered_exiftool(monkeypatch: pytest.MonkeyPatch, found: str):
+    monkeypatch.delenv("EXIFTOOL_PATH", raising=False)
+    monkeypatch.setattr(
+        "markitdown._markitdown.shutil.which",
+        lambda name: found if name == "exiftool" else None,
+    )
+    return MarkItDown()._exiftool_path
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows paths are case-insensitive")
+@pytest.mark.parametrize(
+    "found",
+    [
+        r"C:\Windows\System32\exiftool.exe",
+        # The default Windows PATH spells System32 like this.
+        r"C:\WINDOWS\system32\exiftool.exe",
+        r"c:\program files\exiftool.exe",
+        "C:/Program Files (x86)/exiftool.exe",
+    ],
+)
+def test_exiftool_found_in_windows_directory_of_any_case(
+    monkeypatch: pytest.MonkeyPatch, found: str
+) -> None:
+    assert _discovered_exiftool(monkeypatch, found) == os.path.abspath(found)
+
+
+@pytest.mark.parametrize(
+    "found",
+    [
+        r"C:\Windows\Temp\exiftool.exe",
+        r"C:\WINDOWS\system32\tools\exiftool.exe",
+        "/home/user/bin/exiftool",
+        "/usr/bin/tools/exiftool",
+    ],
+)
+def test_exiftool_outside_trusted_directories_is_ignored(
+    monkeypatch: pytest.MonkeyPatch, found: str
+) -> None:
+    assert _discovered_exiftool(monkeypatch, found) is None
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX paths are case-sensitive")
+def test_exiftool_posix_directory_match_is_exact(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert _discovered_exiftool(monkeypatch, "/usr/bin/exiftool") == "/usr/bin/exiftool"
+    assert _discovered_exiftool(monkeypatch, "/USR/BIN/exiftool") is None
+
+
 # Charset sampling
+
+
+def test_json_fixture_has_late_non_ascii_character() -> None:
+    data = (Path(TEST_FILES_DIR) / "json_late_non_ascii.json").read_bytes()
+    # Guard the regression setup: an 8 KiB sample must miss the first Unicode
+    # character, while the current 64 KiB sample must include it.
+    first_non_ascii = next(i for i, value in enumerate(data) if value >= 128)
+    assert 8192 < first_non_ascii < 65536
+
 
 _SAMPLE_SIZE = 65536
 

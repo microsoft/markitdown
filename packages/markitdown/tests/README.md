@@ -52,3 +52,10 @@ The existing remote, credential, platform, and optional-dependency skip conditio
 apply. A consolidation should preserve test bodies, parametrization, fixtures,
 and skip conditions; compare collected cases as well as test results to catch
 accidentally dropped or overwritten tests.
+
+The `test_files/pdf_cleanup_{plain,form,mixed}.pdf` fixtures contain copied pages
+from `test.pdf` and `REPAIR-2022-INV-001_multipage.pdf`. They exercise real PDF
+parsing, fallback, and cleanup without changing either source fixture. Rebuild
+them with `python tests/test_files/generate_pdf_cleanup_fixtures.py` in an
+environment with PyMuPDF installed; PyMuPDF is needed only to rebuild the files,
+not to run the core tests.

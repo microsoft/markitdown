@@ -2,7 +2,6 @@
 
 import re
 
-
 # Matches a pipe together with the (possibly empty) run of backslashes in front
 # of it, so that run can be doubled before the pipe is escaped.
 # The lookbehind avoids retrying from each position inside a backslash run.
