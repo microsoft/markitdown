@@ -78,6 +78,35 @@ def test_atom_without_namespace_is_still_supported() -> None:
     assert "Entry content." in result.markdown
 
 
+@pytest.mark.parametrize("extension", [".atom", ".xml"])
+def test_empty_atom_feed_preserves_metadata(extension: str) -> None:
+    feed = b"""<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Empty feed</title>
+  <subtitle>Updates will appear here</subtitle>
+  <id>urn:example:feed</id>
+  <updated>2026-01-01T00:00:00Z</updated>
+  <author><name>Example</name></author>
+</feed>"""
+    stream_info = StreamInfo(extension=extension)
+    converter = RssConverter()
+    stream = io.BytesIO(feed)
+
+    assert converter.accepts(stream, stream_info)
+    assert stream.tell() == 0
+    result = converter.convert(stream, stream_info)
+    assert result.title == "Empty feed"
+    assert result.markdown == "# Empty feed\nUpdates will appear here\n"
+
+    converted = MarkItDown().convert_stream(io.BytesIO(feed), stream_info=stream_info)
+    assert converted.title == result.title
+    assert converted.markdown == result.markdown
+
+
+def test_unrelated_empty_feed_is_not_detected_as_atom() -> None:
+    feed = b"<feed><title>Other XML</title></feed>"
+    assert not RssConverter().accepts(io.BytesIO(feed), StreamInfo(extension=".xml"))
+
+
 def test_atom_ignores_elements_from_other_namespaces() -> None:
     feed = b"""<a:feed xmlns:a="http://www.w3.org/2005/Atom" xmlns="urn:example:other">
   <title>Unrelated title</title>
