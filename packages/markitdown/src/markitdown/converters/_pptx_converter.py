@@ -10,6 +10,7 @@ from typing import BinaryIO, Any, Optional
 from ._html_converter import HtmlConverter
 from ._llm_caption import llm_caption
 from ..converter_utils._image import _parse_image_html
+from ..converter_utils._markdown import _escape_table_cell
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
@@ -351,7 +352,11 @@ class PptxConverter(DocumentConverter):
 
             markdown_table = []
             for row in data:
-                markdown_table.append("| " + " | ".join(map(str, row)) + " |")
+                markdown_table.append(
+                    "| "
+                    + " | ".join(_escape_table_cell(str(cell)) for cell in row)
+                    + " |"
+                )
             header = markdown_table[0]
             separator = "|" + "|".join(["---"] * len(data[0])) + "|"
             return md + "\n".join([header, separator] + markdown_table[1:])
