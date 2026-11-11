@@ -40,6 +40,11 @@ def file_uri_to_path(file_uri: str) -> Tuple[str | None, str]:
 
 
 def parse_data_uri(uri: str) -> Tuple[str | None, Dict[str, str], bytes]:
+    """Decode a data URI, excluding its fragment from the payload.
+
+    A literal ``#`` starts a URI fragment, even inside text such as SVG markup.
+    Percent-encode a payload hash as ``%23`` to preserve it in the decoded data.
+    """
     if uri[:5].lower() != "data:":
         raise ValueError("Not a data URI")
 
