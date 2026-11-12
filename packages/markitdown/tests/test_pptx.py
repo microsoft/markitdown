@@ -26,7 +26,6 @@ from markitdown import (
 )
 from markitdown.converters import HtmlConverter, PptxConverter, _pptx_converter
 
-
 # Slide titles
 
 BODY_TEXT = "Some body text on the slide."

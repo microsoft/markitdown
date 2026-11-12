@@ -20,7 +20,6 @@ from markitdown import (
 )
 from markitdown.converters import ImageConverter
 
-
 # Image captions
 
 IMAGE_FILE = Path(__file__).parent / "test_files" / "test.jpg"

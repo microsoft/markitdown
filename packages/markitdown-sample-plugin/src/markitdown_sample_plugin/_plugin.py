@@ -9,7 +9,6 @@ from markitdown import (
     StreamInfo,
 )
 
-
 __plugin_interface_version__ = (
     1  # The version of the plugin interface that this plugin uses
 )

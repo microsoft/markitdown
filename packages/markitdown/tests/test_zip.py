@@ -15,7 +15,6 @@ from markitdown import (
 )
 from markitdown.converters._zip_converter import ZipConverter
 
-
 # Nested conversion
 
 TEST_FILES_DIR = os.path.join(os.path.dirname(__file__), "test_files")
