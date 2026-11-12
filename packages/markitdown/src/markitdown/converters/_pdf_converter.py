@@ -62,6 +62,7 @@ _dependency_exc_info = None
 try:
     import pdfminer
     import pdfminer.high_level
+    from pdfminer.pdfexceptions import PDFValueError
     import pdfplumber
 except ImportError:
     _dependency_exc_info = sys.exc_info()
@@ -548,6 +549,19 @@ class PdfConverter(DocumentConverter):
                 raise pdfminer.pdfdocument.PDFPasswordIncorrect(
                     "This PDF requires a valid password. Use --pdf-password to "
                     "enter it securely, or pass pdf_password to convert()."
+                ) from exc
+            except PDFValueError as exc:
+                if not str(exc).startswith("SASLprep:"):
+                    raise
+                # Revision-6 encryption normalizes passwords before authentication.
+                # Do not silently strip characters: that would change the password.
+                raise PDFValueError(
+                    "The PDF password was rejected by SASLprep before authentication. "
+                    "It may contain prohibited characters (such as control characters "
+                    "from pasted input) or unsupported Unicode text. Retry "
+                    "--pdf-password and type the password manually without pasted "
+                    "line breaks. If the password intentionally contains these "
+                    "characters, decrypt the PDF with a compatible PDF reader first."
                 ) from exc
 
         try:

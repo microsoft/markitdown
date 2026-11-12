@@ -12,7 +12,10 @@ from markitdown.converters import _pdf_converter
 
 
 @pytest.mark.parametrize("mode", ["plain", "form", "fallback", "empty"])
-def test_pdf_password_forwarded(monkeypatch, mode):
+@pytest.mark.parametrize(
+    "password", ["test-password", " spaced password ", "caf\u00e9"]
+)
+def test_pdf_password_forwarded(monkeypatch, mode, password):
     open_pdf = MagicMock()
     page = MagicMock()
     page.extract_text.return_value = "plain text"
@@ -29,15 +32,15 @@ def test_pdf_password_forwarded(monkeypatch, mode):
     monkeypatch.setattr(_pdf_converter.pdfminer.high_level, "extract_text", extract)
 
     result = _pdf_converter.PdfConverter().convert(
-        io.BytesIO(b"pdf"), StreamInfo(extension=".pdf"), pdf_password="test-password"
+        io.BytesIO(b"pdf"), StreamInfo(extension=".pdf"), pdf_password=password
     )
 
-    assert open_pdf.call_args.kwargs["password"] == "test-password"
+    assert open_pdf.call_args.kwargs["password"] == password
     if mode == "form":
         extract.assert_not_called()
         assert result.markdown == "form text"
     else:
-        assert extract.call_args.kwargs["password"] == "test-password"
+        assert extract.call_args.kwargs["password"] == password
         assert result.markdown == "fallback text"
 
 
@@ -56,6 +59,59 @@ def test_pdf_password_error_is_actionable(monkeypatch):
             pdf_password="do-not-disclose",
         )
     assert "do-not-disclose" not in str(exc.value)
+
+
+@pytest.mark.parametrize(
+    "password",
+    [
+        "do-not-disclose\r",
+        "do-not-disclose\t",
+        "\x1b[200~do-not-disclose\x1b[201~",
+        "do-not-disclose\ue000",
+        "do-not-disclose\u0627",
+    ],
+)
+def test_pdf_saslprep_error_is_actionable(monkeypatch, password):
+    # Exercise pdfminer's actual revision-6 normalization, not a mocked error.
+    handler = _pdf_converter.pdfminer.pdfdocument.PDFStandardSecurityHandlerV5.__new__(
+        _pdf_converter.pdfminer.pdfdocument.PDFStandardSecurityHandlerV5
+    )
+    handler.r = 6
+
+    def reject_password(stream, *, password):
+        handler._normalize_password(password)
+        pytest.fail("Expected SASLprep to reject the synthetic password")
+
+    open_pdf = MagicMock(side_effect=reject_password)
+    extract = MagicMock(side_effect=reject_password)
+    monkeypatch.setattr(_pdf_converter.pdfplumber, "open", open_pdf)
+    monkeypatch.setattr(_pdf_converter.pdfminer.high_level, "extract_text", extract)
+
+    with pytest.raises(
+        _pdf_converter.PDFValueError, match="type the password manually"
+    ) as exc:
+        _pdf_converter.PdfConverter().convert(
+            io.BytesIO(b"pdf"), StreamInfo(extension=".pdf"), pdf_password=password
+        )
+
+    assert "do-not-disclose" not in str(exc.value)
+    assert "SASLprep:" in str(exc.value.__cause__)
+    assert open_pdf.call_args.kwargs["password"] == password
+    assert extract.call_args.kwargs["password"] == password
+
+
+def test_pdf_unrelated_value_error_is_preserved(monkeypatch):
+    error = _pdf_converter.PDFValueError("Invalid PDF structure")
+    monkeypatch.setattr(_pdf_converter.pdfplumber, "open", MagicMock(side_effect=error))
+    monkeypatch.setattr(
+        _pdf_converter.pdfminer.high_level, "extract_text", MagicMock(side_effect=error)
+    )
+
+    with pytest.raises(type(error)) as exc:
+        _pdf_converter.PdfConverter().convert(
+            io.BytesIO(b"pdf"), StreamInfo(extension=".pdf")
+        )
+    assert exc.value is error
 
 
 @pytest.mark.parametrize("stdin", [False, True])
