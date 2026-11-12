@@ -100,6 +100,31 @@ If you want to mount a directory, adjust it accordingly:
 
 ## Debugging
 
+### Package installation behind a corporate proxy
+
+If `uvx` fails with a certificate verification error before the MCP server
+starts, check whether your organization's CA is already trusted by your
+operating system. With uv 0.11 or later, launch the STDIO server with
+`--system-certs`:
+
+```json
+{
+  "mcpServers": {
+    "markitdown": {
+      "command": "uvx",
+      "args": ["--system-certs", "markitdown-mcp"]
+    }
+  }
+}
+```
+
+If your IT team provides a PEM CA bundle instead, set `SSL_CERT_FILE` in the
+MCP client's `env` object for this server to the bundle's absolute path.
+The bundle replaces uv's default certificate source. See the
+[uv TLS certificate documentation](https://docs.astral.sh/uv/concepts/authentication/certificates/).
+
+### MCP Inspector
+
 To debug the MCP server you can use the `MCP Inspector` tool.
 
 ```bash
