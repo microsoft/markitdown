@@ -89,6 +89,18 @@ You can also pipe content:
 cat path-to-file.pdf | markitdown
 ```
 
+For a password-protected PDF, request a hidden password prompt:
+
+```bash
+markitdown path-to-file.pdf --pdf-password -o document.md
+```
+
+The password is not passed as a command-line argument or stored in shell history.
+This option requires a terminal and applies to local PDF conversion, not Azure
+services. In Python, pass `pdf_password` to `convert()` (for example, using
+`getpass.getpass()` to obtain it). A valid document password is required;
+MarkItDown does not recover or bypass passwords.
+
 ### Optional Dependencies
 MarkItDown has optional dependencies for activating various file formats. Earlier in this document, we installed all optional dependencies with the `[all]` option. However, you can also install them individually for more control. For example:
 

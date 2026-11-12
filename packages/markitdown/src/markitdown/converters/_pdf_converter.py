@@ -538,6 +538,17 @@ class PdfConverter(DocumentConverter):
 
         # Read file stream into BytesIO for compatibility with pdfplumber
         pdf_bytes = io.BytesIO(file_stream.read())
+        password = kwargs.get("pdf_password", "")
+
+        def extract_text() -> str:
+            pdf_bytes.seek(0)
+            try:
+                return pdfminer.high_level.extract_text(pdf_bytes, password=password)
+            except pdfminer.pdfdocument.PDFPasswordIncorrect as exc:
+                raise pdfminer.pdfdocument.PDFPasswordIncorrect(
+                    "This PDF requires a valid password. Use --pdf-password to "
+                    "enter it securely, or pass pdf_password to convert()."
+                ) from exc
 
         try:
             # Single pass: check every page for form-style content.
@@ -549,7 +560,7 @@ class PdfConverter(DocumentConverter):
             form_page_count = 0
             plain_page_indices: list[int] = []
 
-            with pdfplumber.open(pdf_bytes) as pdf:
+            with pdfplumber.open(pdf_bytes, password=password) as pdf:
                 for page_idx, page in enumerate(pdf.pages):
                     page_content = _extract_form_content_from_words(page)
 
@@ -568,20 +579,17 @@ class PdfConverter(DocumentConverter):
             # If no pages had form-style content, use pdfminer for
             # the whole document (better text spacing for prose).
             if form_page_count == 0:
-                pdf_bytes.seek(0)
-                markdown = pdfminer.high_level.extract_text(pdf_bytes)
+                markdown = extract_text()
             else:
                 markdown = "\n\n".join(markdown_chunks).strip()
 
         except Exception:
             # Fallback if pdfplumber fails
-            pdf_bytes.seek(0)
-            markdown = pdfminer.high_level.extract_text(pdf_bytes)
+            markdown = extract_text()
 
         # Fallback if still empty
         if not markdown:
-            pdf_bytes.seek(0)
-            markdown = pdfminer.high_level.extract_text(pdf_bytes)
+            markdown = extract_text()
 
         # Post-process to merge MasterFormat-style partial numbering with following text
         markdown = _merge_partial_numbering_lines(markdown)

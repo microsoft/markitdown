@@ -6,6 +6,8 @@ import os
 import sys
 import codecs
 import io
+import getpass
+import warnings
 from typing import Any, Dict
 from textwrap import dedent
 from importlib.metadata import entry_points
@@ -167,6 +169,12 @@ def main():
         help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
     )
 
+    parser.add_argument(
+        "--pdf-password",
+        action="store_true",
+        help="Prompt for a PDF password without displaying it (local PDF conversion).",
+    )
+
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
 
@@ -292,16 +300,31 @@ def main():
     else:
         markitdown = MarkItDown(enable_plugins=args.use_plugins)
 
+    conversion_kwargs: Dict[str, Any] = {}
+    if args.pdf_password:
+        if args.use_docintel or args.use_cu:
+            parser.error("--pdf-password is only supported for local PDF conversion.")
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("error", getpass.GetPassWarning)
+                conversion_kwargs["pdf_password"] = getpass.getpass("PDF password: ")
+        except (EOFError, getpass.GetPassWarning):
+            parser.error("A terminal with hidden input is required for --pdf-password.")
+
     if args.filename is None:
         # Windows pipe-backed stdin can report seekable() even though it cannot rewind.
         result = markitdown.convert_stream(
             io.BytesIO(sys.stdin.buffer.read()),
             stream_info=stream_info,
             keep_data_uris=args.keep_data_uris,
+            **conversion_kwargs,
         )
     else:
         result = markitdown.convert(
-            args.filename, stream_info=stream_info, keep_data_uris=args.keep_data_uris
+            args.filename,
+            stream_info=stream_info,
+            keep_data_uris=args.keep_data_uris,
+            **conversion_kwargs,
         )
 
     _handle_output(args, result)
