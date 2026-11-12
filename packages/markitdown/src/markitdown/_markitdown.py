@@ -14,7 +14,6 @@ from pathlib import Path
 from urllib.parse import urlparse
 from warnings import warn
 import requests
-import magika
 import charset_normalizer
 import codecs
 
@@ -165,7 +164,7 @@ class MarkItDown:
         else:
             self._requests_session = requests_session
 
-        self._magika = magika.Magika()
+        self._magika: Any = None
 
         # TODO - remove these (see enable_builtins)
         self._llm_client: Any = None
@@ -774,6 +773,10 @@ class MarkItDown:
                 enhanced_guess = enhanced_guess.copy_and_update(extension=_e[0])
 
         # Call magika to guess from the stream
+        if self._magika is None:
+            import magika
+
+            self._magika = magika.Magika()
         cur_pos = file_stream.tell()
         try:
             result = self._magika.identify_stream(file_stream)
