@@ -93,6 +93,48 @@ def _repair_sheetview_show_zeroes(
     return repaired_stream
 
 
+def _restore_error_cells(
+    sheets: dict[str, Any], workbook_stream: BinaryIO
+) -> dict[str, Any]:
+    """Restore saved Excel error values (e.g. ``#DIV/0!``) that pandas replaces.
+
+    ``pandas.io.excel._openpyxl`` maps every error-typed cell to ``NaN``
+    unconditionally (``_convert_cell`` returns ``np.nan`` for
+    ``cell.data_type == TYPE_ERROR``), so ``pd.read_excel`` cannot preserve
+    them regardless of ``dtype``/``keep_default_na`` options. Scan the workbook
+    with openpyxl itself and copy each saved error token back into the frame.
+    Blank cells stay ``NaN``; text cells that merely look like errors are
+    untouched because they are typed ``s``, not ``e``.
+    """
+    from openpyxl import load_workbook
+    from openpyxl.cell.cell import TYPE_ERROR
+
+    workbook_stream.seek(0)
+    workbook = load_workbook(workbook_stream, read_only=True, data_only=True)
+    try:
+        for sheet_name, frame in sheets.items():
+            if sheet_name not in workbook.sheetnames:
+                continue
+            restored = False
+            frame = frame.astype(object)
+            for row in workbook[sheet_name].iter_rows():
+                for cell in row:
+                    if cell.data_type != TYPE_ERROR or not cell.value:
+                        continue
+                    # pandas uses the first row as the header, so sheet row N
+                    # maps to frame index N - 2; out-of-range cells belong to
+                    # rows pandas dropped (fully empty trailing rows).
+                    index = cell.row - 2
+                    if 0 <= index < len(frame):
+                        frame.iat[index, cell.column - 1] = cell.value
+                        restored = True
+            if restored:
+                sheets[sheet_name] = frame
+    finally:
+        workbook.close()
+    return sheets
+
+
 class XlsxConverter(DocumentConverter):
     """
     Converts XLSX files to Markdown, with each sheet presented as a separate Markdown table.
@@ -142,6 +184,7 @@ class XlsxConverter(DocumentConverter):
 
         md_content = ""
         with _read_xlsx_sheets(file_stream) as (sheets, workbook_stream):
+            sheets = _restore_error_cells(sheets, workbook_stream)
             images = None
             if type(self)._image_to_html is not XlsxConverter._image_to_html:
                 from ..converter_utils._xlsx_images import _XlsxImages
