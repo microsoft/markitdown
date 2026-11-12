@@ -4,6 +4,8 @@ import io
 import json
 import ntpath
 import os
+import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -951,6 +953,27 @@ def test_a_declared_charset_still_wins() -> None:
         stream_info=StreamInfo(extension=".csv", charset="gb18030"),
     )
     assert "浦发银行" in result.markdown
+
+
+def test_importing_markitdown_does_not_load_magika() -> None:
+    """Magika pulls in onnxruntime; importing the library must not pay for it."""
+    script = "import sys, markitdown; print('magika' in sys.modules)"
+    completed = subprocess.run(
+        [sys.executable, "-c", script], capture_output=True, text=True, check=True
+    )
+    assert completed.stdout.strip() == "False"
+
+
+def test_magika_loads_on_the_first_conversion() -> None:
+    markitdown = MarkItDown()
+    assert markitdown._magika is None
+
+    result = markitdown.convert_stream(
+        io.BytesIO(b"# Note\n\nBody\n"), stream_info=StreamInfo(extension=".md")
+    )
+
+    assert result.markdown.strip() == "# Note\n\nBody"
+    assert markitdown._magika is not None
 
 
 if __name__ == "__main__":
