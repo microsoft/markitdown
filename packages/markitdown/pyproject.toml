@@ -29,13 +29,14 @@ dependencies = [
   "requests",
   "certifi>=2026.10.19",
   "markdownify",
-  "magika>=0.6.1,<2",
   "charset-normalizer",
   "defusedxml",
 ]
 
 [project.optional-dependencies]
+magika = ["magika>=0.6.1,<2"]
 all = [
+  "magika>=0.6.1,<2",
   "python-pptx",
   "mammoth>=1.12.2,<2",
   "pandas",
