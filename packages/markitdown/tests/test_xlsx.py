@@ -540,5 +540,38 @@ def test_xlsx_show_zeroes_rename_is_scoped_to_sheet_view_tags() -> None:
     assert b'<customSheetView showZeroes="0"/>' in repaired
 
 
+def test_xlsx_saved_error_values_are_preserved() -> None:
+    from openpyxl import Workbook
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Results"
+    sheet.append(["Case", "Result"])
+    sheet.append(["Valid value", 42])
+    for error in ("#DIV/0!", "#REF!", "#VALUE!", "#N/A", "#NUM!", "#NAME?", "#NULL!"):
+        sheet.append(["Error " + str(sheet.max_row), error])
+    # A text cell that merely looks like an error must survive untouched ...
+    sheet.append(["Lookalike", "#DIV/0!"])
+    sheet.append(["Blank", None])
+    source = io.BytesIO()
+    workbook.save(source)
+    source.seek(0)
+
+    result = XlsxConverter().convert(source, _INFO)
+
+    assert "## Results" in result.markdown
+    # ... and every saved error token keeps its own row (pandas maps error-typed
+    # cells to NaN before any option applies; #2728).
+    rows = ("Error 2", "Error 3", "Error 4", "Error 5", "Error 6", "Error 7", "Error 8")
+    tokens = ("#DIV/0!", "#REF!", "#VALUE!", "#N/A", "#NUM!", "#NAME?", "#NULL!")
+    for row, error in zip(rows, tokens):
+        assert f"| {row} | {error} |" in result.markdown
+    # text-typed lookalike and genuinely blank cells are unaffected
+    assert "| Lookalike | #DIV/0! |" in result.markdown
+    assert "| Blank | NaN |" in result.markdown
+    # the numeric row still converts
+    assert "| Valid value | 42.0 |" in result.markdown
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
