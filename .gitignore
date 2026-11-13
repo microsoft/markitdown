@@ -166,3 +166,9 @@ cython_debug/
 src/.DS_Store
 .DS_Store
 .cursorrules
+
+## AI agent workspace
+# Ket qua chuyen doi file cua nguoi dung (skill file-to-md)
+.ai-work/conversions/
+# Artifact build noi bo cua agent
+.artifacts/
