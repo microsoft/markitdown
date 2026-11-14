@@ -56,5 +56,9 @@ def transcribe_audio(
     recognizer = sr.Recognizer()
     with sr.AudioFile(audio_source) as source:
         audio = recognizer.record(source)
-        transcript = recognizer.recognize_google(audio, language=language).strip()
+        transcript = recognizer.recognize_google(
+            audio,
+            language=language,
+            endpoint="https://www.google.com/speech-api/v2/recognize",
+        ).strip()
         return "[No speech detected]" if transcript == "" else transcript
