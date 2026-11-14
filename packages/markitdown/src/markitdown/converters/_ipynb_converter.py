@@ -16,19 +16,14 @@ def _is_notebook_json(content: str) -> bool:
     if "nbformat" not in content or "nbformat_minor" not in content:
         return False
     notebook = json.loads(content.lstrip("\ufeff"))
-    return (
-        isinstance(notebook, dict)
-        and "nbformat" in notebook
-        and "nbformat_minor" in notebook
-        and isinstance(notebook.get("cells"), list)
-    )
-
-
-def _first_heading_title(source_lines: list[str]) -> str | None:
-    for line in source_lines:
-        if line.startswith("# "):
-            return line.removeprefix("# ").strip()
-    return None
+    if not isinstance(notebook, dict):
+        return False
+    if type(notebook.get("nbformat")) is not int:
+        return False
+    if type(notebook.get("nbformat_minor")) is not int:
+        return False
+    cells = notebook.get("cells")
+    return isinstance(cells, list) and all(isinstance(cell, dict) for cell in cells)
 
 
 class IpynbConverter(DocumentConverter):
@@ -91,9 +86,11 @@ class IpynbConverter(DocumentConverter):
                     md_output.append("".join(source_lines))
 
                     # Extract the first # heading as title if not already found
-                    title = (
-                        _first_heading_title(source_lines) if title is None else title
-                    )
+                    if title is None:
+                        for line in source_lines:
+                            if line.startswith("# "):
+                                title = line.removeprefix("# ").strip()
+                                break
 
                 elif cell_type == "code":
                     # Code cells are wrapped in Markdown code blocks

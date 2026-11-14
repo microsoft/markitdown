@@ -583,18 +583,29 @@ def test_ipynb_accepts_non_ascii() -> None:
         {"description": "The format uses nbformat and nbformat_minor fields."},
         {"nbformat": 4, "nbformat_minor": 5, "data": ["important content"]},
         {"example": {"nbformat": 4, "nbformat_minor": 5, "cells": []}},
+        {
+            "nbformat": "metadata",
+            "nbformat_minor": "revision",
+            "cells": [],
+            "records": ["important content"],
+        },
+        {"nbformat": 4, "nbformat_minor": 5, "cells": ["important content"]},
+        {"nbformat": True, "nbformat_minor": False, "cells": []},
     ],
 )
 def test_ipynb_markers_in_ordinary_json_do_not_discard_content(payload) -> None:
-    content = json.dumps(payload)
+    from markitdown.converters._ipynb_converter import IpynbConverter
 
-    result = MarkItDown().convert_stream(
-        io.BytesIO(content.encode("utf-8")),
-        stream_info=StreamInfo(
-            extension=".json", mimetype="application/json", charset="utf-8"
-        ),
+    content = json.dumps(payload)
+    stream = io.BytesIO(content.encode("utf-8"))
+    stream_info = StreamInfo(
+        extension=".json", mimetype="application/json", charset="utf-8"
     )
 
+    assert IpynbConverter().accepts(stream, stream_info) is False
+    assert stream.tell() == 0
+
+    result = MarkItDown().convert_stream(stream, stream_info=stream_info)
     assert result.markdown == content
 
 
