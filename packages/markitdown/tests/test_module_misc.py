@@ -752,6 +752,25 @@ def test_exiftool_outside_trusted_directories_is_ignored(
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX paths are case-sensitive")
+@pytest.mark.parametrize(
+    "found",
+    [
+        "/usr/bin/exiftool",
+        "/usr/local/bin/exiftool",
+        "/usr/bin/vendor_perl/exiftool",
+        "/usr/bin/site_perl/exiftool",
+        "/opt/bin/exiftool",
+        "/opt/local/bin/exiftool",
+        "/opt/homebrew/bin/exiftool",
+    ],
+)
+def test_exiftool_found_in_posix_directory(
+    monkeypatch: pytest.MonkeyPatch, found: str
+) -> None:
+    assert _discovered_exiftool(monkeypatch, found) == os.path.abspath(found)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX paths are case-sensitive")
 def test_exiftool_posix_directory_match_is_exact(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
