@@ -14,7 +14,7 @@ from .._stream_info import StreamInfo
 _xlsx_dependency_exc_info = None
 try:
     import pandas as pd
-    import openpyxl  # noqa: F401
+    import openpyxl
 except ImportError:
     _xlsx_dependency_exc_info = sys.exc_info()
 
@@ -93,6 +93,67 @@ def _repair_sheetview_show_zeroes(
     return repaired_stream
 
 
+_CURRENCY_SYMBOLS = ("$", "£", "€", "¥", "₹", "₩", "₪", "₺", "₫")
+
+
+def _extract_currency_prefix(fmt: str) -> Optional[str]:
+    """Return the currency symbol or code from an openpyxl number_format string.
+
+    Handles Excel locale blocks ([$USD-409] → 'USD', [$€-407] → '€'),
+    bare locale markers ([$-409] → None), color prefixes, and simple symbols.
+    Returns None for non-currency formats such as percentages or General.
+    """
+    if not fmt or fmt in ("General", "@"):
+        return None
+    # [$USD-409] → 'USD', [$€-407] → '€'; [$-409] has no chars before '-', no match
+    m = re.search(r"\[\$([^-\]]+)", fmt)
+    if m:
+        return m.group(1)
+    # Strip all [...] blocks (color codes, bare LCID markers) before symbol scan
+    stripped = re.sub(r"\[[^\]]*\]", "", fmt)
+    for sym in _CURRENCY_SYMBOLS:
+        if sym in stripped:
+            return sym
+    return None
+
+
+def _build_currency_overlays(
+    workbook_stream: BinaryIO,
+) -> dict[str, dict[tuple[int, int], str]]:
+    """Return per-sheet maps of (df_row_index, column_index) → currency prefix.
+
+    Uses openpyxl to read cell.number_format, which pandas discards.
+    workbook_stream may be at any position; openpyxl locates the ZIP central
+    directory by seeking from the end of the stream.
+    """
+    overlays: dict[str, dict[tuple[int, int], str]] = {}
+    wb = openpyxl.load_workbook(workbook_stream, data_only=True, read_only=True)
+    try:
+        for sheet_name in wb.sheetnames:
+            ws = wb[sheet_name]
+            rows = list(ws.iter_rows())
+            if not rows:
+                continue
+            sheet_overlay: dict[tuple[int, int], str] = {}
+            for df_row_idx, row in enumerate(rows[1:]):
+                for cell in row:
+                    if cell.value is None:
+                        continue
+                    col_idx = cell.column - 1
+                    prefix = _extract_currency_prefix(cell.number_format or "")
+                    if (
+                        prefix
+                        and isinstance(cell.value, (int, float))
+                        and not isinstance(cell.value, bool)
+                    ):
+                        sheet_overlay[(df_row_idx, col_idx)] = prefix
+            if sheet_overlay:
+                overlays[sheet_name] = sheet_overlay
+    finally:
+        wb.close()
+    return overlays
+
+
 class XlsxConverter(DocumentConverter):
     """
     Converts XLSX files to Markdown, with each sheet presented as a separate Markdown table.
@@ -148,9 +209,19 @@ class XlsxConverter(DocumentConverter):
 
                 images = _XlsxImages(workbook_stream)
 
+            currency_overlays = _build_currency_overlays(workbook_stream)
+
             for s in sheets:
                 md_content += f"## {s}\n"
-                html_content = sheets[s].to_html(index=False)
+                sheet_df = sheets[s]
+                if s in currency_overlays:
+                    sheet_df = sheet_df.copy().astype(object)
+                    for (df_row_idx, col_idx), prefix in currency_overlays[s].items():
+                        if df_row_idx < len(sheet_df) and col_idx < len(sheet_df.columns):
+                            sheet_df.iloc[df_row_idx, col_idx] = (
+                                f"{prefix}{sheet_df.iloc[df_row_idx, col_idx]}"
+                            )
+                html_content = sheet_df.to_html(index=False)
                 md_content += (
                     self._html_converter.convert_string(
                         html_content, **kwargs
