@@ -214,6 +214,8 @@ class MarkItDown:
                         for d in [
                             "/usr/bin",
                             "/usr/local/bin",
+                            "/usr/bin/vendor_perl",
+                            "/usr/bin/site_perl",
                             "/opt",
                             "/opt/bin",
                             "/opt/local/bin",
