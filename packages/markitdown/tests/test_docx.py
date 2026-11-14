@@ -5,6 +5,8 @@ import inspect
 import io
 import os
 import re
+import subprocess
+import sys
 import zipfile
 from pathlib import Path
 from typing import Any, BinaryIO, Callable, Optional
@@ -1029,6 +1031,183 @@ def test_missing_dependencies_fail_before_invoking_hook(
 
     assert caught.value.__cause__ is error
     render.assert_not_called()
+
+
+# Image extraction
+# Tests for the built-in extract_images option, which writes embedded images
+# to a directory and references them by relative path instead of data URIs.
+
+_TWO_IMAGES_BODY = _paragraph(
+    _text("Before") + _image() + _image(rid="rIdGif", number=2) + _text("After")
+)
+
+
+def test_extract_images_writes_files_and_references_them(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    result = DocxConverter().convert(
+        _docx(_TWO_IMAGES_BODY), _INFO, extract_images=True, images_dir="imgs"
+    )
+
+    assert (tmp_path / "imgs" / "image_1.png").read_bytes() == _PNG
+    assert (tmp_path / "imgs" / "image_2.gif").read_bytes() == _GIF
+    assert "imgs/image_1.png" in result.markdown
+    assert "imgs/image_2.gif" in result.markdown
+    assert "data:image" not in result.markdown
+
+
+def test_extract_images_default_dir(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    result = DocxConverter().convert(_docx(), _INFO, extract_images=True)
+
+    assert (tmp_path / "images" / "image_1.png").read_bytes() == _PNG
+    assert "images/image_1.png" in result.markdown
+
+
+def test_extract_images_accepts_path_objects(tmp_path) -> None:
+    images_dir = tmp_path / "imgs"
+
+    result = DocxConverter().convert(
+        _docx(), _INFO, extract_images=True, images_dir=images_dir
+    )
+
+    assert (images_dir / "image_1.png").read_bytes() == _PNG
+    assert f"{images_dir}/image_1.png" in result.markdown
+
+
+def test_extract_images_off_by_default(tmp_path) -> None:
+    result = DocxConverter().convert(_docx(), _INFO)
+
+    assert list(tmp_path.iterdir()) == []
+    assert "![Image 1](data:image/png;base64...)" in result.markdown
+
+
+def test_extract_images_via_dispatcher(tmp_path) -> None:
+    markitdown = MarkItDown()
+
+    result = markitdown.convert_stream(
+        _docx(), stream_info=_INFO, extract_images=True, images_dir=str(tmp_path)
+    )
+
+    assert (tmp_path / "image_1.png").read_bytes() == _PNG
+
+
+def test_subclass_hook_takes_precedence_over_extract_images(tmp_path) -> None:
+    observed = []
+
+    def render(image_stream, stream_info, **kwargs):
+        observed.append(stream_info.mimetype)
+        return "<span>hook</span>"
+
+    result = _ImageConverter(render).convert(
+        _docx(), _INFO, extract_images=True, images_dir=str(tmp_path / "imgs")
+    )
+
+    assert observed == ["image/png"]
+    assert list(tmp_path.iterdir()) == []
+    assert result.markdown == "BeforehookAfter"
+
+
+def test_extract_images_rel_dir(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    result = DocxConverter().convert(
+        _docx(),
+        _INFO,
+        extract_images=True,
+        images_dir="raw",
+        images_rel_dir="assets/pics",
+    )
+
+    assert (tmp_path / "raw" / "image_1.png").read_bytes() == _PNG
+    assert "assets/pics/image_1.png" in result.markdown
+
+
+def test_extract_images_magic_bytes_fallback(tmp_path) -> None:
+    # A media file whose extension is not declared in [Content_Types].xml
+    # carries no content type; the extension is recovered from magic bytes.
+    stream = io.BytesIO()
+    with zipfile.ZipFile(stream, "w") as archive:
+        archive.writestr(
+            "[Content_Types].xml",
+            """<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>""",
+        )
+        archive.writestr(
+            "_rels/.rels",
+            """<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rIdDocument" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>""",
+        )
+        archive.writestr(
+            "word/_rels/document.xml.rels",
+            """<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rIdPng" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/blob.bin"/>
+</Relationships>""",
+        )
+        archive.writestr(
+            "word/document.xml",
+            f"""<w:document
+  xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+  xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+  <w:body>{_BODY}</w:body>
+</w:document>""",
+        )
+        archive.writestr("word/media/blob.bin", _PNG)
+    stream.seek(0)
+
+    result = DocxConverter().convert(
+        stream, _INFO, extract_images=True, images_dir=str(tmp_path)
+    )
+
+    assert (tmp_path / "image_1.png").read_bytes() == _PNG
+
+
+def test_extract_images_names_per_occurrence(tmp_path) -> None:
+    body = _paragraph(_image() + _image(rid="rIdGif", number=2) + _image())
+
+    result = DocxConverter().convert(
+        _docx(body), _INFO, extract_images=True, images_dir=str(tmp_path)
+    )
+
+    assert (tmp_path / "image_1.png").read_bytes() == _PNG
+    assert (tmp_path / "image_2.gif").read_bytes() == _GIF
+    assert (tmp_path / "image_3.png").read_bytes() == _PNG
+    assert "image_1.png" in result.markdown
+    assert "image_3.png" in result.markdown
+
+
+def test_extract_images_cli(tmp_path) -> None:
+    docx_path = tmp_path / "doc.docx"
+    docx_path.write_bytes(_docx().getvalue())
+    images_dir = tmp_path / "out"
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "markitdown",
+            str(docx_path),
+            "--extract-images",
+            "--images-dir",
+            str(images_dir),
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    assert (images_dir / "image_1.png").read_bytes() == _PNG
+    assert "image_1.png" in proc.stdout
 
 
 # Conversion regressions

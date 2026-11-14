@@ -1,5 +1,8 @@
-import sys
+import html
 import io
+import itertools
+import os
+import sys
 from warnings import warn
 
 from typing import BinaryIO, Any, Optional
@@ -108,6 +111,33 @@ class DocxConverter(HtmlConverter):
             from ..converter_utils.docx._images import _DocxImages
 
             image_adapter = _DocxImages(self._image_to_html, kwargs)
+        elif kwargs.get("extract_images"):
+            # Built-in extraction: write each embedded image to a directory
+            # (images_dir, default "images") and reference it by relative path
+            # (images_rel_dir, defaulting to images_dir) in the converted
+            # Markdown instead of a data URI. A subclass override of
+            # _image_to_html takes precedence.
+            from ..converter_utils.docx._images import _DocxImages
+
+            raw_images_dir = str(kwargs.get("images_dir", "images"))
+            images_dir = os.path.expanduser(raw_images_dir)
+            images_rel_dir = str(kwargs.get("images_rel_dir", raw_images_dir))
+            counter = itertools.count(1)
+
+            def render(
+                image_stream: BinaryIO, stream_info: StreamInfo, **options: Any
+            ) -> Optional[str]:
+                return self._write_extracted_image(
+                    image_stream,
+                    stream_info,
+                    next(counter),
+                    images_dir=images_dir,
+                    images_rel_dir=images_rel_dir,
+                )
+
+            image_adapter = _DocxImages(render, kwargs)
+
+        if image_adapter is not None:
             mammoth_kwargs["convert_image"] = image_adapter.convert_image
 
         html_result = mammoth.convert_to_html(
@@ -141,3 +171,38 @@ class DocxConverter(HtmlConverter):
         normal conversion failure path.
         """
         return None
+
+    def _write_extracted_image(
+        self,
+        image_stream: BinaryIO,
+        stream_info: StreamInfo,
+        index: int,
+        images_dir: str,
+        images_rel_dir: str,
+    ) -> str:
+        """Write an embedded image to disk and reference it by relative path."""
+        data = image_stream.read()
+        extension = self._image_extension(stream_info.extension, data)
+        filename = f"image_{index}{extension}"
+        os.makedirs(images_dir, exist_ok=True)
+        with open(os.path.join(images_dir, filename), "wb") as image_file:
+            image_file.write(data)
+        return f'<img src="{html.escape(f"{images_rel_dir}/{filename}", quote=True)}">'
+
+    @staticmethod
+    def _image_extension(extension: Optional[str], data: bytes) -> str:
+        """Normalize the declared extension, falling back to magic bytes."""
+        ext = (extension or "").lower()
+        if ext in (".jpeg", ".jpe"):
+            ext = ".jpg"
+        if ext:
+            return ext
+        if data[:8] == b"\x89PNG\r\n\x1a\n":
+            return ".png"
+        if data[:2] == b"\xff\xd8":
+            return ".jpg"
+        if data[:4] == b"GIF8":
+            return ".gif"
+        if len(data) > 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+            return ".webp"
+        return ".img"
