@@ -540,5 +540,91 @@ def test_xlsx_show_zeroes_rename_is_scoped_to_sheet_view_tags() -> None:
     assert b'<customSheetView showZeroes="0"/>' in repaired
 
 
+# Currency formatting
+
+
+@pytest.mark.parametrize(
+    ("fmt", "expected"),
+    [
+        ("$#,##0.00", "$"),
+        ("£#,##0.00", "£"),
+        ("€#,##0.00", "€"),
+        ("[$USD-409]#,##0.00", "USD"),
+        ("[$€-407]#,##0", "€"),
+        ("[$-409]#,##0", None),  # locale-only block, no currency symbol
+        ("[Red]$#,##0;[Red]-$#,##0", "$"),  # color code stripped before scan
+        ("0.00%", None),
+        ("General", None),
+        ("@", None),
+        ("", None),
+    ],
+)
+def test_extract_currency_prefix(fmt: str, expected: "Optional[str]") -> None:
+    assert _xlsx_converter._extract_currency_prefix(fmt) == expected
+
+
+def _currency_workbook() -> bytes:
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Prices"
+    ws["A1"] = "Item"
+    ws["B1"] = "USD"
+    ws["C1"] = "GBP"
+    ws["D1"] = "Rate"
+    ws["A2"] = "Widget"
+    ws["B2"] = 1199
+    ws["B2"].number_format = "$#,##0.00"
+    ws["C2"] = 950
+    ws["C2"].number_format = "£#,##0.00"
+    ws["D2"] = 0.08
+    ws["D2"].number_format = "0.00%"  # not a currency format
+    ws["A3"] = "Gadget"
+    ws["B3"] = 5995
+    ws["B3"].number_format = "$#,##0.00"
+    ws["C3"] = 4750
+    ws["C3"].number_format = "£#,##0.00"
+    ws["D3"] = 0.05
+    ws["D3"].number_format = "0.00%"
+    stream = io.BytesIO()
+    wb.save(stream)
+    wb.close()
+    return stream.getvalue()
+
+
+def test_currency_symbols_preserved_in_xlsx_output() -> None:
+    result = _convert(XlsxConverter(), _currency_workbook())
+    assert "$1199" in result
+    assert "£950" in result
+    assert "$5995" in result
+    assert "£4750" in result
+    # Percentage cells retain their raw numeric value without a currency prefix
+    assert "$0.08" not in result
+    assert "£0.08" not in result
+
+
+def test_currency_duplicate_column_names() -> None:
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws["A1"] = "Item"
+    ws["B1"] = "Price"
+    ws["C1"] = "Price"  # duplicate header; pandas renames it "Price.1"
+    ws["A2"] = "Widget"
+    ws["B2"] = 1199
+    ws["B2"].number_format = "$#,##0.00"
+    ws["C2"] = 950
+    ws["C2"].number_format = "£#,##0.00"
+    stream = io.BytesIO()
+    wb.save(stream)
+    wb.close()
+
+    result = _convert(XlsxConverter(), stream.getvalue())
+
+    # Each column must receive its own symbol, not the other's
+    assert "$1199" in result   # first  "Price"   column → $
+    assert "£950" in result    # second "Price.1" column → £
+    assert "£1199" not in result  # first column must not receive £
+    assert "$950" not in result   # second column must not receive $
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
