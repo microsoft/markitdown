@@ -589,7 +589,15 @@ def test_ipynb_accepts_non_ascii() -> None:
             "cells": [],
             "records": ["important content"],
         },
+        pytest.param({**_BOM_NOTEBOOK, "nbformat": "4"}, id="string-major-version"),
+        pytest.param(
+            {**_BOM_NOTEBOOK, "nbformat_minor": "5"}, id="string-minor-version"
+        ),
         {"nbformat": 4, "nbformat_minor": 5, "cells": ["important content"]},
+        pytest.param(
+            {**_BOM_NOTEBOOK, "cells": [*_BOM_NOTEBOOK["cells"], "important content"]},
+            id="non-object-after-valid-cells",
+        ),
         {"nbformat": True, "nbformat_minor": False, "cells": []},
     ],
 )
