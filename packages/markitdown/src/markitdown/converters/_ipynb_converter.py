@@ -12,6 +12,20 @@ CANDIDATE_MIME_TYPE_PREFIXES = [
 ACCEPTED_FILE_EXTENSIONS = [".ipynb"]
 
 
+def _is_notebook_json(content: str) -> bool:
+    if "nbformat" not in content or "nbformat_minor" not in content:
+        return False
+    notebook = json.loads(content.lstrip("\ufeff"))
+    if not isinstance(notebook, dict):
+        return False
+    if type(notebook.get("nbformat")) is not int:
+        return False
+    if type(notebook.get("nbformat_minor")) is not int:
+        return False
+    cells = notebook.get("cells")
+    return isinstance(cells, list) and all(isinstance(cell, dict) for cell in cells)
+
+
 class IpynbConverter(DocumentConverter):
     """Converts Jupyter Notebook (.ipynb) files to Markdown."""
 
@@ -34,11 +48,8 @@ class IpynbConverter(DocumentConverter):
                 try:
                     encoding = stream_info.charset or "utf-8"
                     notebook_content = file_stream.read().decode(encoding)
-                    return (
-                        "nbformat" in notebook_content
-                        and "nbformat_minor" in notebook_content
-                    )
-                except (ValueError, LookupError):
+                    return _is_notebook_json(notebook_content)
+                except (ValueError, LookupError, RecursionError):
                     return False
                 finally:
                     file_stream.seek(cur_pos)
