@@ -98,6 +98,18 @@ If you want to mount a directory, adjust it accordingly:
 }
 ```
 
+Alternatively, if you installed with pip instead of Docker (`pip install markitdown-mcp`), use the `markitdown-mcp` command directly:
+
+```json
+{
+  "mcpServers": {
+    "markitdown": {
+      "command": "markitdown-mcp"
+    }
+  }
+}
+```
+
 ## Debugging
 
 To debug the MCP server you can use the `MCP Inspector` tool.
