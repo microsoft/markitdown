@@ -1,7 +1,8 @@
 import sys
 import io
 import re
-from typing import BinaryIO, Any
+import unicodedata
+from typing import BinaryIO, Any, Iterator
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
@@ -492,6 +493,146 @@ def _extract_tables_from_words(page: Any) -> list[list[list[str]]]:
     return [table_rows]
 
 
+def _bidi_class(text: str) -> str:
+    """Classify a glyph as R (right-to-left), L (left-to-right), N (number),
+    S (number separator) or "" (neutral), from its first character."""
+    bidi = unicodedata.bidirectional(text[0]) if text else ""
+    if bidi in ("R", "AL"):
+        return "R"
+    if bidi == "L":
+        return "L"
+    if bidi in ("EN", "AN", "ET"):
+        return "N"
+    if bidi in ("ES", "CS"):
+        return "S"
+    return ""
+
+
+def _spans_without(
+    classes: list[str], excluded: str, edges: tuple[str, ...]
+) -> Iterator[tuple[int, int]]:
+    """Yield the longest spans that hold no `excluded` glyph and start and end
+    on a glyph whose class is in `edges`."""
+    i = 0
+    while i < len(classes):
+        if classes[i] not in edges:
+            i += 1
+            continue
+        last = j = i
+        while j < len(classes) and classes[j] != excluded:
+            if classes[j] in edges:
+                last = j
+            j += 1
+        yield i, last + 1
+        i = j
+
+
+def _number_runs(classes: list[str], start: int, end: int) -> Iterator[tuple[int, int]]:
+    """Yield the spans of numbers such as "2026", "3.5" or "50%" in classes[start:end]."""
+    i = start
+    while i < end:
+        if classes[i] != "N":
+            i += 1
+            continue
+        j = i + 1
+        while j < end and (
+            classes[j] == "N"
+            or (classes[j] == "S" and j + 1 < end and classes[j + 1] == "N")
+        ):
+            j += 1
+        yield i, j
+        i = j
+
+
+def _visual_line_to_logical(glyphs: list[str]) -> str:
+    """
+    Put one line of glyph texts, given left to right as drawn, into reading order.
+
+    A right-to-left line is reversed, then the left-to-right text and numbers
+    inside it are turned back. In a left-to-right line only the right-to-left
+    parts are reversed. Glyphs move whole, so a ligature such as "لا" keeps the
+    order of its letters.
+    """
+    glyphs = list(glyphs)
+    classes = [_bidi_class(glyph) for glyph in glyphs]
+    strong = [c for c in classes if c in ("R", "L")]
+    if not strong:
+        return "".join(glyphs)
+    if strong[0] == strong[-1]:
+        rtl = strong[0] == "R"
+    else:
+        rtl = strong.count("R") >= strong.count("L")
+    if rtl:
+        glyphs.reverse()
+        classes.reverse()
+        for start, end in _spans_without(classes, "R", ("L", "N")):
+            if "L" in classes[start:end]:
+                glyphs[start:end] = glyphs[start:end][::-1]
+            else:
+                for run_start, run_end in _number_runs(classes, start, end):
+                    glyphs[run_start:run_end] = glyphs[run_start:run_end][::-1]
+    else:
+        for start, end in _spans_without(classes, "L", ("R",)):
+            glyphs[start:end] = glyphs[start:end][::-1]
+            classes[start:end] = classes[start:end][::-1]
+            for run_start, run_end in _number_runs(classes, start, end):
+                glyphs[run_start:run_end] = glyphs[run_start:run_end][::-1]
+    return "".join(glyphs)
+
+
+def _extract_visual_rtl_text(page: Any) -> str | None:
+    """
+    Extract a page whose right-to-left text (Arabic, Hebrew, ...) is drawn
+    left to right, as many PDF generators do. pdfminer keeps the drawing order,
+    which reverses every right-to-left word.
+
+    Returns None when the page has no such text, so it keeps the usual extraction.
+    """
+    glyphs: list[dict] = []
+    marks = ""
+    for char in page.chars:
+        text = char["text"]
+        if not text:
+            continue
+        if unicodedata.category(text[0]) in ("Mn", "Me"):
+            # Drawn left to right, a mark comes before its letter; keep it after.
+            marks += text
+            continue
+        glyphs.append({**char, "text": text + marks})
+        marks = ""
+
+    drawn_rightward = drawn_leftward = 0
+    for prev, cur in zip(glyphs, glyphs[1:]):
+        if (
+            _bidi_class(prev["text"]) == _bidi_class(cur["text"]) == "R"
+            and abs(cur["top"] - prev["top"]) <= 3
+        ):
+            if cur["x0"] > prev["x0"]:
+                drawn_rightward += 1
+            elif cur["x0"] < prev["x0"]:
+                drawn_leftward += 1
+    if drawn_rightward <= drawn_leftward:
+        return None
+
+    lines: list[str] = []
+    # Same line and word-gap tolerances as pdfplumber's extract_text().
+    for row in pdfplumber.utils.cluster_objects(glyphs, "top", 3):
+        row.sort(key=lambda glyph: glyph["x0"])
+        texts = [row[0]["text"]]
+        for prev, cur in zip(row, row[1:]):
+            if (
+                cur["x0"] - prev["x1"] > 3
+                and not prev["text"].isspace()
+                and not cur["text"].isspace()
+            ):
+                texts.append(" ")
+            texts.append(cur["text"])
+        line = _visual_line_to_logical(texts).strip()
+        if line:
+            lines.append(line)
+    return "\n".join(lines)
+
+
 class PdfConverter(DocumentConverter):
     """
     Converts PDFs to Markdown.
@@ -547,6 +688,7 @@ class PdfConverter(DocumentConverter):
             # keep memory usage constant regardless of page count.
             markdown_chunks: list[str] = []
             form_page_count = 0
+            visual_rtl_page_count = 0
             plain_page_indices: list[int] = []
 
             with pdfplumber.open(pdf_bytes) as pdf:
@@ -558,16 +700,20 @@ class PdfConverter(DocumentConverter):
                         if page_content.strip():
                             markdown_chunks.append(page_content)
                     else:
-                        plain_page_indices.append(page_idx)
-                        text = page.extract_text()
+                        text = _extract_visual_rtl_text(page)
+                        if text is not None:
+                            visual_rtl_page_count += 1
+                        else:
+                            plain_page_indices.append(page_idx)
+                            text = page.extract_text()
                         if text and text.strip():
                             markdown_chunks.append(text.strip())
 
                     page.close()  # Free cached page data immediately
 
-            # If no pages had form-style content, use pdfminer for
-            # the whole document (better text spacing for prose).
-            if form_page_count == 0:
+            # If no pages had form-style or visual-order RTL content, use
+            # pdfminer for the whole document (better text spacing for prose).
+            if form_page_count == 0 and visual_rtl_page_count == 0:
                 pdf_bytes.seek(0)
                 markdown = pdfminer.high_level.extract_text(pdf_bytes)
             else:
