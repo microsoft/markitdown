@@ -2,6 +2,7 @@
 
 import io
 import zipfile
+from codecs import BOM_UTF16_BE, BOM_UTF16_LE
 
 import pytest
 
@@ -172,20 +173,20 @@ _EPUB_CHAPTER = (
 )
 
 
-def _build_epub_with_data_uri() -> bytes:
+def _build_single_chapter_epub(chapter: str | bytes = _EPUB_CHAPTER) -> bytes:
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:
         zf.writestr("mimetype", "application/epub+zip")
         zf.writestr("META-INF/container.xml", _EPUB_CONTAINER)
         zf.writestr("OEBPS/content.opf", _EPUB_OPF)
-        zf.writestr("OEBPS/ch1.xhtml", _EPUB_CHAPTER)
+        zf.writestr("OEBPS/ch1.xhtml", chapter)
     return buf.getvalue()
 
 
 def test_epub_honors_keep_data_uris() -> None:
     """EPUB chapters must be converted with the options the caller passed."""
     result = MarkItDown().convert_stream(
-        io.BytesIO(_build_epub_with_data_uri()),
+        io.BytesIO(_build_single_chapter_epub()),
         stream_info=StreamInfo(extension=".epub"),
         keep_data_uris=True,
     )
@@ -198,7 +199,7 @@ def test_epub_honors_keep_data_uris() -> None:
 def test_epub_truncates_data_uris_by_default() -> None:
     """Without the option, the default truncation must still apply."""
     result = MarkItDown().convert_stream(
-        io.BytesIO(_build_epub_with_data_uri()),
+        io.BytesIO(_build_single_chapter_epub()),
         stream_info=StreamInfo(extension=".epub"),
     )
 
@@ -209,13 +210,32 @@ def test_epub_truncates_data_uris_by_default() -> None:
 def test_epub_metadata_and_text_are_unchanged() -> None:
     """The rest of the conversion must not move."""
     result = MarkItDown().convert_stream(
-        io.BytesIO(_build_epub_with_data_uri()),
+        io.BytesIO(_build_single_chapter_epub()),
         stream_info=StreamInfo(extension=".epub"),
     )
 
     assert result.title == "Example book"
     assert "**Title:** Example book" in result.markdown
     assert "Chapter text." in result.markdown
+
+
+@pytest.mark.parametrize(
+    ("encoding", "bom"),
+    [("utf-16-le", BOM_UTF16_LE), ("utf-16-be", BOM_UTF16_BE)],
+)
+def test_epub_converts_utf16_chapter(encoding: str, bom: bytes) -> None:
+    chapter = '<?xml version="1.0" encoding="UTF-16"?>' + CHAPTER_XHTML.format(
+        title="Chapter one", body="Chapter text."
+    )
+    epub = _build_single_chapter_epub(bom + chapter.encode(encoding))
+
+    result = MarkItDown().convert_stream(
+        io.BytesIO(epub), stream_info=StreamInfo(extension=".epub")
+    )
+
+    assert (
+        result.markdown == "**Title:** Example book\n\n# Chapter one\n\nChapter text."
+    )
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 import os
 import posixpath
 import zipfile
+from codecs import BOM_UTF16_BE, BOM_UTF16_LE
 from urllib.parse import unquote
 from defusedxml import minidom
 from xml.dom.minidom import Document
@@ -22,6 +23,11 @@ ACCEPTED_FILE_EXTENSIONS = [".epub"]
 MIME_TYPE_MAPPING = {
     ".html": "text/html",
     ".xhtml": "application/xhtml+xml",
+}
+
+_UTF16_BOM_CHARSETS = {
+    BOM_UTF16_BE: "utf-16-be",
+    BOM_UTF16_LE: "utf-16-le",
 }
 
 
@@ -108,11 +114,16 @@ class EpubConverter(HtmlConverter):
                         filename = os.path.basename(file)
                         extension = os.path.splitext(filename)[1].lower()
                         mimetype = MIME_TYPE_MAPPING.get(extension)
+                        # EPUB XML resources may be UTF-8 or UTF-16. Pass the
+                        # byte order explicitly because HtmlConverter defaults to UTF-8.
+                        charset = _UTF16_BOM_CHARSETS.get(f.read(2))
+                        f.seek(0)
                         converted_content = self._html_converter.convert(
                             f,
                             StreamInfo(
                                 mimetype=mimetype,
                                 extension=extension,
+                                charset=charset,
                                 filename=filename,
                             ),
                             **kwargs,
