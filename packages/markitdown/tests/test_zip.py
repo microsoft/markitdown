@@ -181,5 +181,28 @@ def test_zip_stream_no_filename_header() -> None:
     assert "Hello world" in result.markdown
 
 
+def test_zip_many_members_preserve_exact_output_and_order() -> None:
+    """Building a large archive result must preserve every member and heading."""
+    markitdown = MarkItDown(enable_builtins=False)
+    markitdown.register_converter(_RecordingConverter())
+    markitdown.register_converter(ZipConverter(markitdown=markitdown))
+
+    buf = io.BytesIO()
+    expected = ["Content from the zip file `many.zip`:\n\n"]
+    with zipfile.ZipFile(buf, "w") as archive:
+        for i in range(256):
+            name = f"notes/{i:04d}.txt"
+            content = f"Entry {i:04d}: " + "x" * 200
+            archive.writestr(name, content)
+            expected.append(f"## File: {name}\n\n{content}\n\n")
+    buf.seek(0)
+
+    result = markitdown.convert_stream(
+        buf, stream_info=StreamInfo(extension=".zip", filename="many.zip")
+    )
+
+    assert result.markdown == "".join(expected).strip()
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))

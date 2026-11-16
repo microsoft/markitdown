@@ -96,7 +96,7 @@ class ZipConverter(DocumentConverter):
             or stream_info.filename
             or "(unknown)"
         )
-        md_content = f"Content from the zip file `{file_path}`:\n\n"
+        parts = [f"Content from the zip file `{file_path}`:\n\n"]
 
         # Drop the metadata describing the outer *archive*
         member_kwargs = {
@@ -120,11 +120,11 @@ class ZipConverter(DocumentConverter):
                         **member_kwargs,
                     )
                     if result is not None:
-                        md_content += f"## File: {name}\n\n"
-                        md_content += result.markdown + "\n\n"
+                        parts.append(f"## File: {name}\n\n")
+                        parts.append(result.markdown + "\n\n")
                 except UnsupportedFormatException:
                     pass
                 except FileConversionException:
                     pass
 
-        return DocumentConverterResult(markdown=md_content.strip())
+        return DocumentConverterResult(markdown="".join(parts).strip())
