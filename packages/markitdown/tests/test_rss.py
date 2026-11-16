@@ -97,6 +97,36 @@ def test_atom_feed_with_zero_entries_is_valid() -> None:
     assert result.markdown == "# Empty feed\n"
 
 
+def test_namespace_free_empty_feed_without_metadata_is_not_atom() -> None:
+    """A bare <feed> with no namespace, entries, or Atom metadata is not Atom."""
+    feed = b"""<?xml version="1.0" encoding="utf-8"?>
+<feed>
+</feed>"""
+    converter = RssConverter()
+    stream_info = StreamInfo(extension=".xml")
+
+    assert not converter.accepts(io.BytesIO(feed), stream_info)
+    with pytest.raises(ValueError, match="Unknown feed type"):
+        converter.convert(io.BytesIO(feed), stream_info)
+
+
+def test_namespace_free_empty_feed_with_core_metadata_is_atom() -> None:
+    """A namespace-free empty feed is accepted when it has required Atom metadata."""
+    feed = b"""<?xml version="1.0" encoding="utf-8"?>
+<feed>
+  <title>Empty feed</title>
+  <id>urn:example:feed</id>
+  <updated>2026-01-01T00:00:00Z</updated>
+</feed>"""
+    converter = RssConverter()
+    stream_info = StreamInfo(extension=".xml")
+
+    assert converter.accepts(io.BytesIO(feed), stream_info)
+    result = converter.convert(io.BytesIO(feed), stream_info)
+    assert result.title == "Empty feed"
+    assert result.markdown == "# Empty feed\n"
+
+
 def test_atom_ignores_elements_from_other_namespaces() -> None:
     feed = b"""<a:feed xmlns:a="http://www.w3.org/2005/Atom" xmlns="urn:example:other">
   <title>Unrelated title</title>

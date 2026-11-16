@@ -133,8 +133,23 @@ class RssConverter(DocumentConverter):
         if root.tagName == "rss":
             return "rss"
         if root.localName == "feed" and root.namespaceURI in (None, ATOM_NAMESPACE):
-            return "atom"
+            # Namespaced Atom feeds may have zero entries (RFC 4287). A
+            # namespace-free <feed> is only treated as Atom when it has an
+            # <entry> or the required Atom metadata, so an unrelated empty
+            # <feed> is not classified as Atom.
+            if (
+                root.namespaceURI == ATOM_NAMESPACE
+                or self._get_children(root, "entry")
+                or self._has_core_atom_metadata(root)
+            ):
+                return "atom"
         return None
+
+    def _has_core_atom_metadata(self, root: Element) -> bool:
+        """RFC 4287 requires atom:feed to contain title, id, and updated."""
+        return all(
+            self._get_child(root, name) is not None for name in ("title", "id", "updated")
+        )
 
     def convert(
         self,
