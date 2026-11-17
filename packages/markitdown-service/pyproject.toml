@@ -1,0 +1,27 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "markitdown-service"
+dynamic = ["version"]
+description = "Internal HTTP service that converts uploaded PDF/Office files to Markdown with MarkItDown (used by the Dont Scroll admin portal)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+keywords = []
+dependencies = [
+  "markitdown[pdf,docx,pptx,xlsx,xls]",
+]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[project.scripts]
+markitdown-service = "markitdown_service.__main__:main"
+
+[tool.hatch.version]
+path = "src/markitdown_service/__about__.py"
+
+[tool.hatch.build.targets.sdist]
+only-include = ["src/markitdown_service"]

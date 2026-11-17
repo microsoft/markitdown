@@ -1,0 +1,33 @@
+# Testes do markitdown-service (Dont Scroll). Fica num arquivo próprio para não conflitar com o tests.yml do upstream.
+name: markitdown-service tests
+on:
+  pull_request:
+    paths:
+      - "packages/markitdown-service/**"
+      - "packages/markitdown/src/**"
+      - ".github/workflows/service-tests.yml"
+  push:
+    branches: [main]
+    paths:
+      - "packages/markitdown-service/**"
+      - ".github/workflows/service-tests.yml"
+permissions:
+  contents: read
+
+jobs:
+  service-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install packages
+        run: pip install "./packages/markitdown[pdf,docx,pptx,xlsx,xls]" ./packages/markitdown-service pytest
+      - name: Run tests
+        working-directory: packages/markitdown-service
+        run: pytest
