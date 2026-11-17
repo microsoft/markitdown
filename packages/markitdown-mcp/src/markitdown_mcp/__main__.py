@@ -200,7 +200,7 @@ def main():
                 "Only proceed if you understand the security implications.\n",
                 file=sys.stderr,
             )
-        starlette_app = create_starlette_app(mcp, host=host, debug=True)
+        starlette_app = create_starlette_app(mcp, host=host)
         uvicorn.run(
             starlette_app,
             host=host,
