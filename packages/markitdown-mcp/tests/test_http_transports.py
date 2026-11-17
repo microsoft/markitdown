@@ -6,7 +6,9 @@ from contextlib import aclosing, asynccontextmanager
 from urllib.parse import parse_qs, urlsplit
 
 import httpx2 as httpx
+from starlette.routing import Route
 
+from markitdown_mcp import __main__ as server
 from markitdown_mcp.__main__ import create_starlette_app, mcp
 
 BASE_URL = "http://127.0.0.1:3001"
@@ -155,3 +157,35 @@ def test_sse_session_uses_preserved_message_route():
                     assert_conversion(json.loads(event.data))
 
     asyncio.run(asyncio.wait_for(exercise(), timeout=15))
+
+
+def test_http_mode_does_not_send_tracebacks_to_clients(monkeypatch):
+    """`markitdown-mcp --http` must answer an unhandled error with a bare 500,
+    not Starlette's debug page with the traceback and exception message."""
+    # Capture the app exactly as the CLI entry point builds it.
+    served = {}
+    monkeypatch.setattr(
+        server.uvicorn, "run", lambda app, **kwargs: served.setdefault("app", app)
+    )
+    monkeypatch.setattr(server.sys, "argv", ["markitdown-mcp", "--http"])
+    server.main()
+    app = served["app"]
+
+    async def boom(request):
+        raise RuntimeError("secret-detail")
+
+    # No real route raises on demand, so add one. Starlette builds its error
+    # middleware on the first request, from the app's debug flag, so a route
+    # added before then is served through the same middleware as the others.
+    app.router.routes.append(Route("/boom", boom))
+
+    async def exercise():
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app, raise_app_exceptions=False),
+            base_url=BASE_URL,
+        ) as client:
+            return await client.get("/boom")
+
+    response = asyncio.run(asyncio.wait_for(exercise(), timeout=15))
+    assert response.status_code == 500
+    assert response.text == "Internal Server Error"

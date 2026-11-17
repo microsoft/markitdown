@@ -1,27 +1,102 @@
+import os
+
+# numpy (pulled in by markitdown's converters) ships OpenBLAS, which on import
+# commits a work buffer per CPU core (~30MB each: 360MB+ on a 12-core machine)
+# and keeps idle worker threads. MarkItDown does no heavy linear algebra, and a
+# server process runs per MCP client session, so cap the pools before anything
+# can import numpy. Explicit settings in the environment still win.
+for _var in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS"):
+    os.environ.setdefault(_var, "1")
+
 import contextlib
 import logging
-import os
 import sys
+import threading
 from collections.abc import AsyncIterator
+from typing import TYPE_CHECKING, Any
+import anyio
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from starlette.applications import Starlette
-from markitdown import MarkItDown, FileConversionException, UnsupportedFormatException
 import requests
 import uvicorn
+
+if TYPE_CHECKING:
+    from markitdown import MarkItDown as _MarkItDown
 
 logger = logging.getLogger(__name__)
 
 # Initialize the MCP server for MarkItDown
 mcp = MCPServer("markitdown")
 
+# markitdown imports its whole converter stack (numpy, pandas, onnxruntime,
+# pdfminer, ...) eagerly. Defer it to the first conversion so sessions that
+# never convert anything stay small and the MCP handshake is fast.
+MarkItDown: "type[_MarkItDown] | None" = None
+
+# One MarkItDown instance is shared, and only one conversion runs on it at a
+# time: converters keep per-call state on the instance (RssConverter sets
+# self._kwargs), and plugins may too. This also bounds CPU and peak memory.
+_conversion_lock = threading.Lock()
+_converter: "_MarkItDown | None" = None
+_converter_key: tuple[object, bool] | None = None
+
+# (connect, read) seconds. Without a timeout a hung server would hold the
+# conversion lock, and with it every later conversion, forever.
+FETCH_TIMEOUT = (10, 60)
+
+
+class _TimeoutSession(requests.Session):
+    """A requests session that applies FETCH_TIMEOUT unless a call sets one."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        # The header MarkItDown sets on the session it creates by default.
+        self.headers.update(
+            {"Accept": "text/markdown, text/html;q=0.9, text/plain;q=0.8, */*;q=0.1"}
+        )
+
+    def request(self, *args: Any, **kwargs: Any) -> requests.Response:  # type: ignore[override]
+        if kwargs.get("timeout") is None:
+            kwargs["timeout"] = FETCH_TIMEOUT
+        return super().request(*args, **kwargs)
+
+
+def _get_converter() -> "_MarkItDown":
+    """Return the shared MarkItDown instance. Call with _conversion_lock held.
+
+    Construction registers every converter and loads Magika's ONNX model with
+    its own thread pool, so building one per call costs ~0.25s and leaks memory.
+    """
+    global MarkItDown, _converter, _converter_key
+    if MarkItDown is None:
+        from markitdown import MarkItDown as _loaded
+
+        MarkItDown = _loaded
+    # Keyed on the class too, so a substituted MarkItDown takes effect.
+    key = (MarkItDown, check_plugins_enabled())
+    if _converter is None or _converter_key != key:
+        _converter = MarkItDown(
+            enable_plugins=key[1], requests_session=_TimeoutSession()
+        )
+        _converter_key = key
+    return _converter
+
 
 @mcp.tool()
 async def convert_to_markdown(uri: str) -> str:
     """Convert a resource described by an http:, https:, file: or data: URI to markdown"""
-    converter = MarkItDown(enable_plugins=check_plugins_enabled())
+    # Conversion is blocking and CPU-bound: keep it off the event loop so the
+    # server keeps serving pings, cancellations and other clients meanwhile.
+    return await anyio.to_thread.run_sync(_convert_to_markdown, uri)
+
+
+def _convert_to_markdown(uri: str) -> str:
+    from markitdown import FileConversionException, UnsupportedFormatException
+
     try:
-        return converter.convert_uri(uri).markdown
+        with _conversion_lock:
+            return _get_converter().convert_uri(uri).markdown
 
     # SDK 2.x only exposes ToolError messages.
     except UnsupportedFormatException as exc:
@@ -125,7 +200,7 @@ def main():
                 "Only proceed if you understand the security implications.\n",
                 file=sys.stderr,
             )
-        starlette_app = create_starlette_app(mcp, host=host, debug=True)
+        starlette_app = create_starlette_app(mcp, host=host)
         uvicorn.run(
             starlette_app,
             host=host,
