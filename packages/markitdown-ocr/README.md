@@ -85,13 +85,45 @@ md = MarkItDown(
 )
 ```
 
+### MiniCPM-OCR (Local)
+
+[MiniCPM-OCR 1.0](https://github.com/OpenBMB/MiniCPM-OCR) is a compact document-parsing model that can be served locally through vLLM or SGLang and used through their OpenAI-compatible API. Start the server:
+
+```bash
+vllm serve openbmb/MiniCPM-OCR-1.0 \
+  --served-model-name minicpm-ocr \
+  --max-model-len 40960 \
+  --host 127.0.0.1 --port 8000
+```
+
+Then point MarkItDown at it:
+
+```python
+from markitdown import MarkItDown
+from openai import OpenAI
+
+md = MarkItDown(
+    enable_plugins=True,
+    llm_client=OpenAI(base_url="http://127.0.0.1:8000/v1", api_key="EMPTY"),
+    llm_model="minicpm-ocr",
+)
+```
+
+When the model name contains `minicpm-ocr`, the plugin selects a MiniCPM-OCR-aware service. It asks the model for Markdown rather than plain text, so tables and formulas in scanned pages stay structured, and it converts MiniCPM-OCR's OTSL table output into Markdown tables. The service uses deterministic decoding and the image-first message order recommended by the model's deployment guide.
+
+This selection uses the `model` name sent to the server, so keep `minicpm-ocr` in the served name (the example above does). Names containing `jev` are excluded because MiniCPM-OCR Jev is a reliability-scoring model, not an OCR model.
+
+The OCR request does not send an `enable_thinking` flag. MiniCPM-OCR's chat template disables thinking by default; if your server overrides that default, pass `--default-chat-template-kwargs '{"enable_thinking":false}'` when launching it. A leading `<think>...</think>` block is removed defensively if one is returned. See the [MiniCPM-OCR deployment guide](https://github.com/OpenBMB/MiniCPM-OCR/blob/main/docs/minicpm_ocr_tutorial_en.md) for model weights, GPU requirements, and the full launch command (including DSpark acceleration).
+
+No extra Python packages are required: the plugin talks to the server through the same OpenAI-compatible client path.
+
 ## How It Works
 
 When `MarkItDown(enable_plugins=True, llm_client=..., llm_model=...)` is called:
 
 1. MarkItDown discovers the plugin via the `markitdown.plugin` entry point group
 2. It calls `register_converters()`, forwarding all kwargs including `llm_client` and `llm_model`
-3. The plugin creates an `LLMVisionOCRService` from those kwargs
+3. The plugin creates an OCR service from those kwargs — `MiniCPMOCRService` when the model name contains `minicpm-ocr`, otherwise `LLMVisionOCRService`
 4. Four OCR-enhanced converters are registered at **priority -1.0** — before the built-in converters at priority 0.0
 
 When a file is converted:
@@ -203,6 +235,10 @@ Contributions are welcome! See the [MarkItDown repository](https://github.com/mi
 MIT — see [LICENSE](LICENSE).
 
 ## Changelog
+
+### Unreleased
+
+- MiniCPM-OCR support: model-name detection, Markdown-oriented OCR prompt, OTSL table conversion, and defensive thinking-block removal
 
 ### 0.1.0 (Initial Release)
 
