@@ -6,7 +6,7 @@ Registers OCR-enhanced converters with priority-based replacement strategy.
 from typing import Any
 from markitdown import MarkItDown
 
-from ._ocr_service import LLMVisionOCRService
+from ._ocr_service import LLMVisionOCRService, create_ocr_service
 from ._pdf_converter_with_ocr import PdfConverterWithOCR
 from ._docx_converter_with_ocr import DocxConverterWithOCR
 from ._pptx_converter_with_ocr import PptxConverterWithOCR
@@ -28,7 +28,9 @@ def register_converters(markitdown: MarkItDown, **kwargs: Any) -> None:
         markitdown: MarkItDown instance to register converters with
         **kwargs: Additional keyword arguments that may include:
             - llm_client: OpenAI-compatible client for LLM-based OCR (required for OCR to work)
-            - llm_model: Model name (e.g., 'gpt-4o')
+            - llm_model: Model name (e.g., 'gpt-4o'). Names containing
+              'minicpm-ocr' select the MiniCPM-OCR service; Jev scoring
+              models are excluded.
             - llm_prompt: Custom prompt for text extraction
     """
     # Create OCR service — reads the same llm_client/llm_model kwargs
@@ -39,7 +41,7 @@ def register_converters(markitdown: MarkItDown, **kwargs: Any) -> None:
 
     ocr_service: LLMVisionOCRService | None = None
     if llm_client and llm_model:
-        ocr_service = LLMVisionOCRService(
+        ocr_service = create_ocr_service(
             client=llm_client,
             model=llm_model,
             default_prompt=llm_prompt,

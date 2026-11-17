@@ -156,6 +156,8 @@ result = md.convert("document_with_images.pdf")
 print(result.markdown)
 ```
 
+Local OCR models that expose an OpenAI-compatible API work the same way. When the model name contains `minicpm-ocr`, the plugin uses a document-to-Markdown prompt and converts MiniCPM-OCR's OTSL tables into Markdown tables; see the [plugin README](packages/markitdown-ocr/README.md#minicpm-ocr-local) for the server launch command.
+
 If no `llm_client` is provided the plugin still loads, but OCR is silently skipped and the standard built-in converter is used instead.
 
 See [`packages/markitdown-ocr/README.md`](packages/markitdown-ocr/README.md) for detailed documentation.
