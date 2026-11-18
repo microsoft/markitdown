@@ -9,6 +9,13 @@ from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 from .._stream_info import StreamInfo
 
+def _format_cell_float(val: float) -> str:
+    """Format float values so whole numbers render without trailing .0 and NaN is blank."""
+    if pd.isna(val):
+        return ""
+    if val.is_integer():
+        return str(int(val))
+    return str(val)
 # Try loading optional (but in this case, required) dependencies
 # Save reporting of any exceptions for later
 _xlsx_dependency_exc_info = None
@@ -150,7 +157,11 @@ class XlsxConverter(DocumentConverter):
 
             for s in sheets:
                 md_content += f"## {s}\n"
-                html_content = sheets[s].to_html(index=False)
+                html_content = sheets[s].to_html(
+    index=False,
+    float_format=_format_cell_float,
+    na_rep="",
+)
                 md_content += (
                     self._html_converter.convert_string(
                         html_content, **kwargs
@@ -241,7 +252,11 @@ class XlsConverter(DocumentConverter):
         md_content = ""
         for s in sheets:
             md_content += f"## {s}\n"
-            html_content = sheets[s].to_html(index=False)
+            html_content = sheets[s].to_html(
+    index=False,
+    float_format=_format_cell_float,
+    na_rep="",
+)
             md_content += (
                 self._html_converter.convert_string(
                     html_content, **kwargs
