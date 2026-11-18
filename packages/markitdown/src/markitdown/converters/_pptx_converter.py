@@ -4,6 +4,7 @@ import os
 import io
 import re
 import html
+from collections import Counter
 
 from typing import BinaryIO, Any, Optional
 
@@ -88,9 +89,14 @@ class PptxConverter(DocumentConverter):
             md_content += f"\n\n<!-- Slide number: {slide_num} -->\n"
 
             title = slide.shapes.title
+            labels: dict[str, str] = {}
+            connectors = []
 
             def get_shape_content(shape, **kwargs):
                 nonlocal md_content
+                if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.LINE:
+                    connectors.append(shape.element)
+
                 # Pictures
                 if self._is_picture(shape):
                     md_content += self._convert_picture_to_markdown(shape, **kwargs)
@@ -106,6 +112,8 @@ class PptxConverter(DocumentConverter):
                 # Text areas
                 elif shape.has_text_frame:
                     text = shape.text or ""
+                    if text.strip():
+                        labels[str(shape.shape_id)] = " ".join(text.split())
                     if shape == title:
                         if text.strip():
                             md_content += "# " + text.lstrip() + "\n"
@@ -136,6 +144,11 @@ class PptxConverter(DocumentConverter):
 
             md_content = md_content.strip()
 
+            if connectors:
+                connections = self._format_connections(connectors, labels)
+                if connections:
+                    md_content += "\n\n### Connections\n\n" + "\n".join(connections)
+
             if slide.has_notes_slide:
                 # PowerPoint attaches a notes slide to a slide whose notes pane
                 # has merely been opened, so having one says nothing about there
@@ -147,6 +160,40 @@ class PptxConverter(DocumentConverter):
                     md_content = md_content.strip()
 
         return DocumentConverterResult(markdown=md_content.strip())
+
+    @staticmethod
+    def _format_connections(connectors, labels: dict[str, str]) -> list[str]:
+        """Describe explicit attachments; a line near a shape need not connect to it."""
+        counts = Counter(labels.values())
+
+        def label(shape_id: str) -> str:
+            text = labels[shape_id]
+            return f"{text} (shape {shape_id})" if counts[text] > 1 else text
+
+        lines = []
+        arrowheads = {"arrow", "triangle", "stealth"}
+        for connector in connectors:
+            if connector.xpath(
+                "./p:spPr/a:ln/a:noFill | ./p:nvCxnSpPr/p:cNvPr[@hidden='1' or @hidden='true']"
+            ):
+                continue
+            props = "./p:nvCxnSpPr/p:cNvCxnSpPr"
+            start = connector.xpath(f"{props}/a:stCxn/@id")
+            end = connector.xpath(f"{props}/a:endCxn/@id")
+            if not start or not end or start[0] not in labels or end[0] not in labels:
+                continue
+
+            # Attachment order alone does not imply a direction.
+            head = connector.xpath("./p:spPr/a:ln/a:headEnd/@type")
+            tail = connector.xpath("./p:spPr/a:ln/a:tailEnd/@type")
+            at_start = bool(arrowheads.intersection(head))
+            at_end = bool(arrowheads.intersection(tail))
+            if at_start:
+                symbol = "↔" if at_end else "←"
+            else:
+                symbol = "→" if at_end else "—"
+            lines.append(f"- {label(start[0])} {symbol} {label(end[0])}")
+        return lines
 
     def _image_to_html(
         self,
