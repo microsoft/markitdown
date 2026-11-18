@@ -15,7 +15,8 @@ from lxml import etree
 from pptx import Presentation
 from pptx.chart.data import CategoryChartData
 from pptx.enum.chart import XL_CHART_TYPE
-from pptx.enum.shapes import MSO_SHAPE_TYPE
+from pptx.enum.shapes import MSO_CONNECTOR, MSO_SHAPE, MSO_SHAPE_TYPE
+from pptx.oxml.xmlchemy import OxmlElement
 from pptx.util import Inches
 
 from markitdown import (
@@ -25,6 +26,81 @@ from markitdown import (
     StreamInfo,
 )
 from markitdown.converters import HtmlConverter, PptxConverter, _pptx_converter
+
+# Native flowchart connectors
+
+
+def _add_node(shapes, text, left):
+    node = shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(left), 0, Inches(1), Inches(1))
+    node.text = text
+    return node
+
+
+def _add_edge(shapes, start, end, head=None, tail=None):
+    edge = shapes.add_connector(MSO_CONNECTOR.STRAIGHT, 0, 0, Inches(1), Inches(1))
+    if start is not None:
+        edge.begin_connect(start, 3)
+    if end is not None:
+        edge.end_connect(end, 1)
+    for tag, kind in (("headEnd", head), ("tailEnd", tail)):
+        if kind is not None:
+            marker = OxmlElement(f"a:{tag}")
+            marker.set("type", kind)
+            edge.element.spPr.get_or_add_ln().append(marker)
+    return edge
+
+
+def _diagram_markdown(deck):
+    stream = io.BytesIO()
+    deck.save(stream)
+    stream.seek(0)
+    return MarkItDown().convert_stream(stream, stream_info=_INFO).markdown
+
+
+@pytest.mark.parametrize(
+    ("head", "tail", "relation"),
+    [
+        (None, "triangle", "Review → Publish"),
+        ("stealth", None, "Review ← Publish"),
+        ("arrow", "triangle", "Review ↔ Publish"),
+        (None, None, "Review — Publish"),
+        ("diamond", "oval", "Review — Publish"),
+    ],
+)
+def test_pptx_reports_attached_shapes_and_explicit_arrowheads(head, tail, relation):
+    deck = Presentation()
+    shapes = deck.slides.add_slide(deck.slide_layouts[6]).shapes
+    group = shapes.add_group_shape()
+    start = _add_node(group.shapes, "Review", 0)
+    end = _add_node(group.shapes, "Publish", 2)
+    _add_edge(group.shapes, start, end, head, tail)
+    assert f"### Connections\n\n- {relation}" in _diagram_markdown(deck)
+
+
+def test_pptx_connection_endpoints_are_slide_local_and_must_be_attached():
+    deck = Presentation()
+    slide = deck.slides.add_slide(deck.slide_layouts[6])
+    start = _add_node(slide.shapes, "Review", 0)
+    first = _add_node(slide.shapes, "Hold", 2)
+    second = _add_node(slide.shapes, "Hold", 4)
+    _add_edge(slide.shapes, start, first, tail="triangle")
+    _add_edge(slide.shapes, start, second, tail="triangle")
+    other = deck.slides.add_slide(deck.slide_layouts[6]).shapes
+    source = _add_node(other, "Review", 0)
+    target = _add_node(other, "", 2)
+    _add_edge(other, source, None)
+    _add_edge(other, source, target)
+    hidden = _add_edge(other, source, source)
+    hidden.element.nvCxnSpPr.cNvPr.set("hidden", "1")
+    invisible = _add_edge(other, source, source)
+    invisible.line.fill.background()
+    dangling = _add_edge(other, source, source)
+    dangling.element.xpath(".//a:endCxn")[0].set("id", str(second.shape_id))
+    first_md, second_md = _diagram_markdown(deck).split("<!-- Slide number: 2 -->")
+    assert f"- Review → Hold (shape {first.shape_id})" in first_md
+    assert f"- Review → Hold (shape {second.shape_id})" in first_md
+    assert "### Connections" not in second_md
+
 
 # Slide titles
 
