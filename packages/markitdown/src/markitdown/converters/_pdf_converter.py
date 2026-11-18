@@ -497,6 +497,11 @@ class PdfConverter(DocumentConverter):
     Converts PDFs to Markdown.
     Supports extracting tables into aligned Markdown format (via pdfplumber).
     Falls back to pdfminer if pdfplumber is missing or fails.
+
+    Pass ``pdf_workers=N`` (N >= 2) to extract pages in up to N worker
+    processes (Linux and Windows). The output is identical to sequential
+    conversion, which remains the default and is used whenever parallel
+    extraction is not possible.
     """
 
     def accepts(
@@ -534,10 +539,32 @@ class PdfConverter(DocumentConverter):
                 _dependency_exc_info[2]
             )  # type: ignore[union-attr]
 
+        pdf_workers = kwargs.get("pdf_workers")
+        if pdf_workers is not None:
+            if isinstance(pdf_workers, bool) or not isinstance(pdf_workers, int):
+                raise TypeError(
+                    "pdf_workers must be an int or None, "
+                    f"not {type(pdf_workers).__name__}"
+                )
+            if pdf_workers < 1:
+                raise ValueError(f"pdf_workers must be at least 1, got {pdf_workers}")
+
         assert isinstance(file_stream, io.IOBase)
 
         # Read file stream into BytesIO for compatibility with pdfplumber
         pdf_bytes = io.BytesIO(file_stream.read())
+
+        if pdf_workers is not None and pdf_workers > 1:
+            from ._pdf_parallel import extract_markdown
+
+            markdown = extract_markdown(pdf_bytes.getvalue(), pdf_workers)
+            if markdown is not None:  # None: fall through to sequential conversion
+                if not markdown:
+                    pdf_bytes.seek(0)
+                    markdown = pdfminer.high_level.extract_text(pdf_bytes)
+                return DocumentConverterResult(
+                    markdown=_merge_partial_numbering_lines(markdown)
+                )
 
         try:
             # Single pass: check every page for form-style content.
