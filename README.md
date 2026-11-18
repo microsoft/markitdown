@@ -362,6 +362,20 @@ print(result.markdown)
 
 If any attempt succeeds, image conversion continues normally. If the client raises an error after exhausting its retries, or encounters a non-retryable error, MarkItDown tries other applicable converters and raises `FileConversionException` only if none succeeds.
 
+To extract the pages of large PDFs in parallel worker processes, pass `pdf_workers`:
+
+```python
+from markitdown import MarkItDown
+
+if __name__ == "__main__":  # required: workers re-import the main module
+    result = MarkItDown().convert("large.pdf", pdf_workers=4)
+    print(result.markdown)
+```
+
+The output is identical to the default sequential conversion. `pdf_workers` is an upper bound: MarkItDown uses fewer workers when fewer CPUs, pages, or memory are available. It converts sequentially, emitting a `RuntimeWarning`, when parallel extraction is not possible or a worker fails. Starting workers takes about a second, so this helps mainly with documents of many pages.
+
+Parallel extraction is currently supported on Windows and Linux; on other platforms, including macOS, MarkItDown converts sequentially. Each worker is a separate Python process holding its own copy of the PDF, so its memory use grows with the size of the PDF and its pages (in our measurements, roughly 100 MB plus 2.5 times the PDF size). On Windows, each worker additionally reserves (commits) about 32 MB per CPU thread for numpy, which it does not normally use; this counts against the system or job commit limit rather than physical memory. MarkItDown checks available memory, including container and job limits, before starting workers, but this is an estimate and not a guarantee.
+
 ### Docker
 
 ```sh
