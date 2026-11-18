@@ -312,6 +312,8 @@ class RssConverter(DocumentConverter):
             if title:
                 md_text += f"\n## {title}\n"
             if pubDate:
+                if md_text and not md_text.endswith("\n"):
+                    md_text += "\n\n"
                 md_text += f"Published on: {pubDate}\n"
             body_parts = (
                 self._parse_content(
