@@ -539,6 +539,31 @@ def test_xlsx_show_zeroes_rename_is_scoped_to_sheet_view_tags() -> None:
     assert b'<f>IF(A1=" showZeroes=","x","y")</f>' in repaired
     assert b'<customSheetView showZeroes="0"/>' in repaired
 
+def test_xlsx_whole_numbers_with_blank_cells():
+    """Ensure integers in columns with blank cells do not render as floats like 1.0."""
+    import io
+    from openpyxl import Workbook
+    from markitdown import MarkItDown, StreamInfo
 
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Sheet1"
+    ws.append(["count", "decimal"])
+    ws.append([1, 1.25])
+    ws.append([None, 2.50])
+    ws.append([2, 3.0])
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    md = MarkItDown().convert_stream(buf, stream_info=StreamInfo(extension=".xlsx")).markdown
+
+    # Whole numbers must not render with .0
+    assert "1.0" not in md
+    assert "2.0" not in md
+    # Fractions should preserve decimals
+    assert "1.25" in md
+    assert "2.5" in md
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
