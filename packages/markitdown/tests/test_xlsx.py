@@ -557,10 +557,189 @@ def test_xlsx_show_zeroes_rename_is_scoped_to_sheet_view_tags() -> None:
         ("General", None),
         ("@", None),
         ("", None),
+        # ── Quoted-literal edge cases ─────────────────────────────────────────
+        # Single-symbol quoted literal: IS a recognised currency prefix in Excel.
+        ('"$"#,##0.00', "$"),
+        ('"£"#,##0', "£"),
+        # Multi-character quoted literal containing $: display text, not currency.
+        ('"$10 off"#,##0', None),
+        ('"price: $"#,##0', None),
+        # Quoted text before a bare currency symbol: bare symbol still recognised.
+        ('"USD "$#,##0', "$"),
+        # Unclosed quoted literal (malformed format): safe fallback.
+        ('"hello[>=0]$0;0', None),
+        ('"unclosed$', None),
     ],
 )
 def test_extract_currency_prefix(fmt: str, expected: "Optional[str]") -> None:
     assert _xlsx_converter._extract_currency_prefix(fmt) == expected
+
+
+@pytest.mark.parametrize(
+    ("fmt", "value", "expected"),
+    [
+        # Single section — returned unchanged regardless of value
+        ("$#,##0.00", 42, "$#,##0.00"),
+        ("$#,##0.00", -1, "$#,##0.00"),
+        # 2 sections: positive/zero → section 0, negative → section 1
+        ("0;[Red]$0", 42, "0"),           # positive: section 0, no $
+        ("0;[Red]$0", 0, "0"),            # zero:     section 0, no $
+        ("0;[Red]$0", -42, "[Red]$0"),    # negative: section 1, has $
+        # 3 sections: positive → 0, negative → 1, zero → 2
+        ("$#,##0;[Red]$#,##0;0", 1, "$#,##0"),
+        ("$#,##0;[Red]$#,##0;0", -1, "[Red]$#,##0"),
+        ("$#,##0;[Red]$#,##0;0", 0, "0"),
+        # 4 sections: text → section 3
+        ('$#,##0;[Red]$#,##0;0;"n/a"', "hello", '"n/a"'),
+        # Semicolons inside quoted literals are NOT section separators
+        ('"val;a";$#,##0', 42, '"val;a"'),
+        # ── Conditional operators ────────────────────────────────────────────
+        # Item 1: all five comparison operators
+        ("[>100]$0;0",   150, "$0"),      # >  : above threshold
+        ("[>100]$0;0",    50, "0"),       # >  : below threshold
+        ("[>=100]$0;0", 100, "$0"),       # >= : at threshold
+        ("[>=100]$0;0",  99, "0"),        # >= : one below threshold
+        ("[<0]$0;0",     -5, "$0"),       # <  : below threshold
+        ("[<0]$0;0",      5, "0"),        # <  : above threshold
+        ("[<=0]$0;0",     0, "$0"),       # <= : at threshold
+        ("[<=0]$0;0",     1, "0"),        # <= : one above threshold
+        ("[=0]$0;0",      0, "$0"),       # =  : exact match
+        ("[=0]$0;0",      1, "0"),        # =  : no match
+        # Item 2: decimal and negative thresholds
+        ("[>=1.5]$0;0",  2.5, "$0"),
+        ("[>=1.5]$0;0",  1.0, "0"),
+        ("[>-10]$0;0",   -5, "$0"),
+        ("[>-10]$0;0",  -15, "0"),
+        # Item 3: multiple conditions evaluated in declaration order
+        ("[>=100]$0;[>=50]€0;0", 150, "$0"),   # first condition wins
+        ("[>=100]$0;[>=50]€0;0",  75, "€0"),   # first fails, second wins
+        ("[>=100]$0;[>=50]€0;0",  25, "0"),    # both fail, catch-all
+        # Item 4: unconditional third section is the catch-all
+        ("[>=100]$0;[<0]€0;$0",  42, "$0"),    # neither condition, catch-all $
+        # Item 5: no prefix when no condition matches and no catch-all
+        ("[>=100]$0;[<0]$0",     42, ""),
+        # Item 6: color code BEFORE the condition bracket
+        ("[Red][>=100]$0;0",    150, "[Red]$0"),  # condition matches; [Red] kept
+        ("[Red][>=100]$0;0",     42, "0"),         # condition fails; catch-all
+        # Condition after color — condition bracket removed, color bracket kept
+        ("[Blue][<0]$0;0",       -5, "[Blue]$0"),
+        ("[Blue][<0]$0;0",        5, "0"),
+        # ── Edge-case regressions ────────────────────────────────────────────
+        # Issue 1: decimal threshold without a leading digit (e.g. .5 not 0.5)
+        ("[>=.5]$0;0",  0.7, "$0"),   # above .5: condition matches
+        ("[>=.5]$0;0",  0.3, "0"),    # below .5: catch-all
+        ("[<.5]$0;0",   0.3, "$0"),   # below .5: condition matches
+        ("[<.5]$0;0",   0.7, "0"),    # above .5: catch-all
+        # Issue 2: scientific-notation threshold
+        ("[>=1E3]$0;0", 1500, "$0"),  # above 1000: condition matches
+        ("[>=1E3]$0;0",  500, "0"),   # below 1000: catch-all
+        ("[>=1.5e2]$0;0", 200, "$0"), # above 150: condition matches
+        ("[>=1.5e2]$0;0",  50, "0"),  # below 150: catch-all
+        # Issue 3: condition-like bracket inside a quoted literal — NOT a condition;
+        # the format must be treated as sign-based and the section returned intact.
+        ('"val[>=0]";0',  42, '"val[>=0]"'),  # positive → section 0, no stripping
+        ('"val[>=0]";0',  -5, "0"),            # negative → section 1
+    ],
+)
+def test_select_format_section(fmt: str, value: object, expected: str) -> None:
+    assert _xlsx_converter._select_format_section(fmt, value) == expected
+
+
+def test_currency_section_selection_no_prefix_for_positive_value() -> None:
+    """Positive value with format 0;[Red]$0 must NOT receive a $ prefix.
+
+    Regression for the bug where _extract_currency_prefix searched the entire
+    format string instead of only the section that applies to the cell's value.
+    """
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws["A1"] = "Amount"
+    ws["A2"] = 42        # positive → first section "0", no currency
+    ws["A2"].number_format = "0;[Red]$0"
+    ws["A3"] = -42       # negative → second section "[Red]$0", has currency
+    ws["A3"].number_format = "0;[Red]$0"
+    stream = io.BytesIO()
+    wb.save(stream)
+    wb.close()
+
+    result = _convert(XlsxConverter(), stream.getvalue())
+
+    assert "42" in result        # positive value appears as a plain number
+    assert "$42" not in result   # must NOT be prefixed — $ belongs to negative section
+    assert "$-42" in result      # negative value must receive the prefix
+
+
+def test_currency_conditional_section_selection() -> None:
+    """Conditional format [>=100]$0;0: only values meeting the condition get $.
+
+    Regression for the bug where returning the full format string caused
+    _extract_currency_prefix to find $ in a section that did not apply.
+    """
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws["A1"] = "Amount"
+    ws["A2"] = 42         # 42 < 100: catch-all "0" applies, no $
+    ws["A2"].number_format = "[>=100]$0;0"
+    ws["A3"] = 150        # 150 >= 100: "$0" applies, has $
+    ws["A3"].number_format = "[>=100]$0;0"
+    stream = io.BytesIO()
+    wb.save(stream)
+    wb.close()
+
+    result = _convert(XlsxConverter(), stream.getvalue())
+
+    assert "$42" not in result   # below threshold: must NOT be prefixed
+    assert "42" in result        # value still appears
+    assert "$150" in result      # above threshold: must be prefixed
+
+
+def test_currency_dollar_in_quoted_display_text() -> None:
+    """Dollar sign inside a multi-char quoted literal is display text, not a prefix.
+
+    Format '"$10 off"#,##0' uses "$10 off" as a quoted display string.  The $
+    is part of the label, not a currency code, so the cell must not be prefixed.
+    Regression: _extract_currency_prefix previously scanned raw format strings and
+    returned '$' for any '$' it found, regardless of quoting.
+    """
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws["A1"] = "Note"
+    ws["A2"] = 42
+    ws["A2"].number_format = '"$10 off"#,##0'  # dollar is display text only
+    ws["A3"] = 1199
+    ws["A3"].number_format = "$#,##0.00"       # real currency format
+    stream = io.BytesIO()
+    wb.save(stream)
+    wb.close()
+
+    result = _convert(XlsxConverter(), stream.getvalue())
+
+    assert "$42" not in result   # display-text dollar must NOT produce a prefix
+    assert "42" in result        # value still present
+    assert "$1199" in result     # real currency cell keeps its prefix
+
+
+def test_currency_single_symbol_quoted_prefix() -> None:
+    """A single-symbol quoted literal such as "$" is a valid Excel currency prefix.
+
+    Excel generates formats like "$"#,##0.00 in some currency styles; the
+    quoted dollar sign is intentional and must be recognised as a prefix.
+    """
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws["A1"] = "Price"
+    ws["A2"] = 42
+    ws["A2"].number_format = '"$"#,##0.00'
+    ws["A3"] = 999
+    ws["A3"].number_format = '"£"#,##0'
+    stream = io.BytesIO()
+    wb.save(stream)
+    wb.close()
+
+    result = _convert(XlsxConverter(), stream.getvalue())
+
+    assert "$42" in result    # single-char quoted dollar recognised as prefix
+    assert "£999" in result   # single-char quoted pound recognised as prefix
 
 
 def _currency_workbook() -> bytes:

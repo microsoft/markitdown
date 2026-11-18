@@ -96,6 +96,138 @@ def _repair_sheetview_show_zeroes(
 _CURRENCY_SYMBOLS = ("$", "£", "€", "¥", "₹", "₩", "₪", "₺", "₫")
 
 
+def _split_format_sections(fmt: str) -> list[str]:
+    """Split an Excel number-format string on top-level semicolons.
+
+    Semicolons inside "quoted literals" or [bracketed blocks] are literal
+    text, not section separators, and are preserved as-is.
+    """
+    sections: list[str] = []
+    buf: list[str] = []
+    in_quotes = False
+    depth = 0
+    i = 0
+    while i < len(fmt):
+        ch = fmt[i]
+        if ch == '"' and depth == 0:
+            in_quotes = not in_quotes
+            buf.append(ch)
+        elif ch == "\\" and not in_quotes and depth == 0:
+            buf.append(ch)
+            if i + 1 < len(fmt):
+                i += 1
+                buf.append(fmt[i])
+        elif ch == "[" and not in_quotes:
+            depth += 1
+            buf.append(ch)
+        elif ch == "]" and not in_quotes and depth > 0:
+            depth -= 1
+            buf.append(ch)
+        elif ch == ";" and not in_quotes and depth == 0:
+            sections.append("".join(buf))
+            buf = []
+        else:
+            buf.append(ch)
+        i += 1
+    sections.append("".join(buf))
+    return sections
+
+
+# Matches a condition bracket: [>=100], [<0], [>=.5], [>=1E3].
+# (?:\d+\.?\d*|\.\d+) accepts thresholds with or without a leading digit.
+# (?:[eE][+-]?\d+)? adds optional scientific-notation exponent.
+# search() (not match()) lets a leading colour code such as [Red] precede the bracket.
+_CONDITION_RE = re.compile(
+    r"\[([<>]=?|=)(-?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)\]"
+)
+
+# Matches a double-quoted Excel format literal: "text".  Used to blank out
+# quoted spans before scanning a section for condition brackets so that
+# bracket-like content inside quotes (e.g. "val[>=0]") is never mistaken for
+# a conditional operator.  Excel format strings do not support escape sequences
+# inside double-quoted literals, so a simple [^"]* inner pattern is correct.
+_QUOTED_RE = re.compile(r'"[^"]*"')
+
+
+def _condition_match_outside_quotes(section: str):
+    """Return a _CONDITION_RE match from text that is outside quoted literals.
+
+    Replaces every "..." span with spaces of equal length so that bracket
+    content inside quotes is invisible to _CONDITION_RE while all character
+    positions remain unchanged — m.start()/m.end() index correctly into the
+    original section string.
+    """
+    blanked = _QUOTED_RE.sub(lambda m: " " * len(m.group()), section)
+    return _CONDITION_RE.search(blanked)
+
+
+def _select_format_section(fmt: str, value: object) -> str:
+    """Return the format section applicable to *value*.
+
+    Excel's sign-based rules (sections without conditional operators):
+      1 section  → applies to everything
+      2 sections → [0] positive/zero, [1] negative
+      3 sections → [0] positive, [1] negative, [2] zero
+      4 sections → [0] positive, [1] negative, [2] zero, [3] text
+
+    When sections contain a conditional operator ([>N], [>=N], [<N], [<=N],
+    [=N]) — possibly preceded by a color code such as [Red] — the first
+    section whose condition evaluates to True is used; the condition bracket is
+    removed from the returned section so color/locale brackets remain intact.
+    The first section without a condition serves as the catch-all. If no
+    condition matches and there is no catch-all, an empty string is returned so
+    that _extract_currency_prefix() produces no prefix rather than searching a
+    section that does not apply to this value.
+    """
+    sections = _split_format_sections(fmt)
+    n = len(sections)
+    if n <= 1:
+        return fmt
+
+    has_conditional = any(_condition_match_outside_quotes(s) for s in sections)
+
+    if not has_conditional:
+        # Standard sign-based section selection
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            return sections[3] if n >= 4 else sections[0]
+        if n == 2:
+            return sections[1] if value < 0 else sections[0]
+        # n >= 3
+        if value > 0:
+            return sections[0]
+        if value < 0:
+            return sections[1]
+        return sections[2]  # zero
+
+    # Conditional format: evaluate sections in declaration order.
+    # Non-numeric values cannot satisfy numeric conditions → no prefix.
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return ""
+
+    fval = float(value)
+    catch_all: Optional[str] = None
+    for section in sections:
+        m = _condition_match_outside_quotes(section)
+        if m:
+            op, threshold = m.group(1), float(m.group(2))
+            matched = (
+                (op == ">" and fval > threshold)
+                or (op == ">=" and fval >= threshold)
+                or (op == "<" and fval < threshold)
+                or (op == "<=" and fval <= threshold)
+                or (op == "=" and fval == threshold)
+            )
+            if matched:
+                # Remove the condition bracket; keep any preceding color/locale
+                # brackets (e.g. [Red]) so _extract_currency_prefix can process them.
+                return section[: m.start()] + section[m.end() :]
+        elif catch_all is None:
+            catch_all = section  # first unconditional section is the catch-all
+
+    # No condition matched — use the catch-all, or "" if none exists.
+    return catch_all if catch_all is not None else ""
+
+
 def _extract_currency_prefix(fmt: str) -> Optional[str]:
     """Return the currency symbol or code from an openpyxl number_format string.
 
@@ -105,12 +237,21 @@ def _extract_currency_prefix(fmt: str) -> Optional[str]:
     """
     if not fmt or fmt in ("General", "@"):
         return None
-    # [$USD-409] → 'USD', [$€-407] → '€'; [$-409] has no chars before '-', no match
+    # An unmatched " indicates a malformed format (unclosed quoted literal).
+    # Scanning such a string for currency symbols is unreliable; fail safely.
+    if '"' in _QUOTED_RE.sub("", fmt):
+        return None
+    # [$USD-409] → 'USD', [$€-407] → '€'; [$-409] has no chars before '-', no match.
     m = re.search(r"\[\$([^-\]]+)", fmt)
     if m:
         return m.group(1)
-    # Strip all [...] blocks (color codes, bare LCID markers) before symbol scan
-    stripped = re.sub(r"\[[^\]]*\]", "", fmt)
+    # Blank out multi-character quoted literals so that a dollar sign in display
+    # text like "$10 off" is not mistaken for a currency prefix.  Single-symbol
+    # quoted literals ("$", "£", …) are preserved so they ARE recognised.
+    def _keep_single_symbol(qm: re.Match) -> str:
+        inner = qm.group()[1:-1]
+        return qm.group() if (len(inner) == 1 and inner in _CURRENCY_SYMBOLS) else " " * len(qm.group())
+    stripped = re.sub(r"\[[^\]]*\]", "", _QUOTED_RE.sub(_keep_single_symbol, fmt))
     for sym in _CURRENCY_SYMBOLS:
         if sym in stripped:
             return sym
@@ -140,7 +281,10 @@ def _build_currency_overlays(
                     if cell.value is None:
                         continue
                     col_idx = cell.column - 1
-                    prefix = _extract_currency_prefix(cell.number_format or "")
+                    applicable_fmt = _select_format_section(
+                        cell.number_format or "", cell.value
+                    )
+                    prefix = _extract_currency_prefix(applicable_fmt)
                     if (
                         prefix
                         and isinstance(cell.value, (int, float))
