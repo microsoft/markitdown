@@ -1085,3 +1085,23 @@ def test_deeply_nested_rss_item_fallback() -> None:
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
+
+
+def test_untitled_rss_item_date_starts_after_previous_body() -> None:
+    feed = b"""<rss version="2.0"><channel>
+  <title>Example feed</title>
+  <description>News</description>
+  <link>https://example.org/</link>
+  <item><description>First item body.</description></item>
+  <item>
+    <description>Second item body.</description>
+    <pubDate>Mon, 01 Jan 2024 00:00:00 GMT</pubDate>
+  </item>
+</channel></rss>"""
+
+    result = RssConverter().convert(io.BytesIO(feed), StreamInfo(extension=".rss"))
+
+    assert (
+        "First item body.\n\nPublished on: Mon, 01 Jan 2024 00:00:00 GMT\n"
+        "Second item body."
+    ) in result.markdown
