@@ -446,6 +446,19 @@ def test_embedded_drawing_entities_are_rejected() -> None:
     render.assert_not_called()
 
 
+def test_xls_acceptance_prefers_known_extension_over_mimetype() -> None:
+    converter = XlsConverter()
+    excel_mimetype = "application/vnd.ms-excel"
+
+    assert converter.accepts(
+        io.BytesIO(), StreamInfo(extension=".xls", mimetype=excel_mimetype)
+    )
+    assert converter.accepts(io.BytesIO(), StreamInfo(mimetype=excel_mimetype))
+    assert not converter.accepts(
+        io.BytesIO(), StreamInfo(extension=".doc", mimetype=excel_mimetype)
+    )
+
+
 def test_missing_dependencies_and_legacy_xls_stay_separate(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
