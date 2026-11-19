@@ -12,6 +12,29 @@ from markitdown.converters._markdownify import _CustomMarkdownify
 # HTML rendering
 
 
+@pytest.mark.parametrize(
+    ("html", "expected_title"),
+    [
+        ("<body><svg><title>Diagram</title></svg><p>Body</p></body>", None),
+        (
+            "<head><title>Page</title></head>"
+            "<body><svg><title>Diagram</title></svg><p>Body</p></body>",
+            "Page",
+        ),
+        ("<title>Page</title><p>Body</p>", "Page"),
+    ],
+)
+def test_html_document_title_excludes_svg_titles(
+    html: str, expected_title: str | None
+) -> None:
+    result = MarkItDown().convert_stream(
+        io.BytesIO(html.encode("utf-8")), stream_info=StreamInfo(extension=".html")
+    )
+
+    assert result.title == expected_title
+    assert "Body" in result.markdown
+
+
 def _convert_html(html: str, **kwargs) -> str:
     result = MarkItDown().convert_stream(
         io.BytesIO(html.encode("utf-8")),
