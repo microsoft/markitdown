@@ -955,3 +955,26 @@ def test_a_declared_charset_still_wins() -> None:
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
+
+
+def test_ipynb_heading_title_with_single_string_source() -> None:
+    """Heading title must be extracted when a markdown cell's source is a single string.
+
+    Regression for https://github.com/microsoft/markitdown/issues/2762
+    """
+    from markitdown.converters._ipynb_converter import IpynbConverter
+
+    notebook = {
+        "nbformat": 4,
+        "nbformat_minor": 5,
+        "metadata": {},
+        "cells": [
+            {
+                "cell_type": "markdown",
+                "source": "# Notebook Title\nSome content follows here.",
+                "metadata": {},
+            }
+        ],
+    }
+    result = IpynbConverter()._convert(notebook)
+    assert result.title == "Notebook Title"
