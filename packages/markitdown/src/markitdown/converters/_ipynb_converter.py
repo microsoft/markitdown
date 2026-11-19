@@ -76,7 +76,8 @@ class IpynbConverter(DocumentConverter):
 
                     # Extract the first # heading as title if not already found
                     if title is None:
-                        for line in source_lines:
+                        lines = source_lines.splitlines() if isinstance(source_lines, str) else source_lines
+                        for line in lines:
                             if line.startswith("# "):
                                 title = line.removeprefix("# ").strip()
                                 break
