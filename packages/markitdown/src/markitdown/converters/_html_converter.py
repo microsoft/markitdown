@@ -85,9 +85,12 @@ class HtmlConverter(DocumentConverter):
         # remove leading and trailing \n
         webpage_text = webpage_text.strip()
 
+        title = soup.find(
+            lambda tag: tag.name == "title" and tag.find_parent("svg") is None
+        )
         return DocumentConverterResult(
             markdown=webpage_text,
-            title=None if soup.title is None else soup.title.string,
+            title=None if title is None else title.string,
         )
 
     def convert_string(
