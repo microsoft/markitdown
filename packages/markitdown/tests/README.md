@@ -28,6 +28,7 @@ appropriate section instead of creating a file for each bug or feature.
 | `test_youtube.py` | YouTube URLs, extraction, transcripts, and fallback |
 | `test_zip.py` | ZIP entries and nested conversion options |
 | `test_docintel.py` | Document Intelligence routing and client options |
+| `test_docintel_converter.py` | DocumentIntelligenceConverter internals: model/feature/query-field options and YAML front matter, against a mocked client |
 | `test_cu.py` | Content Understanding routing, conversion, and registration |
 | `test_cli_misc.py` | CLI behavior outside the vector matrix, including service flags |
 | `test_module_misc.py` | Library infrastructure, cross-format options, and formats without a dedicated suite |
