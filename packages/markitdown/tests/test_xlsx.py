@@ -542,3 +542,36 @@ def test_xlsx_show_zeroes_rename_is_scoped_to_sheet_view_tags() -> None:
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
+
+
+def test_xlsx_preserves_formula_error_values() -> None:
+    """Excel formula error values such as #DIV/0!, #REF!, #VALUE! must be preserved.
+
+    Regression for https://github.com/microsoft/markitdown/issues/2728
+    """
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = "Errors"
+    sheet.append(["Error Type", "Result"])
+    sheet.append(["Division by zero", "#DIV/0!"])
+    sheet["B2"].data_type = "e"
+    sheet.append(["Invalid reference", "#REF!"])
+    sheet["B3"].data_type = "e"
+    sheet.append(["Value error", "#VALUE!"])
+    sheet["B4"].data_type = "e"
+    sheet.append(["Not available", "#N/A"])
+    sheet["B5"].data_type = "e"
+
+    stream = io.BytesIO()
+    workbook.save(stream)
+    workbook.close()
+
+    result = XlsxConverter().convert(
+        io.BytesIO(stream.getvalue()), StreamInfo(extension=".xlsx")
+    )
+
+    assert "## Errors" in result.markdown
+    assert "#DIV/0!" in result.markdown
+    assert "#REF!" in result.markdown
+    assert "#VALUE!" in result.markdown
+    assert "#N/A" in result.markdown

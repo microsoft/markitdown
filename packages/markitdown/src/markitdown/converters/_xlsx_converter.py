@@ -50,16 +50,27 @@ def _read_xlsx_sheets(
 ) -> Iterator[tuple[dict[str, Any], BinaryIO]]:
     start_pos = file_stream.tell()
     repaired_stream = None
+    import pandas.io.excel._openpyxl as ox
+
+    orig_convert_cell = ox.OpenpyxlReader._convert_cell
+
+    def _convert_cell(self, cell):
+        if getattr(cell, "data_type", None) == "e" and cell.value is not None:
+            return cell.value
+        return orig_convert_cell(self, cell)
+
+    ox.OpenpyxlReader._convert_cell = _convert_cell
     try:
         try:
-            sheets = pd.read_excel(file_stream, sheet_name=None, engine="openpyxl")
+            sheets = pd.read_excel(file_stream, sheet_name=None, engine="openpyxl", keep_default_na=False)
         except TypeError as exc:
             if "showZeroes" not in str(exc):
                 raise
             repaired_stream = _repair_sheetview_show_zeroes(file_stream, start_pos)
-            sheets = pd.read_excel(repaired_stream, sheet_name=None, engine="openpyxl")
+            sheets = pd.read_excel(repaired_stream, sheet_name=None, engine="openpyxl", keep_default_na=False)
         yield sheets, repaired_stream if repaired_stream is not None else file_stream
     finally:
+        ox.OpenpyxlReader._convert_cell = orig_convert_cell
         if repaired_stream is not None:
             repaired_stream.close()
 
