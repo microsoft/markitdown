@@ -100,6 +100,22 @@ def test_html_href_does_not_quote_query_or_fragment() -> None:
     assert f"[example]({expected_href})" in markdown
 
 
+def test_empty_anchor_kept_only_when_linked() -> None:
+    html = (
+        '<p><a href="#sec">Go</a></p>'
+        '<h2><a id="sec"></a>Section</h2>'
+        '<h2><a name="unused"></a>Other</h2>'
+        '<p><a id="x&quot;y"></a><a href="#x&quot;y">Quoted</a></p>'
+    )
+
+    markdown = _convert_html(html)
+
+    assert "[Go](#sec)" in markdown
+    assert '## <a id="sec"></a>Section' in markdown
+    assert "unused" not in markdown
+    assert '<a id="x&quot;y"></a>' in markdown
+
+
 def test_img_prefers_data_src_over_placeholder_data_uri() -> None:
     placeholder = (
         "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBTAA7"

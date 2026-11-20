@@ -1482,5 +1482,23 @@ def test_convert_docx_with_style_missing_type(tmp_path):
     assert "# Abstract" in result.markdown
 
 
+def test_toc_links_keep_bookmark_targets() -> None:
+    body = _paragraph(
+        '<w:hyperlink w:anchor="_Toc123">' + _text("1.1 Overview 2") + "</w:hyperlink>"
+    ) + _paragraph(
+        '<w:bookmarkStart w:id="0" w:name="_Toc123"/>'
+        '<w:bookmarkStart w:id="1" w:name="_GoBack"/>'
+        + _text("Overview")
+        + '<w:bookmarkEnd w:id="1"/><w:bookmarkEnd w:id="0"/>'
+    )
+
+    markdown = MarkItDown().convert_stream(_docx(body), stream_info=_INFO).markdown
+
+    assert "[1.1 Overview 2](#_Toc123)" in markdown
+    assert '<a id="_Toc123"></a>Overview' in markdown
+    # Bookmarks that nothing links to are still dropped.
+    assert "_GoBack" not in markdown
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
