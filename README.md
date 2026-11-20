@@ -150,7 +150,7 @@ from openai import OpenAI
 md = MarkItDown(
     enable_plugins=True,
     llm_client=OpenAI(),
-    llm_model="gpt-4o",
+    llm_model="gpt-6-luna",
 )
 result = md.convert("document_with_images.pdf")
 print(result.markdown)
@@ -353,7 +353,7 @@ from markitdown import MarkItDown
 from openai import OpenAI
 
 client = OpenAI(max_retries=5)
-md = MarkItDown(llm_client=client, llm_model="gpt-4o", llm_prompt="optional custom prompt")
+md = MarkItDown(llm_client=client, llm_model="gpt-6-luna", llm_prompt="optional custom prompt")
 result = md.convert("example.jpg")
 print(result.markdown)
 ```

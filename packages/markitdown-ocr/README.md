@@ -45,7 +45,7 @@ from openai import OpenAI
 md = MarkItDown(
     enable_plugins=True,
     llm_client=OpenAI(),
-    llm_model="gpt-4o",
+    llm_model="gpt-6-luna",
 )
 
 result = md.convert("document_with_images.pdf")
@@ -62,7 +62,7 @@ Override the default extraction prompt for specialized documents:
 md = MarkItDown(
     enable_plugins=True,
     llm_client=OpenAI(),
-    llm_model="gpt-4o",
+    llm_model="gpt-6-luna",
     llm_prompt="Extract all text from this image, preserving table structure.",
 )
 ```
@@ -159,7 +159,7 @@ from markitdown import MarkItDown
 md = MarkItDown(
     enable_plugins=True,
     llm_client=OpenAI(),   # required
-    llm_model="gpt-4o",    # required
+    llm_model="gpt-6-luna",    # required
 )
 ```
 
