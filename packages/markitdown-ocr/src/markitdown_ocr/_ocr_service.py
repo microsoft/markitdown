@@ -4,6 +4,7 @@ Provides LLM Vision-based image text extraction.
 """
 
 import base64
+import inspect
 from typing import Any, BinaryIO
 from dataclasses import dataclass
 
@@ -108,3 +109,19 @@ class LLMVisionOCRService:
             return OCRResult(text="", backend_used="llm_vision", error=str(e))
         finally:
             image_stream.seek(0)
+
+
+def _extract_text_with_metadata(
+    ocr_service: LLMVisionOCRService,
+    image_stream: BinaryIO,
+    stream_info: StreamInfo,
+) -> OCRResult:
+    """Forward metadata when supported, retaining the legacy stream-only call."""
+    extract_text = ocr_service.extract_text
+    try:
+        inspect.signature(extract_text).bind(image_stream, stream_info=stream_info)
+    except (TypeError, ValueError):
+        # Unsupported or uninspectable signatures keep the legacy invocation.
+        return extract_text(image_stream)
+    # Keep service errors outside the signature check; never retry an OCR call.
+    return extract_text(image_stream, stream_info=stream_info)

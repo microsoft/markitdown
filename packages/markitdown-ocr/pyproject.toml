@@ -25,16 +25,16 @@ classifiers = [
 
 # Core dependencies — matches the file-format libraries markitdown already uses
 dependencies = [
-  "markitdown>=0.1.0",
+  "markitdown>=0.1.9,<0.2.0",
   "pdfminer.six>=20251230",
   "pdfplumber>=0.11.9",
-  "PyMuPDF>=1.24.0",
-  "mammoth~=1.11.0",
+  "PyMuPDF>=1.24.0,<2",
+  "mammoth>=1.12.2,<2",
   "python-docx",
   "python-pptx",
   "pandas",
   "openpyxl",
-  "Pillow>=9.0.0",
+  "Pillow>=12.1.1",
 ]
 
 # llm_client is passed in by the user (same as for markitdown image descriptions);

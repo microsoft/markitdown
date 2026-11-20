@@ -26,8 +26,8 @@ CHR = {
     "\u0307": "\\dot{{{0}}}",
     "\u0308": "\\ddot{{{0}}}",
     "\u0309": "\\ovhook{{{0}}}",
-    "\u030a": "\\ocirc{{{0}}}}",
-    "\u030c": "\\check{{{0}}}}",
+    "\u030a": "\\ocirc{{{0}}}",
+    "\u030c": "\\check{{{0}}}",
     "\u0310": "\\candra{{{0}}}",
     "\u0312": "\\oturnedcomma{{{0}}}",
     "\u0315": "\\ocommatopright{{{0}}}",
@@ -50,7 +50,7 @@ CHR = {
     "\u20e8": "\\threeunderdot{{{0}}}",
     "\u20ec": "\\underrightharpoondown{{{0}}}",
     "\u20ed": "\\underleftharpoondown{{{0}}}",
-    "\u20ee": "\\underledtarrow{{{0}}}",
+    "\u20ee": "\\underleftarrow{{{0}}}",
     "\u20ef": "\\underrightarrow{{{0}}}",
     # Over | group
     "\u23b4": "\\overbracket{{{0}}}",
@@ -79,12 +79,11 @@ CHR_BO = {
 }
 
 T = {
-    "\u2192": "\\rightarrow ",
     # Greek letters
     "\U0001d6fc": "\\alpha ",
     "\U0001d6fd": "\\beta ",
     "\U0001d6fe": "\\gamma ",
-    "\U0001d6ff": "\\theta ",
+    "\U0001d6ff": "\\delta ",
     "\U0001d700": "\\epsilon ",
     "\U0001d701": "\\zeta ",
     "\U0001d702": "\\eta ",
@@ -92,15 +91,15 @@ T = {
     "\U0001d704": "\\iota ",
     "\U0001d705": "\\kappa ",
     "\U0001d706": "\\lambda ",
-    "\U0001d707": "\\m ",
-    "\U0001d708": "\\n ",
+    "\U0001d707": "\\mu ",
+    "\U0001d708": "\\nu ",
     "\U0001d709": "\\xi ",
     "\U0001d70a": "\\omicron ",
     "\U0001d70b": "\\pi ",
     "\U0001d70c": "\\rho ",
     "\U0001d70d": "\\varsigma ",
     "\U0001d70e": "\\sigma ",
-    "\U0001d70f": "\\ta ",
+    "\U0001d70f": "\\tau ",
     "\U0001d710": "\\upsilon ",
     "\U0001d711": "\\phi ",
     "\U0001d712": "\\chi ",
@@ -117,7 +116,7 @@ T = {
     "\u2190": "\\leftarrow ",
     "\u2191": "\\uparrow ",
     "\u2192": "\\rightarrow ",
-    "\u2193": "\\downright ",
+    "\u2193": "\\downarrow ",
     "\u2194": "\\leftrightarrow ",
     "\u2195": "\\updownarrow ",
     "\u2196": "\\nwarrow ",
@@ -181,6 +180,8 @@ T = {
     "\U0001d452": "e",
     "\U0001d453": "f",
     "\U0001d454": "g",
+    # U+1D455 is reserved: the math italic small h is unified with U+210E
+    "\u210e": "h",
     "\U0001d456": "i",
     "\U0001d457": "j",
     "\U0001d458": "k",
@@ -208,13 +209,29 @@ FUNC = {
     "arcsin": "\\arcsin({fe})",
     "arccos": "\\arccos({fe})",
     "arctan": "\\arctan({fe})",
-    "arccot": "\\arccot({fe})",
+    "arccot": "\\operatorname{arccot}({fe})",
     "sinh": "\\sinh({fe})",
     "cosh": "\\cosh({fe})",
     "tanh": "\\tanh({fe})",
     "coth": "\\coth({fe})",
     "sec": "\\sec({fe})",
     "csc": "\\csc({fe})",
+    "log": "\\log({fe})",
+    "ln": "\\ln({fe})",
+    "exp": "\\exp({fe})",
+    "det": "\\det({fe})",
+    "gcd": "\\gcd({fe})",
+    "lcm": "\\operatorname{lcm}({fe})",
+    "lim": "\\lim({fe})",
+    "max": "\\max({fe})",
+    "min": "\\min({fe})",
+    "sup": "\\sup({fe})",
+    "inf": "\\inf({fe})",
+    "dim": "\\dim({fe})",
+    "ker": "\\ker({fe})",
+    "hom": "\\hom({fe})",
+    "deg": "\\deg({fe})",
+    "arg": "\\arg({fe})",
 }
 
 FUNC_PLACE = "{fe}"
@@ -223,6 +240,7 @@ BRK = "\\\\"
 
 CHR_DEFAULT = {
     "ACC_VAL": "\\hat{{{0}}}",
+    "GROUP_CHR_VAL": "\\underbrace{{{0}}}",
 }
 
 POS = {
