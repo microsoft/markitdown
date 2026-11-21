@@ -1,6 +1,8 @@
 import base64
+import ipaddress
 import ntpath
 import os
+import socket
 from typing import Tuple, Dict
 from urllib.request import url2pathname
 from urllib.parse import urlparse, unquote_to_bytes
@@ -73,3 +75,34 @@ def parse_data_uri(uri: str) -> Tuple[str | None, Dict[str, str], bytes]:
     content = base64.b64decode(data) if is_base64 else unquote_to_bytes(data)
 
     return mime_type, attributes, content
+
+
+def is_ssrf_safe_host(hostname: str | None) -> bool:
+    """Return False if hostname resolves to a private or local address.
+
+    Blocking these addresses stops markitdown from being used as an SSRF proxy
+    to reach internal services (e.g. instance metadata) when converting a
+    user-supplied http/https URL.
+    """
+    if not hostname:
+        return True
+    try:
+        infos = socket.getaddrinfo(hostname, None)
+    except socket.gaierror:
+        return True  # Unresolvable hosts cannot be fetched anyway
+    for info in infos:
+        sockaddr = info[4]
+        try:
+            ip = ipaddress.ip_address(sockaddr[0])
+        except ValueError:
+            continue
+        if (
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_link_local
+            or ip.is_multicast
+            or ip.is_reserved
+            or ip.is_unspecified
+        ):
+            return False
+    return True

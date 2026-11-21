@@ -19,7 +19,7 @@ import charset_normalizer
 import codecs
 
 from ._stream_info import StreamInfo
-from ._uri_utils import parse_data_uri, file_uri_to_path
+from ._uri_utils import parse_data_uri, file_uri_to_path, is_ssrf_safe_host
 
 from .converters import (
     PlainTextConverter,
@@ -136,6 +136,9 @@ class ConverterRegistration:
 
     converter: DocumentConverter
     priority: float
+
+
+_REQUEST_TIMEOUT = 30  # Seconds before an http/https fetch is aborted
 
 
 class MarkItDown:
@@ -526,7 +529,9 @@ class MarkItDown:
             )
         # HTTP/HTTPS URIs
         elif scheme in ("http", "https"):
-            response = self._requests_session.get(uri, stream=True)
+            if not is_ssrf_safe_host(urlparse(uri).hostname):
+                raise ValueError(f"Refusing to fetch private or local address: {uri}")
+            response = self._requests_session.get(uri, stream=True, timeout=_REQUEST_TIMEOUT)
             response.raise_for_status()
             return self.convert_response(
                 response,
