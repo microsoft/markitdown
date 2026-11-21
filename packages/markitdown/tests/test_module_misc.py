@@ -26,6 +26,7 @@ from markitdown._markitdown import (
 from markitdown._uri_utils import (
     _is_unc_or_device_path,
     file_uri_to_path,
+    is_ssrf_safe_host,
     parse_data_uri,
 )
 
@@ -657,6 +658,36 @@ def test_convert_rejects_remote_file_uri_before_file_access(
 )
 def test_resolved_path_validation(path: str, blocked: bool) -> None:
     assert _is_unc_or_device_path(path) is blocked
+
+
+@pytest.mark.parametrize(
+    "hostname, safe",
+    [
+        ("127.0.0.1", False),
+        ("localhost", False),
+        ("::1", False),
+        ("10.0.0.1", False),
+        ("172.16.0.1", False),
+        ("192.168.1.1", False),
+        ("169.254.169.254", False),
+        ("0.0.0.0", False),
+        ("224.0.0.1", False),
+        ("example.com", True),
+        ("1.1.1.1", True),
+        ("8.8.8.8", True),
+        (None, True),
+        ("", True),
+    ],
+)
+def test_is_ssrf_safe_host(hostname: str | None, safe: bool) -> None:
+    assert is_ssrf_safe_host(hostname) is safe
+
+
+def test_convert_rejects_private_http_address() -> None:
+    # SSRF: markitdown must not fetch loopback/private addresses.
+    markitdown = MarkItDown()
+    with pytest.raises(ValueError, match="Refusing to fetch private or local address"):
+        markitdown.convert("http://127.0.0.1/secret.txt")
 
 
 def test_file_uri_rejects_unc_after_conversion(monkeypatch: pytest.MonkeyPatch) -> None:
