@@ -90,6 +90,38 @@ def test_title_with_text_is_still_emitted() -> None:
     assert BODY_TEXT in markdown
 
 
+# Body paragraphs
+
+
+def test_body_paragraphs_are_separate_markdown_paragraphs() -> None:
+    """Each PowerPoint paragraph must become its own Markdown paragraph.
+
+    A single newline is only a soft break in Markdown, so joining paragraphs
+    with "\n" renders them as one continuous line.
+    """
+    prs = pptx.Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[1])
+    slide.shapes.title.text = "Quarterly review"
+    body = slide.placeholders[1].text_frame
+    body.text = "Revenue grew 12% year over year."
+    body.add_paragraph().text = "Costs stayed flat."
+    body.add_paragraph().text = "Outlook is positive."
+    stream = io.BytesIO()
+    prs.save(stream)
+    stream.seek(0)
+
+    markdown = MarkItDown().convert_stream(
+        stream, stream_info=StreamInfo(extension=".pptx")
+    ).markdown
+
+    assert (
+        "Revenue grew 12% year over year.\n\n"
+        "Costs stayed flat.\n\n"
+        "Outlook is positive." in markdown
+    )
+    assert "year over year. Costs stayed flat." not in markdown
+
+
 # Speaker notes
 
 
