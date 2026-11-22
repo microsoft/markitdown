@@ -240,9 +240,10 @@ def test_wikipedia_converter_blank_title() -> None:
     assert result.text_content.strip() == "Hello"
 
 
-# Language codes are BCP 47-style subdomains, so some carry hyphens. Those
-# editions must reach WikipediaConverter; the generic HTML converter would
-# keep the navigation and footer chrome around the article.
+# Language codes are BCP 47-style subdomains, so some carry hyphens. Hostnames
+# are case-insensitive, so an uppercase edition must resolve too. Those editions
+# must reach WikipediaConverter; the generic HTML converter would keep the
+# navigation and footer chrome around the article.
 @pytest.mark.parametrize(
     "url",
     [
@@ -251,6 +252,10 @@ def test_wikipedia_converter_blank_title() -> None:
         "https://zh-min-nan.wikipedia.org/wiki/Ada_Lovelace",
         "https://roa-rup.wikipedia.org/wiki/Ada_Lovelace",
         "https://simple.m.wikipedia.org/wiki/Ada_Lovelace",
+        "https://EN.wikipedia.org/wiki/Ada_Lovelace",
+        "https://En.Wikipedia.org/wiki/Ada_Lovelace",
+        "https://ZH-MIN-NAN.wikipedia.org/wiki/Ada_Lovelace",
+        "https://SIMPLE.m.wikipedia.org/wiki/Ada_Lovelace",
     ],
 )
 def test_wikipedia_converter_reads_hyphenated_language_editions(url: str) -> None:

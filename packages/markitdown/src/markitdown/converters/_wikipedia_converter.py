@@ -23,7 +23,7 @@ ACCEPTED_FILE_EXTENSIONS = [
 # The earlier `[a-zA-Z]{2,3}` form rejected all 13 of those editions, so their
 # pages fell through to the generic HTML converter and came out wrapped in the
 # site navigation and footer instead of the article alone.
-_WIKIPEDIA_URL = r"^https?:\/\/[a-z]{2,8}(?:-[a-z0-9]{1,9})*(?:\.m)?\.wikipedia\.org\/"
+_WIKIPEDIA_URL = re.compile(r"^https?:\/\/[a-z]{2,8}(?:-[a-z0-9]{1,9})*(?:\.m)?\.wikipedia\.org\/", re.IGNORECASE)
 
 
 class WikipediaConverter(DocumentConverter):
@@ -43,7 +43,7 @@ class WikipediaConverter(DocumentConverter):
         mimetype = (stream_info.mimetype or "").lower()
         extension = (stream_info.extension or "").lower()
 
-        if not re.search(_WIKIPEDIA_URL, url):
+        if not _WIKIPEDIA_URL.search(url):
             # Not a Wikipedia URL
             return False
 
