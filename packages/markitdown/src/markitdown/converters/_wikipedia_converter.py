@@ -1,99 +1,96 @@
+from __future__ import annotations
+
 import re
-import bs4
-from typing import Any, BinaryIO
+import sys
+from typing import TYPE_CHECKING, BinaryIO, Final, cast
 
 from .._base_converter import DocumentConverter, DocumentConverterResult
 from .._stream_info import StreamInfo
-from ._markdownify import _CustomMarkdownify
 
-ACCEPTED_MIME_TYPE_PREFIXES = [
+if sys.version_info < (3, 11):
+    from ._legacy_html import convert_wikipedia
+else:
+    from ._markdown import _CustomMarkdown, _document_title, _parse_html
+
+if TYPE_CHECKING:
+    from ._markdown_options import _OPTION_VALUE, _MarkdownOptions
+
+
+_ACCEPTED_MIME_TYPE_PREFIXES: Final = [
     "text/html",
     "application/xhtml",
 ]
 
-ACCEPTED_FILE_EXTENSIONS = [
+_ACCEPTED_FILE_EXTENSIONS: Final = [
     ".html",
     ".htm",
 ]
 
 
 class WikipediaConverter(DocumentConverter):
-    """Handle Wikipedia pages separately, focusing only on the main document content."""
+    """Exclude navigation and preserve the article title."""
 
     def accepts(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
-        **kwargs: Any,  # Options to pass to the converter
+        **kwargs: _OPTION_VALUE,
     ) -> bool:
-        """
-        Make sure we're dealing with HTML content *from* Wikipedia.
-        """
-
-        url = stream_info.url or ""
-        mimetype = (stream_info.mimetype or "").lower()
-        extension = (stream_info.extension or "").lower()
+        url: Final = stream_info.url or ""
+        mimetype: Final = (stream_info.mimetype or "").lower()
+        extension: Final = (stream_info.extension or "").lower()
 
         if not re.search(r"^https?:\/\/[a-zA-Z]{2,3}(\.m)?\.wikipedia.org\/", url):
-            # Not a Wikipedia URL
             return False
 
-        if extension in ACCEPTED_FILE_EXTENSIONS:
+        if extension in _ACCEPTED_FILE_EXTENSIONS:
             return True
 
-        for prefix in ACCEPTED_MIME_TYPE_PREFIXES:
+        for prefix in _ACCEPTED_MIME_TYPE_PREFIXES:
             if mimetype.startswith(prefix):
                 return True
 
-        # Not HTML content
         return False
 
     def convert(
         self,
         file_stream: BinaryIO,
         stream_info: StreamInfo,
-        **kwargs: Any,  # Options to pass to the converter
+        **kwargs: _OPTION_VALUE,
     ) -> DocumentConverterResult:
-        # Parse the stream
-        encoding = "utf-8" if stream_info.charset is None else stream_info.charset
-        soup = bs4.BeautifulSoup(file_stream, "html.parser", from_encoding=encoding)
+        if sys.version_info < (3, 11):
+            return convert_wikipedia(
+                file_stream, stream_info, cast("_MarkdownOptions", kwargs)
+            )
+        doc: Final = _parse_html(file_stream, stream_info)
 
-        # Remove javascript and style blocks
-        for script in soup(["script", "style"]):
-            script.extract()
-
-        # Print only the main content
-        body_elm = soup.find("div", {"id": "mw-content-text"})
-        # Wikipedia only wraps the title in mw-page-title-main when it is plain
-        # text. Titles that carry markup -- italicised species, film, album and
-        # journal names -- are written straight into the first heading instead.
-        title_elm = soup.find("span", {"class": "mw-page-title-main"}) or soup.find(
-            "h1", {"id": "firstHeading"}
+        body_elm: Final = doc.select_one("div#mw-content-text")
+        title_elm: Final = doc.select_one("span.mw-page-title-main") or doc.select_one(
+            "h1#firstHeading"
         )
 
         webpage_text = ""
-        main_title = None if soup.title is None else soup.title.string
+        main_title = _document_title(doc)
 
         if body_elm:
-            # What's the title
-            if title_elm and isinstance(title_elm, bs4.Tag):
-                # .string is None as soon as the element holds more than one
-                # child, which is what a title mixing markup with plain text
-                # looks like, so gather the descendant text instead.
-                main_title = title_elm.get_text()
+            if title_elm:
+                main_title = title_elm.text or None
 
-            # Treat whitespace-only titles as if they were absent
             if main_title:
                 main_title = main_title.strip() or None
 
-            # Convert the page
             webpage_text = (
                 f"# {main_title}\n\n" if main_title else ""
-            ) + _CustomMarkdownify(**kwargs).convert_soup(body_elm)
+            ) + _CustomMarkdown(**cast("_MarkdownOptions", kwargs)).convert(body_elm)
         else:
-            webpage_text = _CustomMarkdownify(**kwargs).convert_soup(soup)
+            webpage_text = _CustomMarkdown(**cast("_MarkdownOptions", kwargs)).convert(
+                doc
+            )
 
         return DocumentConverterResult(
             markdown=webpage_text,
             title=main_title,
         )
+
+
+__all__ = ["WikipediaConverter"]
