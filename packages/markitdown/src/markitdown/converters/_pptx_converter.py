@@ -322,6 +322,29 @@ class PptxConverter(DocumentConverter):
             + "\n"
         )
 
+    def _convert_plot_data_to_table(self, categories, series_list):
+        category_names = [getattr(c, "label", str(c)) for c in categories]
+        series_names = [s.name for s in series_list]
+        data = [["Category"] + series_names]
+
+        # Materialize each series' values once. Accessing series.values[idx]
+        # inside the nested loop is O(n^2) in python-pptx (each lookup does an
+        # XPath scan of all points), which is extremely slow on large charts.
+        series_values = [list(s.values) for s in series_list]
+
+        for idx, category in enumerate(category_names):
+            row = [category]
+            for sv in series_values:
+                row.append(sv[idx] if idx < len(sv) else None)
+            data.append(row)
+
+        markdown_table = []
+        for row in data:
+            markdown_table.append("| " + " | ".join(map(str, row)) + " |")
+        header = markdown_table[0]
+        separator = "|" + "|".join(["---"] * len(data[0])) + "|"
+        return "\n".join([header, separator] + markdown_table[1:])
+
     def _convert_chart_to_markdown(self, chart):
         try:
             md = "\n\n### Chart"
@@ -332,29 +355,30 @@ class PptxConverter(DocumentConverter):
             if chart.has_title and chart.chart_title.has_text_frame:
                 md += f": {chart.chart_title.text_frame.text}"
             md += "\n\n"
-            data = []
-            category_names = [c.label for c in chart.plots[0].categories]
-            series_list = list(chart.series)
-            series_names = [s.name for s in series_list]
-            data.append(["Category"] + series_names)
 
-            # Materialize each series' values once. Accessing series.values[idx]
-            # inside the nested loop is O(n^2) in python-pptx (each lookup does an
-            # XPath scan of all points), which is extremely slow on large charts.
-            series_values = [list(s.values) for s in series_list]
+            plots = [p for p in chart.plots if list(p.series)]
+            if not plots:
+                plots = list(chart.plots)
+            if not plots:
+                return "\n\n[unsupported chart]\n\n"
 
-            for idx, category in enumerate(category_names):
-                row = [category]
-                for sv in series_values:
-                    row.append(sv[idx] if idx < len(sv) else None)
-                data.append(row)
+            plot_categories = [
+                [getattr(c, "label", str(c)) for c in p.categories] for p in plots
+            ]
+            all_same_categories = len(plots) == 1 or all(
+                cats == plot_categories[0] for cats in plot_categories[1:]
+            )
 
-            markdown_table = []
-            for row in data:
-                markdown_table.append("| " + " | ".join(map(str, row)) + " |")
-            header = markdown_table[0]
-            separator = "|" + "|".join(["---"] * len(data[0])) + "|"
-            return md + "\n".join([header, separator] + markdown_table[1:])
+            if all_same_categories:
+                all_series = [s for p in plots for s in p.series]
+                return md + self._convert_plot_data_to_table(
+                    plots[0].categories, all_series
+                )
+
+            tables = [
+                self._convert_plot_data_to_table(p.categories, p.series) for p in plots
+            ]
+            return md + "\n\n".join(tables)
         except ValueError as e:
             # Handle the specific error for unsupported chart types
             if "unsupported plot type" in str(e):

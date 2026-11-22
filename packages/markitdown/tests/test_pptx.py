@@ -893,5 +893,81 @@ def test_pptx_chart_title_text_frame(title: str | None) -> None:
     assert result.strip() in markdown
 
 
+def test_pptx_combo_chart_different_categories_separate_tables() -> None:
+    """Combo charts with different category sequences must not mislabel or drop data (#2839)."""
+    from pptx import Presentation
+    from pptx.chart.data import CategoryChartData
+    from pptx.enum.chart import XL_CHART_TYPE
+    from pptx.util import Inches
+
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    d1 = CategoryChartData()
+    d1.categories = ["January", "February"]
+    d1.add_series("Orders", (10.0, 20.0))
+    c1 = slide.shapes.add_chart(
+        XL_CHART_TYPE.COLUMN_CLUSTERED, 0, 0, Inches(4), Inches(4), d1
+    ).chart
+
+    p2 = Presentation()
+    s2 = p2.slides.add_slide(p2.slide_layouts[6])
+    d2 = CategoryChartData()
+    d2.categories = ["February", "January", "March"]
+    d2.add_series("Revenue", (100.0, 200.0, 300.0))
+    c2 = s2.shapes.add_chart(XL_CHART_TYPE.LINE, 0, 0, Inches(4), Inches(4), d2).chart
+
+    line_chart_xml = c2._element.chart.plotArea.find(
+        "{http://schemas.openxmlformats.org/drawingml/2006/chart}lineChart"
+    )
+    c1._element.chart.plotArea.append(line_chart_xml)
+
+    converter = PptxConverter()
+    result = converter._convert_chart_to_markdown(c1)
+
+    # Orders table
+    assert "| January | 10.0 |" in result
+    assert "| February | 20.0 |" in result
+    # Revenue table
+    assert "| February | 100.0 |" in result
+    assert "| January | 200.0 |" in result
+    assert "| March | 300.0 |" in result
+
+
+def test_pptx_combo_chart_same_categories_combined_table() -> None:
+    """Combo charts with identical category sequences combine into a single table."""
+    from pptx import Presentation
+    from pptx.chart.data import CategoryChartData
+    from pptx.enum.chart import XL_CHART_TYPE
+    from pptx.util import Inches
+
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    d1 = CategoryChartData()
+    d1.categories = ["Q1", "Q2"]
+    d1.add_series("Orders", (10.0, 20.0))
+    c1 = slide.shapes.add_chart(
+        XL_CHART_TYPE.COLUMN_CLUSTERED, 0, 0, Inches(4), Inches(4), d1
+    ).chart
+
+    p2 = Presentation()
+    s2 = p2.slides.add_slide(p2.slide_layouts[6])
+    d2 = CategoryChartData()
+    d2.categories = ["Q1", "Q2"]
+    d2.add_series("Revenue", (100.0, 200.0))
+    c2 = s2.shapes.add_chart(XL_CHART_TYPE.LINE, 0, 0, Inches(4), Inches(4), d2).chart
+
+    line_chart_xml = c2._element.chart.plotArea.find(
+        "{http://schemas.openxmlformats.org/drawingml/2006/chart}lineChart"
+    )
+    c1._element.chart.plotArea.append(line_chart_xml)
+
+    converter = PptxConverter()
+    result = converter._convert_chart_to_markdown(c1)
+
+    assert "| Category | Orders | Revenue |" in result
+    assert "| Q1 | 10.0 | 100.0 |" in result
+    assert "| Q2 | 20.0 | 200.0 |" in result
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
