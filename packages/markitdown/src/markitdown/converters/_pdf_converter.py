@@ -1,9 +1,14 @@
 import sys
 import io
+import logging
 import re
-from typing import BinaryIO, Any
+from typing import BinaryIO, Any, List, Optional
 
-from .._base_converter import DocumentConverter, DocumentConverterResult
+from .._base_converter import (
+    ConversionWarning,
+    DocumentConverter,
+    DocumentConverterResult,
+)
 from .._stream_info import StreamInfo
 from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 
@@ -73,6 +78,39 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 ]
 
 ACCEPTED_FILE_EXTENSIONS = [".pdf"]
+
+# Optional vector-graphics diagnostic (enabled with detect_vector_graphics=True)
+VECTOR_GRAPHICS_PRESENT = "VECTOR_GRAPHICS_PRESENT"
+VECTOR_GRAPHICS_CHECK_INCOMPLETE = "VECTOR_GRAPHICS_CHECK_INCOMPLETE"
+_VECTOR_GRAPHICS_PRESENT_MESSAGE = (
+    "PDF contains vector graphics that may not be represented in Markdown."
+)
+_VECTOR_GRAPHICS_INCOMPLETE_MESSAGE = (
+    "Vector graphics check could not be completed for this PDF."
+)
+# Minimum number of curve objects for a page to be flagged. Straight lines and
+# rectangles (table borders, rules, boxes) never trigger a warning on their own.
+_MIN_CURVES_FOR_WARNING = 1
+
+
+def _vector_graphics_warning(
+    page: Any, page_number: int
+) -> Optional[ConversionWarning]:
+    """Return a VECTOR_GRAPHICS_PRESENT warning if the page has curves, else None."""
+    counts = {
+        "curves": len(page.curves),
+        "lines": len(page.lines),
+        "rects": len(page.rects),
+    }
+    if counts["curves"] < _MIN_CURVES_FOR_WARNING:
+        return None
+    return ConversionWarning(
+        code=VECTOR_GRAPHICS_PRESENT,
+        severity=logging.WARNING,
+        message=_VECTOR_GRAPHICS_PRESENT_MESSAGE,
+        page=page_number,
+        counts=counts,
+    )
 
 
 def _to_markdown_table(table: list[list[str]], include_separator: bool = True) -> str:
@@ -497,6 +535,18 @@ class PdfConverter(DocumentConverter):
     Converts PDFs to Markdown.
     Supports extracting tables into aligned Markdown format (via pdfplumber).
     Falls back to pdfminer if pdfplumber is missing or fails.
+
+    Optional vector-graphics diagnostic: pass ``detect_vector_graphics=True`` to
+    ``convert()``. The result's ``warnings`` then lists one
+    ``VECTOR_GRAPHICS_PRESENT`` warning (``logging.WARNING``) per page that
+    contains curve objects, with per-page counts of curves, lines and rects.
+    The Markdown is unchanged. If the check cannot complete, ``warnings``
+    contains a single ``VECTOR_GRAPHICS_CHECK_INCOMPLETE`` warning
+    (``logging.INFO``). Without the option, ``warnings`` is None.
+
+    The diagnostic applies only to this built-in converter. Known limitations:
+    charts built only from rectangles (e.g., bar charts) are not flagged, while
+    rounded-corner boxes and text drawn as outlines are flagged.
     """
 
     def accepts(
@@ -539,6 +589,11 @@ class PdfConverter(DocumentConverter):
         # Read file stream into BytesIO for compatibility with pdfplumber
         pdf_bytes = io.BytesIO(file_stream.read())
 
+        detect_vector_graphics = bool(kwargs.get("detect_vector_graphics"))
+        page_warnings: List[ConversionWarning] = []
+        vector_check_complete = False
+        vector_check_failed = False
+
         try:
             # Single pass: check every page for form-style content.
             # Pages with tables/forms get rich extraction; plain-text
@@ -563,7 +618,22 @@ class PdfConverter(DocumentConverter):
                         if text and text.strip():
                             markdown_chunks.append(text.strip())
 
+                    if detect_vector_graphics and not vector_check_failed:
+                        # Isolated so a diagnostic failure can never divert
+                        # Markdown extraction into the pdfminer fallback.
+                        try:
+                            warning = _vector_graphics_warning(page, page_idx + 1)
+                        except Exception:
+                            vector_check_failed = True
+                        else:
+                            if warning is not None:
+                                page_warnings.append(warning)
+
                     page.close()  # Free cached page data immediately
+
+            # Set before any later pdfminer call, so a failure there is not
+            # misreported as an incomplete vector-graphics check.
+            vector_check_complete = True
 
             # If no pages had form-style content, use pdfminer for
             # the whole document (better text spacing for prose).
@@ -586,4 +656,18 @@ class PdfConverter(DocumentConverter):
         # Post-process to merge MasterFormat-style partial numbering with following text
         markdown = _merge_partial_numbering_lines(markdown)
 
-        return DocumentConverterResult(markdown=markdown)
+        warnings: Optional[List[ConversionWarning]] = None
+        if detect_vector_graphics:
+            if vector_check_complete and not vector_check_failed:
+                warnings = page_warnings
+            else:
+                warnings = [
+                    ConversionWarning(
+                        code=VECTOR_GRAPHICS_CHECK_INCOMPLETE,
+                        severity=logging.INFO,
+                        message=_VECTOR_GRAPHICS_INCOMPLETE_MESSAGE,
+                        page=None,
+                    )
+                ]
+
+        return DocumentConverterResult(markdown=markdown, warnings=warnings)

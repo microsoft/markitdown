@@ -1,12 +1,13 @@
 """PDF conversion, table extraction, numbering, and page cleanup."""
 
+import logging
 import os
 import re
 from unittest.mock import patch
 
 import pytest
 
-from markitdown import MarkItDown
+from markitdown import ConversionWarning, MarkItDown
 from markitdown.converters._pdf_converter import (
     PARTIAL_NUMBERING_PATTERN,
     _merge_partial_numbering_lines,
@@ -1381,6 +1382,156 @@ def test_markitdown_remote() -> None:
     result = markitdown.convert(PDF_TEST_URL)
     for test_string in PDF_TEST_STRINGS:
         assert test_string in result.text_content
+
+
+# --- Vector-graphics diagnostic (detect_vector_graphics) ---
+
+VECTOR_GRAPHICS_MESSAGE = (
+    "PDF contains vector graphics that may not be represented in Markdown."
+)
+EXISTING_PDF_FIXTURES = sorted(
+    f
+    for f in os.listdir(TEST_FILES_DIR)
+    if f.endswith(".pdf") and not f.startswith("vector_graphics_")
+)
+VECTOR_GRAPHICS_FIXTURES = [
+    "vector_graphics_curve.pdf",
+    "vector_graphics_mixed.pdf",
+    "vector_graphics_rule_only.pdf",
+    "vector_graphics_form_xobject.pdf",
+]
+
+
+def _vg_convert(filename, **kwargs):
+    return MarkItDown().convert(os.path.join(TEST_FILES_DIR, filename), **kwargs)
+
+
+class TestPdfVectorGraphicsDiagnostic:
+    """Opt-in VECTOR_GRAPHICS_PRESENT warnings (spec AC-001 to AC-008)."""
+
+    @pytest.mark.parametrize("filename", EXISTING_PDF_FIXTURES)
+    def test_warnings_none_by_default(self, filename):
+        # AC-001: default behaviour exposes no diagnostic
+        assert _vg_convert(filename).warnings is None
+
+    def test_curve_page_flagged_with_counts(self):
+        # AC-002
+        warnings = _vg_convert(
+            "vector_graphics_curve.pdf", detect_vector_graphics=True
+        ).warnings
+        assert warnings is not None and len(warnings) == 1
+        w = warnings[0]
+        assert isinstance(w, ConversionWarning)
+        assert w.code == "VECTOR_GRAPHICS_PRESENT"
+        assert w.severity == logging.WARNING
+        assert w.message == VECTOR_GRAPHICS_MESSAGE
+        assert w.page == 1
+        assert w.counts["curves"] >= 1
+        assert set(w.counts) == {"curves", "lines", "rects"}
+
+    def test_one_warning_per_affected_page_in_order(self):
+        # AC-003
+        warnings = _vg_convert(
+            "vector_graphics_mixed.pdf", detect_vector_graphics=True
+        ).warnings
+        assert warnings is not None
+        assert [w.page for w in warnings] == [1, 3]
+        assert all(w.code == "VECTOR_GRAPHICS_PRESENT" for w in warnings)
+
+    def test_curve_inside_form_xobject_flagged(self):
+        warnings = _vg_convert(
+            "vector_graphics_form_xobject.pdf", detect_vector_graphics=True
+        ).warnings
+        assert warnings is not None
+        assert [w.page for w in warnings] == [1]
+
+    @pytest.mark.parametrize(
+        "filename", EXISTING_PDF_FIXTURES + ["vector_graphics_rule_only.pdf"]
+    )
+    def test_borders_and_rules_not_flagged(self, filename):
+        # AC-004 (existing fixtures contain table borders/rules but no curves)
+        assert _vg_convert(filename, detect_vector_graphics=True).warnings == []
+
+    def test_checked_distinguishable_from_not_checked(self):
+        # AC-005
+        assert _vg_convert("test.pdf", detect_vector_graphics=True).warnings == []
+        assert _vg_convert("test.pdf").warnings is None
+
+    @pytest.mark.parametrize(
+        "filename", EXISTING_PDF_FIXTURES + VECTOR_GRAPHICS_FIXTURES
+    )
+    def test_markdown_unchanged_when_enabled(self, filename):
+        # AC-006
+        without = _vg_convert(filename)
+        with_option = _vg_convert(filename, detect_vector_graphics=True)
+        assert with_option.markdown == without.markdown
+        assert with_option.title == without.title
+
+    def test_incomplete_check_reported_when_pdfplumber_fails(self):
+        # AC-007: pdfplumber fails, pdfminer fallback still produces Markdown
+        with patch(
+            "markitdown.converters._pdf_converter.pdfplumber.open",
+            side_effect=RuntimeError("simulated pdfplumber failure"),
+        ):
+            without = _vg_convert("vector_graphics_curve.pdf")
+            result = _vg_convert(
+                "vector_graphics_curve.pdf", detect_vector_graphics=True
+            )
+        assert "Quarterly revenue chart" in result.markdown
+        assert result.markdown == without.markdown
+        assert without.warnings is None
+        assert result.warnings is not None and len(result.warnings) == 1
+        w = result.warnings[0]
+        assert w.code == "VECTOR_GRAPHICS_CHECK_INCOMPLETE"
+        assert w.severity == logging.INFO
+        assert w.message == "Vector graphics check could not be completed for this PDF."
+        assert w.page is None
+        assert dict(w.counts) == {}
+
+    @pytest.mark.parametrize(
+        "filename", ["pdf_cleanup_form.pdf", "vector_graphics_curve.pdf"]
+    )
+    def test_diagnostic_failure_does_not_change_markdown(self, filename):
+        # A failure inside the counting itself must not divert extraction
+        # into the pdfminer fallback (FR-007), and is reported as incomplete.
+        without = _vg_convert(filename)
+        with patch(
+            "markitdown.converters._pdf_converter._vector_graphics_warning",
+            side_effect=RuntimeError("simulated diagnostic failure"),
+        ):
+            result = _vg_convert(filename, detect_vector_graphics=True)
+        assert result.markdown == without.markdown
+        assert result.warnings is not None
+        assert [w.code for w in result.warnings] == ["VECTOR_GRAPHICS_CHECK_INCOMPLETE"]
+
+    def test_pdfminer_failure_after_complete_check_not_misreported(self):
+        # The pdfplumber pass completes; the whole-document pdfminer call
+        # inside the same try block fails once, then the fallback succeeds.
+        import pdfminer.high_level
+
+        real_extract_text = pdfminer.high_level.extract_text
+        calls = {"n": 0}
+
+        def flaky_extract_text(*args, **kwargs):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise RuntimeError("simulated pdfminer failure")
+            return real_extract_text(*args, **kwargs)
+
+        with patch(
+            "markitdown.converters._pdf_converter.pdfminer.high_level.extract_text",
+            side_effect=flaky_extract_text,
+        ):
+            result = _vg_convert(
+                "vector_graphics_curve.pdf", detect_vector_graphics=True
+            )
+        assert calls["n"] >= 2
+        assert result.warnings is not None
+        assert [w.code for w in result.warnings] == ["VECTOR_GRAPHICS_PRESENT"]
+
+    def test_option_ignored_for_non_pdf(self):
+        # AC-008
+        assert _vg_convert("test.docx", detect_vector_graphics=True).warnings is None
 
 
 if __name__ == "__main__":

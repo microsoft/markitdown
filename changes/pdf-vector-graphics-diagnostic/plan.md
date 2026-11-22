@@ -1,8 +1,8 @@
 # Implementation Plan: Optional PDF vector-graphics diagnostic
 
 **ID:** pdf-vector-graphics-diagnostic
-**Status:** Draft
-**Version:** 0.1
+**Status:** Approved
+**Version:** 1.0
 **Created:** 2026-11-05
 **Source intent:** [changes/pdf-vector-graphics-diagnostic/intent.md](intent.md) (Approved 2026-11-05, Gary Bake)
 **Source specification:** [changes/pdf-vector-graphics-diagnostic/spec.md](spec.md) (Approved v1.0, 2026-11-05, Gary Bake)
@@ -66,7 +66,7 @@ All paths are relative to `packages/markitdown/`. Everything in the table below 
 
 ### Technical Constraints
 
-- **Verified:** the pdfplumber `page.curves`, `page.lines` and `page.rects` classification. A hand-built Bézier and a polyline each give one curve, a rule gives one line, bars give rects, and a rounded box gives one curve. All 12 existing PDF fixtures have zero curves.
+- **Verified:** the pdfplumber `page.curves`, `page.lines` and `page.rects` classification. A hand-built Bézier and a polyline each give one curve, a rule gives one line, bars give rects, and a rounded box gives one curve. All 10 existing PDF fixtures have zero curves (corrected from 12 after VER-004).
 - **Verified:** `DocumentConverterResult` is constructed in 23 places outside the tests, including the OCR and sample plugins. All of them use `markdown=` with an optional `title=`, so a new keyword-only argument with a default is compatible.
 - **Verified:** inside `convert`, the `try` block covers both the pdfplumber loop **and** the whole-document pdfminer call. An exception from pdfminer after a completed loop would also reach `except`. A "loop completed" flag is therefore required so that a finished check is not reported as incomplete.
 - **Verified:** black (`~/.local/bin/black`) and pytest are available. `.pre-commit-config.yaml` pins black 26.10.1. CI runs `hatch test` and `pre-commit run --all-files`.
@@ -373,14 +373,28 @@ Not enabled. `policies/team-policy.md` is marked "Example; review before adoptin
 
 | Task | Status | Verification | Notes |
 |---|---|---|---|
-| TASK-001 | Pending | Not run | |
-| TASK-002 | Pending | Not run | |
-| TASK-003 | Pending | Not run | |
-| TASK-004 | Pending | Not run | |
+| TASK-001 | Complete | Passed | `tests/test_conversion_warnings.py` 6/6 pass; black clean |
+| TASK-002 | Complete | Passed | 4 fixtures; generator deterministic (identical sha256 across runs); pdfplumber counts as expected. **Form XObject curves ARE counted** (curves=1), which resolves the spec's unverified assumption |
+| TASK-003 | Complete | Passed | `hatch test tests/test_pdf.py`: 79 passed (37 existing + 42 new); existing tests unmodified (only the import line was extended) |
+| TASK-004 | Complete | Passed (with pre-existing exceptions noted in §13) | Full suite, mypy and black run; see §13 |
+
+Baselines taken on 2026-11-22 before TASK-001, on branch `feature/pdf-vector-graphics-diagnostic`:
+- `hatch test`: 1162 passed, 12 skipped, 1 failed (`test_speech_transcription`: `ffprobe` not installed, which is environmental).
+- `hatch run types:check`: 28 errors in 9 files, one of them in `_pdf_converter.py:533` in existing code.
 
 ## 12. Plan Deviations
 
-None recorded.
+### DEV-001: Hardening after independent verification (minor)
+
+**Original plan:** Counting inside the page loop; `counts` stored as a plain dict (TASK-001 step 1 accepted this).
+
+**Reason for deviation:** Verifier findings VER-001 (a failure in the counting could divert extraction to the pdfminer fallback, breaking FR-007), VER-002 (`counts` could be changed in place, a gap against FR-001's "immutable") and VER-003 (incomplete-warning message not asserted).
+
+**Proposed alternative:** The counting is isolated in its own try/except (sets `vector_check_failed`, giving the INCOMPLETE warning). `counts` is wrapped in a read-only `dict` subclass, `_ReadOnlyCounts`. A first attempt with `MappingProxyType` broke pickle, deepcopy and asdict (VER-006) and was replaced. New tests cover each case.
+
+**Impact:** Brings the code closer to the approved spec; no change to the public contract, scope or dependencies.
+
+**Approval status:** Not required (minor; within approved behaviour).
 
 ## 13. Final Verification Evidence
 
@@ -388,19 +402,21 @@ None recorded.
 
 | Check | Result | Evidence |
 |---|---|---|
-| Unit tests | Not run | |
-| Integration tests | Not run | |
-| Lint (black) | Not run | |
-| Type checking (mypy) | Not run | |
-| Acceptance criteria | Not evaluated | |
+| Unit and integration tests | Pass (1 pre-existing failure) | `hatch test` (packages/markitdown, 2026-11-22, after all verifier fixes): 1214 passed, 12 skipped, 1 failed. The failure is `test_speech_transcription` (ffprobe missing), identical to the baseline |
+| PDF and warning tests | Pass | `hatch test tests/test_pdf.py tests/test_conversion_warnings.py`: 89 passed (after all verifier fixes) |
+| Lint (black) | Pass on changed files | `pre-commit run black --files <6 changed/new files>` (pinned black 26.10.1): Passed. `black --check .` at the repository root flags 6 untracked factory files outside this change's scope (`.claude/hooks/*.py`, root `tests/test_*.py`); not modified |
+| Type checking (mypy) | No new errors | `hatch run types:check`: exit 1, 28 errors in 9 files (66 files checked). The error set is identical to the baseline (diff of error lines with line numbers stripped is empty) |
+| No dependency changes | Pass | `pyproject.toml` absent from `git diff` |
+| `scripts/verify.sh` | Not applicable | `scripts/verify.conf` is the factory profile (it verifies factory files, not markitdown). A project-specific `verify.conf` would be a factory change requiring approval |
+| Acceptance criteria | AC-001 to AC-009 evaluated | AC-001/004/006: parametrised over all 10 existing and 4 new PDFs. AC-002/003/005/007/008: dedicated tests. AC-009: `test_conversion_warnings.py` |
 
 ### Requirement Coverage
 
-- [ ] Every approved requirement has been addressed.
-- [ ] Acceptance criteria have been evaluated.
-- [ ] Important failure scenarios have been checked.
-- [ ] No unapproved scope changes remain.
-- [ ] Security and operational concerns have been reviewed.
+- [x] Every approved requirement has been addressed (FR-001 to FR-007).
+- [x] Acceptance criteria have been evaluated (AC-001 to AC-009 pass, confirmed by the verifier).
+- [x] Important failure scenarios have been checked (pdfplumber failure, pdfminer failure after a complete check, diagnostic failure).
+- [x] No unapproved scope changes remain (DEV-001 is minor and within approved behaviour).
+- [x] Security and operational concerns have been reviewed (no document content in warnings; no new dependencies).
 
 ### Security Review
 
@@ -410,24 +426,40 @@ None recorded.
 
 ### Independent Verification
 
-**Verifier:** Not run
+**Verifier:** `verifier` subagent, 3 runs on 2026-11-22. The final run covers the current code.
 
-**Result:** Pending
+**Result:** Pass with findings. AC-001 to AC-009 pass, and there are no blocking findings.
 
-**Outstanding issues:** —
+**Findings:**
+- **VER-001 (LOW):** a diagnostic failure could change the Markdown. **Resolved.**
+- **VER-002 (LOW):** `counts` could be changed in place. **Resolved.**
+- **VER-003 (LOW):** the incomplete-warning message was not asserted. **Resolved.**
+- **VER-004 (INFO):** the plan stated the wrong fixture count. **Resolved** (corrected to 10).
+- **VER-005 (INFO):** a truthy string enables the option. Allowed by spec §5; no action.
+- **VER-006 (LOW):** `MappingProxyType` broke pickle, deepcopy and asdict. This was introduced by the VER-002 fix. **Resolved** with `_ReadOnlyCounts`.
+- **VER-007 (LOW, open):** `w.counts.__init__({...})` can still change counts. It needs a deliberate dunder call. **Awaiting a reviewer decision** (accept, or harden).
+- **VER-008 (LOW, open):** `dataclasses.asdict(w)["counts"]` is a read-only `_ReadOnlyCounts`, not a plain dict, so changing the output of `asdict` raises `TypeError`. Serialisation itself works. **Awaiting a reviewer decision** (accept and document, or change).
+- **Informational:** unbound `dict.__setitem__(w.counts, ...)` bypasses are possible, as with any dict subclass. `counts=None` raises `TypeError`, which is consistent with the field's type.
 
-**Changes since last verifier run:** None
+**Outstanding issues:**
+- VER-007 and VER-008 (above).
+- A pre-existing test failure, `test_speech_transcription` (ffprobe not installed).
+- 28 mypy errors that existed before this change (none new).
+- `scripts/verify.sh` is not configured for markitdown.
+- Real-world detection accuracy is unverified because there are no sample PDFs.
+
+**Changes since last verifier run:** None.
 
 ## 14. Plan Review and Approval
 
-**Decision:** Pending
+**Decision:** Approved
 
-**Reviewed by:** —
+**Reviewed by:** Gary Bake
 
-**Review date:** —
+**Review date:** 2026-11-22
 
-**Implementation authorised:** No
+**Implementation authorised:** Yes (Gary Bake, 2026-11-22: "Please can you start the task")
 
 **Conditions:** —
 
-**Approval notes:** —
+**Approval notes:** GATE-1 approved 2026-11-05 (mypy required). No production deployment, commit or push authorised.

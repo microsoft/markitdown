@@ -1,0 +1,52 @@
+%PDF-1.4
+1 0 obj
+<</Type/Catalog/Pages 2 0 R>>
+endobj
+2 0 obj
+<</Type/Pages/Kids[5 0 R 7 0 R 9 0 R]/Count 3>>
+endobj
+3 0 obj
+<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>
+endobj
+4 0 obj
+<</Length 105>>stream
+BT /F1 12 Tf 72 720 Td (Page one has a pie chart) Tj ET
+300 400 m 400 400 l 400 455 355 500 300 500 c h f
+endstream
+endobj
+5 0 obj
+<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Resources<</Font<</F1 3 0 R>>>>/Contents 4 0 R>>
+endobj
+6 0 obj
+<</Length 52>>stream
+BT /F1 12 Tf 72 720 Td (Page two is text only) Tj ET
+endstream
+endobj
+7 0 obj
+<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Resources<</Font<</F1 3 0 R>>>>/Contents 6 0 R>>
+endobj
+8 0 obj
+<</Length 110>>stream
+BT /F1 12 Tf 72 720 Td (Page three has a line chart) Tj ET
+100 100 m 150 200 l 200 150 l 250 300 l 300 250 l S
+endstream
+endobj
+9 0 obj
+<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Resources<</Font<</F1 3 0 R>>>>/Contents 8 0 R>>
+endobj
+xref
+0 10
+0000000000 65535 f 
+0000000009 00000 n 
+0000000054 00000 n 
+0000000117 00000 n 
+0000000180 00000 n 
+0000000333 00000 n 
+0000000445 00000 n 
+0000000544 00000 n 
+0000000656 00000 n 
+0000000814 00000 n 
+trailer<</Size 10/Root 1 0 R>>
+startxref
+926
+%%EOF
