@@ -16,6 +16,15 @@ ACCEPTED_FILE_EXTENSIONS = [
     ".htm",
 ]
 
+# A Wikipedia article URL: http(s), a language subdomain, an optional mobile
+# (.m) marker, then wikipedia.org. Language codes are BCP 47-style subdomains
+# rather than always two or three letters: besides en/de/ja there is `simple`,
+# and hyphenated codes such as be-tarask, zh-min-nan, zh-classical, be-x-old.
+# The earlier `[a-zA-Z]{2,3}` form rejected all 13 of those editions, so their
+# pages fell through to the generic HTML converter and came out wrapped in the
+# site navigation and footer instead of the article alone.
+_WIKIPEDIA_URL = re.compile(r"^https?:\/\/[a-z]{2,8}(?:-[a-z0-9]{1,9})*(?:\.m)?\.wikipedia\.org\/", re.IGNORECASE)
+
 
 class WikipediaConverter(DocumentConverter):
     """Handle Wikipedia pages separately, focusing only on the main document content."""
@@ -34,7 +43,7 @@ class WikipediaConverter(DocumentConverter):
         mimetype = (stream_info.mimetype or "").lower()
         extension = (stream_info.extension or "").lower()
 
-        if not re.search(r"^https?:\/\/[a-zA-Z]{2,3}(\.m)?\.wikipedia.org\/", url):
+        if not _WIKIPEDIA_URL.search(url):
             # Not a Wikipedia URL
             return False
 

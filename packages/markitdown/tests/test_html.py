@@ -240,6 +240,61 @@ def test_wikipedia_converter_blank_title() -> None:
     assert result.text_content.strip() == "Hello"
 
 
+# Language codes are BCP 47-style subdomains, so some carry hyphens. Hostnames
+# are case-insensitive, so an uppercase edition must resolve too. Those editions
+# must reach WikipediaConverter; the generic HTML converter would keep the
+# navigation and footer chrome around the article.
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://simple.wikipedia.org/wiki/Ada_Lovelace",
+        "https://be-tarask.wikipedia.org/wiki/Ada_Lovelace",
+        "https://zh-min-nan.wikipedia.org/wiki/Ada_Lovelace",
+        "https://roa-rup.wikipedia.org/wiki/Ada_Lovelace",
+        "https://simple.m.wikipedia.org/wiki/Ada_Lovelace",
+        "https://EN.wikipedia.org/wiki/Ada_Lovelace",
+        "https://En.Wikipedia.org/wiki/Ada_Lovelace",
+        "https://ZH-MIN-NAN.wikipedia.org/wiki/Ada_Lovelace",
+        "https://SIMPLE.m.wikipedia.org/wiki/Ada_Lovelace",
+    ],
+)
+def test_wikipedia_converter_reads_hyphenated_language_editions(url: str) -> None:
+    page = io.BytesIO(
+        b"""<html><head><title>Ada Lovelace - Wikipedia</title></head><body>
+<nav><a href="/wiki/Main_Page">Main page</a></nav>
+<h1 id="firstHeading">Ada Lovelace</h1>
+<div id="mw-content-text"><p>Body text.</p></div>
+<footer>Privacy policy</footer>
+</body></html>"""
+    )
+
+    result = MarkItDown().convert_stream(
+        page,
+        stream_info=StreamInfo(mimetype="text/html", extension=".html", url=url),
+    )
+
+    assert "Main page" not in result.markdown
+    assert "Privacy policy" not in result.markdown
+    assert result.markdown.strip() == "# Ada Lovelace\n\nBody text."
+
+
+def test_wikipedia_converter_rejects_non_wikipedia_urls() -> None:
+    page = io.BytesIO(
+        b"<html><body><h1>Not Wikipedia</h1><p>Body text.</p></body></html>"
+    )
+
+    result = MarkItDown().convert_stream(
+        page,
+        stream_info=StreamInfo(
+            mimetype="text/html",
+            extension=".html",
+            url="https://example.com/wiki/Ada_Lovelace",
+        ),
+    )
+
+    assert result.markdown.strip() == "# Not Wikipedia\n\nBody text."
+
+
 def test_uppercase_data_image_uri_is_truncated_by_default() -> None:
     markitdown = MarkItDown()
     html = b'<html><body><img alt="dot" src="DATA:image/png;base64,AAAA"></body></html>'
