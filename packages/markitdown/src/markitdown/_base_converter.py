@@ -1,5 +1,65 @@
-from typing import Any, BinaryIO, Optional
+from dataclasses import dataclass, field
+from typing import Any, BinaryIO, List, Mapping, NoReturn, Optional
 from ._stream_info import StreamInfo
+
+
+class _ReadOnlyCounts(dict):
+    """
+    A dict that cannot be modified after construction.
+
+    Unlike types.MappingProxyType it can be pickled, deep-copied, passed to
+    dataclasses.asdict and serialised directly with json.dumps.
+    """
+
+    def _readonly(self, *args: Any, **kwargs: Any) -> NoReturn:
+        raise TypeError("ConversionWarning.counts is read-only")
+
+    __setitem__ = _readonly
+    __delitem__ = _readonly
+    __ior__ = _readonly  # type: ignore[assignment]
+    clear = _readonly
+    pop = _readonly
+    popitem = _readonly
+    setdefault = _readonly
+    update = _readonly
+
+    def __reduce__(self) -> Any:
+        # Rebuild through the constructor instead of item assignment.
+        return (type(self), (dict(self),))
+
+    def __deepcopy__(self, memo: Any) -> "_ReadOnlyCounts":
+        return self  # immutable, so sharing is safe
+
+
+@dataclass(frozen=True)
+class ConversionWarning:
+    """
+    A diagnostic reported by a converter alongside the converted Markdown.
+
+    Warnings describe information that the conversion may have lost or could
+    not check. They never alter the Markdown itself.
+
+    Attributes:
+    - code: Stable, machine-readable identifier (e.g., "VECTOR_GRAPHICS_PRESENT").
+    - severity: A standard Python ``logging`` level, such as ``logging.WARNING``
+      or ``logging.INFO``. This allows ``logger.log(w.severity, w.message)``.
+    - message: Human-readable description. Contains no document content.
+    - page: 1-based page number the warning applies to, or None if it applies
+      to the whole document.
+    - counts: Optional diagnostic counts (e.g., {"curves": 3}). Stored as a
+      read-only mapping. Instances are immutable but not hashable.
+    """
+
+    code: str
+    severity: int
+    message: str
+    page: Optional[int] = None
+    counts: Mapping[str, int] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        # Copy into a read-only dict so the frozen instance cannot be mutated
+        # through its counts mapping (and later caller changes don't leak in).
+        object.__setattr__(self, "counts", _ReadOnlyCounts(self.counts))
 
 
 class DocumentConverterResult:
@@ -10,6 +70,7 @@ class DocumentConverterResult:
         markdown: str,
         *,
         title: Optional[str] = None,
+        warnings: Optional[List[ConversionWarning]] = None,
     ):
         """
         Initialize the DocumentConverterResult.
@@ -20,9 +81,13 @@ class DocumentConverterResult:
         Parameters:
         - markdown: The converted Markdown text.
         - title: Optional title of the document.
+        - warnings: Optional list of ConversionWarning diagnostics. None (the
+          default) means no diagnostic was run; an empty list means diagnostics
+          ran and found nothing to report.
         """
         self.markdown = markdown
         self.title = title
+        self.warnings = warnings
 
     @property
     def text_content(self) -> str:
