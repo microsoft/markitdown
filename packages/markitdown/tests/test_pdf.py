@@ -1,5 +1,6 @@
 """PDF conversion, table extraction, numbering, and page cleanup."""
 
+import base64
 import io
 import os
 import re
@@ -1389,8 +1390,6 @@ def test_markitdown_remote() -> None:
         assert test_string in result.text_content
 
 
-
-
 class TestPdfInlineImageRecovery:
     """Recover text that pdfplumber/pdfminer drop after inline image data.
 
@@ -1435,6 +1434,54 @@ class TestPdfInlineImageRecovery:
         )
 
     @staticmethod
+    def _ascii85_inline_image_pdf_bytes(after_line_count: int) -> bytes:
+        """Build the #1870 bare-tilde shape with a real page tree and xref."""
+        after_lines = [
+            f"AFTER_IMAGE: line {index} " + ("R" * 40)
+            for index in range(1, after_line_count + 1)
+        ]
+        image_payload = base64.a85encode(zlib.compress(bytes(32)), adobe=False)
+        content = (
+            b"BT /F1 12 Tf 72 760 Td "
+            b"(BEFORE_IMAGE: this text should be extracted) Tj ET\n"
+            b"q\n16 0 0 16 72 700 cm\n"
+            b"BI /W 16 /H 16 /BPC 1 /IM true /F [/A85 /Fl] ID\n"
+            + image_payload
+            + b"~\nEI\nQ\n"
+        )
+        for index, line in enumerate(after_lines):
+            content += (
+                f"BT /F1 12 Tf 72 {650 - index * 30} Td (".encode()
+                + line.encode()
+                + b") Tj ET\n"
+            )
+
+        objects = [
+            b"<< /Type /Catalog /Pages 2 0 R >>",
+            b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+            b"/Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
+            b"<< /Length "
+            + str(len(content)).encode()
+            + b" >>\nstream\n"
+            + content
+            + b"endstream",
+            b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica "
+            b"/Encoding /WinAnsiEncoding >>",
+        ]
+        pdf = b"%PDF-1.7\n"
+        offsets = [0]
+        for number, obj in enumerate(objects, 1):
+            offsets.append(len(pdf))
+            pdf += f"{number} 0 obj\n".encode() + obj + b"\nendobj\n"
+        xref = len(pdf)
+        pdf += b"xref\n0 6\n0000000000 65535 f \n"
+        for offset in offsets[1:]:
+            pdf += f"{offset:010d} 00000 n \n".encode()
+        pdf += b"trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n"
+        return pdf + str(xref).encode() + b"\n%%EOF\n"
+
+    @staticmethod
     def _plain_page():
         page = MagicMock()
         page.width = 612
@@ -1462,7 +1509,7 @@ class TestPdfInlineImageRecovery:
 
         return mock_open
 
-    def _convert(self, pages, pdf_bytes, monkeypatch=None, fitz_module=...):
+    def _convert(self, pages, pdf_bytes, monkeypatch=None, pymupdf_module=...):
         from markitdown import StreamInfo
 
         with (
@@ -1473,8 +1520,8 @@ class TestPdfInlineImageRecovery:
             # pdfminer only sees the text before the image, matching what a
             # truncated extraction produces for a stream with inline image data.
             mock_pdfminer.high_level.extract_text.return_value = "BEFORE_IMAGE"
-            if fitz_module is not ...:
-                monkeypatch.setitem(sys.modules, "fitz", fitz_module)
+            if pymupdf_module is not ...:
+                monkeypatch.setitem(sys.modules, "pymupdf", pymupdf_module)
             result = MarkItDown().convert_stream(
                 io.BytesIO(pdf_bytes),
                 stream_info=StreamInfo(extension=".pdf", mimetype="application/pdf"),
@@ -1494,9 +1541,12 @@ class TestPdfInlineImageRecovery:
             def close(self):
                 pass
 
-        fake_fitz = types.SimpleNamespace(open=lambda *, stream, filetype: FakeDoc())
+        fake_pymupdf = types.SimpleNamespace(open=lambda *, stream, filetype: FakeDoc())
         result = self._convert(
-            [self._plain_page()], self._inline_image_pdf_bytes(), monkeypatch, fake_fitz
+            [self._plain_page()],
+            self._inline_image_pdf_bytes(),
+            monkeypatch,
+            fake_pymupdf,
         )
         assert "AFTER_IMAGE" in result.text_content
 
@@ -1522,7 +1572,100 @@ class TestPdfInlineImageRecovery:
         assert _contains_inline_image(self._inline_image_pdf_bytes_compressed())
         assert not _contains_inline_image(b"%PDF-1.7\nno images here")
 
+    def test_flate_decode_has_an_output_cap(self, monkeypatch):
+        from markitdown.converters import _pdf_converter as converter
 
+        output_cap = 1024 * 1024
+        packed = zlib.compress(b"A" * (output_cap + 1))
+        pdf = (
+            b"%PDF-1.7\n1 0 obj << /Filter /FlateDecode >> stream\n"
+            + packed
+            + b"\nendstream endobj\n%%EOF\n"
+        )
+        max_lengths = []
+        real_decompressobj = zlib.decompressobj
+
+        class TrackingDecompressor:
+            def __init__(self):
+                self._decompressor = real_decompressobj()
+
+            def decompress(self, data, max_length=0):
+                max_lengths.append(max_length)
+                return self._decompressor.decompress(data, max_length)
+
+            @property
+            def eof(self):
+                return self._decompressor.eof
+
+        monkeypatch.setattr(zlib, "decompressobj", TrackingDecompressor)
+
+        assert not converter._contains_inline_image(pdf)
+        assert max_lengths == [output_cap + 1]
+
+    @pytest.mark.parametrize("suffix_length", [232, 406])
+    def test_recovers_prefix_extension_below_legacy_margin(
+        self, monkeypatch, suffix_length
+    ):
+        from markitdown.converters import _pdf_converter as converter
+
+        current = "BEFORE_IMAGE\n" + ("x" * 32)
+        recovered = current + ("R" * suffix_length)
+        monkeypatch.setattr(
+            converter, "_extract_text_with_pymupdf", lambda _: recovered
+        )
+
+        result = converter._maybe_recover_inline_image_text(
+            self._inline_image_pdf_bytes(), current
+        )
+
+        assert result == recovered
+
+    @pytest.mark.parametrize("after_line_count", [4, 6])
+    def test_recovers_real_ascii85_inline_image_below_legacy_margin(
+        self, after_line_count
+    ):
+        pytest.importorskip("pymupdf")
+        import pdfplumber
+        from markitdown import StreamInfo
+        from markitdown.converters._pdf_converter import _extract_text_with_pymupdf
+
+        pdf = self._ascii85_inline_image_pdf_bytes(after_line_count)
+        with pdfplumber.open(io.BytesIO(pdf)) as document:
+            current = "\n".join(
+                page.extract_text() or "" for page in document.pages
+            ).strip()
+        recovered = _extract_text_with_pymupdf(pdf)
+
+        assert "AFTER_IMAGE" not in current
+        assert recovered is not None
+        assert "AFTER_IMAGE" in recovered
+        assert len(recovered) < len(current) * 1.3 + 500
+
+        result = (
+            MarkItDown()
+            .convert_stream(
+                io.BytesIO(pdf),
+                stream_info=StreamInfo(extension=".pdf", mimetype="application/pdf"),
+            )
+            .text_content.strip()
+        )
+
+        assert result == recovered
+
+    def test_nonprefix_text_keeps_the_conservative_margin(self, monkeypatch):
+        from markitdown.converters import _pdf_converter as converter
+
+        current = "BEFORE_IMAGE\n" + ("x" * 32)
+        unrelated = "DIFFERENT_TEXT\n" + ("R" * 400)
+        monkeypatch.setattr(
+            converter, "_extract_text_with_pymupdf", lambda _: unrelated
+        )
+
+        result = converter._maybe_recover_inline_image_text(
+            self._inline_image_pdf_bytes(), current
+        )
+
+        assert result == current
 
 
 @pytest.mark.parametrize("padding", [170, 237])
@@ -1571,6 +1714,7 @@ def test_flate_checksum_bytes_are_not_trimmed(padding, delimiter):
     page = next(PDFPage.create_pages(document))
     assert page.contents[0].get_data() == content
     assert _contains_inline_image(pdf)
+
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))

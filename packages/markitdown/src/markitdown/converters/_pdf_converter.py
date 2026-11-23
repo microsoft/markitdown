@@ -15,6 +15,7 @@ INLINE_IMAGE_START_PATTERN = re.compile(rb"(?:^|\s)BI\s+")
 INLINE_IMAGE_DATA_PATTERN = re.compile(rb"\sID\s+")
 INLINE_IMAGE_END_PATTERN = re.compile(rb"\sEI(?:\s|$)")
 INLINE_IMAGE_STREAM_PATTERN = re.compile(rb"stream\r?\n(.*?)endstream", re.DOTALL)
+FLATE_STREAM_MAX_BYTES = 1024 * 1024
 PYMUPDF_RECOVERY_MARGIN = 500
 PYMUPDF_RECOVERY_RATIO = 1.3
 
@@ -81,9 +82,15 @@ def _contains_inline_image(pdf_bytes: bytes) -> bool:
     for match in INLINE_IMAGE_STREAM_PATTERN.finditer(pdf_bytes):
         try:
             # Trailing CR/LF may belong to the binary checksum. zlib ignores
-            # the PDF delimiter after its end-of-stream marker.
-            decoded = zlib.decompress(match.group(1))
+            # the PDF delimiter after its end-of-stream marker. Bound each
+            # stream's inflated output before searching for image operators.
+            decompressor = zlib.decompressobj()
+            decoded = decompressor.decompress(
+                match.group(1), FLATE_STREAM_MAX_BYTES + 1
+            )
         except zlib.error:
+            continue
+        if not decompressor.eof or len(decoded) > FLATE_STREAM_MAX_BYTES:
             continue
         if _has_inline_image_operators(decoded):
             return True
@@ -92,11 +99,11 @@ def _contains_inline_image(pdf_bytes: bytes) -> bool:
 
 def _extract_text_with_pymupdf(pdf_bytes: bytes) -> str | None:
     try:
-        import fitz  # type: ignore[import-not-found]
+        import pymupdf  # type: ignore[import-not-found]
     except ImportError:
         return None
 
-    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
     try:
         return "\n".join(page.get_text("text") for page in doc).strip()
     finally:
@@ -118,8 +125,16 @@ def _maybe_recover_inline_image_text(pdf_bytes: bytes, markdown: str) -> str:
             )
         return markdown
 
-    current_len = len((markdown or "").strip())
-    if len(pymupdf_text) > current_len * PYMUPDF_RECOVERY_RATIO + PYMUPDF_RECOVERY_MARGIN:
+    current_text = (markdown or "").strip()
+    current_len = len(current_text)
+    extends_current_text = len(pymupdf_text) > current_len and pymupdf_text.startswith(
+        current_text
+    )
+    if (
+        extends_current_text
+        or len(pymupdf_text)
+        > current_len * PYMUPDF_RECOVERY_RATIO + PYMUPDF_RECOVERY_MARGIN
+    ):
         return pymupdf_text
 
     return markdown
@@ -598,7 +613,9 @@ class PdfConverter(DocumentConverter):
                     extension=".pdf",
                     feature="pdf",
                 )
-            ) from _dependency_exc_info[1].with_traceback(  # type: ignore[union-attr]
+            ) from _dependency_exc_info[
+                1
+            ].with_traceback(  # type: ignore[union-attr]
                 _dependency_exc_info[2]
             )
 
