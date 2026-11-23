@@ -344,5 +344,63 @@ def test_deeply_nested_html_fallback() -> None:
     assert "<p>" not in result.markdown
 
 
+def test_html_table_without_th_infers_header_by_default() -> None:
+    """When HTML table lacks <th> tags, first row should be inferred as header (issue #1086)."""
+    markitdown = MarkItDown()
+    html = b"""
+    <table>
+      <tr><td>Product</td><td>Quantity</td><td>Price</td></tr>
+      <tr><td>Apple</td><td>10</td><td>$1.00</td></tr>
+      <tr><td>Banana</td><td>5</td><td>$0.50</td></tr>
+    </table>
+    """
+    result = markitdown.convert_stream(
+        io.BytesIO(html), stream_info=StreamInfo(extension=".html")
+    )
+    assert "| Product | Quantity | Price |" in result.markdown
+    assert "| --- | --- | --- |" in result.markdown
+    assert "| Apple | 10 | $1.00 |" in result.markdown
+    assert "|  |  |  |" not in result.markdown
+
+
+def test_html_table_infer_header_can_be_disabled() -> None:
+    """Explicitly passing table_infer_header=False disables header inference."""
+    markitdown = MarkItDown()
+    html = b"""
+    <table>
+      <tr><td>Product</td><td>Quantity</td><td>Price</td></tr>
+      <tr><td>Apple</td><td>10</td><td>$1.00</td></tr>
+    </table>
+    """
+    result = markitdown.convert_stream(
+        io.BytesIO(html),
+        stream_info=StreamInfo(extension=".html"),
+        table_infer_header=False,
+    )
+    assert "|  |  |  |" in result.markdown
+    assert "| Product | Quantity | Price |" in result.markdown
+
+
+def test_html_table_with_th_preserves_header() -> None:
+    """Tables with explicit <th> cells keep their headers intact."""
+    markitdown = MarkItDown()
+    html = b"""
+    <table>
+      <thead>
+        <tr><th>Name</th><th>Role</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Alice</td><td>Admin</td></tr>
+      </tbody>
+    </table>
+    """
+    result = markitdown.convert_stream(
+        io.BytesIO(html), stream_info=StreamInfo(extension=".html")
+    )
+    assert "| Name | Role |" in result.markdown
+    assert "| --- | --- |" in result.markdown
+    assert "| Alice | Admin |" in result.markdown
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))

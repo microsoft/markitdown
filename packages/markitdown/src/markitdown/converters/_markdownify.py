@@ -29,11 +29,13 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
     - Removing javascript hyperlinks.
     - Truncating images with large data:uri sources.
     - Ensuring URIs are properly escaped, and do not conflict with Markdown syntax
+    - Inferring table headers by default when no <th> elements are present
     """
 
     def __init__(self, **options: Any):
         options["heading_style"] = options.get("heading_style", markdownify.ATX)
         options["keep_data_uris"] = options.get("keep_data_uris", False)
+        options["table_infer_header"] = options.get("table_infer_header", True)
         # Explicitly cast options to the expected type if necessary
         super().__init__(**options)
 

@@ -1482,5 +1482,51 @@ def test_convert_docx_with_style_missing_type(tmp_path):
     assert "# Abstract" in result.markdown
 
 
+def test_docx_table_infers_header_by_default() -> None:
+    """DOCX tables without explicit header rows should infer the first row as the table header (issue #1086)."""
+    table_xml = (
+        "<w:tbl>"
+        "<w:tr>"
+        "<w:tc><w:p><w:r><w:t>Item</w:t></w:r></w:p></w:tc>"
+        "<w:tc><w:p><w:r><w:t>Price</w:t></w:r></w:p></w:tc>"
+        "</w:tr>"
+        "<w:tr>"
+        "<w:tc><w:p><w:r><w:t>Apple</w:t></w:r></w:p></w:tc>"
+        "<w:tc><w:p><w:r><w:t>$1.00</w:t></w:r></w:p></w:tc>"
+        "</w:tr>"
+        "</w:tbl>"
+    )
+    stream = _docx(table_xml)
+    result = MarkItDown().convert_stream(
+        stream, stream_info=StreamInfo(extension=".docx")
+    )
+    assert "| Item | Price |" in result.markdown
+    assert "| --- | --- |" in result.markdown
+    assert "| Apple | $1.00 |" in result.markdown
+    assert "|  |  |" not in result.markdown
+
+
+def test_docx_table_infer_header_can_be_disabled() -> None:
+    """Passing table_infer_header=False disables header inference in DOCX conversion."""
+    table_xml = (
+        "<w:tbl>"
+        "<w:tr>"
+        "<w:tc><w:p><w:r><w:t>Item</w:t></w:r></w:p></w:tc>"
+        "<w:tc><w:p><w:r><w:t>Price</w:t></w:r></w:p></w:tc>"
+        "</w:tr>"
+        "<w:tr>"
+        "<w:tc><w:p><w:r><w:t>Apple</w:t></w:r></w:p></w:tc>"
+        "<w:tc><w:p><w:r><w:t>$1.00</w:t></w:r></w:p></w:tc>"
+        "</w:tr>"
+        "</w:tbl>"
+    )
+    stream = _docx(table_xml)
+    result = MarkItDown().convert_stream(
+        stream, stream_info=StreamInfo(extension=".docx"), table_infer_header=False
+    )
+    assert "|  |  |" in result.markdown
+    assert "| Item | Price |" in result.markdown
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
