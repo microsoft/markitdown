@@ -1,3 +1,4 @@
+import html
 import re
 import markdownify
 
@@ -36,6 +37,17 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         options["keep_data_uris"] = options.get("keep_data_uris", False)
         # Explicitly cast options to the expected type if necessary
         super().__init__(**options)
+        self._link_targets: set[str] = set()
+
+    def convert_soup(self, soup: Any) -> str:
+        # Record in-document link targets so that empty anchors they point to
+        # (e.g., Word TOC bookmarks) can be kept in convert_a.
+        self._link_targets = {
+            a["href"][1:]
+            for a in soup.find_all("a", href=True)
+            if a["href"].startswith("#") and len(a["href"]) > 1
+        }
+        return super().convert_soup(soup)  # type: ignore
 
     def convert_hn(
         self,
@@ -62,6 +74,11 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         """Same as usual converter, but removes JavaScript links and escapes URIs."""
         prefix, suffix, text = markdownify.chomp(text)  # type: ignore
         if not text:
+            # Keep empty anchors that in-document links point to, so that
+            # links such as a DOCX table of contents still resolve.
+            anchor = el.get("id") or el.get("name")
+            if anchor and anchor in self._link_targets:
+                return '<a id="%s"></a>' % html.escape(anchor, quote=True)
             return ""
 
         if el.find_parent("pre") is not None:
@@ -173,6 +190,3 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
     def convert_strike(self, el: Any, text: str, *args, **kwargs) -> str:
         """Obsolete <strike> is still in the wild; treat it like <s>/<del>."""
         return self.convert_s(el, text, *args, **kwargs)  # type: ignore
-
-    def convert_soup(self, soup: Any) -> str:
-        return super().convert_soup(soup)  # type: ignore
