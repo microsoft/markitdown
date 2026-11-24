@@ -89,6 +89,14 @@ You can also pipe content:
 cat path-to-file.pdf | markitdown
 ```
 
+When you know the format of piped input, pass a file extension hint:
+
+```bash
+markitdown --extension csv < data.csv
+```
+
+For text input, you can also pass a known encoding with `--charset`.
+
 ### Optional Dependencies
 MarkItDown has optional dependencies for activating various file formats. Earlier in this document, we installed all optional dependencies with the `[all]` option. However, you can also install them individually for more control. For example:
 
