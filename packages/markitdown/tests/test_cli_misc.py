@@ -81,6 +81,33 @@ def test_windows_pipe_input_is_buffered_before_conversion(monkeypatch, capsys) -
     assert captured.out.strip() == "# Test HTML"
 
 
+def test_extract_images_writes_files_and_relinks(monkeypatch, tmp_path) -> None:
+    docx = os.path.join(os.path.dirname(__file__), "test_files", "test.docx")
+    output = tmp_path / "out.md"
+    monkeypatch.setattr(
+        sys, "argv", ["markitdown", docx, "--extract-images", "-o", str(output)]
+    )
+
+    main()
+
+    markdown = output.read_text(encoding="utf-8")
+    images = sorted((tmp_path / "out_images").iterdir())
+    assert images, "Expected at least one extracted image"
+    assert "base64" not in markdown
+    assert f"(out_images/{images[0].name})" in markdown
+    assert images[0].read_bytes().startswith(b"\x89PNG")
+
+
+def test_extract_images_requires_output(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(sys, "argv", ["markitdown", "fake.docx", "--extract-images"])
+
+    with pytest.raises(SystemExit) as exc:
+        main()
+
+    assert exc.value.code == 1
+    assert "--extract-images requires -o/--output" in capsys.readouterr().out
+
+
 # Service flags and endpoints
 
 # ---------------------------------------------------------------------------

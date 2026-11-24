@@ -167,6 +167,12 @@ def main():
         help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
     )
 
+    parser.add_argument(
+        "--extract-images",
+        action="store_true",
+        help="Save embedded base64 images as files in '<output>_images/' and link them from the Markdown. Requires -o.",
+    )
+
     parser.add_argument("filename", nargs="?")
     args = parser.parse_args()
 
@@ -292,6 +298,11 @@ def main():
     else:
         markitdown = MarkItDown(enable_plugins=args.use_plugins)
 
+    if args.extract_images:
+        if not args.output:
+            _exit_with_error("--extract-images requires -o/--output")
+        args.keep_data_uris = True
+
     if args.filename is None:
         # Windows pipe-backed stdin can report seekable() even though it cannot rewind.
         result = markitdown.convert_stream(
@@ -310,13 +321,46 @@ def main():
 def _handle_output(args, result: DocumentConverterResult):
     """Handle output to stdout or file"""
     if args.output:
+        markdown = result.markdown
+        if args.extract_images:
+            markdown = _extract_images(markdown, args.output)
         with open(args.output, "w", encoding="utf-8") as f:
-            f.write(result.markdown)
+            f.write(markdown)
     else:
         # Handle stdout encoding errors more gracefully, with fallback for
         # cases where sys.stdout.encoding is None (e.g. redirected streams).
         encoding = sys.stdout.encoding or "utf-8"
         print(result.markdown.encode(encoding, errors="replace").decode(encoding))
+
+
+def _extract_images(markdown: str, output_path: str) -> str:
+    """Write base64 data-URI images to '<output>_images/' and relink them."""
+    import base64
+    import os
+    import re
+
+    stem = os.path.splitext(output_path)[0]
+    img_dir = stem + "_images"
+    rel_dir = os.path.basename(img_dir)
+    count = 0
+
+    def replace(m):
+        nonlocal count
+        count += 1
+        ext = {"jpeg": "jpg", "svg+xml": "svg"}.get(
+            m.group(2).lower(), m.group(2).lower()
+        )
+        os.makedirs(img_dir, exist_ok=True)
+        name = f"img_{count:02d}.{ext}"
+        with open(os.path.join(img_dir, name), "wb") as f:
+            f.write(base64.b64decode(m.group(3)))
+        return f"![{m.group(1)}]({rel_dir}/{name})"
+
+    return re.sub(
+        r"!\[([^\]]*)\]\(data:image/([A-Za-z0-9+.-]+);base64,([A-Za-z0-9+/=\s]+)\)",
+        replace,
+        markdown,
+    )
 
 
 def _exit_with_error(message: str):
