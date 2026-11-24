@@ -19,6 +19,7 @@ from .._exceptions import MissingDependencyException, MISSING_DEPENDENCY_MESSAGE
 _dependency_exc_info = None
 try:
     import pptx
+    from pptx.text.text import _Run
 except ImportError:
     # Preserve the error and stack trace for later
     _dependency_exc_info = sys.exc_info()
@@ -29,6 +30,13 @@ ACCEPTED_MIME_TYPE_PREFIXES = [
 ]
 
 ACCEPTED_FILE_EXTENSIONS = [".pptx"]
+
+_BULLET_PLACEHOLDER_TYPES = {
+    2,  # PP_PLACEHOLDER.BODY
+    7,  # PP_PLACEHOLDER.OBJECT
+    6,  # PP_PLACEHOLDER.VERTICAL_BODY
+    17,  # PP_PLACEHOLDER.VERTICAL_OBJECT
+}
 
 
 class PptxConverter(DocumentConverter):
@@ -105,12 +113,49 @@ class PptxConverter(DocumentConverter):
 
                 # Text areas
                 elif shape.has_text_frame:
-                    text = shape.text or ""
                     if shape == title:
-                        if text.strip():
-                            md_content += "# " + text.lstrip() + "\n"
+                        title_lines = []
+                        for p in shape.text_frame.paragraphs:
+                            p_text = self._format_paragraph_content(p).strip()
+                            if p_text:
+                                title_lines.append("# " + p_text)
+                        if title_lines:
+                            md_content += "\n".join(title_lines) + "\n"
                     else:
-                        md_content += text + "\n"
+                        shape_lines = []
+                        ordered_counters: dict[int, int] = {}
+                        for p in shape.text_frame.paragraphs:
+                            p_text = self._format_paragraph_content(p)
+                            if not p_text.strip():
+                                shape_lines.append("")
+                                ordered_counters.clear()
+                                continue
+
+                            is_list, list_type = self._get_paragraph_list_info(p, shape)
+                            if is_list:
+                                lvl = max(0, getattr(p, "level", 0))
+                                indent = "  " * lvl
+                                if list_type == "ordered":
+                                    count = ordered_counters.get(lvl, 0) + 1
+                                    ordered_counters[lvl] = count
+                                    for k in list(ordered_counters.keys()):
+                                        if k > lvl:
+                                            del ordered_counters[k]
+                                    prefix = f"{indent}{count}. "
+                                else:
+                                    ordered_counters.clear()
+                                    prefix = f"{indent}* "
+
+                                sublines = p_text.splitlines()
+                                shape_lines.append(prefix + sublines[0].lstrip())
+                                for subline in sublines[1:]:
+                                    shape_lines.append(f"{indent}  " + subline.lstrip())
+                            else:
+                                ordered_counters.clear()
+                                shape_lines.append(p_text)
+
+                        if shape_lines and any(line.strip() for line in shape_lines):
+                            md_content += "\n".join(shape_lines) + "\n"
 
                 # Group Shapes
                 if shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.GROUP:
@@ -141,10 +186,15 @@ class PptxConverter(DocumentConverter):
                 # has merely been opened, so having one says nothing about there
                 # being notes to read. Only head a section that has content.
                 notes_frame = slide.notes_slide.notes_text_frame
-                notes_text = (notes_frame.text or "") if notes_frame is not None else ""
-                if notes_text.strip():
-                    md_content += "\n\n### Notes:\n" + notes_text
-                    md_content = md_content.strip()
+                if notes_frame is not None and (notes_frame.text or "").strip():
+                    notes_lines = [
+                        self._format_paragraph_content(p)
+                        for p in notes_frame.paragraphs
+                    ]
+                    notes_text = "\n".join(notes_lines).strip()
+                    if notes_text:
+                        md_content += "\n\n### Notes:\n" + notes_text
+                        md_content = md_content.strip()
 
         return DocumentConverterResult(markdown=md_content.strip())
 
@@ -302,6 +352,35 @@ class PptxConverter(DocumentConverter):
             return True
         return False
 
+    def _format_table_cell(self, cell) -> str:
+        ns = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+        parts = []
+        for p_idx, p in enumerate(cell.text_frame.paragraphs):
+            if p_idx > 0:
+                parts.append("<br/>")
+            p_parts = []
+            if hasattr(p, "_p") and p._p is not None:
+                for child in p._p:
+                    if child.tag == f"{ns}r":
+                        try:
+                            run = _Run(child, p)
+                            t = html.escape(run.text or "")
+                            addr = None
+                            if run.hyperlink and run.hyperlink.address:
+                                addr = run.hyperlink.address.strip()
+                            if addr:
+                                p_parts.append(f'<a href="{html.escape(addr)}">{t}</a>')
+                            else:
+                                p_parts.append(t)
+                        except Exception:
+                            pass
+                    elif child.tag == f"{ns}br":
+                        p_parts.append("<br/>")
+            if not p_parts and p.text:
+                p_parts.append(html.escape(p.text))
+            parts.extend(p_parts)
+        return "".join(parts) if parts else html.escape(cell.text or "")
+
     def _convert_table_to_markdown(self, table, **kwargs):
         # Write the table as HTML, then convert it to Markdown
         html_table = "<html><body><table>"
@@ -309,10 +388,11 @@ class PptxConverter(DocumentConverter):
         for row in table.rows:
             html_table += "<tr>"
             for cell in row.cells:
+                cell_content = self._format_table_cell(cell)
                 if first_row:
-                    html_table += "<th>" + html.escape(cell.text) + "</th>"
+                    html_table += "<th>" + cell_content + "</th>"
                 else:
-                    html_table += "<td>" + html.escape(cell.text) + "</td>"
+                    html_table += "<td>" + cell_content + "</td>"
             html_table += "</tr>"
             first_row = False
         html_table += "</table></body></html>"
@@ -321,6 +401,125 @@ class PptxConverter(DocumentConverter):
             self._html_converter.convert_string(html_table, **kwargs).markdown.strip()
             + "\n"
         )
+
+    def _format_run_text(self, text: str, address: Optional[str]) -> str:
+        if not address or not text.strip():
+            return text
+        l_ws = len(text) - len(text.lstrip())
+        r_ws = len(text) - len(text.rstrip())
+        prefix = text[:l_ws]
+        suffix = text[len(text) - r_ws :] if r_ws > 0 else ""
+        core = text[l_ws : len(text) - r_ws if r_ws > 0 else len(text)]
+        if core:
+            return f"{prefix}[{core}]({address}){suffix}"
+        return text
+
+    def _format_paragraph_content(self, paragraph) -> str:
+        ns = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+        elements: list[tuple[str, Optional[str]]] = []
+
+        if hasattr(paragraph, "_p") and paragraph._p is not None:
+            for child in paragraph._p:
+                if child.tag == f"{ns}r":
+                    try:
+                        run = _Run(child, paragraph)
+                        text = run.text or ""
+                        addr = None
+                        if run.hyperlink and run.hyperlink.address:
+                            addr = run.hyperlink.address.strip()
+                        elements.append((text, addr))
+                    except Exception:
+                        pass
+                elif child.tag == f"{ns}br":
+                    elements.append(("\n", None))
+                elif child.tag == f"{ns}fld":
+                    t = child.find(f"{ns}t")
+                    if t is not None and t.text:
+                        elements.append((t.text, None))
+
+        if not elements:
+            if getattr(paragraph, "runs", None):
+                for run in paragraph.runs:
+                    text = run.text or ""
+                    addr = None
+                    try:
+                        if run.hyperlink and run.hyperlink.address:
+                            addr = run.hyperlink.address.strip()
+                    except Exception:
+                        pass
+                    elements.append((text, addr))
+            else:
+                return paragraph.text or ""
+
+        # Merge adjacent elements with the same hyperlink address
+        merged: list[tuple[str, Optional[str]]] = []
+        for text, addr in elements:
+            if not text:
+                continue
+            if (
+                merged
+                and merged[-1][1] == addr
+                and "\n" not in text
+                and "\n" not in merged[-1][0]
+            ):
+                prev_text, prev_addr = merged[-1]
+                merged[-1] = (prev_text + text, prev_addr)
+            else:
+                merged.append((text, addr))
+
+        parts = [self._format_run_text(text, addr) for text, addr in merged]
+        return "".join(parts)
+
+    def _get_paragraph_list_info(self, paragraph, shape) -> tuple[bool, Optional[str]]:
+        ns = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+        pPr = (
+            paragraph._p.pPr
+            if hasattr(paragraph, "_p") and paragraph._p is not None
+            else None
+        )
+
+        if pPr is not None:
+            if pPr.find(f"{ns}buNone") is not None:
+                return False, None
+            if pPr.find(f"{ns}buAutoNum") is not None:
+                return True, "ordered"
+            if (
+                pPr.find(f"{ns}buChar") is not None
+                or pPr.find(f"{ns}buBlip") is not None
+            ):
+                return True, "unordered"
+
+        try:
+            lvl_tag = f"{ns}lvl{paragraph.level + 1}pPr"
+            lst_style = shape._element.find(f".//{ns}lstStyle")
+            if lst_style is not None:
+                lvl_pr = lst_style.find(lvl_tag)
+                if lvl_pr is not None:
+                    if lvl_pr.find(f"{ns}buNone") is not None:
+                        return False, None
+                    if lvl_pr.find(f"{ns}buAutoNum") is not None:
+                        return True, "ordered"
+                    if (
+                        lvl_pr.find(f"{ns}buChar") is not None
+                        or lvl_pr.find(f"{ns}buBlip") is not None
+                    ):
+                        return True, "unordered"
+        except Exception:
+            pass
+
+        try:
+            if (
+                getattr(shape, "is_placeholder", False)
+                and shape.placeholder_format.type in _BULLET_PLACEHOLDER_TYPES
+            ):
+                return True, "unordered"
+        except Exception:
+            pass
+
+        if getattr(paragraph, "level", 0) > 0:
+            return True, "unordered"
+
+        return False, None
 
     def _convert_chart_to_markdown(self, chart):
         try:

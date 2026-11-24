@@ -893,5 +893,153 @@ def test_pptx_chart_title_text_frame(title: str | None) -> None:
     assert result.strip() in markdown
 
 
+def test_pptx_hyperlinks_in_paragraphs() -> None:
+    prs = Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    tb = slide.shapes.add_textbox(0, 0, Inches(4), Inches(2))
+    tf = tb.text_frame
+
+    p1 = tf.paragraphs[0]
+    r1 = p1.add_run()
+    r1.text = "MarkitDown"
+    r1.hyperlink.address = "https://github.com/microsoft/markitdown"
+
+    p2 = tf.add_paragraph()
+    r2_a = p2.add_run()
+    r2_a.text = "Check out "
+    r2_b = p2.add_run()
+    r2_b.text = "repo"
+    r2_b.hyperlink.address = "https://github.com/microsoft/markitdown"
+    r2_c = p2.add_run()
+    r2_c.text = " for info."
+
+    stream = io.BytesIO()
+    prs.save(stream)
+    stream.seek(0)
+
+    markdown = (
+        MarkItDown()
+        .convert_stream(stream, stream_info=StreamInfo(extension=".pptx"))
+        .markdown
+    )
+    assert "[MarkitDown](https://github.com/microsoft/markitdown)" in markdown
+    assert (
+        "Check out [repo](https://github.com/microsoft/markitdown) for info."
+        in markdown
+    )
+
+
+def test_pptx_bullets_and_indentation() -> None:
+    prs = Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[1])
+    slide.shapes.title.text = "List Demo"
+    body = slide.placeholders[1]
+    tf = body.text_frame
+    tf.text = "List item 1"
+
+    p2 = tf.add_paragraph()
+    p2.text = "Sub list 1"
+    p2.level = 1
+
+    p3 = tf.add_paragraph()
+    p3.text = "List item 2"
+    p3.level = 0
+
+    p4 = tf.add_paragraph()
+    p4.text = "Sub list 2"
+    p4.level = 1
+
+    p5 = tf.add_paragraph()
+    p5.text = "Sub list 3"
+    p5.level = 2
+
+    stream = io.BytesIO()
+    prs.save(stream)
+    stream.seek(0)
+
+    markdown = (
+        MarkItDown()
+        .convert_stream(stream, stream_info=StreamInfo(extension=".pptx"))
+        .markdown
+    )
+    expected = (
+        "# List Demo\n"
+        "* List item 1\n"
+        "  * Sub list 1\n"
+        "* List item 2\n"
+        "  * Sub list 2\n"
+        "    * Sub list 3"
+    )
+    assert expected in markdown
+
+
+def test_pptx_table_cell_hyperlinks() -> None:
+    prs = Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    table_shape = slide.shapes.add_table(2, 2, 0, 0, Inches(4), Inches(2))
+    table = table_shape.table
+    table.cell(0, 0).text = "Col A"
+    table.cell(0, 1).text = "Col B"
+    table.cell(1, 0).text = "Normal"
+
+    cell = table.cell(1, 1)
+    p = cell.text_frame.paragraphs[0]
+    p.text = "Visit "
+    r = p.add_run()
+    r.text = "MarkitDown"
+    r.hyperlink.address = "https://github.com/microsoft/markitdown"
+
+    stream = io.BytesIO()
+    prs.save(stream)
+    stream.seek(0)
+
+    markdown = (
+        MarkItDown()
+        .convert_stream(stream, stream_info=StreamInfo(extension=".pptx"))
+        .markdown
+    )
+    assert (
+        "| Normal | Visit [MarkitDown](https://github.com/microsoft/markitdown) |"
+        in markdown
+    )
+
+
+def test_pptx_textbox_bullet_tags() -> None:
+    prs = Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    tb = slide.shapes.add_textbox(0, 0, Inches(4), Inches(2))
+    tf = tb.text_frame
+
+    p1 = tf.paragraphs[0]
+    p1.text = "Bullet item"
+    p1_pr = p1._p.get_or_add_pPr()
+    ns = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+    p1_pr.append(etree.Element(f"{ns}buChar", char="•"))
+
+    p2 = tf.add_paragraph()
+    p2.text = "Numbered item"
+    p2_pr = p2._p.get_or_add_pPr()
+    p2_pr.append(etree.Element(f"{ns}buAutoNum", type="arabicPeriod"))
+
+    p3 = tf.add_paragraph()
+    p3.text = "Plain item"
+    p3_pr = p3._p.get_or_add_pPr()
+    p3_pr.append(etree.Element(f"{ns}buNone"))
+
+    stream = io.BytesIO()
+    prs.save(stream)
+    stream.seek(0)
+
+    markdown = (
+        MarkItDown()
+        .convert_stream(stream, stream_info=StreamInfo(extension=".pptx"))
+        .markdown
+    )
+    assert "* Bullet item" in markdown
+    assert "1. Numbered item" in markdown
+    assert "Plain item" in markdown
+    assert "* Plain item" not in markdown
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
