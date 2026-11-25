@@ -895,6 +895,34 @@ def test_get_content_disposition_filename_decodes_rfc5987() -> None:
     )
 
 
+def test_pptx_table_converts_large_table() -> None:
+    from markitdown.converters._pptx_converter import PptxConverter
+
+    cell = lambda text: SimpleNamespace(text=text)
+    row = lambda *texts: SimpleNamespace(cells=[cell(text) for text in texts])
+    table = SimpleNamespace(
+        rows=[
+            row("Header & 1", "Header < 2"),
+            *[row(f"R{index}", f"<V{index}>") for index in range(200)],
+        ]
+    )
+
+    converter = PptxConverter()
+    captured: dict[str, str] = {}
+
+    def capture_html(html_table: str, **kwargs):
+        captured["html"] = html_table
+        return SimpleNamespace(markdown="| Header & 1 | Header < 2 |\n|---|---|")
+
+    converter._html_converter.convert_string = capture_html
+    result = converter._convert_table_to_markdown(table)
+
+    assert "<th>Header &amp; 1</th>" in captured["html"]
+    assert "<th>Header &lt; 2</th>" in captured["html"]
+    assert "<td>&lt;V199&gt;</td>" in captured["html"]
+    assert result == "| Header & 1 | Header < 2 |\n|---|---|\n"
+
+
 def test_pptx_chart_multi_series_conversion() -> None:
     """Charts with multiple series and many categories must convert correctly.
 
