@@ -1,5 +1,6 @@
 """PDF conversion, table extraction, numbering, and page cleanup."""
 
+import io
 import os
 import re
 from unittest.mock import patch
@@ -7,6 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from markitdown import MarkItDown
+from markitdown._stream_info import StreamInfo
 from markitdown.converters._pdf_converter import (
     PARTIAL_NUMBERING_PATTERN,
     _merge_partial_numbering_lines,
@@ -1355,6 +1357,174 @@ class TestPdfMemoryOptimization:
                 f"Page {page_number} must be closed after extraction and before "
                 f"the next page or document cleanup: {events}"
             )
+
+
+def _build_synthetic_pdf(pages: list[tuple[int, list[str]]]) -> bytes:
+    """Build a minimal valid PDF from (rotation_degrees, content_stream_lines) specs."""
+    page_ids: list[int] = []
+    page_objs: list[tuple[int, bytes]] = []
+    next_id = 4
+
+    for rotation, commands in pages:
+        page_id = next_id
+        content_id = next_id + 1
+        next_id += 2
+        page_ids.append(page_id)
+
+        stream = "\n".join(commands).encode("latin-1")
+        page_dict = (
+            f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+            f"/Rotate {rotation} /Resources << /Font << /F1 3 0 R >> >> "
+            f"/Contents {content_id} 0 R >>"
+        ).encode("latin-1")
+        content_dict = (
+            f"<< /Length {len(stream)} >>\nstream\n".encode("latin-1")
+            + stream
+            + b"\nendstream"
+        )
+        page_objs.append((page_id, page_dict))
+        page_objs.append((content_id, content_dict))
+
+    kids = " ".join(f"{pid} 0 R" for pid in page_ids)
+    objs: list[tuple[int, bytes]] = [
+        (1, b"<< /Type /Catalog /Pages 2 0 R >>"),
+        (
+            2,
+            f"<< /Type /Pages /Kids [{kids}] /Count {len(page_ids)} >>".encode(
+                "latin-1"
+            ),
+        ),
+        (3, b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"),
+        *page_objs,
+    ]
+
+    buf = io.BytesIO()
+    buf.write(b"%PDF-1.4\n")
+    offsets: dict[int, int] = {}
+    for oid, body in objs:
+        offsets[oid] = buf.tell()
+        buf.write(f"{oid} 0 obj\n".encode("latin-1"))
+        buf.write(body)
+        buf.write(b"\nendobj\n")
+
+    xref_pos = buf.tell()
+    buf.write(f"xref\n0 {len(objs) + 1}\n0000000000 65535 f \n".encode("latin-1"))
+    for oid in range(1, len(objs) + 1):
+        buf.write(f"{offsets[oid]:010d} 00000 n \n".encode("latin-1"))
+    buf.write(
+        f"trailer\n<< /Size {len(objs) + 1} /Root 1 0 R >>\n"
+        f"startxref\n{xref_pos}\n%%EOF\n".encode("latin-1")
+    )
+    return buf.getvalue()
+
+
+class TestPdfRotatedPages:
+    """Regression tests for PDFs with /Rotate entries (90, 180, 270)."""
+
+    def test_rotated_pages_mixed_orientations(self):
+        pages = [
+            (
+                rot,
+                [
+                    "BT /F1 12 Tf",
+                    f"1 0 0 1 72 720 Tm (Page rot{rot} first line alpha{rot}) Tj",
+                    f"1 0 0 1 72 700 Tm (Page rot{rot} second line beta{rot}) Tj",
+                    "ET",
+                ],
+            )
+            for rot in (0, 90, 180, 270)
+        ]
+        pdf_bytes = _build_synthetic_pdf(pages)
+
+        markdown = (
+            MarkItDown()
+            .convert_stream(
+                io.BytesIO(pdf_bytes), stream_info=StreamInfo(extension=".pdf")
+            )
+            .markdown
+        )
+
+        for rot in (0, 90, 180, 270):
+            assert f"Page rot{rot} first line alpha{rot}" in markdown
+            assert f"Page rot{rot} second line beta{rot}" in markdown
+
+    def test_uniformly_rotated_90_prose_not_misclassified_as_table(self):
+        commands = ["BT /F1 12 Tf"]
+        for i in range(10):
+            commands.append(
+                f"1 0 0 1 72 {720 - i * 20} Tm (Paragraph line {i} gamma{i}.) Tj"
+            )
+        commands.append("ET")
+        pdf_bytes = _build_synthetic_pdf([(90, commands)])
+
+        markdown = (
+            MarkItDown()
+            .convert_stream(
+                io.BytesIO(pdf_bytes), stream_info=StreamInfo(extension=".pdf")
+            )
+            .markdown
+        )
+
+        assert "|" not in markdown
+        for i in range(10):
+            assert f"Paragraph line {i} gamma{i}." in markdown
+
+    def test_mixed_form_and_rotated_plain_pages(self):
+        form_commands = ["BT /F1 12 Tf"]
+        for r in range(5):
+            y = 700 - r * 20
+            form_commands.append(f"1 0 0 1 50 {y} Tm (ColA{r}) Tj")
+            form_commands.append(f"1 0 0 1 200 {y} Tm (ColB{r}) Tj")
+            form_commands.append(f"1 0 0 1 350 {y} Tm (ColC{r}) Tj")
+        form_commands.append("ET")
+
+        pdf_bytes = _build_synthetic_pdf(
+            [
+                (0, form_commands),
+                (90, ["BT /F1 12 Tf 1 0 0 1 72 720 Tm (RotatedNinetyText) Tj ET"]),
+                (180, ["BT /F1 12 Tf 1 0 0 1 72 720 Tm (RotatedOneEightyText) Tj ET"]),
+                (270, ["BT /F1 12 Tf 1 0 0 1 72 720 Tm (RotatedTwoSeventyText) Tj ET"]),
+            ]
+        )
+
+        markdown = (
+            MarkItDown()
+            .convert_stream(
+                io.BytesIO(pdf_bytes), stream_info=StreamInfo(extension=".pdf")
+            )
+            .markdown
+        )
+
+        assert "| ColA0" in markdown
+        assert "RotatedNinetyText" in markdown
+        assert "RotatedOneEightyText" in markdown
+        assert "RotatedTwoSeventyText" in markdown
+
+    def test_landscape_rotated_page_with_upright_text_preserved(self):
+        pdf_bytes = _build_synthetic_pdf(
+            [
+                (
+                    90,
+                    [
+                        "BT /F1 12 Tf",
+                        "0 1 -1 0 100 72 Tm (Landscape upright line one) Tj",
+                        "0 1 -1 0 120 72 Tm (Landscape upright line two) Tj",
+                        "ET",
+                    ],
+                )
+            ]
+        )
+
+        markdown = (
+            MarkItDown()
+            .convert_stream(
+                io.BytesIO(pdf_bytes), stream_info=StreamInfo(extension=".pdf")
+            )
+            .markdown
+        )
+
+        assert "Landscape upright line one" in markdown
+        assert "Landscape upright line two" in markdown
 
 
 # Conversion regressions

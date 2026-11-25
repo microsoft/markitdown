@@ -62,6 +62,7 @@ _dependency_exc_info = None
 try:
     import pdfminer
     import pdfminer.high_level
+    from pdfminer.layout import LAParams
     import pdfplumber
 except ImportError:
     _dependency_exc_info = sys.exc_info()
@@ -117,6 +118,31 @@ def _to_markdown_table(table: list[list[str]], include_separator: bool = True) -
     return "\n".join(md)
 
 
+def _has_rotated_text_orientation(page: Any) -> bool:
+    """Return True if most characters on the page are non-upright or inverted."""
+    chars = getattr(page, "chars", None)
+    if not chars:
+        return False
+    rotated_count = sum(
+        1
+        for char in chars
+        if not char.get("upright", True) or char.get("matrix", (1,))[0] < 0
+    )
+    return rotated_count > len(chars) / 2
+
+
+def _extract_text_with_pdfminer(
+    pdf_bytes: io.BytesIO, page_numbers: list[int] | None = None
+) -> str:
+    """Extract text via pdfminer with vertical text detection enabled for rotated pages."""
+    pdf_bytes.seek(0)
+    return pdfminer.high_level.extract_text(
+        pdf_bytes,
+        page_numbers=page_numbers,
+        laparams=LAParams(detect_vertical=True),
+    )
+
+
 def _extract_form_content_from_words(page: Any) -> str | None:
     """
     Extract form-style content from a PDF page by analyzing word positions.
@@ -131,6 +157,11 @@ def _extract_form_content_from_words(page: Any) -> str | None:
     """
     words = page.extract_words(keep_blank_chars=True, x_tolerance=3, y_tolerance=3)
     if not words:
+        return None
+
+    # Rotated prose pages (90/180/270) invert or transpose word coordinates,
+    # which causes column clustering to misclassify prose lines as tables.
+    if _has_rotated_text_orientation(page):
         return None
 
     # Group words by their Y position (rows)
@@ -547,7 +578,7 @@ class PdfConverter(DocumentConverter):
             # keep memory usage constant regardless of page count.
             markdown_chunks: list[str] = []
             form_page_count = 0
-            plain_page_indices: list[int] = []
+            rotated_plain_chunk_indices: list[tuple[int, int]] = []
 
             with pdfplumber.open(pdf_bytes) as pdf:
                 for page_idx, page in enumerate(pdf.pages):
@@ -557,8 +588,13 @@ class PdfConverter(DocumentConverter):
                         form_page_count += 1
                         if page_content.strip():
                             markdown_chunks.append(page_content)
+                    elif _has_rotated_text_orientation(page):
+                        # Defer rotated plain pages until after pdfplumber closes
+                        # so pdfminer can extract them without stream cursor conflicts.
+                        chunk_idx = len(markdown_chunks)
+                        markdown_chunks.append("")
+                        rotated_plain_chunk_indices.append((chunk_idx, page_idx))
                     else:
-                        plain_page_indices.append(page_idx)
                         text = page.extract_text()
                         if text and text.strip():
                             markdown_chunks.append(text.strip())
@@ -568,20 +604,25 @@ class PdfConverter(DocumentConverter):
             # If no pages had form-style content, use pdfminer for
             # the whole document (better text spacing for prose).
             if form_page_count == 0:
-                pdf_bytes.seek(0)
-                markdown = pdfminer.high_level.extract_text(pdf_bytes)
+                markdown = _extract_text_with_pdfminer(pdf_bytes)
             else:
-                markdown = "\n\n".join(markdown_chunks).strip()
+                for chunk_idx, page_idx in rotated_plain_chunk_indices:
+                    text = _extract_text_with_pdfminer(
+                        pdf_bytes, page_numbers=[page_idx]
+                    )
+                    if text and text.strip():
+                        markdown_chunks[chunk_idx] = text.strip()
+                markdown = "\n\n".join(
+                    chunk for chunk in markdown_chunks if chunk
+                ).strip()
 
         except Exception:
             # Fallback if pdfplumber fails
-            pdf_bytes.seek(0)
-            markdown = pdfminer.high_level.extract_text(pdf_bytes)
+            markdown = _extract_text_with_pdfminer(pdf_bytes)
 
         # Fallback if still empty
         if not markdown:
-            pdf_bytes.seek(0)
-            markdown = pdfminer.high_level.extract_text(pdf_bytes)
+            markdown = _extract_text_with_pdfminer(pdf_bytes)
 
         # Post-process to merge MasterFormat-style partial numbering with following text
         markdown = _merge_partial_numbering_lines(markdown)
