@@ -1043,6 +1043,53 @@ class TestPdfTableStructureConsistency:
         assert "Hardware" in table_text, "Second table should contain Hardware"
 
 
+class TestPdfHyperlinks:
+    def test_repeated_link_text_keeps_the_correct_destination(self):
+        pdf_path = os.path.join(TEST_FILES_DIR, "pdf_links_plain.pdf")
+
+        markdown = MarkItDown().convert(pdf_path).markdown
+
+        assert markdown.rstrip() == (
+            "Unlinked: Read more.\n\n"
+            "First: [Read more](https://example.org/first).\n\n"
+            "Second: [Read more](https://example.org/second).\n\n"
+            "Keep  these  spaces."
+        )
+
+    def test_links_in_prose_and_table_cells(self):
+        pdf_path = os.path.join(TEST_FILES_DIR, "pdf_links_mixed.pdf")
+
+        markdown = MarkItDown().convert(pdf_path).markdown
+
+        assert markdown.startswith(
+            "[Read more](https://example.org/schedule) about the schedule.\n\n"
+        )
+        assert extract_markdown_tables(markdown) == [
+            [
+                ["Document", "Link", "Revision"],
+                ["Index", "[Read more](https://example.org/index)", "2026"],
+            ]
+        ]
+
+    def test_links_on_a_rotated_page_with_offset_media_box(self):
+        pdf_path = os.path.join(TEST_FILES_DIR, "pdf_links_rotated.pdf")
+
+        markdown = MarkItDown().convert(pdf_path).markdown
+
+        assert "[Open guide](https://example.org/guide)" in markdown
+        assert r"[Report \] draft](https://example.org/v2\)draft)" in markdown
+
+    def test_link_quad_points_leave_intervening_text_unlinked(self):
+        pdf_path = os.path.join(TEST_FILES_DIR, "pdf_links_mixed.pdf")
+
+        markdown = MarkItDown().convert(pdf_path).markdown
+
+        assert (
+            "[Left](https://example.org/both) middle [Right](https://example.org/both)"
+            in markdown
+        )
+
+
 # MasterFormat numbering
 
 
@@ -1229,8 +1276,8 @@ def pdf_activity(monkeypatch):
         events.append(("pdfminer", None))
         return original_extract_text(*args, **kwargs)
 
-    def extract_form(page):
-        result = original_form_extraction(page)
+    def extract_form(page, links=()):
+        result = original_form_extraction(page, links)
         events.append(("form" if result is not None else "plain", page.page_number))
         return result
 
