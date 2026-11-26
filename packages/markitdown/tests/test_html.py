@@ -65,6 +65,55 @@ def test_html_href_still_quotes_raw_unicode_and_spaces() -> None:
     assert f"[example]({expected_href})" in markdown
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/wiki/C++",
+        "/wiki/Help:Contents",
+        "/@user",
+        "/maps/@46.52,6.63,15z",
+        "/a;b=c/$5/*",
+        "/lib@1.2/x+y.js",
+    ],
+)
+def test_html_href_keeps_reserved_path_characters(path: str) -> None:
+    """RFC 3986 allows these in a path, and quoting them rewrites the URL."""
+    markdown = _convert_html(f'<a href="https://example.com{path}">example</a>')
+
+    assert f"[example](https://example.com{path})" in markdown
+
+
+def test_html_href_still_quotes_parentheses_and_ampersands() -> None:
+    """An unbalanced parenthesis ends a Markdown destination, and `&amp;` in
+    one is read as an entity."""
+    markdown = _convert_html('<a href="https://example.com/a_(b)/c&amp;d">x</a>')
+
+    assert "[x](https://example.com/a_%28b%29/c%26d)" in markdown
+
+
+def test_html_href_keeps_apostrophe_quoted() -> None:
+    """Some parsers read a pair of apostrophes in a destination as a title."""
+    markdown = _convert_html("<a href=\"https://example.com/a'b'\">x</a>")
+
+    assert "[x](https://example.com/a%27b%27)" in markdown
+
+
+@pytest.mark.parametrize("href", ["/@user", "/C++", "/wiki"])
+def test_html_relative_href_equal_to_its_text_is_a_bracketed_link(href: str) -> None:
+    """An autolink needs a scheme, so a relative one cannot use the shortcut."""
+    markdown = _convert_html(f'<a href="{href}">{href}</a>')
+
+    assert f"[{href}]({href})" in markdown
+
+
+def test_html_absolute_href_equal_to_its_text_stays_an_autolink() -> None:
+    markdown = _convert_html(
+        '<a href="https://example.com/a">https://example.com/a</a>'
+    )
+
+    assert "<https://example.com/a>" in markdown
+
+
 def test_html_href_quotes_literal_percent_sign() -> None:
     href = "https://example.com/100% complete"
     expected_href = "https://example.com/100%25%20complete"
