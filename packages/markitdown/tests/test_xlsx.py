@@ -540,5 +540,90 @@ def test_xlsx_show_zeroes_rename_is_scoped_to_sheet_view_tags() -> None:
     assert b'<customSheetView showZeroes="0"/>' in repaired
 
 
+def test_xlsx_preserves_literal_na_null_and_blank_cells() -> None:
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Data"
+    ws.append(["region", "status", "count", "empty"])
+    ws.append(["NA", "NULL", 1, None])
+    ws.append(["None", "n/a", 2, ""])
+    ws.append(["nan", "OK", None, None])
+
+    stream = io.BytesIO()
+    wb.save(stream)
+    wb.close()
+    stream.seek(0)
+
+    result = MarkItDown().convert_stream(stream, file_extension=".xlsx").markdown
+    assert "## Data" in result
+    assert "| NA | NULL | 1 |  |" in result
+    assert "| None | n/a | 2 |  |" in result
+    assert "| nan | OK |  |  |" in result
+    assert "NaN" not in result
+
+
+def test_xlsx_legacy_show_zeroes_preserves_literal_na_null_and_blank_cells(
+    tmp_path: Path,
+) -> None:
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Data"
+    ws.append(["region", "status", "empty"])
+    ws.append(["NA", "NULL", None])
+
+    base_path = tmp_path / "base.xlsx"
+    xlsx_path = tmp_path / "legacy_show_zeroes.xlsx"
+    wb.save(str(base_path))
+    wb.close()
+
+    with zipfile.ZipFile(base_path, "r") as source:
+        with zipfile.ZipFile(xlsx_path, "w", zipfile.ZIP_DEFLATED) as target:
+            for item in source.infolist():
+                data = source.read(item.filename)
+                if item.filename == "xl/worksheets/sheet1.xml":
+                    data = data.replace(b"<sheetView ", b'<sheetView showZeroes="0" ')
+                target.writestr(item, data)
+
+    result = MarkItDown().convert(str(xlsx_path)).markdown
+    assert "| NA | NULL |  |" in result
+    assert "NaN" not in result
+
+
+def test_xls_preserves_literal_na_null_and_blank_cells() -> None:
+    try:
+        import xlwt
+    except ImportError:
+        pytest.skip("xlwt not installed")
+
+    wb = xlwt.Workbook()
+    ws = wb.add_sheet("Data")
+    ws.write(0, 0, "region")
+    ws.write(0, 1, "status")
+    ws.write(0, 2, "count")
+    ws.write(0, 3, "empty")
+
+    ws.write(1, 0, "NA")
+    ws.write(1, 1, "NULL")
+    ws.write(1, 2, 42)
+
+    ws.write(2, 0, "None")
+    ws.write(2, 1, "n/a")
+    ws.write(2, 3, "present")
+
+    stream = io.BytesIO()
+    wb.save(stream)
+    stream.seek(0)
+
+    result = (
+        MarkItDown()
+        .convert_stream(stream, stream_info=StreamInfo(extension=".xls"))
+        .markdown
+    )
+    assert "## Data" in result
+    assert "| NA | NULL | 42 |  |" in result
+    assert "| None | n/a |  | present |" in result
+    assert "NaN" not in result
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
