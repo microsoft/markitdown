@@ -172,6 +172,29 @@ def test_youtube_preserves_library_transcript(
     transcript_api.return_value.fetch.assert_called_once_with("12345", languages=["fr"])
 
 
+@pytest.mark.parametrize(
+    "url",
+    [
+        r"https://www.youtube.com/watch\?v\=12345",
+        "https://www.youtube.com/watch%3Fv%3D12345",
+        "https://www.youtube.com/watch?v=12345",
+    ],
+)
+def test_youtube_accepted_url_is_used_for_transcript(
+    url: str, transcript_api: MagicMock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(youtube_module, "IS_YOUTUBE_TRANSCRIPT_CAPABLE", True)
+    transcript_api.return_value.fetch.return_value = [SimpleNamespace(text="Hello")]
+    result = MarkItDown().convert_stream(
+        io.BytesIO(b"<html><head><title>Video</title></head></html>"),
+        stream_info=StreamInfo(mimetype="text/html", extension=".html", url=url),
+    )
+
+    assert "### Transcript\nHello" in result.markdown
+    transcript_api.return_value.list.assert_called_once_with("12345")
+    transcript_api.return_value.fetch.assert_called_once_with("12345", languages=["en"])
+
+
 # Conversion regressions
 
 
