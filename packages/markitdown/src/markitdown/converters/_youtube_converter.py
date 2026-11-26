@@ -40,6 +40,9 @@ class YouTubeConverter(DocumentConverter):
 
     def _get_video_id(self, url: str) -> Union[str, None]:
         """Extract a YouTube video ID from supported URL formats."""
+        # Apply the same normalization when identifying a video for routing
+        # and when fetching its transcript.
+        url = unquote(url).replace(r"\?", "?").replace(r"\=", "=")
         parsed_url = urlparse(url)
         hostname = parsed_url.netloc.lower()
         path_parts = [part for part in parsed_url.path.split("/") if part]
@@ -68,9 +71,6 @@ class YouTubeConverter(DocumentConverter):
         url = stream_info.url or ""
         mimetype = (stream_info.mimetype or "").lower()
         extension = (stream_info.extension or "").lower()
-
-        url = unquote(url)
-        url = url.replace(r"\?", "?").replace(r"\=", "=")
 
         if not self._get_video_id(url):
             # Not a YouTube URL
