@@ -4,6 +4,12 @@ import markdownify
 from typing import Any, Optional
 from urllib.parse import quote, urlparse, urlunparse
 
+# RFC 3986 pchar characters, minus parentheses, that are legal in a path and
+# harmless in a Markdown link destination. Parentheses stay quoted because
+# an unbalanced one ends the destination early, "&" stays quoted because
+# Markdown reads "&amp;" in a destination as an entity, and "'" stays quoted
+# because some parsers read a pair of them as a link title.
+_PATH_SAFE = "/:@!$*+,;="
 _PERCENT_ENCODED_OCTET = re.compile(r"%[0-9A-Fa-f]{2}")
 
 
@@ -13,11 +19,11 @@ def _quote_path_preserving_percent_encoded_octets(path: str) -> str:
     last_end = 0
 
     for match in _PERCENT_ENCODED_OCTET.finditer(path):
-        parts.append(quote(path[last_end : match.start()]))
+        parts.append(quote(path[last_end : match.start()], safe=_PATH_SAFE))
         parts.append(match.group(0))
         last_end = match.end()
 
-    parts.append(quote(path[last_end:]))
+    parts.append(quote(path[last_end:], safe=_PATH_SAFE))
     return "".join(parts)
 
 
@@ -92,6 +98,8 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
             and text.replace(r"\_", "_") == href
             and not title
             and not self.options["default_title"]
+            # An autolink needs a scheme, or it reads as an email or not a link
+            and parsed_url.scheme
         ):
             # Shortcut syntax
             return "<%s>" % href
