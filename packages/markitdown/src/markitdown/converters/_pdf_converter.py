@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import sys
 import io
 import re
@@ -63,6 +65,7 @@ try:
     import pdfminer
     import pdfminer.high_level
     import pdfplumber
+    from ._pdf_links import PageLinks, extract_text_with_links, render_linked_text
 except ImportError:
     _dependency_exc_info = sys.exc_info()
 
@@ -86,7 +89,7 @@ def _to_markdown_table(table: list[list[str]], include_separator: bool = True) -
     if not table:
         return ""
 
-    # Normalize None → ""
+    # Normalize None â†’ ""
     table = [[cell if cell is not None else "" for cell in row] for row in table]
 
     # Filter out empty rows
@@ -117,7 +120,9 @@ def _to_markdown_table(table: list[list[str]], include_separator: bool = True) -
     return "\n".join(md)
 
 
-def _extract_form_content_from_words(page: Any) -> str | None:
+def _extract_form_content_from_words(
+    page: Any, links: PageLinks | None = None
+) -> str | None:
     """
     Extract form-style content from a PDF page by analyzing word positions.
     This handles borderless forms/tables where words are aligned in columns.
@@ -129,7 +134,9 @@ def _extract_form_content_from_words(page: Any) -> str | None:
     Returns None if the page doesn't appear to be a form-style document,
     indicating that pdfminer should be used instead for better text spacing.
     """
-    words = page.extract_words(keep_blank_chars=True, x_tolerance=3, y_tolerance=3)
+    words = page.extract_words(
+        keep_blank_chars=True, x_tolerance=3, y_tolerance=3, return_chars=bool(links)
+    )
     if not words:
         return None
 
@@ -304,7 +311,7 @@ def _extract_form_content_from_words(page: Any) -> str | None:
 
     # Helper function to extract cells from a row
     def extract_cells(info: dict) -> list[str]:
-        cells: list[str] = ["" for _ in range(num_cols)]
+        cells: list[list[dict]] = [[] for _ in range(num_cols)]
         for word in info["words"]:
             word_x = word["x0"]
             # Find the correct column using boundary ranges
@@ -314,11 +321,11 @@ def _extract_form_content_from_words(page: Any) -> str | None:
                 if word_x < col_end - 20:
                     assigned_col = col_idx
                     break
-            if cells[assigned_col]:
-                cells[assigned_col] += " " + word["text"]
-            else:
-                cells[assigned_col] = word["text"]
-        return cells
+            cells[assigned_col].append(word)
+        return [
+            links.render_words(cell) if links else " ".join(w["text"] for w in cell)
+            for cell in cells
+        ]
 
     # Process rows, collecting table data for proper formatting
     idx = 0
@@ -389,7 +396,9 @@ def _extract_form_content_from_words(page: Any) -> str | None:
 
             if not in_table:
                 # Non-table content
-                result_lines.append(info["text"])
+                result_lines.append(
+                    links.render_words(info["words"]) if links else info["text"]
+                )
             idx += 1
 
     return "\n".join(result_lines)
@@ -547,19 +556,27 @@ class PdfConverter(DocumentConverter):
             # keep memory usage constant regardless of page count.
             markdown_chunks: list[str] = []
             form_page_count = 0
-            plain_page_indices: list[int] = []
+            links_by_page: dict[int, PageLinks] = {}
 
             with pdfplumber.open(pdf_bytes) as pdf:
                 for page_idx, page in enumerate(pdf.pages):
-                    page_content = _extract_form_content_from_words(page)
+                    links = PageLinks.from_page(page)
+                    if links:
+                        links_by_page[page_idx] = links
+                    page_content = _extract_form_content_from_words(page, links)
 
                     if page_content is not None:
                         form_page_count += 1
                         if page_content.strip():
                             markdown_chunks.append(page_content)
                     else:
-                        plain_page_indices.append(page_idx)
-                        text = page.extract_text()
+                        if links:
+                            text = render_linked_text(
+                                (char_text, links.for_char(char) if char else None)
+                                for char_text, char in page.get_textmap().tuples
+                            )
+                        else:
+                            text = page.extract_text()
                         if text and text.strip():
                             markdown_chunks.append(text.strip())
 
@@ -569,7 +586,10 @@ class PdfConverter(DocumentConverter):
             # the whole document (better text spacing for prose).
             if form_page_count == 0:
                 pdf_bytes.seek(0)
-                markdown = pdfminer.high_level.extract_text(pdf_bytes)
+                if links_by_page:
+                    markdown = extract_text_with_links(pdf_bytes, links_by_page)
+                else:
+                    markdown = pdfminer.high_level.extract_text(pdf_bytes)
             else:
                 markdown = "\n\n".join(markdown_chunks).strip()
 
