@@ -133,14 +133,20 @@ def _extract_form_content_from_words(page: Any) -> str | None:
     if not words:
         return None
 
-    # Group words by their Y position (rows)
-    y_tolerance = 5
+    # Group words by their Y position (rows). Words on one line can have
+    # slightly different tops (mixed fonts or sizes), so start a new row only
+    # when a word is more than y_tolerance below the top of the current row,
+    # the same tolerance extract_words() uses to group characters into words.
+    # Rounding each top to a fixed grid would split such a line in two
+    # whenever its tops fall on either side of a grid boundary.
+    y_tolerance = 3
     rows_by_y: dict[float, list[dict]] = {}
-    for word in words:
-        y_key = round(word["top"] / y_tolerance) * y_tolerance
-        if y_key not in rows_by_y:
-            rows_by_y[y_key] = []
-        rows_by_y[y_key].append(word)
+    row_top: float | None = None
+    for word in sorted(words, key=lambda w: w["top"]):
+        if row_top is None or word["top"] - row_top > y_tolerance:
+            row_top = word["top"]
+            rows_by_y[row_top] = []
+        rows_by_y[row_top].append(word)
 
     # Sort rows by Y position
     sorted_y_keys = sorted(rows_by_y.keys())
