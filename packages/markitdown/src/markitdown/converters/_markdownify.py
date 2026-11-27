@@ -52,6 +52,21 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
 
         return super().convert_hn(n, el, text, convert_as_inline)  # type: ignore
 
+    def convert_hN(  # noqa: N802 -- name dictated by markdownify
+        self,
+        n: int,
+        el: Any,
+        text: str,
+        parent_tags: Any = None,
+        **kwargs,
+    ) -> str:
+        """Drop headings that have no content instead of emitting a bare '##'."""
+        if parent_tags is None:
+            parent_tags = set()
+        if "_inline" not in parent_tags and not text.strip():
+            return ""
+        return super().convert_hN(n, el, text, parent_tags, **kwargs)  # type: ignore
+
     def convert_a(
         self,
         el: Any,
