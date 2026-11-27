@@ -89,6 +89,14 @@ You can also pipe content:
 cat path-to-file.pdf | markitdown
 ```
 
+XLSX conversion omits pictures by default. To include pictures anchored over worksheet cells, use `--keep-data-uris`. The pictures appear after their worksheet's table.
+
+```bash
+markitdown --keep-data-uris workbook.xlsx -o workbook.md
+```
+
+In Python, use `MarkItDown().convert("workbook.xlsx", keep_data_uris=True)`. Each placement of a picture includes its full image bytes as a base64 data URI, so workbooks with many or repeated pictures can produce large Markdown files. Alt text is empty, including for pictures with an Excel description.
+
 ### Optional Dependencies
 MarkItDown has optional dependencies for activating various file formats. Earlier in this document, we installed all optional dependencies with the `[all]` option. However, you can also install them individually for more control. For example:
 

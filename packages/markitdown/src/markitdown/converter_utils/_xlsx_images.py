@@ -1,13 +1,18 @@
 """Read spreadsheet drawing images without reloading or resaving the workbook."""
 
+import base64
 import io
 import mimetypes
 import posixpath
+import re
 import zipfile
+import zlib
 from typing import Any, BinaryIO, Callable, Optional
 from urllib.parse import unquote
+from xml.etree.ElementTree import ParseError
 
 from defusedxml import ElementTree as ET
+from defusedxml.common import DefusedXmlException
 
 from .._stream_info import StreamInfo
 from ._image import _parse_image_html
@@ -20,6 +25,27 @@ _NS = {
 }
 _REL_ID = "{" + _NS["r"] + "}id"
 _EMBED = "{" + _NS["r"] + "}embed"
+# The workbook supplies this value. Only a bare image type belongs in the URI.
+_IMAGE_MIME_TYPE = re.compile(r"image/[a-z0-9][a-z0-9.+_-]*", re.ASCII | re.IGNORECASE)
+# Missing relationships, malformed XML, and unreadable ZIP parts can leave tables usable.
+_IMAGE_READ_ERRORS = (
+    KeyError,
+    StopIteration,
+    ParseError,
+    DefusedXmlException,
+    zipfile.BadZipFile,
+    zlib.error,
+    EOFError,
+    NotImplementedError,
+)
+
+
+def _image_data_uri(data: bytes, mimetype: Optional[str]) -> str:
+    if mimetype and _IMAGE_MIME_TYPE.fullmatch(mimetype):
+        media_type = mimetype.lower()
+    else:
+        media_type = "application/octet-stream"
+    return f"data:{media_type};base64,{base64.b64encode(data).decode('ascii')}"
 
 
 def _relationships(
@@ -106,9 +132,11 @@ class _XlsxImages:
             with io.BytesIO(data) as image_stream:
                 fragment = render(image_stream, info, **options)
             soup = _parse_image_html(fragment)
-            if soup is None:
-                continue
-            fragments.append(f"<div>{soup}</div>")
+            if soup is not None:
+                fragments.append(f"<div>{soup}</div>")
+            elif options.get("keep_data_uris"):
+                uri = _image_data_uri(data, info.mimetype)
+                fragments.append(f'<div><img alt="" src="{uri}"></div>')
         if not fragments:
             return ""
         return "<h3>Images in this sheet:</h3>" + "".join(fragments)
