@@ -116,5 +116,9 @@ class BingSerpConverter(DocumentConverter):
 
         return DocumentConverterResult(
             markdown=webpage_text,
-            title=None if soup.title is None else soup.title.string,
+            title=(
+                None
+                if soup.title is None or soup.title.string is None
+                else str(soup.title.string)
+            ),
         )

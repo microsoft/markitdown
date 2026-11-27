@@ -85,9 +85,14 @@ class HtmlConverter(DocumentConverter):
         # remove leading and trailing \n
         webpage_text = webpage_text.strip()
 
+        # Copy the title into a plain str. The NavigableString that bs4 returns
+        # keeps the whole parsed document alive, and pickling it recurses
+        # through the document tree.
+        title = soup.title.string if soup.title is not None else None
+
         return DocumentConverterResult(
             markdown=webpage_text,
-            title=None if soup.title is None else soup.title.string,
+            title=None if title is None else str(title),
         )
 
     def convert_string(
