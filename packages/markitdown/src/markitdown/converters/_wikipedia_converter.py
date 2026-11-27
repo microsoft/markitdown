@@ -72,7 +72,11 @@ class WikipediaConverter(DocumentConverter):
         )
 
         webpage_text = ""
-        main_title = None if soup.title is None else soup.title.string
+        main_title = (
+            None
+            if soup.title is None or soup.title.string is None
+            else str(soup.title.string)
+        )
 
         if body_elm:
             # What's the title

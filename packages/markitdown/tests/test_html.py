@@ -1,6 +1,7 @@
 """HTML conversion, link handling, and Wikipedia pages."""
 
 import io
+import pickle
 
 import pytest
 from bs4 import BeautifulSoup
@@ -212,6 +213,36 @@ def test_title_mixing_markup_and_plain_text_keeps_both_parts() -> None:
 
 
 # Conversion regressions
+
+
+_LONG_PAGE = (
+    "<html><head><title>Report</title></head><body>"
+    + "".join(f"<p>Paragraph {i}</p>" for i in range(3000))
+    + "</body></html>"
+).encode()
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        None,
+        "https://www.bing.com/search?q=report",
+        # A Wikipedia URL whose page has no article body.
+        "https://en.wikipedia.org/wiki/Report",
+    ],
+)
+def test_html_title_is_a_plain_str_that_pickles(url) -> None:
+    """The title must not be a bs4 string that keeps the parsed page alive."""
+    result = MarkItDown().convert_stream(
+        io.BytesIO(_LONG_PAGE),
+        stream_info=StreamInfo(mimetype="text/html", extension=".html", url=url),
+    )
+
+    assert type(result.title) is str
+    assert result.title == "Report"
+    restored = pickle.loads(pickle.dumps(result))
+    assert restored.title == "Report"
+    assert restored.markdown == result.markdown
 
 
 def test_wikipedia_converter_no_title() -> None:

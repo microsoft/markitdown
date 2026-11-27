@@ -101,7 +101,7 @@ class YouTubeConverter(DocumentConverter):
         metadata: Dict[str, str] = {}
 
         if soup.title and soup.title.string:
-            metadata["title"] = soup.title.string
+            metadata["title"] = str(soup.title.string)
 
         for meta in soup(["meta"]):
             if not isinstance(meta, bs4.Tag):
