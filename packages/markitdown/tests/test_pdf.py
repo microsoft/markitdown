@@ -9,6 +9,7 @@ import pytest
 from markitdown import MarkItDown
 from markitdown.converters._pdf_converter import (
     PARTIAL_NUMBERING_PATTERN,
+    _extract_form_content_from_words,
     _merge_partial_numbering_lines,
 )
 
@@ -1041,6 +1042,48 @@ class TestPdfTableStructureConsistency:
         table_text = str(second_table)
         assert "Electronics" in table_text, "Second table should contain Electronics"
         assert "Hardware" in table_text, "Second table should contain Hardware"
+
+
+class _WordsPage:
+    """A page that supplies pre-positioned words to the form extractor."""
+
+    width = 612
+
+    def __init__(self, words):
+        self._words = words
+
+    def extract_words(self, **kwargs):
+        return self._words
+
+
+def test_form_row_kept_together_when_word_tops_differ_slightly():
+    """A row whose words sit a fraction of a point apart stays one table row."""
+    rows = [
+        ("Item", "Quantity", "Price"),
+        ("Apples", "10", "$5.00"),
+        ("Bananas", "20", "$7.50"),
+        ("Cherries", "30", "$9.25"),
+    ]
+    words = []
+    for row_index, row in enumerate(rows):
+        for column_index, text in enumerate(row):
+            top = 92.0 + 20 * row_index
+            if row_index == 2 and column_index == 2:
+                # A different font or size on the same line moves the top a
+                # little, here across the old 5-point grid boundary at 132.5.
+                top += 0.6
+            x0 = 72.0 + 150 * column_index
+            words.append({"text": text, "x0": x0, "x1": x0 + 40, "top": top})
+
+    markdown = _extract_form_content_from_words(_WordsPage(words))
+
+    assert markdown is not None
+    assert len(markdown.splitlines()) == len(rows) + 1  # rows plus separator
+    for item, quantity, price in rows:
+        assert any(
+            item in line and quantity in line and price in line
+            for line in markdown.splitlines()
+        ), f"Row for {item} was split: {markdown!r}"
 
 
 # MasterFormat numbering
