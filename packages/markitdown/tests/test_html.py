@@ -344,5 +344,22 @@ def test_deeply_nested_html_fallback() -> None:
     assert "<p>" not in result.markdown
 
 
+@pytest.mark.parametrize(
+    "html",
+    [
+        "<h2></h2>",
+        "<h2> </h2>",
+        "<h3>\n</h3>",
+        "<h1><span class='icon'></span></h1>",
+    ],
+)
+def test_empty_heading_is_not_emitted(html: str) -> None:
+    assert _convert_html(f"<p>before</p>{html}<p>after</p>") == "before\n\nafter"
+
+
+def test_heading_with_content_is_unchanged() -> None:
+    assert _convert_html("<h2>Title</h2><p>text</p>") == "## Title\n\ntext"
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
