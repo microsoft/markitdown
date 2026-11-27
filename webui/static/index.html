@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%234f46e5'/%3E%3Ctext x='16' y='22' font-size='16' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'%3EM%E2%86%93%3C/text%3E%3C/svg%3E">
+<title>MarkItDown — حوّل ملفاتك إلى Markdown</title>
+<style>
+:root{
+  --bg:#f6f7f9;--panel:#fff;--text:#161a20;--muted:#667085;--line:#e3e6eb;
+  --accent:#4f46e5;--accent-soft:#eef0ff;--ok:#16a34a;--err:#dc2626;--code:#f1f3f6;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#0e1116;--panel:#171b22;--text:#e8ebf0;--muted:#8b94a3;--line:#262c36;
+  --accent:#818cf8;--accent-soft:#1f2337;--ok:#4ade80;--err:#f87171;--code:#1f2530}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.6 system-ui,-apple-system,"Segoe UI",Tahoma,"Noto Sans Arabic",sans-serif}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:14px 24px;border-bottom:1px solid var(--line);background:var(--panel)}
+header h1{margin:0;font-size:18px;font-weight:700}
+header h1 span{color:var(--accent)}
+header small{color:var(--muted)}
+main{max-width:1200px;margin:0 auto;padding:24px;display:grid;gap:20px}
+#drop{border:2px dashed var(--line);border-radius:16px;background:var(--panel);
+  padding:44px 20px;text-align:center;cursor:pointer;transition:.15s}
+#drop:hover,#drop.over{border-color:var(--accent);background:var(--accent-soft)}
+#drop .big{font-size:44px;line-height:1}
+#drop h2{margin:10px 0 4px;font-size:18px}
+#drop p{margin:0;color:var(--muted);font-size:13px}
+.workspace{display:grid;grid-template-columns:320px 1fr;gap:20px;align-items:start}
+@media (max-width:820px){.workspace{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.card-h{display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:10px 14px;border-bottom:1px solid var(--line);min-height:50px}
+.card-h b{font-size:14px}
+button{font:inherit;font-size:13px;cursor:pointer;border:1px solid var(--line);
+  background:var(--panel);color:var(--text);border-radius:8px;padding:6px 12px}
+button:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+button:disabled{opacity:.4;cursor:default}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.primary:hover:not(:disabled){color:#fff;opacity:.9}
+.row-actions{display:flex;gap:6px;flex-wrap:wrap}
+#list{list-style:none;margin:0;padding:0;max-height:520px;overflow:auto}
+#list li{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;
+  border-bottom:1px solid var(--line)}
+#list li:last-child{border-bottom:0}
+#list li:hover{background:var(--accent-soft)}
+#list li.active{background:var(--accent-soft);box-shadow:inset -3px 0 var(--accent)}
+.fname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:ltr;text-align:right}
+.meta{font-size:12px;color:var(--muted)}
+.st{font-size:12px;white-space:nowrap}
+.st.done{color:var(--ok)}.st.error{color:var(--err)}.st.run{color:var(--accent)}
+.empty{padding:36px 16px;text-align:center;color:var(--muted)}
+.tabs{display:flex;gap:4px}
+.tabs button{border-color:transparent;background:transparent}
+.tabs button.on{background:var(--accent-soft);color:var(--accent)}
+#out{padding:16px 18px;max-height:600px;overflow:auto;direction:ltr;text-align:left}
+#raw{margin:0;white-space:pre-wrap;word-break:break-word;
+  font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+#view h1,#view h2,#view h3,#view h4{margin:1em 0 .4em;line-height:1.3}
+#view h1{font-size:1.6em}#view h2{font-size:1.3em}#view h3{font-size:1.1em}
+#view p{margin:.6em 0}
+#view code{background:var(--code);padding:1px 5px;border-radius:4px;font-size:.9em}
+#view pre{background:var(--code);padding:12px;border-radius:8px;overflow:auto}
+#view pre code{background:none;padding:0}
+#view table{border-collapse:collapse;margin:.8em 0;display:block;overflow:auto}
+#view th,#view td{border:1px solid var(--line);padding:6px 10px}
+#view th{background:var(--code)}
+#view blockquote{margin:.6em 0;padding:2px 14px;border-left:3px solid var(--accent);color:var(--muted)}
+#view img{max-width:100%}
+#view hr{border:0;border-top:1px solid var(--line)}
+.err-box{color:var(--err);direction:ltr;text-align:left;white-space:pre-wrap}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--text);
+  color:var(--bg);padding:8px 16px;border-radius:999px;font-size:13px;opacity:0;pointer-events:none;transition:.2s}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <h1><span>MarkItDown</span> · محوّل الملفات إلى Markdown</h1>
+  <small id="limit"></small>
+</header>
+
+<main>
+  <div id="drop" tabindex="0" role="button" aria-label="اسحب الملفات هنا أو اضغط للاختيار">
+    <div class="big">📂</div>
+    <h2>اسحب ملفاتك وأفلتها هنا</h2>
+    <p>أو اضغط للاختيار، ويمديك تلصق ملف بـ Ctrl+V · PDF, Word, Excel, PowerPoint, HTML, CSV, JSON, صور، صوت، ZIP…</p>
+    <input id="picker" type="file" multiple hidden>
+  </div>
+
+  <div class="workspace">
+    <section class="card">
+      <div class="card-h">
+        <b>الملفات <span class="meta" id="count"></span></b>
+        <div class="row-actions">
+          <button id="dlAll" disabled title="دمج كل النتائج في ملف واحد">تنزيل الكل</button>
+          <button id="clear" disabled>مسح</button>
+        </div>
+      </div>
+      <ul id="list"></ul>
+      <div class="empty" id="emptyList">ما فيه ملفات بعد</div>
+    </section>
+
+    <section class="card">
+      <div class="card-h">
+        <div class="tabs">
+          <button id="tabRaw" class="on">Markdown</button>
+          <button id="tabView">معاينة</button>
+        </div>
+        <div class="row-actions">
+          <button id="copy" disabled>نسخ</button>
+          <button id="dl" class="primary" disabled>تنزيل الملف</button>
+        </div>
+      </div>
+      <div id="out">
+        <div class="empty" id="emptyOut">اختر ملفًا من القائمة لعرض النتيجة</div>
+        <pre id="raw" hidden></pre>
+        <div id="view" hidden></div>
+      </div>
+    </section>
+  </div>
+</main>
+<div id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const items = [];           // {id,file,name,status,md,error}
+let active = null, mode = 'raw', nextId = 1, running = 0, maxMB = 50;
+const CONCURRENCY = 2;
+
+fetch('/api/config').then(r => r.json()).then(c => {
+  maxMB = c.max_upload_mb;
+  $('#limit').textContent = 'الحد الأقصى للملف: ' + maxMB + ' MB';
+}).catch(() => {});
+
+// ---------- input ----------
+const drop = $('#drop'), picker = $('#picker');
+drop.onclick = () => picker.click();
+drop.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') picker.click(); };
+picker.onchange = () => { addFiles(picker.files); picker.value = ''; };
+['dragenter', 'dragover'].forEach(ev => window.addEventListener(ev, e => {
+  e.preventDefault(); drop.classList.add('over');
+}));
+['dragleave', 'drop'].forEach(ev => window.addEventListener(ev, e => {
+  e.preventDefault();
+  if (ev === 'drop' || e.target === document.documentElement || !e.relatedTarget) drop.classList.remove('over');
+}));
+window.addEventListener('drop', e => { if (e.dataTransfer && e.dataTransfer.files.length) addFiles(e.dataTransfer.files); });
+window.addEventListener('paste', e => {
+  const fs = e.clipboardData && e.clipboardData.files;
+  if (fs && fs.length) addFiles(fs);
+});
+
+function addFiles(list) {
+  for (const f of list) {
+    const it = { id: nextId++, file: f, name: f.name || 'pasted-file', status: 'queued', md: '', error: '' };
+    if (f.size > maxMB * 1024 * 1024) { it.status = 'error'; it.error = 'الملف أكبر من ' + maxMB + ' MB'; }
+    items.push(it);
+    if (!active) active = it.id;
+  }
+  render(); pump();
+}
+
+// ---------- conversion queue ----------
+function pump() {
+  while (running < CONCURRENCY) {
+    const it = items.find(i => i.status === 'queued');
+    if (!it) return;
+    run(it);
+  }
+}
+async function run(it) {
+  running++; it.status = 'run'; render();
+  try {
+    const fd = new FormData();
+    fd.append('file', it.file, it.name);
+    const r = await fetch('/api/convert', { method: 'POST', body: fd });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || j.detail || ('HTTP ' + r.status));
+    it.md = j.markdown; it.status = 'done';
+  } catch (e) { it.status = 'error'; it.error = e.message; }
+  running--; render(); pump();
+}
+
+// ---------- rendering ----------
+const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const fmtSize = n => n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+const STATUS = { queued: 'بالانتظار', run: 'جارٍ التحويل…', done: 'تم ✓', error: 'فشل' };
+
+function render() {
+  const ul = $('#list'); ul.innerHTML = '';
+  for (const it of items) {
+    const li = document.createElement('li');
+    if (it.id === active) li.className = 'active';
+    li.innerHTML = '<span class="fname">' + esc(it.name) + '</span><span class="meta" dir="ltr">' + fmtSize(it.file.size) +
+      '</span><span class="st ' + it.status + '">' + STATUS[it.status] + '</span>';
+    li.onclick = () => { active = it.id; render(); };
+    ul.appendChild(li);
+  }
+  const done = items.filter(i => i.status === 'done').length;
+  $('#emptyList').hidden = items.length > 0;
+  $('#count').textContent = items.length ? '(' + done + '/' + items.length + ')' : '';
+  $('#clear').disabled = !items.length;
+  $('#dlAll').disabled = !done;
+  renderOut();
+}
+
+function renderOut() {
+  const it = items.find(i => i.id === active);
+  const raw = $('#raw'), view = $('#view'), empty = $('#emptyOut');
+  raw.hidden = view.hidden = true; empty.hidden = false;
+  $('#copy').disabled = $('#dl').disabled = !(it && it.status === 'done');
+  if (!it) { empty.textContent = 'اختر ملفًا من القائمة لعرض النتيجة'; return; }
+  if (it.status === 'error') { empty.innerHTML = '<div class="err-box">' + esc(it.error) + '</div>'; return; }
+  if (it.status !== 'done') { empty.textContent = 'جارٍ التحويل…'; return; }
+  empty.hidden = true;
+  if (mode === 'raw') { raw.hidden = false; raw.textContent = it.md || '(النتيجة فارغة)'; }
+  else { view.hidden = false; view.innerHTML = mdToHtml(it.md); }
+}
+
+$('#tabRaw').onclick = () => setMode('raw');
+$('#tabView').onclick = () => setMode('view');
+function setMode(m) {
+  mode = m;
+  $('#tabRaw').classList.toggle('on', m === 'raw');
+  $('#tabView').classList.toggle('on', m === 'view');
+  renderOut();
+}
+
+// ---------- actions ----------
+const cur = () => items.find(i => i.id === active);
+const mdName = n => n.replace(/\.[^.]+$/, '') + '.md';
+function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 1600); }
+function save(name, text) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: 'text/markdown;charset=utf-8' }));
+  a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+$('#copy').onclick = async () => { await navigator.clipboard.writeText(cur().md); toast('تم النسخ'); };
+$('#dl').onclick = () => save(mdName(cur().name), cur().md);
+$('#dlAll').onclick = () => {
+  const text = items.filter(i => i.status === 'done')
+    .map(i => '<!-- ' + i.name + ' -->\n\n' + i.md).join('\n\n---\n\n');
+  save('markitdown-all.md', text);
+};
+$('#clear').onclick = () => { items.length = 0; active = null; render(); };
+
+// ---------- tiny markdown renderer (input is escaped first) ----------
+function inline(s) {
+  s = esc(s);
+  s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+  s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)[^)]*\)/g, (m, a, u) => /^(https?:|data:image\/)/i.test(u) ? '<img alt="' + a + '" src="' + u + '">' : a);
+  s = s.replace(/\[([^\]]+)\]\(([^)\s]+)[^)]*\)/g, (m, t, u) => /^https?:/i.test(u) ? '<a href="' + u + '" target="_blank" rel="noopener">' + t + '</a>' : t);
+  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/(^|[\s(])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+  return s;
+}
+function mdToHtml(src) {
+  const lines = src.replace(/\r/g, '').split('\n'); let out = '', i = 0;
+  const isRow = l => /^\s*\|.*\|\s*$/.test(l);
+  while (i < lines.length) {
+    const l = lines[i];
+    if (/^```/.test(l)) {
+      let code = []; i++;
+      while (i < lines.length && !/^```/.test(lines[i])) code.push(lines[i++]);
+      i++; out += '<pre><code>' + esc(code.join('\n')) + '</code></pre>'; continue;
+    }
+    let m;
+    if ((m = l.match(/^(#{1,6})\s+(.*)/))) { const n = m[1].length; out += '<h' + n + '>' + inline(m[2]) + '</h' + n + '>'; i++; continue; }
+    if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(l)) { out += '<hr>'; i++; continue; }
+    if (isRow(l) && i + 1 < lines.length && /^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1])) {
+      const cells = r => r.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+      out += '<table><thead><tr>' + cells(l).map(c => '<th>' + inline(c) + '</th>').join('') + '</tr></thead><tbody>';
+      i += 2;
+      while (i < lines.length && isRow(lines[i])) { out += '<tr>' + cells(lines[i]).map(c => '<td>' + inline(c) + '</td>').join('') + '</tr>'; i++; }
+      out += '</tbody></table>'; continue;
+    }
+    if (/^\s*>/.test(l)) {
+      let q = []; while (i < lines.length && /^\s*>/.test(lines[i])) q.push(lines[i++].replace(/^\s*>\s?/, ''));
+      out += '<blockquote>' + inline(q.join(' ')) + '</blockquote>'; continue;
+    }
+    if (/^\s*([-*+]|\d+\.)\s+/.test(l)) {
+      const ord = /^\s*\d+\./.test(l); out += ord ? '<ol>' : '<ul>';
+      while (i < lines.length && /^\s*([-*+]|\d+\.)\s+/.test(lines[i])) out += '<li>' + inline(lines[i++].replace(/^\s*([-*+]|\d+\.)\s+/, '')) + '</li>';
+      out += ord ? '</ol>' : '</ul>'; continue;
+    }
+    if (!l.trim()) { i++; continue; }
+    let p = [l]; i++;
+    while (i < lines.length && lines[i].trim() && !/^(#{1,6}\s|```|\s*>|\s*([-*+]|\d+\.)\s|\s*\|)/.test(lines[i])) p.push(lines[i++]);
+    out += '<p>' + inline(p.join(' ')) + '</p>';
+  }
+  return out;
+}
+render();
+</script>
+</body>
+</html>

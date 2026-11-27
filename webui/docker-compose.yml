@@ -1,0 +1,13 @@
+services:
+  markitdown-ui:
+    build:
+      context: ..
+      dockerfile: webui/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      MAX_UPLOAD_MB: "50"
+      # Uncomment to protect the page with a login prompt:
+      # AUTH_USER: "admin"
+      # AUTH_PASSWORD: "change-me"
+    restart: unless-stopped
