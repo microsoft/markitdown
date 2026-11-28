@@ -255,13 +255,14 @@ def _build_currency_overlays(
                         and isinstance(cell.value, (int, float))
                         and not isinstance(cell.value, bool)
                     ):
+                        sections = fmt_string.split(";")
                         is_conditional = any(
                             _condition_match_outside_quotes(s)
-                            for s in fmt_string.split(";")
+                            for s in sections
                         )
                         display_val: Any = (
                             abs(cell.value)
-                            if (not is_conditional and cell.value < 0)
+                            if (not is_conditional and len(sections) >= 2 and cell.value < 0)
                             else cell.value
                         )
                         sheet_overlay[(df_row_idx, col_idx)] = (prefix, display_val)

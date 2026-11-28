@@ -743,6 +743,28 @@ def test_currency_single_symbol_quoted_prefix() -> None:
     assert "£999" in result   # single-char quoted pound recognised as prefix
 
 
+def test_currency_single_section_negative_value() -> None:
+    """Single-section currency format applied to a negative value keeps the sign.
+
+    Format "$#,##0.00" has only one section — it applies to all values.
+    Excel prepends a minus for negative values, so -1199 displays as -$1199.
+    abs() must NOT be applied; only multi-section negative sections use abs().
+    """
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws["A1"] = "Price"
+    ws["A2"] = -1199
+    ws["A2"].number_format = "$#,##0.00"
+    stream = io.BytesIO()
+    wb.save(stream)
+    wb.close()
+
+    result = _convert(XlsxConverter(), stream.getvalue())
+
+    assert "$-1199" in result     # negative sign preserved
+    assert "$1199" not in result  # abs() must NOT have been applied
+
+
 def _currency_workbook() -> bytes:
     wb = openpyxl.Workbook()
     ws = wb.active
