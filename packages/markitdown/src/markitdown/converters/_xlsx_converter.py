@@ -238,11 +238,8 @@ def _build_currency_overlays(
     try:
         for sheet_name in wb.sheetnames:
             ws = wb[sheet_name]
-            rows = list(ws.iter_rows())
-            if not rows:
-                continue
             sheet_overlay: dict[tuple[int, int], tuple[str, Any]] = {}
-            for df_row_idx, row in enumerate(rows[1:]):
+            for df_row_idx, row in enumerate(ws.iter_rows(min_row=2)):
                 for cell in row:
                     if cell.value is None:
                         continue
@@ -328,13 +325,25 @@ class XlsxConverter(DocumentConverter):
 
                 images = _XlsxImages(workbook_stream)
 
-            currency_overlays = _build_currency_overlays(workbook_stream)
+            try:
+                currency_overlays = _build_currency_overlays(workbook_stream)
+            except Exception:
+                currency_overlays = {}
 
             for s in sheets:
                 md_content += f"## {s}\n"
                 sheet_df = sheets[s]
                 if s in currency_overlays:
-                    sheet_df = sheet_df.copy().astype(object)
+                    sheet_df = sheet_df.copy()
+                    # Only convert the columns that hold currency cells to object
+                    # dtype.  Converting the whole DataFrame changes date rendering
+                    # (datetime64 → "2024-01-15 00:00:00" instead of "2024-01-15").
+                    affected_cols = {col_idx for (_, col_idx) in currency_overlays[s]}
+                    for col_idx in affected_cols:
+                        if col_idx < len(sheet_df.columns):
+                            col_name = sheet_df.columns[col_idx]
+                            if sheet_df[col_name].dtype != object:
+                                sheet_df[col_name] = sheet_df[col_name].astype(object)
                     for (df_row_idx, col_idx), (prefix, display_val) in currency_overlays[s].items():
                         if df_row_idx < len(sheet_df) and col_idx < len(sheet_df.columns):
                             sheet_df.iloc[df_row_idx, col_idx] = f"{prefix}{display_val}"

@@ -1,5 +1,6 @@
 """Spreadsheet conversion, compatibility repairs, and image hooks."""
 
+import datetime
 import inspect
 import io
 import zipfile
@@ -826,6 +827,127 @@ def test_currency_duplicate_column_names() -> None:
     assert "£950" in result    # second "Price.1" column → £
     assert "£1199" not in result  # first column must not receive £
     assert "$950" not in result   # second column must not receive $
+
+
+def test_currency_date_column_rendering_unchanged() -> None:
+    """Date columns must not change rendering when a currency column is also present.
+
+    Converting the whole DataFrame to object dtype changes datetime64 rendering
+    from "2024-01-15" to "2024-01-15 00:00:00".  The fix converts only the
+    currency-formatted column, leaving the date column dtype intact.
+    """
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws["A1"] = "Date"
+    ws["B1"] = "Price"
+    ws["A2"] = datetime.date(2024, 1, 15)
+    ws["A2"].number_format = "YYYY-MM-DD"
+    ws["B2"] = 1199
+    ws["B2"].number_format = "$#,##0.00"
+    stream = io.BytesIO()
+    wb.save(stream)
+    wb.close()
+
+    result = _convert(XlsxConverter(), stream.getvalue())
+
+    assert "2024-01-15" in result          # date rendered as date, not datetime
+    assert "00:00:00" not in result        # time component must NOT appear
+    assert "$1199" in result               # currency prefix still applied
+
+
+def test_currency_zero_value_no_prefix_in_third_section() -> None:
+    """Zero value with a 3-section format uses the zero section, which may lack a prefix.
+
+    Format $#,##0;[Red]$#,##0;"-" — section 2 ("-") has no currency symbol,
+    so zero must not receive any prefix.
+    """
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws["A1"] = "Amount"
+    ws["A2"] = 100       # positive  → section 0, has $
+    ws["A2"].number_format = '$#,##0;[Red]$#,##0;"-"'
+    ws["A3"] = -50       # negative  → section 1, has $, abs applied
+    ws["A3"].number_format = '$#,##0;[Red]$#,##0;"-"'
+    ws["A4"] = 0         # zero      → section 2, no $
+    ws["A4"].number_format = '$#,##0;[Red]$#,##0;"-"'
+    stream = io.BytesIO()
+    wb.save(stream)
+    wb.close()
+
+    result = _convert(XlsxConverter(), stream.getvalue())
+
+    assert "$100" in result     # positive: prefix applied
+    assert "$50" in result      # negative: prefix applied to absolute value
+    assert "$0" not in result   # zero: section 2 has no $
+
+
+def test_currency_text_cell_not_prefixed() -> None:
+    """A cell whose value is a string must not receive a currency prefix even if
+    the number_format contains a currency symbol.
+    """
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws["A1"] = "Price"
+    ws["A2"] = "pending"
+    ws["A2"].number_format = "$#,##0.00"   # format has $, but value is text
+    ws["A3"] = 42
+    ws["A3"].number_format = "$#,##0.00"   # real numeric cell
+    stream = io.BytesIO()
+    wb.save(stream)
+    wb.close()
+
+    result = _convert(XlsxConverter(), stream.getvalue())
+
+    assert "$pending" not in result   # text cell must NOT be prefixed
+    assert "pending" in result        # text value still present
+    assert "$42" in result            # numeric cell keeps its prefix
+
+
+def test_currency_mixed_symbols_per_row() -> None:
+    """Different rows in the same column may each have different currency formats.
+
+    The overlay processes each cell independently, so row 2 gets $ and row 3
+    gets £ even though they share a column.
+    """
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws["A1"] = "Amount"
+    ws["A2"] = 1199
+    ws["A2"].number_format = "$#,##0.00"
+    ws["A3"] = 950
+    ws["A3"].number_format = "£#,##0.00"
+    ws["A4"] = 500
+    ws["A4"].number_format = "€#,##0.00"
+    stream = io.BytesIO()
+    wb.save(stream)
+    wb.close()
+
+    result = _convert(XlsxConverter(), stream.getvalue())
+
+    assert "$1199" in result   # row 2: USD
+    assert "£950" in result    # row 3: GBP
+    assert "€500" in result    # row 4: EUR
+
+
+def test_currency_two_section_both_prefixed_negative_uses_abs() -> None:
+    """Format $0;[Red]$0 — both sections carry $, negative value must use abs().
+
+    The negative section applies to the absolute value (Excel convention), so
+    -1199 must render as $1199, not $-1199.
+    """
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws["A1"] = "Price"
+    ws["A2"] = -1199
+    ws["A2"].number_format = "$0;[Red]$0"
+    stream = io.BytesIO()
+    wb.save(stream)
+    wb.close()
+
+    result = _convert(XlsxConverter(), stream.getvalue())
+
+    assert "$1199" in result      # abs applied
+    assert "$-1199" not in result # minus sign must not appear inside the prefix
 
 
 if __name__ == "__main__":
