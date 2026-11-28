@@ -369,6 +369,18 @@ docker build -t markitdown:latest .
 docker run --rm -i markitdown:latest < ~/your-file.pdf > output.md
 ```
 
+## Agent Skills
+
+This repository ships an agent-agnostic plugin marketplace at
+[`.agents/plugins/marketplace.json`](.agents/plugins/marketplace.json). It registers the
+[`plugins/markitdown`](plugins/markitdown) plugin, which contains
+[agent skills](https://agentskills.io/) for converting files, running
+`markitdown-mcp`, and writing plugins, plus an MCP config for `markitdown-mcp`.
+
+Point any agent that reads `.agents` marketplaces at this repository and install
+the `markitdown` plugin. Codex and Claude Code manifests live in
+`plugins/markitdown/.codex-plugin/` and `plugins/markitdown/.claude-plugin/`.
+
 ## Contributing
 
 Before starting significant work, please read [What to Contribute](#what-to-contribute), which describes what is in and out of scope for this repository.

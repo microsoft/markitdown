@@ -1,0 +1,20 @@
+{
+  "name": "markitdown",
+  "interface": {
+    "displayName": "MarkItDown"
+  },
+  "plugins": [
+    {
+      "name": "markitdown",
+      "source": {
+        "source": "local",
+        "path": "./plugins/markitdown"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}
