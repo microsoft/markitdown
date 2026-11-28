@@ -540,5 +540,83 @@ def test_xlsx_show_zeroes_rename_is_scoped_to_sheet_view_tags() -> None:
     assert b'<customSheetView showZeroes="0"/>' in repaired
 
 
+def test_xlsx_preserves_formula_error_values() -> None:
+    """Excel formula error values such as #DIV/0!, #REF!, #VALUE!, #N/A must be preserved.
+
+    Regression for https://github.com/microsoft/markitdown/issues/2728
+    """
+    import datetime
+
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = "Errors"
+    sheet.append(["Error Type", "Result", "DateCol", "NumCol"])
+    sheet.append(["Division by zero", "#DIV/0!", datetime.date(2026, 1, 2), 1])
+    sheet["B2"].data_type = "e"
+    sheet.append(["Invalid reference", "#REF!", None, None])
+    sheet["B3"].data_type = "e"
+    sheet.append(["Value error", "#VALUE!", datetime.date(2026, 1, 3), 2])
+    sheet["B4"].data_type = "e"
+    sheet.append(["Not available", "#N/A", None, 3])
+    sheet["B5"].data_type = "e"
+
+    stream = io.BytesIO()
+    workbook.save(stream)
+    workbook.close()
+
+    result = XlsxConverter().convert(
+        io.BytesIO(stream.getvalue()), StreamInfo(extension=".xlsx")
+    )
+
+    assert "## Errors" in result.markdown
+    assert "#DIV/0!" in result.markdown
+    assert "#REF!" in result.markdown
+    assert "#VALUE!" in result.markdown
+    assert "#N/A" in result.markdown
+
+    # Formatting of dates and numbers with blanks must remain standard (no 00:00:00 appended)
+    assert "2026-01-02" in result.markdown
+    assert "2026-01-03" in result.markdown
+    assert "00:00:00" not in result.markdown
+
+
+def test_xlsx_converter_does_not_mutate_openpyxl_reader_class() -> None:
+    """Converting XLSX files must not mutate OpenpyxlReader._convert_cell globally or leak across threads."""
+    import threading
+    import pandas.io.excel._openpyxl as ox
+
+    orig_convert = ox.OpenpyxlReader._convert_cell
+
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = "ThreadTest"
+    sheet.append(["Col1", "Col2"])
+    for i in range(50):
+        sheet.append([i, "#DIV/0!"])
+        sheet.cell(row=i + 2, column=2).data_type = "e"
+
+    stream = io.BytesIO()
+    workbook.save(stream)
+    data = stream.getvalue()
+    workbook.close()
+
+    barrier = threading.Barrier(4)
+    converter = XlsxConverter()
+
+    def run_conversion() -> None:
+        barrier.wait()
+        res = converter.convert(io.BytesIO(data), StreamInfo(extension=".xlsx"))
+        assert "#DIV/0!" in res.markdown
+
+    threads = [threading.Thread(target=run_conversion) for _ in range(4)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    # The class method must never be touched
+    assert ox.OpenpyxlReader._convert_cell is orig_convert
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
