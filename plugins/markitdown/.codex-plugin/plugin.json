@@ -1,0 +1,48 @@
+{
+  "name": "markitdown",
+  "version": "1.0.0",
+  "description": "Agent skills for converting documents to Markdown with the MarkItDown CLI and Python API, running the markitdown-mcp server, and writing converter plugins.",
+  "author": {
+    "name": "Microsoft",
+    "url": "https://github.com/microsoft/markitdown"
+  },
+  "homepage": "https://github.com/microsoft/markitdown",
+  "repository": "https://github.com/microsoft/markitdown",
+  "license": "MIT",
+  "keywords": [
+    "markitdown",
+    "markdown",
+    "pdf",
+    "docx",
+    "pptx",
+    "xlsx",
+    "document-conversion",
+    "mcp",
+    "agent-skills"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "MarkItDown",
+    "shortDescription": "Convert files to Markdown",
+    "longDescription": "Skills for Microsoft MarkItDown, the Python utility that converts PDF, Word, PowerPoint, Excel, HTML, images, audio, EPub, ZIP and more into structure-preserving Markdown for LLM pipelines. Covers the markitdown CLI and Python API (including which optional extras to install and how to convert untrusted input safely), the markitdown-mcp server and its convert_to_markdown tool, and writing third-party converter plugins. Bundles the markitdown-mcp server.",
+    "developerName": "Microsoft",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/microsoft/markitdown",
+    "privacyPolicyURL": "https://go.microsoft.com/fwlink/?LinkId=521839",
+    "termsOfServiceURL": "https://www.microsoft.com/legal/terms-of-use",
+    "defaultPrompt": [
+      "Convert this PDF to Markdown with MarkItDown",
+      "Add the markitdown MCP server to my agent config",
+      "Write a MarkItDown plugin for a new file format"
+    ],
+    "brandColor": "#0078D4",
+    "composerIcon": "./assets/logo.png",
+    "logo": "./assets/logo.png"
+  }
+}
