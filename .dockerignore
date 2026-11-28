@@ -1,2 +1,5 @@
 *
 !packages/
+!webui/
+webui/__pycache__
+**/__pycache__
