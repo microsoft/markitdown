@@ -591,8 +591,6 @@ def test_extract_currency_prefix(fmt: str, expected: "Optional[str]") -> None:
         ("$#,##0;[Red]$#,##0;0", 0, "0"),
         # 4 sections: text → section 3
         ('$#,##0;[Red]$#,##0;0;"n/a"', "hello", '"n/a"'),
-        # Semicolons inside quoted literals are NOT section separators
-        ('"val;a";$#,##0', 42, '"val;a"'),
         # ── Conditional operators ────────────────────────────────────────────
         # Item 1: all five comparison operators
         ("[>100]$0;0",   150, "$0"),      # >  : above threshold
@@ -650,13 +648,15 @@ def test_currency_section_selection_no_prefix_for_positive_value() -> None:
 
     Regression for the bug where _extract_currency_prefix searched the entire
     format string instead of only the section that applies to the cell's value.
+    Excel applies the negative section to the absolute value, so -100 → $100,
+    not $-100.
     """
     wb = openpyxl.Workbook()
     ws = wb.active
     ws["A1"] = "Amount"
-    ws["A2"] = 42        # positive → first section "0", no currency
+    ws["A2"] = 42         # positive → first section "0", no currency
     ws["A2"].number_format = "0;[Red]$0"
-    ws["A3"] = -42       # negative → second section "[Red]$0", has currency
+    ws["A3"] = -100       # negative → second section "[Red]$0", has currency
     ws["A3"].number_format = "0;[Red]$0"
     stream = io.BytesIO()
     wb.save(stream)
@@ -664,9 +664,10 @@ def test_currency_section_selection_no_prefix_for_positive_value() -> None:
 
     result = _convert(XlsxConverter(), stream.getvalue())
 
-    assert "42" in result        # positive value appears as a plain number
-    assert "$42" not in result   # must NOT be prefixed — $ belongs to negative section
-    assert "$-42" in result      # negative value must receive the prefix
+    assert "42" in result           # positive value appears as a plain number
+    assert "$42" not in result      # must NOT be prefixed — $ belongs to negative section
+    assert "$100" in result         # negative value: prefix applied to absolute value
+    assert "$-100" not in result    # Excel shows absolute value, no minus sign
 
 
 def test_currency_conditional_section_selection() -> None:

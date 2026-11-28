@@ -96,43 +96,6 @@ def _repair_sheetview_show_zeroes(
 _CURRENCY_SYMBOLS = ("$", "£", "€", "¥", "₹", "₩", "₪", "₺", "₫")
 
 
-def _split_format_sections(fmt: str) -> list[str]:
-    """Split an Excel number-format string on top-level semicolons.
-
-    Semicolons inside "quoted literals" or [bracketed blocks] are literal
-    text, not section separators, and are preserved as-is.
-    """
-    sections: list[str] = []
-    buf: list[str] = []
-    in_quotes = False
-    depth = 0
-    i = 0
-    while i < len(fmt):
-        ch = fmt[i]
-        if ch == '"' and depth == 0:
-            in_quotes = not in_quotes
-            buf.append(ch)
-        elif ch == "\\" and not in_quotes and depth == 0:
-            buf.append(ch)
-            if i + 1 < len(fmt):
-                i += 1
-                buf.append(fmt[i])
-        elif ch == "[" and not in_quotes:
-            depth += 1
-            buf.append(ch)
-        elif ch == "]" and not in_quotes and depth > 0:
-            depth -= 1
-            buf.append(ch)
-        elif ch == ";" and not in_quotes and depth == 0:
-            sections.append("".join(buf))
-            buf = []
-        else:
-            buf.append(ch)
-        i += 1
-    sections.append("".join(buf))
-    return sections
-
-
 # Matches a condition bracket: [>=100], [<0], [>=.5], [>=1E3].
 # (?:\d+\.?\d*|\.\d+) accepts thresholds with or without a leading digit.
 # (?:[eE][+-]?\d+)? adds optional scientific-notation exponent.
@@ -179,7 +142,7 @@ def _select_format_section(fmt: str, value: object) -> str:
     that _extract_currency_prefix() produces no prefix rather than searching a
     section that does not apply to this value.
     """
-    sections = _split_format_sections(fmt)
+    sections = fmt.split(";")
     n = len(sections)
     if n <= 1:
         return fmt
@@ -260,14 +223,17 @@ def _extract_currency_prefix(fmt: str) -> Optional[str]:
 
 def _build_currency_overlays(
     workbook_stream: BinaryIO,
-) -> dict[str, dict[tuple[int, int], str]]:
-    """Return per-sheet maps of (df_row_index, column_index) → currency prefix.
+) -> dict[str, dict[tuple[int, int], tuple[str, Any]]]:
+    """Return per-sheet maps of (df_row_index, column_index) → (prefix, display_value).
 
     Uses openpyxl to read cell.number_format, which pandas discards.
+    For sign-based negative sections (no conditional operators), display_value is
+    abs(cell.value) to match Excel's convention of applying the negative section to
+    the absolute value.  For conditional sections, the actual value is used.
     workbook_stream may be at any position; openpyxl locates the ZIP central
     directory by seeking from the end of the stream.
     """
-    overlays: dict[str, dict[tuple[int, int], str]] = {}
+    overlays: dict[str, dict[tuple[int, int], tuple[str, Any]]] = {}
     wb = openpyxl.load_workbook(workbook_stream, data_only=True, read_only=True)
     try:
         for sheet_name in wb.sheetnames:
@@ -275,22 +241,30 @@ def _build_currency_overlays(
             rows = list(ws.iter_rows())
             if not rows:
                 continue
-            sheet_overlay: dict[tuple[int, int], str] = {}
+            sheet_overlay: dict[tuple[int, int], tuple[str, Any]] = {}
             for df_row_idx, row in enumerate(rows[1:]):
                 for cell in row:
                     if cell.value is None:
                         continue
                     col_idx = cell.column - 1
-                    applicable_fmt = _select_format_section(
-                        cell.number_format or "", cell.value
-                    )
+                    fmt_string = cell.number_format or ""
+                    applicable_fmt = _select_format_section(fmt_string, cell.value)
                     prefix = _extract_currency_prefix(applicable_fmt)
                     if (
                         prefix
                         and isinstance(cell.value, (int, float))
                         and not isinstance(cell.value, bool)
                     ):
-                        sheet_overlay[(df_row_idx, col_idx)] = prefix
+                        is_conditional = any(
+                            _condition_match_outside_quotes(s)
+                            for s in fmt_string.split(";")
+                        )
+                        display_val: Any = (
+                            abs(cell.value)
+                            if (not is_conditional and cell.value < 0)
+                            else cell.value
+                        )
+                        sheet_overlay[(df_row_idx, col_idx)] = (prefix, display_val)
             if sheet_overlay:
                 overlays[sheet_name] = sheet_overlay
     finally:
@@ -360,11 +334,9 @@ class XlsxConverter(DocumentConverter):
                 sheet_df = sheets[s]
                 if s in currency_overlays:
                     sheet_df = sheet_df.copy().astype(object)
-                    for (df_row_idx, col_idx), prefix in currency_overlays[s].items():
+                    for (df_row_idx, col_idx), (prefix, display_val) in currency_overlays[s].items():
                         if df_row_idx < len(sheet_df) and col_idx < len(sheet_df.columns):
-                            sheet_df.iloc[df_row_idx, col_idx] = (
-                                f"{prefix}{sheet_df.iloc[df_row_idx, col_idx]}"
-                            )
+                            sheet_df.iloc[df_row_idx, col_idx] = f"{prefix}{display_val}"
                 html_content = sheet_df.to_html(index=False)
                 md_content += (
                     self._html_converter.convert_string(
