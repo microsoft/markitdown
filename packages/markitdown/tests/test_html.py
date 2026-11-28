@@ -6,7 +6,7 @@ import pytest
 from bs4 import BeautifulSoup
 
 from markitdown import MarkItDown, StreamInfo
-from markitdown.converters import WikipediaConverter
+from markitdown.converters import HtmlConverter, WikipediaConverter
 from markitdown.converters._markdownify import _CustomMarkdownify
 
 # HTML rendering
@@ -125,13 +125,21 @@ def test_img_uses_real_src_over_data_src_when_both_present() -> None:
     assert f"![A photo]({real_src})" in markdown
 
 
-def test_img_falls_back_to_data_src_when_src_missing() -> None:
+@pytest.mark.parametrize("src_attr", ["", 'src=" "'])
+def test_img_falls_back_to_data_src_when_src_blank(src_attr: str) -> None:
     real_src = "https://example.com/photo.jpg"
-    html = f'<img data-src="{real_src}" alt="A photo">'
+    html = f'<img {src_attr} data-src="{real_src}" alt="A photo">'
 
     markdown = _convert_html(html)
 
     assert f"![A photo]({real_src})" in markdown
+
+
+@pytest.mark.parametrize("attributes", ["", 'src=""', 'src=" " data-src=" "'])
+def test_img_without_a_destination_preserves_alt_text(attributes: str) -> None:
+    result = HtmlConverter().convert_string(f'<img {attributes} alt="A photo">')
+
+    assert result.markdown == "A photo"
 
 
 def test_img_keeps_truncated_data_uri_when_no_data_src() -> None:

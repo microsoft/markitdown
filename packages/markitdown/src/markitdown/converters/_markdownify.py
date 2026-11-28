@@ -114,8 +114,8 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         """Same as usual converter, but removes data URIs"""
 
         alt = el.attrs.get("alt", None) or ""
-        src = el.attrs.get("src", None) or ""
-        data_src = el.attrs.get("data-src", None) or ""
+        src = (el.attrs.get("src") or "").strip()
+        data_src = (el.attrs.get("data-src") or "").strip()
         # Lazy-loading libraries commonly leave a tiny placeholder data URI in
         # src and put the real image in data-src. Prefer data-src when src
         # isn't a usable URL, so the placeholder doesn't win over actual
@@ -130,6 +130,8 @@ class _CustomMarkdownify(markdownify.MarkdownConverter):
         title_part = ' "%s"' % title.replace('"', r"\"") if title else ""
         # Remove all line breaks from alt
         alt = alt.replace("\n", " ")
+        if not src:
+            return alt
         if (
             convert_as_inline
             and el.parent.name not in self.options["keep_inline_images_in"]
