@@ -25,6 +25,7 @@ _NS = {
 }
 _REL_ID = "{" + _NS["r"] + "}id"
 _EMBED = "{" + _NS["r"] + "}embed"
+_DRAWING = "{" + _NS["s"] + "}drawing"
 # The workbook supplies this value. Only a bare image type belongs in the URI.
 _IMAGE_MIME_TYPE = re.compile(r"image/[a-z0-9][a-z0-9.+_-]*", re.ASCII | re.IGNORECASE)
 # Missing relationships, malformed XML, and unreadable ZIP parts can leave tables usable.
@@ -53,9 +54,11 @@ def _relationships(
 ) -> dict[str, str]:
     directory, filename = posixpath.split(part)
     rels = posixpath.join(directory, "_rels", filename + ".rels")
-    if rels not in archive.namelist():
+    try:
+        rels_part = archive.getinfo(rels)
+    except KeyError:
         return {}
-    root = ET.fromstring(archive.read(rels))
+    root = ET.fromstring(archive.read(rels_part))
     return {
         rel.attrib["Id"]: posixpath.normpath(
             posixpath.join(directory, unquote(rel.attrib["Target"]))
@@ -66,9 +69,26 @@ def _relationships(
     }
 
 
+class _WorksheetDrawings:
+    """XML parser target collecting direct drawing references without storing cells."""
+
+    def __init__(self) -> None:
+        self.ids: list[str] = []
+        self._depth = 0
+
+    def start(self, tag: str, attrib: dict[str, str]) -> None:
+        if self._depth == 1 and tag == _DRAWING:
+            self.ids.append(attrib[_REL_ID])
+        self._depth += 1
+
+    def end(self, tag: str) -> None:
+        self._depth -= 1
+
+
 class _XlsxImages:
     def __init__(self, file_stream: BinaryIO):
         self._sheets: dict[str, list[tuple[bytes, StreamInfo]]] = {}
+        media: dict[str, bytes] = {}
         with zipfile.ZipFile(file_stream) as archive:
             workbook = _relationships(archive, "", "officeDocument")
             workbook_part = next(iter(workbook.values()))
@@ -87,15 +107,16 @@ class _XlsxImages:
             }
             for sheet in sheets.findall("s:sheets/s:sheet", _NS):
                 sheet_part = sheet_parts[sheet.attrib[_REL_ID]]
-                drawings = ET.fromstring(archive.read(sheet_part)).findall(
-                    "s:drawing", _NS
-                )
-                if not drawings:
+                # A worksheet can reference a drawing missing from its relationships.
+                drawings = _WorksheetDrawings()
+                with archive.open(sheet_part) as worksheet:
+                    ET.parse(worksheet, parser=ET.DefusedXMLParser(target=drawings))
+                if not drawings.ids:
                     continue
                 drawing_parts = _relationships(archive, sheet_part, "drawing")
                 images = self._sheets.setdefault(sheet.attrib["name"], [])
-                for drawing in drawings:
-                    drawing_part = drawing_parts[drawing.attrib[_REL_ID]]
+                for drawing_id in drawings.ids:
+                    drawing_part = drawing_parts[drawing_id]
                     image_parts = _relationships(archive, drawing_part, "image")
                     drawing_root = ET.fromstring(archive.read(drawing_part))
                     # Match openpyxl's image traversal, not its XML serialization order.
@@ -119,7 +140,9 @@ class _XlsxImages:
                                 extension=extension,
                                 filename=posixpath.basename(image_part),
                             )
-                            images.append((archive.read(image_part), info))
+                            if image_part not in media:
+                                media[image_part] = archive.read(image_part)
+                            images.append((media[image_part], info))
 
     def to_html(
         self,

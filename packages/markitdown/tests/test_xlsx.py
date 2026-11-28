@@ -150,6 +150,38 @@ def test_keep_data_uris_with_no_drawings_is_table_only() -> None:
     assert _convert(converter, data, keep_data_uris=True) == _convert(converter, data)
 
 
+def test_reader_streams_worksheets_and_shares_media_across_sheets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def reuse_image(name: str, content: bytes) -> bytes:
+        if name == "xl/drawings/_rels/drawing2.xml.rels":
+            return content.replace(b"/xl/media/image4.png", b"/xl/media/image2.png")
+        return content
+
+    workbook = _rewrite(_workbook(), reuse_image)
+    media_streams: set[zipfile.ZipExtFile] = set()
+    read = zipfile.ZipExtFile.read
+
+    def track_read(member: zipfile.ZipExtFile, size: int = -1) -> bytes:
+        if member.name.startswith("xl/worksheets/sheet"):
+            assert size > 0, "worksheet XML should be read in chunks"
+        if member.name.startswith("xl/media/"):
+            media_streams.add(member)
+        return read(member, size)
+
+    monkeypatch.setattr(zipfile.ZipExtFile, "read", track_read)
+    images = _xlsx_images._XlsxImages(io.BytesIO(workbook))
+    assert sorted(stream.name for stream in media_streams) == [
+        "xl/media/image1.png",
+        "xl/media/image2.png",
+        "xl/media/image3.png",
+    ]
+    blue = base64.b64encode(_BLUE).decode("ascii")
+    render = XlsxConverter()._image_to_html
+    for sheet in ("Second", "First"):
+        assert blue in images.to_html(sheet, render, {"keep_data_uris": True})
+
+
 def test_native_picture_uses_original_bytes_after_hook_declines() -> None:
     def render(stream, info, **kwargs):
         data = stream.read()
@@ -532,17 +564,23 @@ def test_repeated_relationships_and_grouped_images_are_not_dropped() -> None:
 
 
 @pytest.mark.parametrize(
-    ("replacement", "error"),
-    [(b'embed="missing"', KeyError), (b"embed=", ET.ParseError)],
+    ("part", "before", "after", "error"),
+    [
+        ("xl/drawings/drawing1.xml", b'embed="rId1"', b'embed="missing"', KeyError),
+        ("xl/drawings/drawing1.xml", b'embed="rId1"', b"embed=", ET.ParseError),
+        ("xl/worksheets/_rels/sheet1.xml.rels", b'/drawing"', b'/other"', KeyError),
+    ],
 )
 def test_drawing_read_errors_warn_for_native_conversion_and_propagate_for_hooks(
-    replacement: bytes,
+    part: str,
+    before: bytes,
+    after: bytes,
     error: type[Exception],
 ) -> None:
     def damage_drawing(name: str, content: bytes) -> bytes:
-        if name != "xl/drawings/drawing1.xml":
+        if name != part:
             return content
-        return content.replace(b'embed="rId1"', replacement)
+        return content.replace(before, after)
 
     data = _rewrite(_workbook(), damage_drawing)
     custom = _ImageConverter(Mock(return_value="<p>recognized</p>"))
