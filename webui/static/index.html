@@ -75,6 +75,19 @@ button.primary:hover:not(:disabled){color:#fff;opacity:.9}
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--text);
   color:var(--bg);padding:8px 16px;border-radius:999px;font-size:13px;opacity:0;pointer-events:none;transition:.2s}
 #toast.show{opacity:1}
+
+details.help{padding:0}
+details.help summary{cursor:pointer;padding:12px 16px;font-weight:600;list-style:none}
+details.help summary::-webkit-details-marker{display:none}
+details.help summary::before{content:"ⓘ ";color:var(--accent)}
+details.help[open] summary{border-bottom:1px solid var(--line)}
+.help table{width:100%;border-collapse:collapse;font-size:13.5px}
+.help th,.help td{padding:9px 16px;text-align:right;border-bottom:1px solid var(--line);vertical-align:top}
+.help tr:last-child td{border-bottom:0}
+.help th{color:var(--muted);font-weight:600;font-size:12px}
+.help td:first-child{white-space:nowrap;font-weight:600}
+.help td code{direction:ltr;unicode-bidi:embed;background:var(--code);padding:1px 5px;border-radius:4px;font-size:12px}
+.help .note{padding:12px 16px;color:var(--muted);font-size:13px;border-top:1px solid var(--line)}
 </style>
 </head>
 <body>
@@ -90,6 +103,25 @@ button.primary:hover:not(:disabled){color:#fff;opacity:.9}
     <p>أو اضغط للاختيار، ويمديك تلصق ملف بـ Ctrl+V · PDF, Word, Excel, PowerPoint, HTML, CSV, JSON, صور، صوت، ZIP…</p>
     <input id="picker" type="file" multiple hidden>
   </div>
+
+  <details class="card help">
+    <summary>وش الأشياء اللي يقدر يحوّلها؟</summary>
+    <table>
+      <tr><th>النوع</th><th>الامتدادات</th><th>وش يطلع لك</th></tr>
+      <tr><td>PDF</td><td><code>.pdf</code></td><td>النص والجداول. الملفات الممسوحة ضوئيًا (صور) ما تنقرأ لأنه ما فيه OCR</td></tr>
+      <tr><td>Word</td><td><code>.docx</code></td><td>العناوين والقوائم والجداول والروابط. صيغة <code>.doc</code> القديمة غير مدعومة</td></tr>
+      <tr><td>PowerPoint</td><td><code>.pptx</code></td><td>نص كل شريحة والجداول وملاحظات المتحدث</td></tr>
+      <tr><td>Excel</td><td><code>.xlsx</code> <code>.xls</code></td><td>كل ورقة تتحول إلى جدول Markdown</td></tr>
+      <tr><td>نصوص وبيانات</td><td><code>.csv</code> <code>.json</code> <code>.xml</code> <code>.txt</code> <code>.md</code></td><td>CSV جدول، والباقي نص منسق</td></tr>
+      <tr><td>صفحات ويب</td><td><code>.html</code> <code>.htm</code></td><td>تتحول العناوين والروابط والجداول إلى Markdown</td></tr>
+      <tr><td>كتب وأوراق</td><td><code>.epub</code> <code>.ipynb</code></td><td>كتب إلكترونية ودفاتر Jupyter</td></tr>
+      <tr><td>بريد Outlook</td><td><code>.msg</code></td><td>المرسل والمستلم والموضوع ونص الرسالة</td></tr>
+      <tr><td>أرشيف</td><td><code>.zip</code></td><td>يحوّل كل الملفات المدعومة داخله</td></tr>
+      <tr><td>صور</td><td><code>.jpg</code> <code>.jpeg</code> <code>.png</code></td><td>بيانات الصورة (EXIF) فقط. ما فيه وصف للصورة ولا قراءة نص منها</td></tr>
+      <tr><td>صوت</td><td><code>.wav</code> <code>.mp3</code> <code>.m4a</code> <code>.mp4</code></td><td>بيانات الملف مع محاولة تفريغ الكلام. التفريغ يرسل الصوت لخدمة Google ويحتاج إنترنت، وأحيانًا ما يشتغل</td></tr>
+    </table>
+    <div class="note">أي صيغة ثانية غير موجودة هنا يحاول يقرأها كنص عادي، وإذا ما قدر تظهر لك رسالة خطأ بجانب الملف.</div>
+  </details>
 
   <div class="workspace">
     <section class="card">
