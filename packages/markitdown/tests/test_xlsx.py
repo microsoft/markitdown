@@ -1,8 +1,13 @@
-"""Spreadsheet conversion, compatibility repairs, and image hooks."""
+"""Spreadsheet conversion, compatibility repairs, and embedded pictures."""
 
+import base64
 import inspect
 import io
+import re
+import subprocess
+import sys
 import zipfile
+import zlib
 from pathlib import Path
 from typing import Any, BinaryIO, Callable, Optional
 from unittest.mock import Mock
@@ -21,7 +26,12 @@ from openpyxl.drawing.spreadsheet_drawing import (
     TwoCellAnchor,
 )
 
-from markitdown import MarkItDown, MissingDependencyException, StreamInfo
+from markitdown import (
+    FileConversionException,
+    MarkItDown,
+    MissingDependencyException,
+    StreamInfo,
+)
 from markitdown.converter_utils import _xlsx_images
 from markitdown.converters import XlsConverter, XlsxConverter, _xlsx_converter
 
@@ -91,6 +101,108 @@ class _ImageConverter(XlsxConverter):
 
 def _convert(converter: XlsxConverter, data: bytes, **kwargs: Any) -> str:
     return converter.convert(io.BytesIO(data), _INFO, **kwargs).markdown
+
+
+def test_keep_data_uris_preserves_each_picture_after_its_sheet_table() -> None:
+    data = _workbook()
+    md = MarkItDown()
+    result = md.convert_stream(io.BytesIO(data), stream_info=_INFO, keep_data_uris=True)
+    preamble, second, first = re.split(r"^## ", result.markdown, flags=re.MULTILINE)
+    assert preamble == ""
+    for section, sheet, expected in [
+        (second, "Second", [_RED, _RED, _BLUE]),
+        (first, "First", [_BLUE]),
+    ]:
+        table, pictures = section.strip().split("\n\n### Images in this sheet:\n\n")
+        assert table.startswith(sheet + "\n|") and table.endswith("|")
+        decoded = []
+        for block in pictures.split("\n\n"):
+            match = re.fullmatch(r"!\[\]\(data:image/png;base64,([^)]*)\)", block)
+            assert match
+            decoded.append(base64.b64decode(match[1], validate=True))
+        assert decoded == expected
+
+
+def test_cli_keep_data_uris_matches_api_for_file_and_stdin(tmp_path: Path) -> None:
+    data = _workbook()
+    result = MarkItDown().convert_stream(
+        io.BytesIO(data), stream_info=_INFO, keep_data_uris=True
+    )
+    path = tmp_path / "pictures.xlsx"
+    path.write_bytes(data)
+    cli = [sys.executable, "-m", "markitdown"]
+    cli_output = subprocess.check_output(cli + ["--keep-data-uris", str(path)])
+    assert cli_output.decode("utf-8").splitlines() == result.markdown.splitlines()
+    assert (
+        subprocess.check_output(
+            cli + ["--keep-data-uris", "--extension", ".xlsx"], input=data
+        )
+        == cli_output
+    )
+    assert subprocess.check_output(cli + [str(path)], text=True).rstrip(
+        "\n"
+    ) == _convert(XlsxConverter(), data)
+
+
+def test_keep_data_uris_with_no_drawings_is_table_only() -> None:
+    data = _workbook(images=False)
+    converter = XlsxConverter()
+    assert _convert(converter, data, keep_data_uris=True) == _convert(converter, data)
+
+
+def test_reader_streams_worksheets_and_shares_media_across_sheets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def reuse_image(name: str, content: bytes) -> bytes:
+        if name == "xl/drawings/_rels/drawing2.xml.rels":
+            return content.replace(b"/xl/media/image4.png", b"/xl/media/image2.png")
+        return content
+
+    workbook = _rewrite(_workbook(), reuse_image)
+    media_streams: set[zipfile.ZipExtFile] = set()
+    read = zipfile.ZipExtFile.read
+
+    def track_read(member: zipfile.ZipExtFile, size: int = -1) -> bytes:
+        if member.name.startswith("xl/worksheets/sheet"):
+            assert size > 0, "worksheet XML should be read in chunks"
+        if member.name.startswith("xl/media/"):
+            media_streams.add(member)
+        return read(member, size)
+
+    monkeypatch.setattr(zipfile.ZipExtFile, "read", track_read)
+    images = _xlsx_images._XlsxImages(io.BytesIO(workbook))
+    assert sorted(stream.name for stream in media_streams) == [
+        "xl/media/image1.png",
+        "xl/media/image2.png",
+        "xl/media/image3.png",
+    ]
+    blue = base64.b64encode(_BLUE).decode("ascii")
+    render = XlsxConverter()._image_to_html
+    for sheet in ("Second", "First"):
+        assert blue in images.to_html(sheet, render, {"keep_data_uris": True})
+
+
+def test_native_picture_uses_original_bytes_after_hook_declines() -> None:
+    def render(stream, info, **kwargs):
+        data = stream.read()
+        return "<p>recognized</p>" if data == _RED else None
+
+    result = _convert(_ImageConverter(render), _workbook(), keep_data_uris=True)
+    assert result.count("recognized") == 2
+    blue = base64.b64encode(_BLUE).decode("ascii")
+    assert result.count(f"![](data:image/png;base64,{blue})") == 2
+    assert result.count("data:") == 2
+
+
+@pytest.mark.parametrize(
+    "mimetype",
+    [None, "", "text/plain", "image/png;parameter=value", "image/\N{KELVIN SIGN}"],
+)
+def test_unusable_picture_media_type_preserves_bytes(mimetype: Optional[str]) -> None:
+    assert (
+        _xlsx_images._image_data_uri(b"abc", mimetype)
+        == "data:application/octet-stream;base64,YWJj"
+    )
 
 
 def test_image_hook_keeps_native_public_signature_and_acceptance() -> None:
@@ -226,20 +338,28 @@ def test_image_fragments_are_separate_valid_blocks(
 
 
 @pytest.mark.parametrize("fragment", [None, "", " \n\t"])
-def test_declining_hook_is_exactly_native(fragment: Optional[str]) -> None:
+@pytest.mark.parametrize("keep_data_uris", [False, True])
+def test_declining_hook_is_exactly_native(
+    fragment: Optional[str], keep_data_uris: bool
+) -> None:
     data = _workbook()
-    options = {"escape_underscores": False, "heading_style": "underlined"}
+    options = {
+        "escape_underscores": False,
+        "heading_style": "underlined",
+        "keep_data_uris": keep_data_uris,
+    }
     assert _convert(_ImageConverter(Mock(return_value=fragment)), data, **options) == (
         _convert(XlsxConverter(), data, **options)
     )
 
 
+@pytest.mark.parametrize("options", [{}, {"keep_data_uris": False}])
 def test_default_converter_does_not_parse_images_or_change_native_output(
     monkeypatch: pytest.MonkeyPatch,
+    options: dict[str, bool],
 ) -> None:
-    monkeypatch.setattr(
-        _xlsx_images, "_XlsxImages", Mock(side_effect=AssertionError("extra parsing"))
-    )
+    image_reader = Mock(side_effect=AssertionError("extra parsing"))
+    monkeypatch.setattr(_xlsx_images, "_XlsxImages", image_reader)
     reader = Mock(wraps=_xlsx_converter.pd.read_excel)
     monkeypatch.setattr(_xlsx_converter.pd, "read_excel", reader)
 
@@ -254,8 +374,9 @@ def test_default_converter_does_not_parse_images_or_change_native_output(
         "## First\n| Other |\n| --- |\n| End |"
     )
     for converter in (XlsxConverter(), NativeSubclass()):
-        assert _convert(converter, _workbook()) == expected
+        assert _convert(converter, _workbook(), **options) == expected
     assert reader.call_count == 2
+    image_reader.assert_not_called()
 
 
 def test_image_hook_uses_repaired_package_and_repair_stream_is_closed(
@@ -305,14 +426,22 @@ def test_image_hook_uses_repaired_package_and_repair_stream_is_closed(
         ("<head><title>title</title></head>", ValueError),
     ],
 )
+@pytest.mark.parametrize("keep_data_uris", [False, True])
 def test_invalid_hook_results_are_rejected(
-    fragment: Any, error: type[Exception]
+    fragment: Any, error: type[Exception], keep_data_uris: bool
 ) -> None:
     with pytest.raises(error, match="_image_to_html must return"):
-        _convert(_ImageConverter(Mock(return_value=fragment)), _workbook())
+        _convert(
+            _ImageConverter(Mock(return_value=fragment)),
+            _workbook(),
+            keep_data_uris=keep_data_uris,
+        )
 
 
-def test_hook_failure_closes_image_stream_and_remains_visible() -> None:
+@pytest.mark.parametrize("keep_data_uris", [False, True])
+def test_hook_failure_closes_image_stream_and_remains_visible(
+    keep_data_uris: bool,
+) -> None:
     streams = []
     error = RuntimeError("image failure")
 
@@ -322,7 +451,7 @@ def test_hook_failure_closes_image_stream_and_remains_visible() -> None:
 
     source = io.BytesIO(_workbook())
     with pytest.raises(RuntimeError) as caught:
-        _ImageConverter(render).convert(source, _INFO)
+        _ImageConverter(render).convert(source, _INFO, keep_data_uris=keep_data_uris)
     assert caught.value is error
     assert streams and all(stream.closed for stream in streams)
     assert not source.closed
@@ -340,7 +469,18 @@ def test_native_table_failure_is_not_silently_skipped(
     render.assert_not_called()
 
 
-def test_package_relationships_preserve_unusual_image_names_types_and_bytes() -> None:
+@pytest.mark.parametrize(
+    ("content_type", "uri_type"),
+    [
+        ("image/svg+xml", "image/svg+xml"),
+        ("IMAGE/SVG+XML", "image/svg+xml"),
+        ("text/plain", "application/octet-stream"),
+    ],
+)
+def test_package_relationships_preserve_unusual_image_names_types_and_bytes(
+    content_type: str,
+    uri_type: str,
+) -> None:
     data = _workbook()
     svg = b'<svg xmlns="http://www.w3.org/2000/svg"><text>vector</text></svg>'
     output = io.BytesIO()
@@ -359,7 +499,7 @@ def test_package_relationships_preserve_unusual_image_names_types_and_bytes() ->
                     content = content.replace(
                         b"</Types>",
                         b'<Override PartName="/xl/media/vector%20image.SVG" '
-                        b'ContentType="image/svg+xml"/></Types>',
+                        + f'ContentType="{content_type}"/></Types>'.encode("ascii"),
                     )
                 target.writestr(name, content)
     render = Mock(return_value="<p>recognized</p>")
@@ -368,7 +508,7 @@ def test_package_relationships_preserve_unusual_image_names_types_and_bytes() ->
 
     assert result.count("recognized") == 4
     assert render.call_args_list[1].args[1] == StreamInfo(
-        mimetype="image/svg+xml", extension=".svg", filename="vector image.SVG"
+        mimetype=content_type, extension=".svg", filename="vector image.SVG"
     )
     # The read-only table reader ignores drawings, including vector images.
     captured = []
@@ -379,6 +519,10 @@ def test_package_relationships_preserve_unusual_image_names_types_and_bytes() ->
 
     _convert(_ImageConverter(capture), output.getvalue())
     assert captured == [_RED, svg, _BLUE, _BLUE]
+
+    native = _convert(XlsxConverter(), output.getvalue(), keep_data_uris=True)
+    payload = base64.b64encode(svg).decode("ascii")
+    assert f"![](data:{uri_type};base64,{payload})" in native
 
 
 def test_repeated_relationships_and_grouped_images_are_not_dropped() -> None:
@@ -419,17 +563,78 @@ def test_repeated_relationships_and_grouped_images_are_not_dropped() -> None:
     assert result.count("recognized") == 5
 
 
-def test_malformed_image_reference_does_not_become_silent_native_fallback() -> None:
-    def missing_reference(name: str, content: bytes) -> bytes:
-        if name != "xl/drawings/drawing1.xml":
+@pytest.mark.parametrize(
+    ("part", "before", "after", "error"),
+    [
+        ("xl/drawings/drawing1.xml", b'embed="rId1"', b'embed="missing"', KeyError),
+        ("xl/drawings/drawing1.xml", b'embed="rId1"', b"embed=", ET.ParseError),
+        ("xl/worksheets/_rels/sheet1.xml.rels", b'/drawing"', b'/other"', KeyError),
+    ],
+)
+def test_drawing_read_errors_warn_for_native_conversion_and_propagate_for_hooks(
+    part: str,
+    before: bytes,
+    after: bytes,
+    error: type[Exception],
+) -> None:
+    def damage_drawing(name: str, content: bytes) -> bytes:
+        if name != part:
             return content
-        return content.replace(b'embed="rId1"', b'embed="missing"')
+        return content.replace(before, after)
 
-    with pytest.raises(KeyError):
-        _convert(
-            _ImageConverter(Mock(return_value="<p>recognized</p>")),
-            _rewrite(_workbook(), missing_reference),
-        )
+    data = _rewrite(_workbook(), damage_drawing)
+    custom = _ImageConverter(Mock(return_value="<p>recognized</p>"))
+    for keep_data_uris in (False, True):
+        with pytest.raises(error):
+            _convert(custom, data, keep_data_uris=keep_data_uris)
+    md = MarkItDown(enable_builtins=False)
+    md.register_converter(custom)
+    with pytest.raises(FileConversionException) as caught:
+        md.convert_stream(io.BytesIO(data), stream_info=_INFO, keep_data_uris=True)
+    assert caught.value.attempts is not None
+    assert any(
+        attempt.exc_info and isinstance(attempt.exc_info[1], error)
+        for attempt in caught.value.attempts
+    )
+
+    expected = _convert(XlsxConverter(), data)
+    assert "## Second\n|" in expected and "## First\n|" in expected
+    assert "Images in this sheet:" not in expected
+    with pytest.warns(
+        RuntimeWarning, match=rf"embedded XLSX pictures.*{error.__name__}"
+    ) as warnings:
+        assert _convert(XlsxConverter(), data, keep_data_uris=True) == expected
+    assert sum(w.category is RuntimeWarning for w in warnings) == 1
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        StopIteration(),
+        zipfile.BadZipFile("media"),
+        zlib.error("media"),
+        EOFError(),
+        NotImplementedError("compression"),
+    ],
+)
+def test_unreadable_package_parts_preserve_native_tables(
+    monkeypatch: pytest.MonkeyPatch, error: Exception
+) -> None:
+    data = _workbook()
+    expected = _convert(XlsxConverter(), data)
+    monkeypatch.setattr(_xlsx_images, "_XlsxImages", Mock(side_effect=error))
+    with pytest.warns(RuntimeWarning, match=type(error).__name__):
+        assert _convert(XlsxConverter(), data, keep_data_uris=True) == expected
+
+
+def test_unexpected_picture_reader_error_propagates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    error = RuntimeError("unexpected reader failure")
+    monkeypatch.setattr(_xlsx_images, "_XlsxImages", Mock(side_effect=error))
+    with pytest.raises(RuntimeError) as caught:
+        _convert(XlsxConverter(), _workbook(), keep_data_uris=True)
+    assert caught.value is error
 
 
 def test_embedded_drawing_entities_are_rejected() -> None:
@@ -441,9 +646,13 @@ def test_embedded_drawing_entities_are_rejected() -> None:
         )
 
     render = Mock(return_value="<p>recognized</p>")
+    data = _rewrite(_workbook(), entity)
     with pytest.raises(EntitiesForbidden):
-        _convert(_ImageConverter(render), _rewrite(_workbook(), entity))
+        _convert(_ImageConverter(render), data)
     render.assert_not_called()
+    expected = _convert(XlsxConverter(), data)
+    with pytest.warns(RuntimeWarning, match="EntitiesForbidden"):
+        assert _convert(XlsxConverter(), data, keep_data_uris=True) == expected
 
 
 def test_missing_dependencies_and_legacy_xls_stay_separate(

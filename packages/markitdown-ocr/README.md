@@ -129,6 +129,7 @@ The DOCX, PPTX, and XLSX converters subclass their core counterparts and overrid
 
 - Inherits core workbook repair and table rendering; images are read from the same repaired workbook.
 - Images are listed under a `### Images in this sheet:` section after the sheet's data table — they are not interleaved into the table rows.
+- Pass `keep_data_uris=True` to the conversion call to embed pictures that yield no OCR text. For pictures with recognized text, the OCR block is the entire output for that picture. The published `markitdown` 0.1.9 release omits unrecognized XLSX pictures even with this option.
 - Sheet heading spacing follows the core converter; no new cell-position labels are added.
 - Legacy `.xls` files remain handled by the existing core converter, without image OCR.
 

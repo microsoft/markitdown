@@ -1,6 +1,7 @@
 import io
 import re
 import sys
+import warnings
 import zipfile
 from contextlib import contextmanager
 from typing import BinaryIO, Any, Iterator, Optional
@@ -143,10 +144,28 @@ class XlsxConverter(DocumentConverter):
         md_content = ""
         with _read_xlsx_sheets(file_stream) as (sheets, workbook_stream):
             images = None
-            if type(self)._image_to_html is not XlsxConverter._image_to_html:
-                from ..converter_utils._xlsx_images import _XlsxImages
+            custom_hook = type(self)._image_to_html is not XlsxConverter._image_to_html
+            if custom_hook or kwargs.get("keep_data_uris"):
+                from ..converter_utils._xlsx_images import (
+                    _IMAGE_READ_ERRORS,
+                    _XlsxImages,
+                )
 
-                images = _XlsxImages(workbook_stream)
+                try:
+                    images = _XlsxImages(workbook_stream)
+                except _IMAGE_READ_ERRORS as exc:
+                    # Keep the existing failure behavior for converters that need the drawings.
+                    if custom_hook:
+                        raise
+                    source = (
+                        f" in {stream_info.filename!r}" if stream_info.filename else ""
+                    )
+                    warnings.warn(
+                        f"Could not read embedded XLSX pictures{source} ({exc!r}). "
+                        "Returning worksheet tables without pictures.",
+                        RuntimeWarning,
+                        stacklevel=2,
+                    )
 
             for s in sheets:
                 md_content += f"## {s}\n"
@@ -181,11 +200,15 @@ class XlsxConverter(DocumentConverter):
         or retain it. StreamInfo describes the image, not the workbook. Existing
         conversion options are forwarded through kwargs.
 
-        Return None or blank text to retain the native representation (no image
-        output). Otherwise return HTML, escaping any literal text. Images appear
-        after their sheet's table, in the existing worksheet image order. Linked
-        images are not fetched. Hook failures propagate through the normal
-        conversion failure path.
+        Return an HTML fragment, escaping any literal text, or return None or
+        blank text to use the native image representation. XLSX omits pictures
+        by default. With keep_data_uris=True, it embeds the original image
+        bytes with empty alt text, including for pictures with Excel descriptions.
+        Images appear after their sheet's table in worksheet image order.
+        Linked images are skipped. The base converter warns and returns the
+        tables if it cannot read the drawings due to a missing part or malformed
+        package data. Overriding this hook makes drawing-read errors propagate
+        to the caller along with hook errors.
         """
         return None
 

@@ -164,7 +164,7 @@ def main():
     parser.add_argument(
         "--keep-data-uris",
         action="store_true",
-        help="Keep data URIs (like base64-encoded images) in the output. By default, data URIs are truncated.",
+        help="Keep full data URIs (truncated by default). For XLSX, include embedded pictures after each sheet's table.",
     )
 
     parser.add_argument("filename", nargs="?")

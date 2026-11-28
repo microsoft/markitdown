@@ -77,8 +77,10 @@ def test_ocr_is_a_thin_subclass_with_native_acceptance_and_signature() -> None:
     )
 
 
+@pytest.mark.parametrize("keep_data_uris", [False, True])
 def test_plugin_full_trip_uses_native_cells_and_original_image(
     monkeypatch: pytest.MonkeyPatch,
+    keep_data_uris: bool,
 ) -> None:
     # Reset the cache so discovery reads the installed package entry points.
     monkeypatch.setattr(markitdown_module, "_plugins", None)
@@ -98,7 +100,11 @@ def test_plugin_full_trip_uses_native_cells_and_original_image(
         if isinstance(registration.converter, XlsxConverterWithOCR)
     ]
     assert len(registered) == 1 and registered[0].priority == -1
-    result = md.convert_stream(io.BytesIO(_workbook((_RED, _RED))), stream_info=_INFO)
+    result = md.convert_stream(
+        io.BytesIO(_workbook((_RED, _RED))),
+        stream_info=_INFO,
+        keep_data_uris=keep_data_uris,
+    )
 
     assert result.markdown == (
         "## Cells\n"
@@ -121,10 +127,17 @@ def test_plugin_full_trip_uses_native_cells_and_original_image(
 
 
 @pytest.mark.parametrize("text", [None, "", " \n\t"])
-def test_no_service_or_blank_recognition_is_exactly_native(text: str | None) -> None:
+@pytest.mark.parametrize("keep_data_uris", [False, True])
+def test_no_service_or_blank_recognition_is_exactly_native(
+    text: str | None, keep_data_uris: bool
+) -> None:
     service = None if text is None else _service(text)
     data = _workbook()
-    options = {"escape_underscores": False, "heading_style": "underlined"}
+    options = {
+        "escape_underscores": False,
+        "heading_style": "underlined",
+        "keep_data_uris": keep_data_uris,
+    }
     assert _convert(XlsxConverterWithOCR(service), data, **options) == (
         _convert(XlsxConverter(), data, **options)
     )
@@ -286,7 +299,10 @@ def test_inherited_repairs_and_native_table_fixes_reach_ocr(
     service.extract_text.assert_called_once()
 
 
-def test_reported_ocr_error_warns_once_and_keeps_native_output() -> None:
+@pytest.mark.parametrize("keep_data_uris", [False, True])
+def test_reported_ocr_error_warns_once_and_keeps_native_output(
+    keep_data_uris: bool,
+) -> None:
     service = Mock(
         extract_text=Mock(
             return_value=OCRResult(text="ignored", error="quota exceeded")
@@ -294,34 +310,76 @@ def test_reported_ocr_error_warns_once_and_keeps_native_output() -> None:
     )
     data = _workbook((_RED, _RED))
     with pytest.warns(RuntimeWarning, match="quota exceeded") as warnings:
-        result = _convert(XlsxConverterWithOCR(service), data)
+        result = _convert(
+            XlsxConverterWithOCR(service), data, keep_data_uris=keep_data_uris
+        )
     assert len(warnings) == 1
-    assert result == _convert(XlsxConverter(), data)
+    assert result == _convert(XlsxConverter(), data, keep_data_uris=keep_data_uris)
+    assert result.count("data:image/png;base64,") == (2 if keep_data_uris else 0)
     service.extract_text.assert_called_once()
 
 
-def test_thrown_ocr_errors_use_standard_dispatcher_fallback() -> None:
+@pytest.mark.parametrize("keep_data_uris", [False, True])
+def test_thrown_ocr_errors_use_standard_dispatcher_fallback(
+    keep_data_uris: bool,
+) -> None:
     error = RuntimeError("custom service failed")
     converter = XlsxConverterWithOCR(Mock(extract_text=Mock(side_effect=error)))
     data = _workbook()
     with pytest.raises(RuntimeError) as caught:
-        _convert(converter, data)
+        _convert(converter, data, keep_data_uris=keep_data_uris)
     assert caught.value is error
 
     md = MarkItDown()
     md.register_converter(converter, priority=-1)
-    assert md.convert_stream(io.BytesIO(data), stream_info=_INFO).markdown == _convert(
-        XlsxConverter(), data
+    result = md.convert_stream(
+        io.BytesIO(data), stream_info=_INFO, keep_data_uris=keep_data_uris
     )
+    assert result.markdown == _convert(
+        XlsxConverter(), data, keep_data_uris=keep_data_uris
+    )
+    assert result.markdown.count("data:image/png;base64,") == int(keep_data_uris)
     no_fallback = MarkItDown(enable_builtins=False)
     no_fallback.register_converter(converter, priority=-1)
     with pytest.raises(FileConversionException) as aggregate:
-        no_fallback.convert_stream(io.BytesIO(data), stream_info=_INFO)
+        no_fallback.convert_stream(
+            io.BytesIO(data), stream_info=_INFO, keep_data_uris=keep_data_uris
+        )
     assert aggregate.value.attempts is not None
     assert any(
         attempt.exc_info and attempt.exc_info[1] is error
         for attempt in aggregate.value.attempts
     )
+
+
+def test_missing_image_part_falls_back_to_native_tables() -> None:
+    damaged = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(_workbook())) as source, zipfile.ZipFile(
+        damaged, "w"
+    ) as target:
+        for entry in source.infolist():
+            if entry.filename != "xl/media/image1.png":
+                target.writestr(entry, source.read(entry))
+    service = _service()
+    md = MarkItDown()
+    expected = md.convert_stream(
+        io.BytesIO(damaged.getvalue()), stream_info=_INFO
+    ).markdown
+    converter = XlsxConverterWithOCR(service)
+    with pytest.raises(KeyError):
+        _convert(converter, damaged.getvalue(), keep_data_uris=True)
+    md.register_converter(converter, priority=-1)
+    with pytest.warns(
+        RuntimeWarning, match="embedded XLSX pictures in 'damaged.xlsx'"
+    ) as warnings:
+        result = md.convert_stream(
+            io.BytesIO(damaged.getvalue()),
+            stream_info=StreamInfo(extension=".xlsx", filename="damaged.xlsx"),
+            keep_data_uris=True,
+        )
+    assert sum(w.category is RuntimeWarning for w in warnings) == 1
+    assert result.markdown == expected
+    service.extract_text.assert_not_called()
 
 
 def test_older_core_fails_with_actionable_upgrade_message(
