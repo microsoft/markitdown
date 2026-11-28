@@ -1,5 +1,6 @@
 import io
 import re
+import threading
 import sys
 import zipfile
 from contextlib import contextmanager
@@ -44,33 +45,67 @@ _SHEET_VIEW_START_TAG = re.compile(rb"<sheetView(?=[\s/>])[^>]*>")
 _SHOW_ZEROES_ATTRIBUTE = re.compile(rb"(?<=[\s])showZeroes(\s*=)")
 
 
+_xlsx_read_lock = threading.Lock()
+
+
+class _FormulaError:
+    """Wrapper for formula error values so pandas does not convert them to NaN."""
+
+    def __init__(self, value: Any) -> None:
+        self._value = str(value)
+
+    def __str__(self) -> str:
+        return self._value
+
+    def __repr__(self) -> str:
+        return self._value
+
+    def __format__(self, format_spec: str) -> str:
+        return self._value.__format__(format_spec)
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, _FormulaError):
+            return self._value == other._value
+        return False
+
+    def __hash__(self) -> int:
+        return hash(self._value)
+
+
+def _read_excel_with_formula_errors(stream: BinaryIO) -> dict[str, Any]:
+    with _xlsx_read_lock:
+        import pandas.io.excel._openpyxl as ox
+
+        orig_convert_cell = ox.OpenpyxlReader._convert_cell
+
+        def _convert_cell(self, cell):
+            if getattr(cell, "data_type", None) == "e" and cell.value is not None:
+                return _FormulaError(cell.value)
+            return orig_convert_cell(self, cell)
+
+        ox.OpenpyxlReader._convert_cell = _convert_cell
+        try:
+            return pd.read_excel(stream, sheet_name=None, engine="openpyxl")
+        finally:
+            ox.OpenpyxlReader._convert_cell = orig_convert_cell
+
+
 @contextmanager
 def _read_xlsx_sheets(
     file_stream: BinaryIO,
 ) -> Iterator[tuple[dict[str, Any], BinaryIO]]:
     start_pos = file_stream.tell()
     repaired_stream = None
-    import pandas.io.excel._openpyxl as ox
-
-    orig_convert_cell = ox.OpenpyxlReader._convert_cell
-
-    def _convert_cell(self, cell):
-        if getattr(cell, "data_type", None) == "e" and cell.value is not None:
-            return cell.value
-        return orig_convert_cell(self, cell)
-
-    ox.OpenpyxlReader._convert_cell = _convert_cell
     try:
         try:
-            sheets = pd.read_excel(file_stream, sheet_name=None, engine="openpyxl", keep_default_na=False)
+            sheets = _read_excel_with_formula_errors(file_stream)
         except TypeError as exc:
             if "showZeroes" not in str(exc):
                 raise
             repaired_stream = _repair_sheetview_show_zeroes(file_stream, start_pos)
-            sheets = pd.read_excel(repaired_stream, sheet_name=None, engine="openpyxl", keep_default_na=False)
+            sheets = _read_excel_with_formula_errors(repaired_stream)
         yield sheets, repaired_stream if repaired_stream is not None else file_stream
     finally:
-        ox.OpenpyxlReader._convert_cell = orig_convert_cell
         if repaired_stream is not None:
             repaired_stream.close()
 
