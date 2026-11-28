@@ -180,9 +180,7 @@ class XlsxConverter(DocumentConverter):
                     extension=".xlsx",
                     feature="xlsx",
                 )
-            ) from _xlsx_dependency_exc_info[
-                1
-            ].with_traceback(  # type: ignore[union-attr]
+            ) from _xlsx_dependency_exc_info[1].with_traceback(  # type: ignore[union-attr]
                 _xlsx_dependency_exc_info[2]
             )
 
@@ -277,9 +275,7 @@ class XlsConverter(DocumentConverter):
                     extension=".xls",
                     feature="xls",
                 )
-            ) from _xls_dependency_exc_info[
-                1
-            ].with_traceback(  # type: ignore[union-attr]
+            ) from _xls_dependency_exc_info[1].with_traceback(  # type: ignore[union-attr]
                 _xls_dependency_exc_info[2]
             )
 
