@@ -99,6 +99,19 @@ def _replace_equations(tag: Tag):
         raise ValueError(f"Not supported tag: {tag.name}")
 
 
+def _parse_docx_xml(content: bytes) -> BeautifulSoup:
+    from bs4.builder import LXMLTreeBuilderForXML
+
+    class DocxXMLTreeBuilder(LXMLTreeBuilderForXML):
+        def end_ns(self, prefix: str | None) -> None:
+            # lxml 6.2.0 only passes namespace mappings to start() when the
+            # target requests namespace events. BeautifulSoup tracks scope
+            # in start() and end(), so there is no work to do in this callback.
+            pass
+
+    return BeautifulSoup(content.decode(), builder=DocxXMLTreeBuilder())
+
+
 def _pre_process_strike(content: bytes) -> bytes:
     """
     Pre-processes the strikethrough content in a DOCX -> XML file by normalizing double
@@ -119,7 +132,7 @@ def _pre_process_strike(content: bytes) -> bytes:
     if b"dstrike" not in content:
         return content
 
-    soup = BeautifulSoup(content.decode(), features="xml")
+    soup = _parse_docx_xml(content)
     for tag in soup.find_all("dstrike"):
         tag.name = "strike"
     return str(soup).encode()
@@ -136,7 +149,7 @@ def _pre_process_math(content: bytes) -> bytes:
     Returns:
         bytes: The processed content with OMML elements replaced by their LaTeX equivalents, encoded as bytes.
     """
-    soup = BeautifulSoup(content.decode(), features="xml")
+    soup = _parse_docx_xml(content)
     for tag in soup.find_all("oMathPara"):
         _replace_equations(tag)
     for tag in soup.find_all("oMath"):
